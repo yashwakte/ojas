@@ -12,13 +12,10 @@ import { Product } from '../../models/interfaces';
 })
 export class Home implements OnInit {
   featuredProducts: Product[] = [];
-  heroProducts: Product[] = [];
 
   constructor(private productService: ProductService) {
     effect(() => {
-      const all = this.productService.products();
-      this.featuredProducts = all.slice(0, 6);
-      this.heroProducts = all.slice(0, 7);
+      this.featuredProducts = this.productService.products().slice(0, 6);
     });
   }
 

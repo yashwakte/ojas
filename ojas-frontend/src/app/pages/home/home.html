@@ -1,120 +1,82 @@
-<!-- HERO — Marathi-first, product collage, mobile-first -->
+<!-- HERO -->
 <section class="hero">
-  <div class="hero-bg"></div>
-
-  <div class="hero-top">
-    <h1 class="hero-marathi">ओजस</h1>
-    <p class="hero-slogan">शुद्ध आहार...शुद्ध विचार</p>
-  </div>
-
-  <!-- Product Collage -->
-  <div class="collage-wrap">
-    <div class="collage">
-      @for (product of heroProducts; track product.id; let i = $index) {
-        <div class="collage-item ci-{{ i }}">
-          <img [src]="getImageUrl(product)" [alt]="product.name" loading="eager">
-        </div>
-      }
-    </div>
+  <div class="hero-heading">
+    <h1>ओजस</h1>
+    <p class="tagline">शुद्ध आहार...शुद्ध विचार</p>
   </div>
 
   <div class="hero-bottom">
-    <p class="hero-desc">Premium stone-ground flours & traditional food products — made in Pune with love.</p>
-    <div class="hero-actions">
-      <a routerLink="/products" class="btn-primary">
-        Explore Products
-        <mat-icon>arrow_forward</mat-icon>
-      </a>
-      <a routerLink="/register" class="btn-outline">Join Us</a>
+    <p class="hero-desc">Premium stone-ground flours & traditional food products, made in Pune with love.</p>
+    <div class="hero-cta">
+      <a routerLink="/products" class="btn-primary">Explore Products <mat-icon>arrow_forward</mat-icon></a>
+      <a routerLink="/register" class="btn-ghost">Join Us</a>
+    </div>
+    <div class="trust-strip">
+      <span><mat-icon>eco</mat-icon> 100% Natural</span>
+      <span><mat-icon>verified</mat-icon> No Preservatives</span>
+      <span><mat-icon>local_shipping</mat-icon> Fresh Delivery</span>
     </div>
   </div>
-
-  <div class="hero-chips">
-    <div class="chip"><mat-icon>eco</mat-icon> 100% Natural</div>
-    <div class="chip"><mat-icon>verified</mat-icon> No Preservatives</div>
-    <div class="chip"><mat-icon>local_shipping</mat-icon> Fresh Delivery</div>
-  </div>
 </section>
 
-<!-- WHY OJAS — Horizontal scroll on mobile -->
-<section class="why-section">
-  <div class="section-tag"><span>WHY OJAS</span></div>
+<!-- WHY OJAS -->
+<section class="section why-section">
+  <div class="tag"><span>WHY OJAS</span></div>
   <div class="why-scroll">
-    @for (feature of features; track feature.title) {
+    @for (f of features; track f.title) {
       <div class="why-card">
-        <div class="why-icon">
-          <mat-icon>{{ feature.icon }}</mat-icon>
-        </div>
-        <h3>{{ feature.title }}</h3>
-        <p>{{ feature.desc }}</p>
+        <div class="why-ico"><mat-icon>{{ f.icon }}</mat-icon></div>
+        <h3>{{ f.title }}</h3>
+        <p>{{ f.desc }}</p>
       </div>
     }
   </div>
 </section>
 
-<!-- PRODUCTS SHOWCASE -->
-<section class="products-section">
-  <div class="section-tag"><span>OUR COLLECTION</span></div>
-  <h2 class="sec-title">Handpicked for Your Kitchen</h2>
-
-  <div class="product-grid">
-    @for (product of featuredProducts; track product.id; let i = $index) {
-      <div class="p-card">
-        <div class="p-img">
-          <img [src]="getImageUrl(product)" [alt]="product.name" loading="lazy">
-          <span class="p-cat">{{ product.category }}</span>
-        </div>
-        <div class="p-body">
-          <h3>{{ product.name }}</h3>
-          <div class="p-meta">
-            <span class="p-wt">{{ product.weight }}</span>
-            <span class="p-price">₹{{ product.price }}</span>
-          </div>
+<!-- PRODUCTS -->
+<section class="section products-section">
+  <div class="tag"><span>OUR COLLECTION</span></div>
+  <h2 class="stitle">Handpicked for Your Kitchen</h2>
+  <div class="pgrid">
+    @for (p of featuredProducts; track p.id) {
+      <div class="pcard">
+        <div class="pimg"><img [src]="getImageUrl(p)" [alt]="p.name" loading="lazy"><span class="pcat">{{ p.category }}</span></div>
+        <div class="pbody">
+          <h3>{{ p.name }}</h3>
+          <div class="pmeta"><span>{{ p.weight }}</span><strong>₹{{ p.price }}</strong></div>
         </div>
       </div>
     }
   </div>
-
-  <div class="sec-action">
-    <a routerLink="/products" class="btn-primary sm">
-      View All Products <mat-icon>arrow_forward</mat-icon>
-    </a>
-  </div>
+  <div class="ctr"><a routerLink="/products" class="btn-primary sm">View All Products <mat-icon>arrow_forward</mat-icon></a></div>
 </section>
 
 <!-- PROCESS -->
-<section class="process-section">
-  <div class="section-tag"><span>OUR PROCESS</span></div>
-  <h2 class="sec-title">From Farm to Your Table</h2>
-  <div class="process-grid">
-    @for (step of processSteps; track step.title; let i = $index) {
-      <div class="step-card">
-        <div class="step-num">{{ i + 1 }}</div>
-        <div class="step-icon"><mat-icon>{{ step.icon }}</mat-icon></div>
-        <h4>{{ step.title }}</h4>
-        <p>{{ step.desc }}</p>
+<section class="section process-section">
+  <div class="tag"><span>OUR PROCESS</span></div>
+  <h2 class="stitle">From Farm to Your Table</h2>
+  <div class="steps">
+    @for (s of processSteps; track s.title; let i = $index) {
+      <div class="step">
+        <div class="snum">{{ i + 1 }}</div>
+        <div class="sico"><mat-icon>{{ s.icon }}</mat-icon></div>
+        <h4>{{ s.title }}</h4>
+        <p>{{ s.desc }}</p>
       </div>
     }
   </div>
 </section>
 
-<!-- TESTIMONIALS -->
-<section class="reviews-section">
-  <div class="section-tag"><span>REVIEWS</span></div>
-  <h2 class="sec-title">Loved by Families</h2>
-  <div class="reviews-scroll">
+<!-- REVIEWS -->
+<section class="section reviews-section">
+  <div class="tag"><span>REVIEWS</span></div>
+  <h2 class="stitle">Loved by Families</h2>
+  <div class="rscroll">
     @for (t of testimonials; track t.name) {
-      <div class="review-card">
-        <div class="r-stars">
-          @for (s of [1,2,3,4,5]; track s) {
-            <mat-icon>star</mat-icon>
-          }
-        </div>
+      <div class="rcard">
+        <div class="rstars">@for (s of [1,2,3,4,5]; track s) { <mat-icon>star</mat-icon> }</div>
         <p>"{{ t.text }}"</p>
-        <div class="r-author">
-          <div class="r-avatar">{{ t.name[0] }}</div>
-          <span>{{ t.name }}</span>
-        </div>
+        <div class="rauthor"><div class="ravatar">{{ t.name[0] }}</div><span>{{ t.name }}</span></div>
       </div>
     }
   </div>
@@ -123,8 +85,6 @@
 <!-- CTA -->
 <section class="cta-section">
   <h2>Ready to taste the <span>purity</span>?</h2>
-  <p>Join thousands of families who trust Ojas for their daily nutrition.</p>
-  <a routerLink="/register" class="btn-white">
-    Create Your Account <mat-icon>arrow_forward</mat-icon>
-  </a>
+  <p>Join families who trust Ojas for daily nutrition.</p>
+  <a routerLink="/register" class="btn-white">Create Account <mat-icon>arrow_forward</mat-icon></a>
 </section>
