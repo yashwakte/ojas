@@ -36,7 +36,20 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins(
+                "http://localhost:4200",
+                "https://localhost:4200"
+              )
+              .SetIsOriginAllowedToAllowWildcardSubdomains()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+
+    options.AddPolicy("AllowAzure", policy =>
+    {
+        policy.SetIsOriginAllowed(origin =>
+                origin.Contains("azurestaticapps.net") ||
+                origin.Contains("localhost"))
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -69,7 +82,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAngular");
+
+if (app.Environment.IsProduction())
+    app.UseCors("AllowAzure");
+else
+    app.UseCors("AllowAngular");
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
