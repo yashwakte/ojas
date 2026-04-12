@@ -40,14 +40,15 @@ builder.Services.AddCors(options =>
                 "http://localhost:4200",
                 "https://localhost:4200"
               )
-              .SetIsOriginAllowedToAllowWildcardSubdomains()
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
 
-    options.AddPolicy("AllowAzure", policy =>
+    options.AddPolicy("AllowProduction", policy =>
     {
         policy.SetIsOriginAllowed(origin =>
+                origin.Contains(".vercel.app") ||
+                origin.Contains(".onrender.com") ||
                 origin.Contains("azurestaticapps.net") ||
                 origin.Contains("localhost"))
               .AllowAnyHeader()
@@ -84,7 +85,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 if (app.Environment.IsProduction())
-    app.UseCors("AllowAzure");
+    app.UseCors("AllowProduction");
 else
     app.UseCors("AllowAngular");
 
