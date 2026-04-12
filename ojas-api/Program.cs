@@ -61,6 +61,9 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Health check endpoint
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
+
 // Seed products (non-blocking)
 _ = Task.Run(async () =>
 {
@@ -80,9 +83,8 @@ _ = Task.Run(async () =>
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 
 if (app.Environment.IsProduction())
     app.UseCors("AllowProduction");
