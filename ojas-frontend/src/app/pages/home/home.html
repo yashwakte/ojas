@@ -1,129 +1,165 @@
-<!-- Hero Section - Cinematic -->
+<!-- Hero Section — Split Layout with Product Showcase -->
 <section class="hero">
   <div class="hero-bg">
     <div class="hero-gradient"></div>
-    <div class="hero-pattern"></div>
     <div class="hero-orb orb-1"></div>
     <div class="hero-orb orb-2"></div>
-    <div class="hero-orb orb-3"></div>
   </div>
 
-  <div class="hero-content">
-    <div class="hero-badge">
-      <mat-icon>verified</mat-icon>
-      <span>100% Pure & Natural</span>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="hero-badge">
+        <mat-icon>verified</mat-icon>
+        <span>100% Pure & Natural</span>
+      </div>
+      <h1 class="hero-title">
+        <span class="hero-devanagari">ओजस</span>
+        <span class="hero-brand">O J A S</span>
+      </h1>
+      <p class="hero-tagline">शुद्ध आहार...शुद्ध विचार</p>
+      <p class="hero-subtitle">Premium stone-ground flours & healthy food products from Pune — crafted with tradition, delivered with love.</p>
+      <div class="hero-actions">
+        <a routerLink="/products" class="hero-btn primary">
+          <span>Explore Products</span>
+          <mat-icon>arrow_forward</mat-icon>
+        </a>
+        <a routerLink="/register" class="hero-btn secondary">
+          <span>Join Us</span>
+        </a>
+      </div>
+      <div class="hero-trust">
+        <div class="trust-item">
+          <mat-icon>eco</mat-icon>
+          <span>No Preservatives</span>
+        </div>
+        <div class="trust-item">
+          <mat-icon>verified_user</mat-icon>
+          <span>Lab Tested</span>
+        </div>
+        <div class="trust-item">
+          <mat-icon>local_shipping</mat-icon>
+          <span>Fast Delivery</span>
+        </div>
+      </div>
     </div>
-    <h1 class="hero-title">
-      <span class="hero-devanagari">ओजस</span>
-      <span class="hero-brand">OJAS</span>
-    </h1>
-    <p class="hero-tagline">शुद्ध आहार...शुद्ध विचार</p>
-    <p class="hero-subtitle">Premium quality flours & healthy food products — crafted with tradition, delivered with love.</p>
-    <div class="hero-actions">
-      <a routerLink="/products" class="hero-btn primary">
-        <span>Explore Products</span>
-        <mat-icon>arrow_forward</mat-icon>
-      </a>
-      <a routerLink="/register" class="hero-btn secondary">
-        <span>Join Us</span>
-      </a>
+
+    <div class="hero-right">
+      <div class="hero-product-grid">
+        @for (product of heroProducts; track product.id; let i = $index) {
+          <div class="hero-product-card" [style.animation-delay]="(0.3 + i * 0.15) + 's'">
+            <img [src]="getImageUrl(product)" [alt]="product.name" loading="eager">
+            <div class="hero-product-label">
+              <span class="hpl-name">{{ product.name }}</span>
+              <span class="hpl-price">₹{{ product.price }}</span>
+            </div>
+          </div>
+        }
+      </div>
     </div>
-    <div class="hero-stats">
-      <div class="stat">
+  </div>
+
+  <div class="hero-stats-bar">
+    <div class="stats-inner">
+      <div class="stat-chip">
         <strong>13+</strong>
         <span>Products</span>
       </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
+      <div class="stat-chip">
         <strong>100%</strong>
         <span>Natural</span>
       </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
+      <div class="stat-chip">
         <strong>Pune</strong>
         <span>Based</span>
       </div>
+      <div class="stat-chip">
+        <strong>500g</strong>
+        <span>Packs</span>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- Features Section - Glassmorphism Cards -->
+<!-- Features Strip -->
 <section class="features">
-  <div class="section-label">
-    <span class="label-line"></span>
-    <span class="label-text">WHY CHOOSE US</span>
-    <span class="label-line"></span>
-  </div>
-  <div class="features-container">
+  <div class="features-inner">
     @for (feature of features; track feature.title; let i = $index) {
       <div class="feature-card" [style.animation-delay]="(i * 0.1) + 's'">
         <div class="feature-icon-wrap">
-          <mat-icon class="feature-icon">{{ feature.icon }}</mat-icon>
+          <mat-icon>{{ feature.icon }}</mat-icon>
         </div>
-        <h3>{{ feature.title }}</h3>
-        <p>{{ feature.desc }}</p>
+        <div class="feature-text">
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.desc }}</p>
+        </div>
       </div>
     }
   </div>
 </section>
 
-<!-- Featured Products - Premium Grid -->
-<section class="featured-section">
-  <div class="section-header">
-    <div class="section-label">
-      <span class="label-line"></span>
-      <span class="label-text">OUR COLLECTION</span>
-      <span class="label-line"></span>
+<!-- Featured Products — Showcase Grid -->
+<section class="products-showcase">
+  <div class="showcase-header">
+    <div class="section-tag">
+      <span>OUR COLLECTION</span>
     </div>
     <h2>Handpicked for Your Kitchen</h2>
-    <p>Pure, natural, and packed with nutrition</p>
+    <p>Pure, nutritious, stone-ground products made the traditional way</p>
   </div>
-  <div class="products-grid">
+
+  <div class="showcase-grid">
     @for (product of featuredProducts; track product.id; let i = $index) {
-      <div class="product-card" [style.animation-delay]="(i * 0.08) + 's'">
-        <div class="product-image">
+      <div class="showcase-card" [style.animation-delay]="(i * 0.08) + 's'">
+        <div class="sc-image">
           <img [src]="getImageUrl(product)" [alt]="product.name" loading="lazy">
-          <div class="product-overlay">
-            <span class="product-category">{{ product.category }}</span>
+          <div class="sc-badge">{{ product.category }}</div>
+          <div class="sc-hover-overlay">
+            <a routerLink="/products" class="sc-view-btn">
+              <mat-icon>visibility</mat-icon>
+            </a>
           </div>
         </div>
-        <div class="product-info">
-          <h3 class="product-name">{{ product.name }}</h3>
-          <div class="product-bottom">
-            <span class="product-weight">{{ product.weight }}</span>
-            <span class="product-price">₹{{ product.price }}</span>
+        <div class="sc-body">
+          <h3>{{ product.name }}</h3>
+          <p class="sc-desc">{{ product.description | slice:0:70 }}...</p>
+          <div class="sc-footer">
+            <span class="sc-weight">{{ product.weight }}</span>
+            <span class="sc-price">₹{{ product.price }}</span>
           </div>
         </div>
       </div>
     }
   </div>
-  <div class="section-action">
-    <a routerLink="/products" class="view-all-btn">
+
+  <div class="showcase-action">
+    <a routerLink="/products" class="view-all-link">
       <span>View All Products</span>
       <mat-icon>arrow_forward</mat-icon>
     </a>
   </div>
 </section>
 
-<!-- Process Section -->
-<section class="process-section">
-  <div class="section-label">
-    <span class="label-line"></span>
-    <span class="label-text">OUR PROCESS</span>
-    <span class="label-line"></span>
+<!-- Process — Visual Timeline -->
+<section class="process">
+  <div class="process-header">
+    <div class="section-tag">
+      <span>OUR PROCESS</span>
+    </div>
+    <h2>From Farm to Your Table</h2>
   </div>
-  <h2 class="process-title">From Farm to Your Table</h2>
-  <div class="process-steps">
+  <div class="process-timeline">
     @for (step of processSteps; track step.title; let i = $index) {
-      <div class="process-step">
-        <div class="step-number">{{ i + 1 }}</div>
-        <mat-icon class="step-icon">{{ step.icon }}</mat-icon>
+      <div class="timeline-step" [style.animation-delay]="(i * 0.15) + 's'">
+        <div class="ts-number">{{ i + 1 }}</div>
+        <div class="ts-icon-wrap">
+          <mat-icon>{{ step.icon }}</mat-icon>
+        </div>
         <h4>{{ step.title }}</h4>
         <p>{{ step.desc }}</p>
       </div>
       @if (i < processSteps.length - 1) {
-        <div class="step-connector">
-          <div class="connector-line"></div>
+        <div class="ts-connector">
+          <div class="connector-dash"></div>
           <mat-icon>chevron_right</mat-icon>
         </div>
       }
@@ -131,18 +167,57 @@
   </div>
 </section>
 
-<!-- CTA Section -->
-<section class="cta">
-  <div class="cta-bg">
-    <div class="cta-pattern"></div>
+<!-- Testimonials -->
+<section class="testimonials">
+  <div class="testimonials-header">
+    <div class="section-tag">
+      <span>WHAT PEOPLE SAY</span>
+    </div>
+    <h2>Loved by Families</h2>
   </div>
-  <div class="cta-content">
-    <span class="cta-emoji">🌾</span>
-    <h2>Ready to taste the purity?</h2>
-    <p>Register now and be the first to know about new products and exclusive offers.</p>
-    <a routerLink="/register" class="cta-btn">
-      <span>Create Your Account</span>
-      <mat-icon>arrow_forward</mat-icon>
-    </a>
+  <div class="testimonials-grid">
+    @for (t of testimonials; track t.name; let i = $index) {
+      <div class="testimonial-card" [style.animation-delay]="(i * 0.12) + 's'">
+        <div class="tc-stars">
+          @for (s of [1,2,3,4,5]; track s) {
+            <mat-icon>star</mat-icon>
+          }
+        </div>
+        <p class="tc-text">"{{ t.text }}"</p>
+        <div class="tc-author">
+          <div class="tc-avatar">{{ t.name[0] }}</div>
+          <span>{{ t.name }}</span>
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
+<!-- CTA Section — Bold -->
+<section class="cta">
+  <div class="cta-inner">
+    <div class="cta-left">
+      <h2>Ready to taste the <span>purity</span>?</h2>
+      <p>Join our community and be the first to know about new products, recipes, and exclusive offers from Ojas.</p>
+      <div class="cta-actions">
+        <a routerLink="/register" class="cta-btn">
+          <span>Create Your Account</span>
+          <mat-icon>arrow_forward</mat-icon>
+        </a>
+        <a routerLink="/products" class="cta-link">Browse Products</a>
+      </div>
+    </div>
+    <div class="cta-right">
+      <div class="cta-card">
+        <mat-icon>restaurant</mat-icon>
+        <strong>13+ Products</strong>
+        <span>Premium flours & food items</span>
+      </div>
+      <div class="cta-card">
+        <mat-icon>eco</mat-icon>
+        <strong>100% Natural</strong>
+        <span>No chemicals, no shortcuts</span>
+      </div>
+    </div>
   </div>
 </section>
