@@ -1,191 +1,118 @@
-<!-- Hero Section — Split Layout with Product Showcase -->
+<!-- HERO — Marathi-first, product collage, mobile-first -->
 <section class="hero">
-  <div class="hero-bg">
-    <div class="hero-gradient"></div>
-    <div class="hero-orb orb-1"></div>
-    <div class="hero-orb orb-2"></div>
+  <div class="hero-bg"></div>
+
+  <div class="hero-top">
+    <h1 class="hero-marathi">ओजस</h1>
+    <p class="hero-slogan">शुद्ध आहार...शुद्ध विचार</p>
   </div>
 
-  <div class="hero-inner">
-    <div class="hero-left">
-      <div class="hero-badge">
-        <mat-icon>verified</mat-icon>
-        <span>100% Pure & Natural</span>
-      </div>
-      <h1 class="hero-title">
-        <span class="hero-devanagari">ओजस</span>
-        <span class="hero-brand">O J A S</span>
-      </h1>
-      <p class="hero-tagline">शुद्ध आहार...शुद्ध विचार</p>
-      <p class="hero-subtitle">Premium stone-ground flours & healthy food products from Pune — crafted with tradition, delivered with love.</p>
-      <div class="hero-actions">
-        <a routerLink="/products" class="hero-btn primary">
-          <span>Explore Products</span>
-          <mat-icon>arrow_forward</mat-icon>
-        </a>
-        <a routerLink="/register" class="hero-btn secondary">
-          <span>Join Us</span>
-        </a>
-      </div>
-      <div class="hero-trust">
-        <div class="trust-item">
-          <mat-icon>eco</mat-icon>
-          <span>No Preservatives</span>
+  <!-- Product Collage -->
+  <div class="collage-wrap">
+    <div class="collage">
+      @for (product of heroProducts; track product.id; let i = $index) {
+        <div class="collage-item ci-{{ i }}">
+          <img [src]="getImageUrl(product)" [alt]="product.name" loading="eager">
         </div>
-        <div class="trust-item">
-          <mat-icon>verified_user</mat-icon>
-          <span>Lab Tested</span>
-        </div>
-        <div class="trust-item">
-          <mat-icon>local_shipping</mat-icon>
-          <span>Fast Delivery</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="hero-right">
-      <div class="hero-product-grid">
-        @for (product of heroProducts; track product.id; let i = $index) {
-          <div class="hero-product-card" [style.animation-delay]="(0.3 + i * 0.15) + 's'">
-            <img [src]="getImageUrl(product)" [alt]="product.name" loading="eager">
-            <div class="hero-product-label">
-              <span class="hpl-name">{{ product.name }}</span>
-              <span class="hpl-price">₹{{ product.price }}</span>
-            </div>
-          </div>
-        }
-      </div>
+      }
     </div>
   </div>
 
-  <div class="hero-stats-bar">
-    <div class="stats-inner">
-      <div class="stat-chip">
-        <strong>13+</strong>
-        <span>Products</span>
-      </div>
-      <div class="stat-chip">
-        <strong>100%</strong>
-        <span>Natural</span>
-      </div>
-      <div class="stat-chip">
-        <strong>Pune</strong>
-        <span>Based</span>
-      </div>
-      <div class="stat-chip">
-        <strong>500g</strong>
-        <span>Packs</span>
-      </div>
+  <div class="hero-bottom">
+    <p class="hero-desc">Premium stone-ground flours & traditional food products — made in Pune with love.</p>
+    <div class="hero-actions">
+      <a routerLink="/products" class="btn-primary">
+        Explore Products
+        <mat-icon>arrow_forward</mat-icon>
+      </a>
+      <a routerLink="/register" class="btn-outline">Join Us</a>
     </div>
+  </div>
+
+  <div class="hero-chips">
+    <div class="chip"><mat-icon>eco</mat-icon> 100% Natural</div>
+    <div class="chip"><mat-icon>verified</mat-icon> No Preservatives</div>
+    <div class="chip"><mat-icon>local_shipping</mat-icon> Fresh Delivery</div>
   </div>
 </section>
 
-<!-- Features Strip -->
-<section class="features">
-  <div class="features-inner">
-    @for (feature of features; track feature.title; let i = $index) {
-      <div class="feature-card" [style.animation-delay]="(i * 0.1) + 's'">
-        <div class="feature-icon-wrap">
+<!-- WHY OJAS — Horizontal scroll on mobile -->
+<section class="why-section">
+  <div class="section-tag"><span>WHY OJAS</span></div>
+  <div class="why-scroll">
+    @for (feature of features; track feature.title) {
+      <div class="why-card">
+        <div class="why-icon">
           <mat-icon>{{ feature.icon }}</mat-icon>
         </div>
-        <div class="feature-text">
-          <h3>{{ feature.title }}</h3>
-          <p>{{ feature.desc }}</p>
-        </div>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.desc }}</p>
       </div>
     }
   </div>
 </section>
 
-<!-- Featured Products — Showcase Grid -->
-<section class="products-showcase">
-  <div class="showcase-header">
-    <div class="section-tag">
-      <span>OUR COLLECTION</span>
-    </div>
-    <h2>Handpicked for Your Kitchen</h2>
-    <p>Pure, nutritious, stone-ground products made the traditional way</p>
-  </div>
+<!-- PRODUCTS SHOWCASE -->
+<section class="products-section">
+  <div class="section-tag"><span>OUR COLLECTION</span></div>
+  <h2 class="sec-title">Handpicked for Your Kitchen</h2>
 
-  <div class="showcase-grid">
+  <div class="product-grid">
     @for (product of featuredProducts; track product.id; let i = $index) {
-      <div class="showcase-card" [style.animation-delay]="(i * 0.08) + 's'">
-        <div class="sc-image">
+      <div class="p-card">
+        <div class="p-img">
           <img [src]="getImageUrl(product)" [alt]="product.name" loading="lazy">
-          <div class="sc-badge">{{ product.category }}</div>
-          <div class="sc-hover-overlay">
-            <a routerLink="/products" class="sc-view-btn">
-              <mat-icon>visibility</mat-icon>
-            </a>
-          </div>
+          <span class="p-cat">{{ product.category }}</span>
         </div>
-        <div class="sc-body">
+        <div class="p-body">
           <h3>{{ product.name }}</h3>
-          <p class="sc-desc">{{ product.description | slice:0:70 }}...</p>
-          <div class="sc-footer">
-            <span class="sc-weight">{{ product.weight }}</span>
-            <span class="sc-price">₹{{ product.price }}</span>
+          <div class="p-meta">
+            <span class="p-wt">{{ product.weight }}</span>
+            <span class="p-price">₹{{ product.price }}</span>
           </div>
         </div>
       </div>
     }
   </div>
 
-  <div class="showcase-action">
-    <a routerLink="/products" class="view-all-link">
-      <span>View All Products</span>
-      <mat-icon>arrow_forward</mat-icon>
+  <div class="sec-action">
+    <a routerLink="/products" class="btn-primary sm">
+      View All Products <mat-icon>arrow_forward</mat-icon>
     </a>
   </div>
 </section>
 
-<!-- Process — Visual Timeline -->
-<section class="process">
-  <div class="process-header">
-    <div class="section-tag">
-      <span>OUR PROCESS</span>
-    </div>
-    <h2>From Farm to Your Table</h2>
-  </div>
-  <div class="process-timeline">
+<!-- PROCESS -->
+<section class="process-section">
+  <div class="section-tag"><span>OUR PROCESS</span></div>
+  <h2 class="sec-title">From Farm to Your Table</h2>
+  <div class="process-grid">
     @for (step of processSteps; track step.title; let i = $index) {
-      <div class="timeline-step" [style.animation-delay]="(i * 0.15) + 's'">
-        <div class="ts-number">{{ i + 1 }}</div>
-        <div class="ts-icon-wrap">
-          <mat-icon>{{ step.icon }}</mat-icon>
-        </div>
+      <div class="step-card">
+        <div class="step-num">{{ i + 1 }}</div>
+        <div class="step-icon"><mat-icon>{{ step.icon }}</mat-icon></div>
         <h4>{{ step.title }}</h4>
         <p>{{ step.desc }}</p>
       </div>
-      @if (i < processSteps.length - 1) {
-        <div class="ts-connector">
-          <div class="connector-dash"></div>
-          <mat-icon>chevron_right</mat-icon>
-        </div>
-      }
     }
   </div>
 </section>
 
-<!-- Testimonials -->
-<section class="testimonials">
-  <div class="testimonials-header">
-    <div class="section-tag">
-      <span>WHAT PEOPLE SAY</span>
-    </div>
-    <h2>Loved by Families</h2>
-  </div>
-  <div class="testimonials-grid">
-    @for (t of testimonials; track t.name; let i = $index) {
-      <div class="testimonial-card" [style.animation-delay]="(i * 0.12) + 's'">
-        <div class="tc-stars">
+<!-- TESTIMONIALS -->
+<section class="reviews-section">
+  <div class="section-tag"><span>REVIEWS</span></div>
+  <h2 class="sec-title">Loved by Families</h2>
+  <div class="reviews-scroll">
+    @for (t of testimonials; track t.name) {
+      <div class="review-card">
+        <div class="r-stars">
           @for (s of [1,2,3,4,5]; track s) {
             <mat-icon>star</mat-icon>
           }
         </div>
-        <p class="tc-text">"{{ t.text }}"</p>
-        <div class="tc-author">
-          <div class="tc-avatar">{{ t.name[0] }}</div>
+        <p>"{{ t.text }}"</p>
+        <div class="r-author">
+          <div class="r-avatar">{{ t.name[0] }}</div>
           <span>{{ t.name }}</span>
         </div>
       </div>
@@ -193,31 +120,11 @@
   </div>
 </section>
 
-<!-- CTA Section — Bold -->
-<section class="cta">
-  <div class="cta-inner">
-    <div class="cta-left">
-      <h2>Ready to taste the <span>purity</span>?</h2>
-      <p>Join our community and be the first to know about new products, recipes, and exclusive offers from Ojas.</p>
-      <div class="cta-actions">
-        <a routerLink="/register" class="cta-btn">
-          <span>Create Your Account</span>
-          <mat-icon>arrow_forward</mat-icon>
-        </a>
-        <a routerLink="/products" class="cta-link">Browse Products</a>
-      </div>
-    </div>
-    <div class="cta-right">
-      <div class="cta-card">
-        <mat-icon>restaurant</mat-icon>
-        <strong>13+ Products</strong>
-        <span>Premium flours & food items</span>
-      </div>
-      <div class="cta-card">
-        <mat-icon>eco</mat-icon>
-        <strong>100% Natural</strong>
-        <span>No chemicals, no shortcuts</span>
-      </div>
-    </div>
-  </div>
+<!-- CTA -->
+<section class="cta-section">
+  <h2>Ready to taste the <span>purity</span>?</h2>
+  <p>Join thousands of families who trust Ojas for their daily nutrition.</p>
+  <a routerLink="/register" class="btn-white">
+    Create Your Account <mat-icon>arrow_forward</mat-icon>
+  </a>
 </section>

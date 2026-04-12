@@ -1,13 +1,12 @@
 import { Component, OnInit, effect } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { SlicePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { ProductService } from '../../services/product.service';
 import { Product } from '../../models/interfaces';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, MatIconModule, SlicePipe],
+  imports: [RouterLink, MatIconModule],
   templateUrl: './home.html',
   styleUrl: './home.scss'
 })
@@ -19,7 +18,7 @@ export class Home implements OnInit {
     effect(() => {
       const all = this.productService.products();
       this.featuredProducts = all.slice(0, 6);
-      this.heroProducts = all.slice(0, 4);
+      this.heroProducts = all.slice(0, 7);
     });
   }
 
