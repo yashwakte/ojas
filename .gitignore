@@ -1,0 +1,19 @@
+# Backend
+ojas-api/bin/
+ojas-api/obj/
+ojas-api/appsettings.json
+
+# Frontend
+ojas-frontend/node_modules/
+ojas-frontend/dist/
+ojas-frontend/.angular/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store

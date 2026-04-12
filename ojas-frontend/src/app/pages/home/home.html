@@ -1,0 +1,148 @@
+<!-- Hero Section - Cinematic -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-gradient"></div>
+    <div class="hero-pattern"></div>
+    <div class="hero-orb orb-1"></div>
+    <div class="hero-orb orb-2"></div>
+    <div class="hero-orb orb-3"></div>
+  </div>
+
+  <div class="hero-content">
+    <div class="hero-badge">
+      <mat-icon>verified</mat-icon>
+      <span>100% Pure & Natural</span>
+    </div>
+    <h1 class="hero-title">
+      <span class="hero-devanagari">ओजस</span>
+      <span class="hero-brand">OJAS</span>
+    </h1>
+    <p class="hero-tagline">शुद्ध आहार...शुद्ध विचार</p>
+    <p class="hero-subtitle">Premium quality flours & healthy food products — crafted with tradition, delivered with love.</p>
+    <div class="hero-actions">
+      <a routerLink="/products" class="hero-btn primary">
+        <span>Explore Products</span>
+        <mat-icon>arrow_forward</mat-icon>
+      </a>
+      <a routerLink="/register" class="hero-btn secondary">
+        <span>Join Us</span>
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <strong>13+</strong>
+        <span>Products</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <strong>100%</strong>
+        <span>Natural</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <strong>Pune</strong>
+        <span>Based</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section - Glassmorphism Cards -->
+<section class="features">
+  <div class="section-label">
+    <span class="label-line"></span>
+    <span class="label-text">WHY CHOOSE US</span>
+    <span class="label-line"></span>
+  </div>
+  <div class="features-container">
+    @for (feature of features; track feature.title; let i = $index) {
+      <div class="feature-card" [style.animation-delay]="(i * 0.1) + 's'">
+        <div class="feature-icon-wrap">
+          <mat-icon class="feature-icon">{{ feature.icon }}</mat-icon>
+        </div>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.desc }}</p>
+      </div>
+    }
+  </div>
+</section>
+
+<!-- Featured Products - Premium Grid -->
+<section class="featured-section">
+  <div class="section-header">
+    <div class="section-label">
+      <span class="label-line"></span>
+      <span class="label-text">OUR COLLECTION</span>
+      <span class="label-line"></span>
+    </div>
+    <h2>Handpicked for Your Kitchen</h2>
+    <p>Pure, natural, and packed with nutrition</p>
+  </div>
+  <div class="products-grid">
+    @for (product of featuredProducts; track product.id; let i = $index) {
+      <div class="product-card" [style.animation-delay]="(i * 0.08) + 's'">
+        <div class="product-image">
+          <img [src]="getImageUrl(product)" [alt]="product.name" loading="lazy">
+          <div class="product-overlay">
+            <span class="product-category">{{ product.category }}</span>
+          </div>
+        </div>
+        <div class="product-info">
+          <h3 class="product-name">{{ product.name }}</h3>
+          <div class="product-bottom">
+            <span class="product-weight">{{ product.weight }}</span>
+            <span class="product-price">₹{{ product.price }}</span>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+  <div class="section-action">
+    <a routerLink="/products" class="view-all-btn">
+      <span>View All Products</span>
+      <mat-icon>arrow_forward</mat-icon>
+    </a>
+  </div>
+</section>
+
+<!-- Process Section -->
+<section class="process-section">
+  <div class="section-label">
+    <span class="label-line"></span>
+    <span class="label-text">OUR PROCESS</span>
+    <span class="label-line"></span>
+  </div>
+  <h2 class="process-title">From Farm to Your Table</h2>
+  <div class="process-steps">
+    @for (step of processSteps; track step.title; let i = $index) {
+      <div class="process-step">
+        <div class="step-number">{{ i + 1 }}</div>
+        <mat-icon class="step-icon">{{ step.icon }}</mat-icon>
+        <h4>{{ step.title }}</h4>
+        <p>{{ step.desc }}</p>
+      </div>
+      @if (i < processSteps.length - 1) {
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <mat-icon>chevron_right</mat-icon>
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta">
+  <div class="cta-bg">
+    <div class="cta-pattern"></div>
+  </div>
+  <div class="cta-content">
+    <span class="cta-emoji">🌾</span>
+    <h2>Ready to taste the purity?</h2>
+    <p>Register now and be the first to know about new products and exclusive offers.</p>
+    <a routerLink="/register" class="cta-btn">
+      <span>Create Your Account</span>
+      <mat-icon>arrow_forward</mat-icon>
+    </a>
+  </div>
+</section>

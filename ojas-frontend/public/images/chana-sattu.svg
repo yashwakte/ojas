@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF8F6"/>
+      <stop offset="100%" style="stop-color:#FFDACF"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <circle cx="200" cy="120" r="60" fill="#FFB599" opacity="0.5"/>
+  <circle cx="200" cy="120" r="40" fill="#F25A1A" opacity="0.3"/>
+  <text x="200" y="130" text-anchor="middle" font-family="Poppins,sans-serif" font-size="24" fill="#F25A1A" font-weight="600">चना सत्तू</text>
+  <text x="200" y="210" text-anchor="middle" font-family="Poppins,sans-serif" font-size="18" fill="#2D2D2D" font-weight="600">Chana Sattu</text>
+  <text x="200" y="235" text-anchor="middle" font-family="Poppins,sans-serif" font-size="13" fill="#6B6B6B">Roasted Gram Sattu • 500g</text>
+  <text x="200" y="265" text-anchor="middle" font-family="Poppins,sans-serif" font-size="22" fill="#F25A1A" font-weight="700">₹110</text>
+</svg>

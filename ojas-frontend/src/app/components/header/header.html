@@ -1,0 +1,47 @@
+<header class="header">
+  <div class="header-container">
+    <a routerLink="/" class="logo">
+      <span class="logo-text">ओजस</span>
+      <div class="logo-sub">
+        <span class="brand-name">OJAS</span>
+        <span class="tagline">शुद्ध आहार...शुद्ध विचार</span>
+      </div>
+    </a>
+
+    <nav class="nav-desktop">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
+      <a routerLink="/products" routerLinkActive="active">Products</a>
+      @if (auth.isLoggedIn()) {
+        <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
+          <mat-icon>account_circle</mat-icon>
+          {{ auth.user()?.fullName }}
+        </button>
+        <mat-menu #userMenu="matMenu">
+          <button mat-menu-item (click)="auth.logout()">
+            <mat-icon>logout</mat-icon> Logout
+          </button>
+        </mat-menu>
+      } @else {
+        <a routerLink="/login" routerLinkActive="active" class="login-link">Login</a>
+        <a routerLink="/register" class="register-btn">Register</a>
+      }
+    </nav>
+
+    <button class="hamburger" (click)="toggleMenu()" aria-label="Toggle menu">
+      <mat-icon>{{ menuOpen ? 'close' : 'menu' }}</mat-icon>
+    </button>
+  </div>
+
+  @if (menuOpen) {
+    <nav class="nav-mobile">
+      <a routerLink="/" (click)="toggleMenu()">Home</a>
+      <a routerLink="/products" (click)="toggleMenu()">Products</a>
+      @if (auth.isLoggedIn()) {
+        <a (click)="auth.logout(); toggleMenu()">Logout</a>
+      } @else {
+        <a routerLink="/login" (click)="toggleMenu()">Login</a>
+        <a routerLink="/register" (click)="toggleMenu()">Register</a>
+      }
+    </nav>
+  }
+</header>

@@ -1,0 +1,75 @@
+<div class="auth-page">
+  <div class="auth-decorative">
+    <div class="decor-bg">
+      <div class="decor-orb orb-1"></div>
+      <div class="decor-orb orb-2"></div>
+    </div>
+    <div class="decor-content">
+      <span class="decor-logo">ओजस</span>
+      <h2>Welcome Back!</h2>
+      <p>Login to access your account and explore our range of pure, healthy products.</p>
+      <div class="decor-features">
+        <div class="decor-feature">
+          <mat-icon>verified</mat-icon>
+          <span>100% Pure Products</span>
+        </div>
+        <div class="decor-feature">
+          <mat-icon>local_shipping</mat-icon>
+          <span>Fast Delivery</span>
+        </div>
+        <div class="decor-feature">
+          <mat-icon>eco</mat-icon>
+          <span>Traditional Process</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-form-side">
+    <div class="auth-card">
+      <div class="auth-header">
+        <span class="auth-logo-mobile">ओजस</span>
+        <h2>Sign In</h2>
+        <p>Enter your credentials to continue</p>
+      </div>
+
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Email</mat-label>
+          <input matInput formControlName="email" type="email" placeholder="Enter your email">
+          <mat-icon matPrefix>email</mat-icon>
+          @if (loginForm.get('email')?.hasError('required') && loginForm.get('email')?.touched) {
+            <mat-error>Email is required</mat-error>
+          }
+          @if (loginForm.get('email')?.hasError('email')) {
+            <mat-error>Please enter a valid email</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Password</mat-label>
+          <input matInput formControlName="password" [type]="hidePassword ? 'password' : 'text'" placeholder="Enter your password">
+          <mat-icon matPrefix>lock</mat-icon>
+          <button mat-icon-button matSuffix (click)="hidePassword = !hidePassword" type="button">
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          @if (loginForm.get('password')?.hasError('required') && loginForm.get('password')?.touched) {
+            <mat-error>Password is required</mat-error>
+          }
+        </mat-form-field>
+
+        <button mat-flat-button class="submit-btn" type="submit" [disabled]="loading || loginForm.invalid">
+          @if (loading) {
+            <mat-spinner diameter="20"></mat-spinner>
+          } @else {
+            <ng-container>Sign In</ng-container>
+          }
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        Don't have an account? <a routerLink="/register">Create one</a>
+      </p>
+    </div>
+  </div>
+</div>

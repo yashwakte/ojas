@@ -1,0 +1,6 @@
+@OjasApi_HostAddress = http://localhost:5207
+
+GET {{OjasApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

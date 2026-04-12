@@ -1,0 +1,62 @@
+<section class="products-page">
+  <div class="page-header">
+    <div class="page-header-bg">
+      <div class="header-orb orb-1"></div>
+      <div class="header-orb orb-2"></div>
+    </div>
+    <div class="page-header-content">
+      <div class="section-label">
+        <span class="label-line"></span>
+        <span class="label-text">EXPLORE</span>
+        <span class="label-line"></span>
+      </div>
+      <h1>Our Products</h1>
+      <p>Pure, natural flours and healthy food products for your family</p>
+    </div>
+  </div>
+
+  <div class="products-container">
+    <!-- Category Filter -->
+    <div class="category-filter">
+      @for (cat of categories; track cat) {
+        <button
+          [class.active]="selectedCategory === cat"
+          (click)="selectCategory(cat)"
+          class="filter-chip">
+          {{ cat }}
+        </button>
+      }
+    </div>
+
+    <!-- Products Grid -->
+    <div class="products-grid">
+      @for (product of filteredProducts; track product.id; let i = $index) {
+        <div class="product-card" [style.animation-delay]="(i * 0.06) + 's'">
+          <div class="product-image">
+            <img [src]="getImageUrl(product)" [alt]="product.name" loading="lazy">
+            <div class="product-overlay">
+              <span class="product-badge">{{ product.category }}</span>
+            </div>
+          </div>
+          <div class="product-info">
+            <h3 class="product-name">{{ product.name }}</h3>
+            <p class="product-desc">{{ product.description }}</p>
+            <div class="product-meta">
+              <span class="product-weight">
+                <mat-icon>scale</mat-icon> {{ product.weight }}
+              </span>
+              <span class="product-price">₹{{ product.price }}</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (filteredProducts.length === 0) {
+      <div class="no-products">
+        <mat-icon>inventory_2</mat-icon>
+        <p>No products found in this category.</p>
+      </div>
+    }
+  </div>
+</section>
