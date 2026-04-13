@@ -52,21 +52,28 @@ export class Register {
       next: (res) => {
         this.loading = false;
         this.auth.saveAuth(res);
-        this.snackBar.open('Account created successfully! 🎉', 'Close', { duration: 3000 });
+        this.snackBar.open('Account created successfully! 🎉', 'Close', {
+          duration: 3000,
+          panelClass: 'snack-success'
+        });
         this.router.navigate(['/']);
       },
       error: (err) => {
         this.loading = false;
+        let msg = 'Registration failed. Please try again.';
         if (err.status === 429) {
-          this.snackBar.open('Too many attempts. Please wait a minute.', 'Close', { duration: 5000 });
+          msg = 'Too many attempts. Please wait a minute.';
         } else if (err.status === 409) {
-          this.snackBar.open('Email already registered', 'Close', { duration: 3000 });
+          msg = 'Email already registered';
         } else if (err.status === 0 || err.name === 'TimeoutError') {
-          this.snackBar.open('Server not reachable. Please try later.', 'Close', { duration: 4000 });
-        } else {
-          const msg = err.error?.message || 'Registration failed. Please try again.';
-          this.snackBar.open(msg, 'Close', { duration: 3000 });
+          msg = 'Server not reachable. Please try later.';
+        } else if (err.error?.message) {
+          msg = err.error.message;
         }
+        this.snackBar.open(msg, 'Close', {
+          duration: 5000,
+          panelClass: 'snack-error'
+        });
       },
     });
   }

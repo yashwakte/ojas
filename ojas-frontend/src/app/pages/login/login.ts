@@ -50,20 +50,26 @@ export class Login {
       next: (res) => {
         this.loading = false;
         this.auth.saveAuth(res);
-        this.snackBar.open('Welcome back! 🎉', 'Close', { duration: 3000 });
+        this.snackBar.open('Welcome back! 🎉', 'Close', {
+          duration: 3000,
+          panelClass: 'snack-success'
+        });
         this.router.navigate(['/']);
       },
       error: (err) => {
         this.loading = false;
+        let msg = 'Something went wrong. Please try again.';
         if (err.status === 429) {
-          this.snackBar.open('Too many attempts. Please wait a minute.', 'Close', { duration: 5000 });
-        } else if (err.status === 401) {
-          this.snackBar.open('Invalid email or password', 'Close', { duration: 3000 });
+          msg = 'Too many attempts. Please wait a minute.';
+        } else if (err.status === 401 || err.status === 400) {
+          msg = 'Invalid email or password';
         } else if (err.status === 0 || err.name === 'TimeoutError') {
-          this.snackBar.open('Server not reachable. Please try later.', 'Close', { duration: 4000 });
-        } else {
-          this.snackBar.open('Something went wrong. Please try again.', 'Close', { duration: 3000 });
+          msg = 'Server not reachable. Please try later.';
         }
+        this.snackBar.open(msg, 'Close', {
+          duration: 5000,
+          panelClass: 'snack-error'
+        });
       },
     });
   }
