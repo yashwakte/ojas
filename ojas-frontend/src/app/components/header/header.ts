@@ -19,8 +19,8 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './header.html',
   styleUrl: './header.scss',
   host: {
-    '[class.scrolled]': 'isScrolled'
-  }
+    '[class.scrolled]': 'isScrolled',
+  },
 })
 export class Header {
   constructor(public auth: AuthService) {}

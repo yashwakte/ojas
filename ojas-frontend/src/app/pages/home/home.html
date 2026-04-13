@@ -6,9 +6,13 @@
   </div>
 
   <div class="hero-bottom">
-    <p class="hero-desc">Premium stone-ground flours & traditional food products, made in Pune with love.</p>
+    <p class="hero-desc">
+      Premium stone-ground flours & traditional food products, made in Pune with love.
+    </p>
     <div class="hero-cta">
-      <a routerLink="/products" class="btn-primary">Explore Products <mat-icon>arrow_forward</mat-icon></a>
+      <a routerLink="/products" class="btn-primary"
+        >Explore Products <mat-icon>arrow_forward</mat-icon></a
+      >
       <a routerLink="/register" class="btn-ghost">Join Us</a>
     </div>
     <div class="trust-strip">
@@ -25,7 +29,9 @@
   <div class="why-scroll">
     @for (f of features; track f.title) {
       <div class="why-card">
-        <div class="why-ico"><mat-icon>{{ f.icon }}</mat-icon></div>
+        <div class="why-ico">
+          <mat-icon>{{ f.icon }}</mat-icon>
+        </div>
         <h3>{{ f.title }}</h3>
         <p>{{ f.desc }}</p>
       </div>
@@ -37,18 +43,31 @@
 <section class="section products-section">
   <div class="tag"><span>OUR COLLECTION</span></div>
   <h2 class="stitle">Handpicked for Your Kitchen</h2>
+
   <div class="pgrid">
     @for (p of featuredProducts; track p.id) {
       <div class="pcard">
-        <div class="pimg"><img [src]="getImageUrl(p)" [alt]="p.name" loading="lazy"><span class="pcat">{{ p.category }}</span></div>
+        <div class="pimg">
+          <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span
+            class="pcat"
+            >{{ p.category }}</span
+          >
+        </div>
         <div class="pbody">
           <h3>{{ p.name }}</h3>
-          <div class="pmeta"><span>{{ p.weight }}</span><strong>₹{{ p.price }}</strong></div>
+          <div class="pmeta">
+            <span>{{ p.weight }}</span
+            ><strong>₹{{ p.price }}</strong>
+          </div>
         </div>
       </div>
     }
   </div>
-  <div class="ctr"><a routerLink="/products" class="btn-primary sm">View All Products <mat-icon>arrow_forward</mat-icon></a></div>
+  <div class="ctr">
+    <a routerLink="/products" class="btn-primary sm"
+      >View All Products <mat-icon>arrow_forward</mat-icon></a
+    >
+  </div>
 </section>
 
 <!-- PROCESS -->
@@ -59,7 +78,9 @@
     @for (s of processSteps; track s.title; let i = $index) {
       <div class="step">
         <div class="snum">{{ i + 1 }}</div>
-        <div class="sico"><mat-icon>{{ s.icon }}</mat-icon></div>
+        <div class="sico">
+          <mat-icon>{{ s.icon }}</mat-icon>
+        </div>
         <h4>{{ s.title }}</h4>
         <p>{{ s.desc }}</p>
       </div>
@@ -74,9 +95,16 @@
   <div class="rscroll">
     @for (t of testimonials; track t.name) {
       <div class="rcard">
-        <div class="rstars">@for (s of [1,2,3,4,5]; track s) { <mat-icon>star</mat-icon> }</div>
+        <div class="rstars">
+          @for (s of [1, 2, 3, 4, 5]; track s) {
+            <mat-icon>star</mat-icon>
+          }
+        </div>
         <p>"{{ t.text }}"</p>
-        <div class="rauthor"><div class="ravatar">{{ t.name[0] }}</div><span>{{ t.name }}</span></div>
+        <div class="rauthor">
+          <div class="ravatar">{{ t.name[0] }}</div>
+          <span>{{ t.name }}</span>
+        </div>
       </div>
     }
   </div>

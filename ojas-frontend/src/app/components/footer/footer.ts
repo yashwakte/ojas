@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
   selector: 'app-footer',
   imports: [RouterLink, MatIconModule],
   templateUrl: './footer.html',
-  styleUrl: './footer.scss'
+  styleUrl: './footer.scss',
 })
 export class Footer {
   currentYear = new Date().getFullYear();

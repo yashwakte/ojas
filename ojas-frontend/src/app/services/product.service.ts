@@ -1,34 +1,18 @@
 import { Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../environments/environment';
 import { Product } from '../models/interfaces';
-import { tap } from 'rxjs';
+import { PRODUCTS } from '../data/products';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
-  private readonly apiUrl = `${environment.apiUrl}/products`;
-  private readonly _products = signal<Product[]>([]);
-  private loaded = false;
+  private readonly _products = signal<Product[]>(PRODUCTS);
 
   readonly products = this._products.asReadonly();
 
-  constructor(private http: HttpClient) {}
-
-  loadProducts() {
-    if (this.loaded) return;
-    this.http.get<Product[]>(this.apiUrl).pipe(
-      tap(products => {
-        this._products.set(products);
-        this.loaded = true;
-      })
-    ).subscribe();
+  getProduct(id: string): Product | undefined {
+    return PRODUCTS.find((p) => p.id === id);
   }
 
-  getProduct(id: string) {
-    return this.http.get<Product>(`${this.apiUrl}/${id}`);
-  }
-
-  getByCategory(category: string) {
-    return this.http.get<Product[]>(`${this.apiUrl}/category/${category}`);
+  getByCategory(category: string): Product[] {
+    return PRODUCTS.filter((p) => p.category === category);
   }
 }

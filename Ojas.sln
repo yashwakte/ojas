@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ojas-api", "ojas-api", "{7F64AD2E-F888-2ACD-9628-1763D39D3936}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OjasApi", "ojas-api\OjasApi.csproj", "{88E7FE2B-32C5-B33C-8402-C5DC3191CE05}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{88E7FE2B-32C5-B33C-8402-C5DC3191CE05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88E7FE2B-32C5-B33C-8402-C5DC3191CE05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88E7FE2B-32C5-B33C-8402-C5DC3191CE05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88E7FE2B-32C5-B33C-8402-C5DC3191CE05}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{88E7FE2B-32C5-B33C-8402-C5DC3191CE05} = {7F64AD2E-F888-2ACD-9628-1763D39D3936}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2A766001-6F61-4483-A319-1F271C6CB1B0}
+	EndGlobalSection
+EndGlobal

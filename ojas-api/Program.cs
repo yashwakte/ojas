@@ -46,11 +46,10 @@ builder.Services.AddCors(options =>
 
     options.AddPolicy("AllowProduction", policy =>
     {
-        policy.SetIsOriginAllowed(origin =>
-                origin.Contains(".vercel.app") ||
-                origin.Contains(".onrender.com") ||
-                origin.Contains("azurestaticapps.net") ||
-                origin.Contains("localhost"))
+        policy.WithOrigins(
+                "https://ojas-atta.vercel.app",
+                "https://ojas-api-kl2q.onrender.com"
+              )
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -85,6 +84,17 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseHttpsRedirection();
 }
+
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
 
 if (app.Environment.IsProduction())
     app.UseCors("AllowProduction");

@@ -22,7 +22,7 @@ import { AuthService } from '../../services/auth.service';
     MatProgressSpinnerModule,
   ],
   templateUrl: './register.html',
-  styleUrl: './register.scss'
+  styleUrl: './register.scss',
 })
 export class Register {
   registerForm: FormGroup;
@@ -33,13 +33,13 @@ export class Register {
     private fb: FormBuilder,
     private auth: AuthService,
     private router: Router,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
   ) {
     this.registerForm = this.fb.group({
       fullName: ['', [Validators.required, Validators.minLength(2)]],
       email: ['', [Validators.required, Validators.email]],
       phone: ['', [Validators.required, Validators.pattern(/^[6-9]\d{9}$/)]],
-      password: ['', [Validators.required, Validators.minLength(6)]]
+      password: ['', [Validators.required, Validators.minLength(6)]],
     });
   }
 
@@ -57,7 +57,7 @@ export class Register {
         this.loading = false;
         const msg = err.error?.message || 'Registration failed. Please try again.';
         this.snackBar.open(msg, 'Close', { duration: 3000 });
-      }
+      },
     });
   }
 }

@@ -4,12 +4,12 @@
 
 ## Tech Stack
 
-| Layer     | Technology                          |
-|-----------|-------------------------------------|
-| Frontend  | Angular 21, Angular Material, SCSS  |
-| Backend   | .NET 10 Web API                     |
-| Database  | MongoDB Atlas                       |
-| Auth      | JWT Bearer Tokens, BCrypt           |
+| Layer    | Technology                         |
+| -------- | ---------------------------------- |
+| Frontend | Angular 21, Angular Material, SCSS |
+| Backend  | .NET 10 Web API                    |
+| Database | MongoDB Atlas                      |
+| Auth     | JWT Bearer Tokens, BCrypt          |
 
 ## Features
 
@@ -22,18 +22,22 @@
 ## Getting Started
 
 ### Backend
+
 ```bash
 cd ojas-api
 dotnet run --launch-profile https
 ```
+
 API runs at `https://localhost:7126`
 
 ### Frontend
+
 ```bash
 cd ojas-frontend
 npm install
 ng serve --open
 ```
+
 App runs at `http://localhost:4200`
 
 ## Products

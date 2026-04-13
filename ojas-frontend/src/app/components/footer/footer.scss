@@ -78,7 +78,9 @@
       height: 16px;
       color: var(--ojas-orange);
       opacity: 0;
-      transition: opacity 0.2s ease, transform 0.2s ease;
+      transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
       transform: translateX(-4px);
     }
 

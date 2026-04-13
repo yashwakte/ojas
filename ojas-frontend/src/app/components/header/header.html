@@ -9,7 +9,9 @@
     </a>
 
     <nav class="nav-desktop">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+        >Home</a
+      >
       <a routerLink="/products" routerLinkActive="active">Products</a>
       @if (auth.isLoggedIn()) {
         <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
@@ -17,9 +19,7 @@
           {{ auth.user()?.fullName }}
         </button>
         <mat-menu #userMenu="matMenu">
-          <button mat-menu-item (click)="auth.logout()">
-            <mat-icon>logout</mat-icon> Logout
-          </button>
+          <button mat-menu-item (click)="auth.logout()"><mat-icon>logout</mat-icon> Logout</button>
         </mat-menu>
       } @else {
         <a routerLink="/login" routerLinkActive="active" class="login-link">Login</a>

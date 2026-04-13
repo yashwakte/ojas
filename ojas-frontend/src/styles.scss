@@ -1,42 +1,43 @@
-
 @use '@angular/material' as mat;
 
 // Custom Ojas orange palette
 $ojas-orange: (
   0: #000000,
-  10: #3B0A00,
-  20: #5E1700,
-  25: #701E00,
+  10: #3b0a00,
+  20: #5e1700,
+  25: #701e00,
   30: #832600,
-  35: #962E00,
-  40: #AA3700,
-  50: #D14500,
-  60: #F25A1A,
-  70: #FF8A5C,
-  80: #FFB599,
-  90: #FFDACF,
-  95: #FFEDE8,
-  98: #FFF8F6,
-  99: #FFFBFF,
-  100: #FFFFFF,
+  35: #962e00,
+  40: #aa3700,
+  50: #d14500,
+  60: #f25a1a,
+  70: #ff8a5c,
+  80: #ffb599,
+  90: #ffdacf,
+  95: #ffede8,
+  98: #fff8f6,
+  99: #fffbff,
+  100: #ffffff,
 );
 
 html {
   height: 100%;
   scroll-behavior: smooth;
-  @include mat.theme((
-    color: (
-      primary: $ojas-orange,
-      tertiary: mat.$orange-palette,
-    ),
-    typography: Roboto,
-    density: 0,
-  ));
+  @include mat.theme(
+    (
+      color: (
+        primary: $ojas-orange,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
 }
 
 body {
   color-scheme: light;
-  background-color: #FAFAFA;
+  background-color: #fafafa;
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
   margin: 0;
@@ -63,20 +64,20 @@ a {
   background: #f1f1f1;
 }
 ::-webkit-scrollbar-thumb {
-  background: #F25A1A;
+  background: #f25a1a;
   border-radius: 3px;
 }
 
 // Orange brand colors as CSS variables
 :root {
-  --ojas-orange: #F25A1A;
-  --ojas-orange-dark: #D14500;
-  --ojas-orange-light: #FFB599;
-  --ojas-orange-bg: #FFF8F6;
-  --ojas-white: #FFFFFF;
-  --ojas-text: #2D2D2D;
-  --ojas-text-light: #6B6B6B;
-  --ojas-border: #E0E0E0;
+  --ojas-orange: #f25a1a;
+  --ojas-orange-dark: #d14500;
+  --ojas-orange-light: #ffb599;
+  --ojas-orange-bg: #fff8f6;
+  --ojas-white: #ffffff;
+  --ojas-text: #2d2d2d;
+  --ojas-text-light: #6b6b6b;
+  --ojas-border: #e0e0e0;
   --ojas-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
   --ojas-shadow-md: 0 8px 30px rgba(0, 0, 0, 0.08);
   --ojas-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12);
@@ -87,54 +88,108 @@ a {
 
 // ===== GLOBAL ANIMATIONS =====
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-40px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(40px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes gradientFlow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 // ===== UTILITY CLASSES =====
@@ -142,12 +197,24 @@ a {
   animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.stagger-1 { animation-delay: 0.1s; }
-.stagger-2 { animation-delay: 0.2s; }
-.stagger-3 { animation-delay: 0.3s; }
-.stagger-4 { animation-delay: 0.4s; }
-.stagger-5 { animation-delay: 0.5s; }
-.stagger-6 { animation-delay: 0.6s; }
+.stagger-1 {
+  animation-delay: 0.1s;
+}
+.stagger-2 {
+  animation-delay: 0.2s;
+}
+.stagger-3 {
+  animation-delay: 0.3s;
+}
+.stagger-4 {
+  animation-delay: 0.4s;
+}
+.stagger-5 {
+  animation-delay: 0.5s;
+}
+.stagger-6 {
+  animation-delay: 0.6s;
+}
 
 // ===== GLASSMORPHISM =====
 .glass {

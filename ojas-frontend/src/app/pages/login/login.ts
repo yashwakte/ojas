@@ -22,7 +22,7 @@ import { AuthService } from '../../services/auth.service';
     MatProgressSpinnerModule,
   ],
   templateUrl: './login.html',
-  styleUrl: './login.scss'
+  styleUrl: './login.scss',
 })
 export class Login {
   loginForm: FormGroup;
@@ -33,11 +33,11 @@ export class Login {
     private fb: FormBuilder,
     private auth: AuthService,
     private router: Router,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
   ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]]
+      password: ['', [Validators.required, Validators.minLength(6)]],
     });
   }
 
@@ -54,7 +54,7 @@ export class Login {
       error: () => {
         this.loading = false;
         this.snackBar.open('Invalid email or password', 'Close', { duration: 3000 });
-      }
+      },
     });
   }
 }

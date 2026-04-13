@@ -36,7 +36,7 @@
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Email</mat-label>
-          <input matInput formControlName="email" type="email" placeholder="Enter your email">
+          <input matInput formControlName="email" type="email" placeholder="Enter your email" />
           <mat-icon matPrefix>email</mat-icon>
           @if (loginForm.get('email')?.hasError('required') && loginForm.get('email')?.touched) {
             <mat-error>Email is required</mat-error>
@@ -48,17 +48,29 @@
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Password</mat-label>
-          <input matInput formControlName="password" [type]="hidePassword ? 'password' : 'text'" placeholder="Enter your password">
+          <input
+            matInput
+            formControlName="password"
+            [type]="hidePassword ? 'password' : 'text'"
+            placeholder="Enter your password"
+          />
           <mat-icon matPrefix>lock</mat-icon>
           <button mat-icon-button matSuffix (click)="hidePassword = !hidePassword" type="button">
             <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
           </button>
-          @if (loginForm.get('password')?.hasError('required') && loginForm.get('password')?.touched) {
+          @if (
+            loginForm.get('password')?.hasError('required') && loginForm.get('password')?.touched
+          ) {
             <mat-error>Password is required</mat-error>
           }
         </mat-form-field>
 
-        <button mat-flat-button class="submit-btn" type="submit" [disabled]="loading || loginForm.invalid">
+        <button
+          mat-flat-button
+          class="submit-btn"
+          type="submit"
+          [disabled]="loading || loginForm.invalid"
+        >
           @if (loading) {
             <mat-spinner diameter="20"></mat-spinner>
           } @else {
@@ -67,9 +79,7 @@
         </button>
       </form>
 
-      <p class="auth-switch">
-        Don't have an account? <a routerLink="/register">Create one</a>
-      </p>
+      <p class="auth-switch">Don't have an account? <a routerLink="/register">Create one</a></p>
     </div>
   </div>
 </div>

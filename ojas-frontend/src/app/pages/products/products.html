@@ -22,7 +22,8 @@
         <button
           [class.active]="selectedCategory === cat"
           (click)="selectCategory(cat)"
-          class="filter-chip">
+          class="filter-chip"
+        >
           {{ cat }}
         </button>
       }
@@ -31,9 +32,14 @@
     <!-- Products Grid -->
     <div class="products-grid">
       @for (product of filteredProducts; track product.id; let i = $index) {
-        <div class="product-card" [style.animation-delay]="(i * 0.06) + 's'">
+        <div class="product-card" [style.animation-delay]="i * 0.06 + 's'">
           <div class="product-image">
-            <img [src]="getImageUrl(product)" [alt]="product.name" loading="lazy">
+            <img
+              [src]="product.imageUrl"
+              [alt]="product.name"
+              loading="lazy"
+              (error)="onImgError($event)"
+            />
             <div class="product-overlay">
               <span class="product-badge">{{ product.category }}</span>
             </div>
@@ -42,9 +48,7 @@
             <h3 class="product-name">{{ product.name }}</h3>
             <p class="product-desc">{{ product.description }}</p>
             <div class="product-meta">
-              <span class="product-weight">
-                <mat-icon>scale</mat-icon> {{ product.weight }}
-              </span>
+              <span class="product-weight"> <mat-icon>scale</mat-icon> {{ product.weight }} </span>
               <span class="product-price">₹{{ product.price }}</span>
             </div>
           </div>

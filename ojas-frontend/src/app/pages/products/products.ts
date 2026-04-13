@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { ProductService } from '../../services/product.service';
@@ -8,26 +8,23 @@ import { Product } from '../../models/interfaces';
   selector: 'app-products',
   imports: [MatButtonModule, MatIconModule],
   templateUrl: './products.html',
-  styleUrl: './products.scss'
+  styleUrl: './products.scss',
 })
-export class Products implements OnInit {
+export class Products {
   selectedCategory = 'All';
   categories = ['All', 'Flour', 'Grains', 'Health Mix'];
 
-  constructor(public productService: ProductService) {}
-
-  ngOnInit() {
-    this.productService.loadProducts();
-  }
+  constructor(private productService: ProductService) {}
 
   get filteredProducts(): Product[] {
     const all = this.productService.products();
     if (this.selectedCategory === 'All') return all;
-    return all.filter(p => p.category === this.selectedCategory);
+    return all.filter((p) => p.category === this.selectedCategory);
   }
 
-  getImageUrl(product: Product): string {
-    return product.imageUrl || '';
+  onImgError(event: Event) {
+    const img = event.target as HTMLImageElement;
+    img.src = '/images/placeholder.svg';
   }
 
   selectCategory(cat: string) {
