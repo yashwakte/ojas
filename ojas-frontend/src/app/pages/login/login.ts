@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { timeout } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -45,15 +46,24 @@ export class Login {
     if (this.loginForm.invalid) return;
 
     this.loading = true;
-    this.auth.login(this.loginForm.value).subscribe({
+    this.auth.login(this.loginForm.value).pipe(timeout(10000)).subscribe({
       next: (res) => {
+        this.loading = false;
         this.auth.saveAuth(res);
         this.snackBar.open('Welcome back! 🎉', 'Close', { duration: 3000 });
         this.router.navigate(['/']);
       },
-      error: () => {
+      error: (err) => {
         this.loading = false;
-        this.snackBar.open('Invalid email or password', 'Close', { duration: 3000 });
+        if (err.status === 429) {
+          this.snackBar.open('Too many attempts. Please wait a minute.', 'Close', { duration: 5000 });
+        } else if (err.status === 401) {
+          this.snackBar.open('Invalid email or password', 'Close', { duration: 3000 });
+        } else if (err.status === 0 || err.name === 'TimeoutError') {
+          this.snackBar.open('Server not reachable. Please try later.', 'Close', { duration: 4000 });
+        } else {
+          this.snackBar.open('Something went wrong. Please try again.', 'Close', { duration: 3000 });
+        }
       },
     });
   }
