@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -35,6 +35,7 @@ export class Login {
     private auth: AuthService,
     private router: Router,
     private snackBar: MatSnackBar,
+    private cdr: ChangeDetectorRef,
   ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
@@ -46,31 +47,36 @@ export class Login {
     if (this.loginForm.invalid) return;
 
     this.loading = true;
-    this.auth.login(this.loginForm.value).pipe(timeout(10000)).subscribe({
-      next: (res) => {
-        this.loading = false;
-        this.auth.saveAuth(res);
-        this.snackBar.open('Welcome back! 🎉', 'Close', {
-          duration: 3000,
-          panelClass: 'snack-success'
-        });
-        this.router.navigate(['/']);
-      },
-      error: (err) => {
-        this.loading = false;
-        let msg = 'Something went wrong. Please try again.';
-        if (err.status === 429) {
-          msg = 'Too many attempts. Please wait a minute.';
-        } else if (err.status === 401 || err.status === 400) {
-          msg = 'Invalid email or password';
-        } else if (err.status === 0 || err.name === 'TimeoutError') {
-          msg = 'Server not reachable. Please try later.';
-        }
-        this.snackBar.open(msg, 'Close', {
-          duration: 5000,
-          panelClass: 'snack-error'
-        });
-      },
-    });
+    this.auth
+      .login(this.loginForm.value)
+      .pipe(timeout(8000))
+      .subscribe({
+        next: (res) => {
+          this.loading = false;
+          this.cdr.detectChanges();
+          this.auth.saveAuth(res);
+          this.snackBar.open('Welcome back! 🎉', 'Close', {
+            duration: 3000,
+            panelClass: 'snack-success',
+          });
+          this.router.navigate(['/']);
+        },
+        error: (err) => {
+          this.loading = false;
+          this.cdr.detectChanges();
+          let msg = 'Something went wrong. Please try again.';
+          if (err.status === 429) {
+            msg = 'Too many attempts. Please wait a minute.';
+          } else if (err.status === 401 || err.status === 400) {
+            msg = 'Invalid email or password';
+          } else if (err.status === 0 || err.name === 'TimeoutError') {
+            msg = 'Server not reachable. Please try later.';
+          }
+          this.snackBar.open(msg, 'Close', {
+            duration: 5000,
+            panelClass: 'snack-error',
+          });
+        },
+      });
   }
 }
