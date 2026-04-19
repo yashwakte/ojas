@@ -11,12 +11,13 @@ public class MongoDbService
     public MongoDbService(IOptions<MongoDbSettings> settings)
     {
         var mongoSettings = MongoClientSettings.FromConnectionString(settings.Value.ConnectionString);
-        mongoSettings.ConnectTimeout = TimeSpan.FromSeconds(10);
-        mongoSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(10);
+        mongoSettings.ConnectTimeout = TimeSpan.FromSeconds(30);
+        mongoSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(30);
         var client = new MongoClient(mongoSettings);
         _database = client.GetDatabase(settings.Value.DatabaseName);
     }
 
     public IMongoCollection<Product> Products => _database.GetCollection<Product>("products");
     public IMongoCollection<User> Users => _database.GetCollection<User>("users");
+    public IMongoCollection<Order> Orders => _database.GetCollection<Order>("orders");
 }
