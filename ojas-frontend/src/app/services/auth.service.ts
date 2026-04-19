@@ -17,10 +17,22 @@ export class AuthService {
   constructor(
     private http: HttpClient,
     private router: Router,
-  ) {}
+  ) {
+    // Remove legacy shared-cart keys that were not scoped to a user
+    localStorage.removeItem('ojas_cart');
+    localStorage.removeItem('ojas_checkout');
+  }
 
   register(request: RegisterRequest) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, request);
+  }
+
+  checkEmail(email: string) {
+    return this.http.get<{ exists: boolean }>(`${this.apiUrl}/check-email`, { params: { email } });
+  }
+
+  checkPhone(phone: string) {
+    return this.http.get<{ exists: boolean }>(`${this.apiUrl}/check-phone`, { params: { phone } });
   }
 
   login(request: LoginRequest) {
@@ -28,20 +40,20 @@ export class AuthService {
   }
 
   saveAuth(response: AuthResponse) {
-    sessionStorage.setItem(this.TOKEN_KEY, response.token);
-    sessionStorage.setItem(this.USER_KEY, JSON.stringify(response));
+    localStorage.setItem(this.TOKEN_KEY, response.token);
+    localStorage.setItem(this.USER_KEY, JSON.stringify(response));
     this._user.set(response);
   }
 
   logout() {
-    sessionStorage.removeItem(this.TOKEN_KEY);
-    sessionStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.USER_KEY);
     this._user.set(null);
     this.router.navigate(['/']);
   }
 
   getToken(): string | null {
-    const token = sessionStorage.getItem(this.TOKEN_KEY);
+    const token = localStorage.getItem(this.TOKEN_KEY);
     if (token && this.isTokenExpired(token)) {
       this.logout();
       return null;
@@ -59,13 +71,13 @@ export class AuthService {
   }
 
   private loadUser(): AuthResponse | null {
-    const token = sessionStorage.getItem('ojas_token');
+    const token = localStorage.getItem('ojas_token');
     if (token && this.isTokenExpired(token)) {
-      sessionStorage.removeItem('ojas_token');
-      sessionStorage.removeItem('ojas_user');
+      localStorage.removeItem('ojas_token');
+      localStorage.removeItem('ojas_user');
       return null;
     }
-    const data = sessionStorage.getItem('ojas_user');
+    const data = localStorage.getItem('ojas_user');
     return data ? JSON.parse(data) : null;
   }
 }
