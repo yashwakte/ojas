@@ -18,14 +18,25 @@ public class AuthService
         _config = config;
     }
 
-    public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
+    public async Task<bool> EmailExistsAsync(string email) =>
+        await _db.Users.Find(u => u.Email == email).AnyAsync();
+
+    public async Task<bool> PhoneExistsAsync(string phone) =>
+        await _db.Users.Find(u => u.Phone == phone).AnyAsync();
+
+    public async Task<(AuthResponse? Response, string? ConflictField)> RegisterAsync(RegisterRequest request)
     {
-        var existingUser = await _db.Users
+        var byEmail = await _db.Users
             .Find(u => u.Email == request.Email)
             .FirstOrDefaultAsync();
+        if (byEmail != null)
+            return (null, "email");
 
-        if (existingUser != null)
-            return null;
+        var byPhone = await _db.Users
+            .Find(u => u.Phone == request.Phone)
+            .FirstOrDefaultAsync();
+        if (byPhone != null)
+            return (null, "phone");
 
         var user = new User
         {
@@ -37,7 +48,7 @@ public class AuthService
 
         await _db.Users.InsertOneAsync(user);
         var token = GenerateToken(user);
-        return new AuthResponse(token, user.FullName, user.Email, user.Phone);
+        return (new AuthResponse(token, user.FullName, user.Email, user.Phone), null);
     }
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request)
