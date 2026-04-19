@@ -1,0 +1,308 @@
+<section class="checkout-page">
+  @if (orderPlaced()) {
+    <!-- ===== ORDER SUCCESS ===== -->
+    <div class="order-success">
+      <div class="success-icon"><mat-icon>check_circle</mat-icon></div>
+      <h2>Order Placed!</h2>
+      <p>
+        Thank you, <strong>{{ auth.user()?.fullName }}</strong
+        >! We'll call you on <strong>{{ phone }}</strong> shortly to confirm delivery.
+      </p>
+      <p class="order-id">
+        Order ID: <code>{{ orderId() }}</code>
+      </p>
+      <div class="success-actions">
+        <a routerLink="/products" class="btn-primary">Continue Shopping</a>
+        <a routerLink="/" class="btn-ghost">Go Home</a>
+      </div>
+    </div>
+  } @else {
+    <div class="checkout-layout">
+      <!-- ===== ORDER FORM ===== -->
+      <div class="form-section">
+        <div class="section-label">
+          <mat-icon>local_shipping</mat-icon>
+          <h2>Delivery Details</h2>
+        </div>
+
+        @if (savedAddresses().length > 0) {
+          <div class="saved-addresses-section">
+            <p class="saved-addr-title"><mat-icon>bookmark</mat-icon> Saved Addresses</p>
+            <div class="saved-addr-scroll">
+              @for (addr of savedAddresses(); track addr.label) {
+                <button
+                  type="button"
+                  class="addr-chip"
+                  [class.addr-chip--selected]="selectedSavedAddress()?.label === addr.label"
+                  (click)="selectAddress(addr)"
+                >
+                  <mat-icon class="addr-chip-icon">{{
+                    addr.isDefault ? 'home' : 'location_on'
+                  }}</mat-icon>
+                  <div class="addr-chip-body">
+                    <span class="addr-chip-label">{{ addr.label }}</span>
+                    <span class="addr-chip-text">{{ addr.fullAddress }}</span>
+                  </div>
+                  @if (selectedSavedAddress()?.label === addr.label) {
+                    <mat-icon class="addr-chip-check">check_circle</mat-icon>
+                  }
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        <form class="checkout-form" (ngSubmit)="placeOrder()">
+          <!-- Contact Info -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fullName">Full Name *</label>
+              <input
+                id="fullName"
+                type="text"
+                [(ngModel)]="fullName"
+                name="fullName"
+                required
+                placeholder="Your full name"
+              />
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone Number *</label>
+              <input
+                id="phone"
+                type="tel"
+                [(ngModel)]="phone"
+                name="phone"
+                required
+                placeholder="10-digit mobile number"
+                pattern="[0-9]{10}"
+              />
+            </div>
+          </div>
+
+          <!-- Delivery Address -->
+          <div class="address-section">
+            <p class="address-section-title"><mat-icon>location_on</mat-icon> Delivery Address *</p>
+
+            @if (selectedSavedAddress()) {
+              <!-- Selected saved address card -->
+              <div class="selected-addr-card">
+                <div class="selected-addr-header">
+                  <mat-icon>{{
+                    selectedSavedAddress()!.isDefault ? 'home' : 'location_on'
+                  }}</mat-icon>
+                  <span class="selected-addr-label">{{ selectedSavedAddress()!.label }}</span>
+                  <span class="selected-addr-badge">Selected</span>
+                </div>
+                <p class="selected-addr-text">{{ selectedSavedAddress()!.fullAddress }}</p>
+                <button type="button" class="use-new-addr-btn" (click)="useNewAddress()">
+                  <mat-icon>edit_location_alt</mat-icon> Enter a different address
+                </button>
+              </div>
+            } @else {
+              <!-- Structured address form -->
+              <div class="address-grid">
+                <div class="form-group">
+                  <label for="houseNo">Flat / House No., Building Name *</label>
+                  <input
+                    id="houseNo"
+                    type="text"
+                    [(ngModel)]="houseNo"
+                    name="houseNo"
+                    required
+                    placeholder="e.g. Flat 4B, Sunrise Apartments"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="street">Street / Road Name *</label>
+                  <input
+                    id="street"
+                    type="text"
+                    [(ngModel)]="street"
+                    name="street"
+                    required
+                    placeholder="e.g. 12, MG Road"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="area">Area / Locality / Colony *</label>
+                  <input
+                    id="area"
+                    type="text"
+                    [(ngModel)]="area"
+                    name="area"
+                    required
+                    placeholder="e.g. Koramangala"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="landmark">Landmark <span class="optional">(optional)</span></label>
+                  <input
+                    id="landmark"
+                    type="text"
+                    [(ngModel)]="landmark"
+                    name="landmark"
+                    placeholder="e.g. Near City Mall"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="city">City *</label>
+                  <input
+                    id="city"
+                    type="text"
+                    [(ngModel)]="city"
+                    name="city"
+                    required
+                    placeholder="e.g. Bengaluru"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="state">State *</label>
+                  <select id="state" [(ngModel)]="state" name="state" required>
+                    <option value="" disabled>Select state</option>
+                    @for (s of indianStates; track s) {
+                      <option [value]="s">{{ s }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group form-group--pincode">
+                  <label for="pincode">Pincode *</label>
+                  <input
+                    id="pincode"
+                    type="text"
+                    [(ngModel)]="pincode"
+                    name="pincode"
+                    required
+                    placeholder="6-digit pincode"
+                    pattern="[0-9]{6}"
+                    maxlength="6"
+                  />
+                </div>
+              </div>
+
+              <!-- Save address prompt -->
+              <div class="save-addr-prompt">
+                <label class="save-toggle">
+                  <input type="checkbox" [(ngModel)]="saveNewAddress" name="saveNewAddress" />
+                  <mat-icon>bookmark_add</mat-icon>
+                  <span>Save this address for later</span>
+                </label>
+                @if (saveNewAddress) {
+                  <input
+                    type="text"
+                    class="save-label-input"
+                    [(ngModel)]="saveNewAddressLabel"
+                    name="saveNewAddressLabel"
+                    placeholder="Label — e.g. Home, Work, Mom's place"
+                  />
+                }
+              </div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="notes">Order Notes <span class="optional">(optional)</span></label>
+            <textarea
+              id="notes"
+              [(ngModel)]="notes"
+              name="notes"
+              rows="2"
+              placeholder="Any special instructions for delivery?"
+            ></textarea>
+          </div>
+
+          @if (errorMsg()) {
+            <div class="error-banner">
+              <mat-icon>error_outline</mat-icon>
+              {{ errorMsg() }}
+            </div>
+          }
+
+          <button
+            type="submit"
+            class="place-order-btn"
+            [disabled]="loading() || !fullName || !phone || !isAddressValid"
+          >
+            @if (loading()) {
+              <mat-icon class="spin">hourglass_empty</mat-icon> Placing Order...
+            } @else {
+              <mat-icon>check_circle</mat-icon> Place Order
+            }
+          </button>
+
+          <p class="cod-note">
+            <mat-icon>info</mat-icon>
+            Cash on delivery — our team will confirm via call.
+          </p>
+        </form>
+      </div>
+
+      <!-- ===== ORDER SUMMARY ===== -->
+      <div class="summary-section">
+        <div class="summary-card">
+          <h3>
+            <mat-icon>receipt_long</mat-icon>
+            Order Summary
+          </h3>
+
+          <div class="summary-items">
+            @for (item of checkoutService.items(); track item.product.id; let i = $index) {
+              <div class="summary-item">
+                <div class="si-img">
+                  <img [src]="item.product.imageUrl" [alt]="item.product.name" />
+                </div>
+                <div class="si-info">
+                  <span class="si-name">{{ item.product.name }}</span>
+                  <span class="si-weight">{{ item.product.weight }}</span>
+                </div>
+                <div class="si-right">
+                  <div class="si-right-inner">
+                    <div class="direct-qty">
+                      <button
+                        type="button"
+                        class="dq-btn"
+                        (click)="decrementCartQty(i)"
+                        [disabled]="item.quantity <= 1"
+                      >
+                        <mat-icon>remove</mat-icon>
+                      </button>
+                      <span class="dq-val">{{ item.quantity }}</span>
+                      <button type="button" class="dq-btn" (click)="incrementCartQty(i)">
+                        <mat-icon>add</mat-icon>
+                      </button>
+                    </div>
+                    <span class="si-price">₹{{ item.product.price * item.quantity }}</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="dq-btn dq-btn--delete"
+                    (click)="removeItem(i)"
+                    aria-label="Remove item"
+                  >
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="summary-totals">
+            <div class="total-row">
+              <span>Subtotal</span>
+              <span>₹{{ totalAmount() }}</span>
+            </div>
+            <div class="total-row">
+              <span>Delivery</span>
+              <span class="free">FREE</span>
+            </div>
+            <div class="total-divider"></div>
+            <div class="total-row grand">
+              <strong>Total</strong>
+              <strong class="grand-amount">₹{{ totalAmount() }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</section>

@@ -1,0 +1,183 @@
+@if (product(); as p) {
+  <section class="product-detail-page">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a routerLink="/">Home</a>
+      <mat-icon>chevron_right</mat-icon>
+      <a routerLink="/products">Products</a>
+      <mat-icon>chevron_right</mat-icon>
+      <span class="breadcrumb-category">{{ p.category }}</span>
+      <mat-icon>chevron_right</mat-icon>
+      <span class="breadcrumb-current">{{ p.name }}</span>
+    </nav>
+
+    <div class="detail-container">
+      <!-- Main Layout: Image + Info -->
+      <div class="detail-layout">
+        <!-- Image Section -->
+        <div class="image-section">
+          <div class="image-wrapper">
+            <img [src]="p.imageUrl" [alt]="p.name" (error)="onImgError($event)" />
+          </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="info-section">
+          <span class="category-badge">{{ p.category }}</span>
+          <h1 class="detail-name">{{ p.name }}</h1>
+
+          <!-- Availability -->
+          <div class="availability" [class.out-of-stock]="!p.isAvailable">
+            <span class="availability-dot"></span>
+            {{ p.isAvailable ? 'In Stock' : 'Out of Stock' }}
+          </div>
+
+          <!-- Price -->
+          <div class="price-section">
+            <span class="detail-price">&#8377;{{ p.price }}</span>
+            <span class="price-note">(Inclusive of all taxes)</span>
+          </div>
+
+          <!-- Weight -->
+          <div class="weight-info">
+            <mat-icon>scale</mat-icon>
+            <span
+              >Net Weight: <strong>{{ p.weight }}</strong></span
+            >
+          </div>
+
+          <!-- Description -->
+          <div class="description-section">
+            <h3>Description</h3>
+            <p class="description-text" [class.expanded]="descExpanded()">
+              {{ p.description }}
+            </p>
+            @if (p.description.length > 120) {
+              <button class="read-more-btn" (click)="toggleDescription()">
+                {{ descExpanded() ? 'Read Less' : 'Read More' }}
+                <mat-icon>{{ descExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+            }
+          </div>
+
+          <!-- Quantity Selector -->
+          <div class="quantity-section">
+            <span class="quantity-label">Quantity</span>
+            <div class="qty-controls">
+              <button
+                class="qty-btn"
+                (click)="decreaseQty()"
+                [disabled]="quantity() <= 1"
+                aria-label="Decrease quantity"
+              >
+                <mat-icon>remove</mat-icon>
+              </button>
+              <span class="qty-value">{{ quantity() }}</span>
+              <button class="qty-btn" (click)="increaseQty()" aria-label="Increase quantity">
+                <mat-icon>add</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="action-buttons">
+            <button
+              class="detail-add-cart-btn"
+              [class.added]="justAdded() === p.id"
+              (click)="addToCart()"
+              [disabled]="!p.isAvailable"
+            >
+              <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+              {{ justAdded() === p.id ? 'Added to Cart!' : 'Add to Cart' }}
+            </button>
+            <button class="detail-buy-now-btn" (click)="buyNow()" [disabled]="!p.isAvailable">
+              <mat-icon>bolt</mat-icon>
+              Buy Now
+            </button>
+          </div>
+
+          <!-- Product Highlights -->
+          <div class="highlights-section">
+            <h3>Product Highlights</h3>
+            <div class="highlights-grid">
+              @for (h of highlights(); track h.text) {
+                <div class="highlight-item">
+                  <mat-icon>{{ h.icon }}</mat-icon>
+                  <span>{{ h.text }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Delivery Info -->
+          <div class="delivery-info">
+            <div class="delivery-item">
+              <mat-icon>local_shipping</mat-icon>
+              <div>
+                <strong>Free Delivery</strong>
+                <span>On all orders across Pune</span>
+              </div>
+            </div>
+            <div class="delivery-item">
+              <mat-icon>schedule</mat-icon>
+              <div>
+                <strong>Estimated Delivery</strong>
+                <span>3-5 business days</span>
+              </div>
+            </div>
+            <div class="delivery-item">
+              <mat-icon>cached</mat-icon>
+              <div>
+                <strong>Fresh Guarantee</strong>
+                <span>Packed fresh on order day</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Similar Products -->
+      @if (similarProducts().length > 0) {
+        <section class="similar-products">
+          <div class="section-label">
+            <span class="label-line"></span>
+            <span class="label-text">SIMILAR</span>
+            <span class="label-line"></span>
+          </div>
+          <h2>You May Also Like</h2>
+          <div class="similar-scroll">
+            @for (sp of similarProducts(); track sp.id) {
+              <a class="similar-card" [routerLink]="['/products', sp.id]">
+                <div class="similar-img">
+                  <img
+                    [src]="sp.imageUrl"
+                    [alt]="sp.name"
+                    loading="lazy"
+                    (error)="onImgError($event)"
+                  />
+                </div>
+                <div class="similar-body">
+                  <h4>{{ sp.name }}</h4>
+                  <div class="similar-meta">
+                    <span class="similar-weight">{{ sp.weight }}</span>
+                    <strong class="similar-price">&#8377;{{ sp.price }}</strong>
+                  </div>
+                </div>
+              </a>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  </section>
+} @else {
+  <!-- Product Not Found -->
+  <section class="not-found-page">
+    <div class="not-found">
+      <mat-icon>search_off</mat-icon>
+      <h2>Product Not Found</h2>
+      <p>The product you're looking for doesn't exist or has been removed.</p>
+      <a routerLink="/products" class="btn-primary">Browse Products</a>
+    </div>
+  </section>
+}
