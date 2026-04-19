@@ -1,35 +1,107 @@
 <header class="header">
   <div class="header-container">
     <a routerLink="/" class="logo">
-      <span class="logo-text">ओजस</span>
-      <div class="logo-sub">
-        <span class="brand-name">OJAS</span>
-        <span class="tagline">शुद्ध आहार...शुद्ध विचार</span>
-      </div>
+      <img src="/images/logo.png" alt="Ojas - शुद्ध आहार...शुद्ध विचार" class="logo-img" />
     </a>
 
+    <!-- Desktop nav links only -->
     <nav class="nav-desktop">
       <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
         >Home</a
       >
       <a routerLink="/products" routerLinkActive="active">Products</a>
+    </nav>
+
+    <!-- Desktop right: icons + user menu (hidden on mobile) -->
+    <div class="header-right">
       @if (auth.isLoggedIn()) {
-        <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
-          <mat-icon>account_circle</mat-icon>
-          {{ auth.user()?.fullName }}
+        <a
+          routerLink="/cart"
+          class="icon-btn cart-btn"
+          [class.cart-bounce]="cartBounce()"
+          aria-label="Cart"
+        >
+          <mat-icon>shopping_cart</mat-icon>
+          @if (cart.items().length > 0) {
+            <span class="icon-badge">{{ cart.items().length }}</span>
+          }
+        </a>
+        @if (activeCheckoutCount() > 0) {
+          <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
+            <mat-icon>shopping_bag</mat-icon>
+            <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
+          </button>
+        }
+        <button [matMenuTriggerFor]="userMenu" class="user-btn">
+          <div class="user-avatar">{{ getInitials() }}</div>
+          <span class="user-name">{{ (auth.user()?.fullName ?? '').split(' ')[0] }}</span>
+          <mat-icon class="chevron-icon">expand_more</mat-icon>
         </button>
-        <mat-menu #userMenu="matMenu">
-          <button mat-menu-item (click)="auth.logout()"><mat-icon>logout</mat-icon> Logout</button>
+        <mat-menu #userMenu="matMenu" class="profile-menu" xPosition="before">
+          <div class="menu-user-header">
+            <div class="menu-avatar">{{ getInitials() }}</div>
+            <div class="menu-user-info">
+              <span class="menu-full-name">{{ auth.user()?.fullName }}</span>
+              <span class="menu-email">{{ auth.user()?.email }}</span>
+            </div>
+          </div>
+          <mat-divider></mat-divider>
+          <a mat-menu-item routerLink="/profile">
+            <mat-icon>account_circle</mat-icon>
+            <span>Profile</span>
+          </a>
+          <a mat-menu-item routerLink="/my-orders">
+            <mat-icon>receipt_long</mat-icon>
+            <span>Your Orders</span>
+          </a>
+          <a mat-menu-item routerLink="/offers">
+            <mat-icon>local_offer</mat-icon>
+            <span>Offers &amp; Deals</span>
+          </a>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="auth.logout()" class="logout-item">
+            <mat-icon>logout</mat-icon>
+            <span>Logout</span>
+          </button>
         </mat-menu>
       } @else {
         <a routerLink="/login" routerLinkActive="active" class="login-link">Login</a>
         <a routerLink="/register" class="register-btn">Register</a>
       }
-    </nav>
+    </div>
 
-    <button class="hamburger" (click)="toggleMenu()" aria-label="Toggle menu">
-      <mat-icon>{{ menuOpen ? 'close' : 'menu' }}</mat-icon>
-    </button>
+    <!-- Mobile: cart icon(s) + hamburger (hidden on desktop) -->
+    <div class="header-mobile-right">
+      @if (auth.isLoggedIn()) {
+        <a
+          routerLink="/cart"
+          class="icon-btn cart-btn"
+          [class.cart-bounce]="cartBounce()"
+          aria-label="Cart"
+        >
+          <mat-icon>shopping_cart</mat-icon>
+          @if (cart.items().length > 0) {
+            <span class="icon-badge">{{ cart.items().length }}</span>
+          }
+        </a>
+        @if (activeCheckoutCount() > 0) {
+          <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
+            <mat-icon>shopping_bag</mat-icon>
+            <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
+          </button>
+        }
+      }
+      <button
+        class="hamburger"
+        [class.open]="menuOpen"
+        (click)="toggleMenu()"
+        aria-label="Toggle menu"
+      >
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
   </div>
 
   @if (menuOpen) {
@@ -37,7 +109,39 @@
       <a routerLink="/" (click)="toggleMenu()">Home</a>
       <a routerLink="/products" (click)="toggleMenu()">Products</a>
       @if (auth.isLoggedIn()) {
-        <a (click)="auth.logout(); toggleMenu()">Logout</a>
+        <a routerLink="/cart" (click)="toggleMenu()">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >shopping_cart</mat-icon
+          >
+          Cart
+          @if (cart.items().length > 0) {
+            ({{ cart.items().length }})
+          }
+        </a>
+        <a routerLink="/profile" (click)="toggleMenu()">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >account_circle</mat-icon
+          >
+          Profile
+        </a>
+        <a routerLink="/my-orders" (click)="toggleMenu()">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >receipt_long</mat-icon
+          >
+          Your Orders
+        </a>
+        <a routerLink="/offers" (click)="toggleMenu()">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >local_offer</mat-icon
+          >
+          Offers &amp; Deals
+        </a>
+        <a (click)="auth.logout(); toggleMenu()" class="mobile-logout">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >logout</mat-icon
+          >
+          Logout
+        </a>
       } @else {
         <a routerLink="/login" (click)="toggleMenu()">Login</a>
         <a routerLink="/register" (click)="toggleMenu()">Register</a>
