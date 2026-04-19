@@ -57,6 +57,14 @@ a {
 }
 
 // Custom scrollbar
+// Fix Material Badge being clipped by mat-icon's default overflow:hidden
+.mat-badge mat-icon,
+.mat-badge-overlap mat-icon,
+[matBadge],
+mat-icon.mat-badge {
+  overflow: visible !important;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -250,6 +258,90 @@ a {
   .mat-mdc-button {
     color: #fff !important;
     font-weight: 700;
+  }
+}
+
+// ===== PROFILE MENU (mat-menu override) =====
+.mat-mdc-menu-panel.profile-menu {
+  background: #fff !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  overflow: hidden;
+  min-width: 220px !important;
+  max-width: 280px !important;
+  padding: 0 !important;
+
+  .mat-mdc-menu-content {
+    padding: 0 !important;
+  }
+
+  .menu-user-header {
+    background: linear-gradient(135deg, #fff8f4 0%, #ffe8d8 100%);
+    border-bottom: 1px solid rgba(242, 90, 26, 0.1);
+  }
+
+  .mat-mdc-menu-item {
+    border-radius: 10px;
+    margin: 2px 8px;
+    width: calc(100% - 16px);
+    transition: background 0.18s ease;
+    min-height: 44px !important;
+
+    .mdc-list-item__primary-text {
+      color: #2d2d2d !important;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+
+    .mat-icon {
+      color: #999 !important;
+      transition: color 0.18s ease;
+    }
+
+    &:hover:not([disabled]) {
+      background-color: rgba(242, 90, 26, 0.08) !important;
+
+      .mdc-list-item__primary-text {
+        color: var(--ojas-orange) !important;
+      }
+
+      .mat-icon {
+        color: var(--ojas-orange) !important;
+      }
+    }
+
+    .mat-ripple-element {
+      background-color: rgba(242, 90, 26, 0.12) !important;
+    }
+  }
+
+  .mat-divider {
+    border-color: #f0f0f0 !important;
+    margin: 4px 0 !important;
+  }
+
+  .logout-item {
+    margin-bottom: 6px !important;
+
+    .mdc-list-item__primary-text {
+      color: #dc2626 !important;
+    }
+
+    .mat-icon {
+      color: #dc2626 !important;
+    }
+
+    &:hover:not([disabled]) {
+      background-color: rgba(220, 38, 38, 0.07) !important;
+
+      .mdc-list-item__primary-text {
+        color: #dc2626 !important;
+      }
+    }
   }
 }
 
