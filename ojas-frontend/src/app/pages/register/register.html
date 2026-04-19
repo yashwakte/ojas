@@ -33,48 +33,60 @@
         <p>Join the Ojas family today</p>
       </div>
 
+      @if (serverError) {
+        <div class="error-banner" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          <span>{{ serverError }}</span>
+        </div>
+      }
+
       <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Full Name</mat-label>
           <input matInput formControlName="fullName" placeholder="Enter your full name" />
           <mat-icon matPrefix>person</mat-icon>
-          @if (
-            registerForm.get('fullName')?.hasError('required') &&
-            registerForm.get('fullName')?.touched
-          ) {
+          @if (registerForm.get('fullName')?.hasError('required') && registerForm.get('fullName')?.touched) {
             <mat-error>Full name is required</mat-error>
+          } @else if (registerForm.get('fullName')?.hasError('minlength')) {
+            <mat-error>Name must be at least 2 characters</mat-error>
           }
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Email</mat-label>
           <input matInput formControlName="email" type="email" placeholder="Enter your email" />
           <mat-icon matPrefix>email</mat-icon>
-          @if (
-            registerForm.get('email')?.hasError('required') && registerForm.get('email')?.touched
-          ) {
+          @if (emailChecking) {
+            <mat-hint class="checking-hint">
+              <span class="checking-dot"></span> Checking availability...
+            </mat-hint>
+          } @else if (registerForm.get('email')?.hasError('required') && registerForm.get('email')?.touched) {
             <mat-error>Email is required</mat-error>
-          }
-          @if (registerForm.get('email')?.hasError('email')) {
+          } @else if (registerForm.get('email')?.hasError('email')) {
             <mat-error>Please enter a valid email</mat-error>
+          } @else if (registerForm.get('email')?.hasError('serverError')) {
+            <mat-error>{{ registerForm.get('email')?.getError('serverError') }}</mat-error>
           }
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Phone Number</mat-label>
           <input matInput formControlName="phone" placeholder="10-digit mobile number" />
           <mat-icon matPrefix>phone</mat-icon>
-          @if (
-            registerForm.get('phone')?.hasError('required') && registerForm.get('phone')?.touched
-          ) {
+          @if (phoneChecking) {
+            <mat-hint class="checking-hint">
+              <span class="checking-dot"></span> Checking availability...
+            </mat-hint>
+          } @else if (registerForm.get('phone')?.hasError('required') && registerForm.get('phone')?.touched) {
             <mat-error>Phone number is required</mat-error>
-          }
-          @if (registerForm.get('phone')?.hasError('pattern')) {
+          } @else if (registerForm.get('phone')?.hasError('pattern')) {
             <mat-error>Enter a valid 10-digit Indian mobile number</mat-error>
+          } @else if (registerForm.get('phone')?.hasError('serverError')) {
+            <mat-error>{{ registerForm.get('phone')?.getError('serverError') }}</mat-error>
           }
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Password</mat-label>
           <input
             matInput
@@ -86,13 +98,9 @@
           <button mat-icon-button matSuffix (click)="hidePassword = !hidePassword" type="button">
             <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
           </button>
-          @if (
-            registerForm.get('password')?.hasError('required') &&
-            registerForm.get('password')?.touched
-          ) {
+          @if (registerForm.get('password')?.hasError('required') && registerForm.get('password')?.touched) {
             <mat-error>Password is required</mat-error>
-          }
-          @if (registerForm.get('password')?.hasError('minlength')) {
+          } @else if (registerForm.get('password')?.hasError('minlength')) {
             <mat-error>Password must be at least 6 characters</mat-error>
           }
         </mat-form-field>
@@ -101,7 +109,7 @@
           mat-flat-button
           class="submit-btn"
           type="submit"
-          [disabled]="loading || registerForm.invalid"
+          [disabled]="loading || registerForm.pending"
         >
           @if (loading) {
             <mat-spinner diameter="20"></mat-spinner>

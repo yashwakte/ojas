@@ -110,6 +110,25 @@
   justify-content: center;
   padding: 40px 24px;
   background: #fafafa;
+
+  // Ensure mat-error is always red
+  mat-error,
+  .mat-mdc-form-field-error {
+    color: #e53935 !important;
+    font-size: 0.78rem;
+  }
+
+  // Red border + label on invalid touched fields
+  .mat-mdc-form-field.ng-invalid.ng-touched {
+    .mdc-notched-outline__leading,
+    .mdc-notched-outline__notch,
+    .mdc-notched-outline__trailing {
+      border-color: #e53935 !important;
+    }
+    .mdc-floating-label {
+      color: #e53935 !important;
+    }
+  }
 }
 
 .auth-card {
@@ -145,7 +164,59 @@
 
 .full-width {
   width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: 16px;
+}
+
+.checking-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ojas-text-light);
+  font-size: 0.78rem;
+}
+
+.checking-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ojas-orange);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff2f2;
+  border: 1px solid #ffc8c8;
+  border-left: 4px solid #e53935;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #c62828;
+  font-size: 0.88rem;
+  font-weight: 500;
+  animation: fadeInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
 }
 
 .submit-btn {
@@ -222,5 +293,16 @@
 @media (max-width: 480px) {
   .auth-form-side {
     padding: 40px 16px;
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
