@@ -152,11 +152,18 @@
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>State *</mat-label>
-                    <mat-select [(ngModel)]="editState">
-                      @for (s of indianStates; track s) {
+                    <input
+                      matInput
+                      [(ngModel)]="editState"
+                      [matAutocomplete]="editStateAuto"
+                      (ngModelChange)="filterEditStates($event)"
+                      placeholder="Search state..."
+                    />
+                    <mat-autocomplete #editStateAuto="matAutocomplete">
+                      @for (s of filteredEditStates; track s) {
                         <mat-option [value]="s">{{ s }}</mat-option>
                       }
-                    </mat-select>
+                    </mat-autocomplete>
                   </mat-form-field>
                   <mat-form-field appearance="outline" class="pincode-field">
                     <mat-label>Pincode *</mat-label>
@@ -252,11 +259,18 @@
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>State *</mat-label>
-              <mat-select [(ngModel)]="newState">
-                @for (s of indianStates; track s) {
+              <input
+                matInput
+                [(ngModel)]="newState"
+                [matAutocomplete]="newStateAuto"
+                (ngModelChange)="filterNewStates($event)"
+                placeholder="Search state..."
+              />
+              <mat-autocomplete #newStateAuto="matAutocomplete">
+                @for (s of filteredNewStates; track s) {
                   <mat-option [value]="s">{{ s }}</mat-option>
                 }
-              </mat-select>
+              </mat-autocomplete>
             </mat-form-field>
             <mat-form-field appearance="outline" class="pincode-field">
               <mat-label>Pincode *</mat-label>

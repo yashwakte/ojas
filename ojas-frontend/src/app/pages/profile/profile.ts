@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
@@ -22,6 +23,7 @@ import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces
     MatFormFieldModule,
     MatCheckboxModule,
     MatSelectModule,
+    MatAutocompleteModule,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
@@ -63,6 +65,9 @@ export class Profile implements OnInit {
   editPincode = '';
   editIsDefault = false;
   savingEditAddress = signal(false);
+
+  filteredNewStates: string[] = [];
+  filteredEditStates: string[] = [];
 
   readonly indianStates = [
     'Andhra Pradesh',
@@ -107,7 +112,10 @@ export class Profile implements OnInit {
     public auth: AuthService,
     private userService: UserService,
     private router: Router,
-  ) {}
+  ) {
+    this.filteredNewStates = [...this.indianStates];
+    this.filteredEditStates = [...this.indianStates];
+  }
 
   ngOnInit(): void {
     if (!this.auth.isLoggedIn()) {
@@ -153,6 +161,16 @@ export class Profile implements OnInit {
       });
   }
 
+  filterNewStates(value: string): void {
+    const q = (value ?? '').toLowerCase();
+    this.filteredNewStates = this.indianStates.filter((s) => s.toLowerCase().includes(q));
+  }
+
+  filterEditStates(value: string): void {
+    const q = (value ?? '').toLowerCase();
+    this.filteredEditStates = this.indianStates.filter((s) => s.toLowerCase().includes(q));
+  }
+
   get isNewAddressValid(): boolean {
     return !!(
       this.newLabel.trim() &&
@@ -160,7 +178,7 @@ export class Profile implements OnInit {
       this.newStreet.trim() &&
       this.newArea.trim() &&
       this.newCity.trim() &&
-      this.newState &&
+      this.indianStates.includes(this.newState) &&
       this.newPincode.trim().length === 6
     );
   }
@@ -205,6 +223,7 @@ export class Profile implements OnInit {
     this.newState = '';
     this.newPincode = '';
     this.newIsDefault = false;
+    this.filteredNewStates = [...this.indianStates];
   }
 
   deleteAddress(index: number): void {
@@ -220,7 +239,7 @@ export class Profile implements OnInit {
       this.editStreet.trim() &&
       this.editArea.trim() &&
       this.editCity.trim() &&
-      this.editState &&
+      this.indianStates.includes(this.editState) &&
       this.editPincode.trim().length === 6
     );
   }
@@ -286,6 +305,7 @@ export class Profile implements OnInit {
     this.editState = '';
     this.editPincode = '';
     this.editIsDefault = false;
+    this.filteredEditStates = [...this.indianStates];
   }
 
   saveEditAddress(): void {
