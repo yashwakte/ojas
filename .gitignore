@@ -2,6 +2,7 @@
 ojas-api/bin/
 ojas-api/obj/
 ojas-api/appsettings.json
+ojas-api/appsettings.Development.json
 
 # Frontend
 ojas-frontend/node_modules/
