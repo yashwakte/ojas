@@ -23,4 +23,19 @@ public class User
 
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [BsonElement("savedAddresses")]
+    public List<SavedAddress> SavedAddresses { get; set; } = [];
+}
+
+public class SavedAddress
+{
+    [BsonElement("label")]
+    public string Label { get; set; } = string.Empty;
+
+    [BsonElement("fullAddress")]
+    public string FullAddress { get; set; } = string.Empty;
+
+    [BsonElement("isDefault")]
+    public bool IsDefault { get; set; }
 }
