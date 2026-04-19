@@ -15,6 +15,7 @@ builder.Services.Configure<MongoDbSettings>(
 builder.Services.AddSingleton<MongoDbService>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<OrderService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -109,6 +110,11 @@ _ = Task.Run(async () =>
     }
 });
 
+if (app.Environment.IsProduction())
+    app.UseCors("AllowProduction");
+else
+    app.UseCors("AllowAngular");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -125,11 +131,6 @@ app.Use(async (context, next) =>
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     await next();
 });
-
-if (app.Environment.IsProduction())
-    app.UseCors("AllowProduction");
-else
-    app.UseCors("AllowAngular");
 
 app.UseRateLimiter();
 
