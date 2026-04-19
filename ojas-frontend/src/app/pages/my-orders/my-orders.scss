@@ -1,0 +1,266 @@
+.orders-page {
+  min-height: 100vh;
+  padding: 100px 24px 48px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 40px;
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  .subtitle {
+    color: var(--ojas-text-light);
+    margin: 4px 0 0;
+    font-size: 0.9rem;
+  }
+}
+
+.back-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(242, 90, 26, 0.08);
+  color: var(--ojas-orange);
+  transition: background 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(242, 90, 26, 0.16);
+  }
+}
+
+.loading-state,
+.error-state,
+.empty-state {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    font-size: 3rem;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 16px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  h3 {
+    font-size: 1.2rem;
+    color: var(--ojas-text);
+    margin-bottom: 8px;
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+  color: var(--ojas-orange) !important;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.shop-btn {
+  margin-top: 20px;
+  background: var(--ojas-orange) !important;
+  color: #fff !important;
+  border-radius: 50px !important;
+  padding: 10px 28px !important;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.order-card {
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+
+  &:hover {
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(242, 90, 26, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.order-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.order-id {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ojas-text);
+  font-family: 'Poppins', sans-serif;
+}
+
+.order-date {
+  font-size: 0.78rem;
+  color: var(--ojas-text-light);
+}
+
+.order-status {
+  padding: 4px 14px;
+  border-radius: 50px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+
+  &.status-pending {
+    background: #fff8e1;
+    color: #f59e0b;
+  }
+  &.status-shipped {
+    background: #e8f4fd;
+    color: #2563eb;
+  }
+  &.status-delivered {
+    background: #f0fdf4;
+    color: #16a34a;
+  }
+  &.status-cancelled {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+}
+
+.order-items {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ojas-text);
+}
+
+.item-weight {
+  font-size: 0.78rem;
+  color: var(--ojas-text-light);
+}
+
+.item-qty-price {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-qty {
+  font-size: 0.85rem;
+  color: var(--ojas-text-light);
+}
+
+.item-price {
+  font-weight: 700;
+  color: var(--ojas-orange);
+  font-size: 0.95rem;
+  min-width: 70px;
+  text-align: right;
+}
+
+.order-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.015);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.delivery-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ojas-text-light);
+  font-size: 0.82rem;
+  flex: 1;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--ojas-orange);
+    flex-shrink: 0;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.order-total {
+  font-size: 0.9rem;
+  color: var(--ojas-text);
+  white-space: nowrap;
+
+  strong {
+    color: var(--ojas-orange);
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .orders-page {
+    padding: 90px 16px 32px;
+  }
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}

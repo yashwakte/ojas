@@ -1,0 +1,290 @@
+<div class="profile-page">
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-icon class="spin">autorenew</mat-icon>
+    </div>
+  } @else if (error()) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+    </div>
+  } @else {
+    <!-- Avatar + Name Banner -->
+    <div class="profile-banner">
+      <div class="avatar-circle">{{ getInitials() }}</div>
+      <div class="banner-info">
+        <h2>{{ profile()?.fullName }}</h2>
+        <p>{{ profile()?.email }}</p>
+      </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="quick-links">
+      <a routerLink="/my-orders" class="quick-link">
+        <div class="link-icon orders"><mat-icon>receipt_long</mat-icon></div>
+        <span>Your Orders</span>
+        <mat-icon class="chevron">chevron_right</mat-icon>
+      </a>
+      <a routerLink="/offers" class="quick-link">
+        <div class="link-icon offers"><mat-icon>local_offer</mat-icon></div>
+        <span>Offers &amp; Deals</span>
+        <mat-icon class="chevron">chevron_right</mat-icon>
+      </a>
+      <button class="quick-link logout-link" (click)="logout()">
+        <div class="link-icon logout"><mat-icon>logout</mat-icon></div>
+        <span>Logout</span>
+        <mat-icon class="chevron">chevron_right</mat-icon>
+      </button>
+    </div>
+
+    <!-- Profile Details -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>Personal Information</h3>
+        @if (!editingProfile()) {
+          <button mat-icon-button (click)="startEdit()" class="edit-btn" aria-label="Edit profile">
+            <mat-icon>edit</mat-icon>
+          </button>
+        }
+      </div>
+
+      @if (!editingProfile()) {
+        <div class="info-rows">
+          <div class="info-row">
+            <mat-icon>person</mat-icon>
+            <div>
+              <label>Full Name</label>
+              <span>{{ profile()?.fullName }}</span>
+            </div>
+          </div>
+          <div class="info-row">
+            <mat-icon>email</mat-icon>
+            <div>
+              <label>Email</label>
+              <span>{{ profile()?.email }}</span>
+            </div>
+          </div>
+          <div class="info-row">
+            <mat-icon>phone</mat-icon>
+            <div>
+              <label>Phone</label>
+              <span>{{ profile()?.phone }}</span>
+            </div>
+          </div>
+        </div>
+      } @else {
+        <div class="edit-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Full Name</mat-label>
+            <input matInput [(ngModel)]="editFullName" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Phone</mat-label>
+            <input matInput [(ngModel)]="editPhone" type="tel" />
+          </mat-form-field>
+          <div class="edit-actions">
+            <button mat-stroked-button (click)="editingProfile.set(false)">Cancel</button>
+            <button
+              mat-raised-button
+              class="save-btn"
+              (click)="saveProfile()"
+              [disabled]="savingProfile()"
+            >
+              {{ savingProfile() ? 'Saving...' : 'Save Changes' }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Saved Addresses -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>Saved Addresses</h3>
+        <button
+          mat-icon-button
+          (click)="showAddressForm.set(true)"
+          class="edit-btn"
+          aria-label="Add address"
+        >
+          <mat-icon>add</mat-icon>
+        </button>
+      </div>
+
+      @if (profile()?.savedAddresses?.length === 0 && !showAddressForm()) {
+        <p class="empty-hint">No saved addresses yet. Add one to speed up checkout!</p>
+      }
+
+      <div class="addresses-list">
+        @for (addr of profile()?.savedAddresses ?? []; track $index) {
+          <div class="address-card" [class.default]="addr.isDefault">
+            @if (editingAddressIndex() === $index) {
+              <!-- Inline edit form -->
+              <div class="address-edit-form">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Label (e.g. Home, Work)</mat-label>
+                  <input matInput [(ngModel)]="editLabel" />
+                </mat-form-field>
+                <div class="addr-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Flat / House No., Building Name *</mat-label>
+                    <input
+                      matInput
+                      [(ngModel)]="editHouseNo"
+                      placeholder="e.g. Flat 4B, Sunrise Apartments"
+                    />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Street / Road Name *</mat-label>
+                    <input matInput [(ngModel)]="editStreet" placeholder="e.g. 12, MG Road" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Area / Locality / Colony *</mat-label>
+                    <input matInput [(ngModel)]="editArea" placeholder="e.g. Koramangala" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Landmark (optional)</mat-label>
+                    <input matInput [(ngModel)]="editLandmark" placeholder="e.g. Near City Mall" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>City *</mat-label>
+                    <input matInput [(ngModel)]="editCity" placeholder="e.g. Bengaluru" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>State *</mat-label>
+                    <mat-select [(ngModel)]="editState">
+                      @for (s of indianStates; track s) {
+                        <mat-option [value]="s">{{ s }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="pincode-field">
+                    <mat-label>Pincode *</mat-label>
+                    <input
+                      matInput
+                      [(ngModel)]="editPincode"
+                      placeholder="6-digit pincode"
+                      maxlength="6"
+                    />
+                  </mat-form-field>
+                </div>
+                <mat-checkbox [(ngModel)]="editIsDefault" color="primary"
+                  >Set as default address</mat-checkbox
+                >
+                <div class="edit-actions">
+                  <button mat-stroked-button (click)="cancelEditAddress()">Cancel</button>
+                  <button
+                    mat-raised-button
+                    class="save-btn"
+                    (click)="saveEditAddress()"
+                    [disabled]="savingEditAddress() || !isEditAddressValid"
+                  >
+                    {{ savingEditAddress() ? 'Saving...' : 'Save Changes' }}
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <!-- Address display -->
+              <div class="address-body">
+                <div class="address-label-row">
+                  <mat-icon>{{ addr.isDefault ? 'home' : 'location_on' }}</mat-icon>
+                  <span class="address-label">{{ addr.label }}</span>
+                  @if (addr.isDefault) {
+                    <span class="default-badge">Default</span>
+                  }
+                </div>
+                <p class="address-text">{{ addr.fullAddress }}</p>
+              </div>
+              <div class="address-actions">
+                <button
+                  mat-icon-button
+                  class="edit-address-btn"
+                  (click)="startEditAddress($index)"
+                  aria-label="Edit address"
+                >
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  class="delete-address-btn"
+                  (click)="deleteAddress($index)"
+                  aria-label="Delete address"
+                >
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (showAddressForm()) {
+        <div class="add-address-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Label (e.g. Home, Work)</mat-label>
+            <input matInput [(ngModel)]="newLabel" />
+          </mat-form-field>
+
+          <div class="addr-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Flat / House No., Building Name *</mat-label>
+              <input
+                matInput
+                [(ngModel)]="newHouseNo"
+                placeholder="e.g. Flat 4B, Sunrise Apartments"
+              />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Street / Road Name *</mat-label>
+              <input matInput [(ngModel)]="newStreet" placeholder="e.g. 12, MG Road" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Area / Locality / Colony *</mat-label>
+              <input matInput [(ngModel)]="newArea" placeholder="e.g. Koramangala" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Landmark (optional)</mat-label>
+              <input matInput [(ngModel)]="newLandmark" placeholder="e.g. Near City Mall" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>City *</mat-label>
+              <input matInput [(ngModel)]="newCity" placeholder="e.g. Bengaluru" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>State *</mat-label>
+              <mat-select [(ngModel)]="newState">
+                @for (s of indianStates; track s) {
+                  <mat-option [value]="s">{{ s }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="pincode-field">
+              <mat-label>Pincode *</mat-label>
+              <input
+                matInput
+                [(ngModel)]="newPincode"
+                placeholder="6-digit pincode"
+                maxlength="6"
+              />
+            </mat-form-field>
+          </div>
+
+          <mat-checkbox [(ngModel)]="newIsDefault" color="primary"
+            >Set as default address</mat-checkbox
+          >
+          <div class="edit-actions">
+            <button mat-stroked-button (click)="cancelAddAddress()">Cancel</button>
+            <button
+              mat-raised-button
+              class="save-btn"
+              (click)="addAddress()"
+              [disabled]="savingAddress() || !isNewAddressValid"
+            >
+              {{ savingAddress() ? 'Saving...' : 'Save Address' }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

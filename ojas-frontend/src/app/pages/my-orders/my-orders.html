@@ -1,0 +1,73 @@
+<div class="orders-page">
+  <div class="page-header">
+    <a routerLink="/profile" class="back-link">
+      <mat-icon>arrow_back</mat-icon>
+    </a>
+    <div>
+      <h1>Your Orders</h1>
+      <p class="subtitle">Track and review your purchases</p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-icon class="spin">autorenew</mat-icon>
+      <p>Loading your orders...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+    </div>
+  } @else if (orders().length === 0) {
+    <div class="empty-state">
+      <mat-icon>receipt_long</mat-icon>
+      <h3>No orders yet</h3>
+      <p>When you place an order, it will appear here.</p>
+      <a routerLink="/products" mat-raised-button class="shop-btn">Shop Now</a>
+    </div>
+  } @else {
+    <div class="orders-list">
+      @for (order of orders(); track order.id) {
+        <div class="order-card">
+          <div class="order-header">
+            <div class="order-meta">
+              <span class="order-id">Order #{{ order.id.slice(-8).toUpperCase() }}</span>
+              <span class="order-date">{{ order.createdAt | date: 'dd MMM yyyy, h:mm a' }}</span>
+            </div>
+            <span class="order-status" [class]="getStatusClass(order.status)">
+              {{ order.status }}
+            </span>
+          </div>
+
+          <div class="order-items">
+            @for (item of order.items; track item.productId) {
+              <div class="order-item">
+                <div class="item-info">
+                  <span class="item-name">{{ item.productName }}</span>
+                  <span class="item-weight">{{ item.weight }}</span>
+                </div>
+                <div class="item-qty-price">
+                  <span class="item-qty">× {{ item.quantity }}</span>
+                  <span class="item-price">{{
+                    item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                  }}</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="order-footer">
+            <div class="delivery-info">
+              <mat-icon>location_on</mat-icon>
+              <span>{{ order.address }}</span>
+            </div>
+            <div class="order-total">
+              Total: <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
