@@ -5,28 +5,28 @@
 // ===== HERO =====
 .hero {
   text-align: center;
-  padding: 90px 20px 36px;
+  padding: 80px 20px 20px;
   background: linear-gradient(175deg, #fff8f4 0%, #ffe6db 40%, #ffd0bd 100%);
   overflow: hidden;
 }
 
 .hero-heading {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 
   h1 {
-    font-size: 5rem;
+    font-size: 2.6rem;
     font-weight: 800;
     color: var(--ojas-orange);
-    line-height: 0.9;
-    letter-spacing: -2px;
+    line-height: 1;
+    letter-spacing: -1px;
     margin-bottom: 2px;
   }
 
   .tagline {
-    font-size: 1.05rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--ojas-orange-dark);
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     margin: 0;
   }
 }
@@ -37,18 +37,18 @@
 }
 
 .hero-desc {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--ojas-text-light);
-  line-height: 1.65;
-  margin-bottom: 20px;
+  line-height: 1.55;
+  margin-bottom: 12px;
 }
 
 .hero-cta {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .trust-strip {
@@ -298,6 +298,22 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.pcard-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  cursor: pointer;
+}
+.pbody-top {
+  padding: 10px 12px 0;
+  h3 {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--ojas-text);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+}
 .pcard {
   background: #fff;
   border-radius: 14px;
@@ -339,19 +355,13 @@
   letter-spacing: 0.3px;
 }
 .pbody {
-  padding: 10px 12px;
-  h3 {
-    font-weight: 600;
-    font-size: 0.78rem;
-    color: var(--ojas-text);
-    margin-bottom: 6px;
-    line-height: 1.3;
-  }
+  padding: 0 12px 10px;
 }
 .pmeta {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
   span {
     font-size: 0.65rem;
     color: var(--ojas-text-light);
@@ -360,6 +370,79 @@
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--ojas-orange);
+  }
+}
+
+.pactions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.home-add-cart-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--ojas-orange);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: var(--ojas-orange-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(242, 90, 26, 0.28);
+  }
+
+  &.added {
+    background: #4caf50;
+
+    &:hover {
+      background: #388e3c;
+    }
+  }
+}
+
+.home-buy-now-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--ojas-orange);
+  border: 1.5px solid var(--ojas-orange);
+  border-radius: 10px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: var(--ojas-orange);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(242, 90, 26, 0.28);
   }
 }
 
@@ -533,13 +616,29 @@
   }
 }
 
+// ===== MOBILE SMALL (icon-only buttons) =====
+@media (max-width: 480px) {
+  .home-add-cart-btn,
+  .home-buy-now-btn {
+    font-size: 0;
+    gap: 0;
+    padding: 10px;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
 // ===== TABLET 640px+ =====
 @media (min-width: 640px) {
   .hero-heading h1 {
-    font-size: 6rem;
+    font-size: 3rem;
   }
   .hero-heading .tagline {
-    font-size: 1.15rem;
+    font-size: 0.95rem;
   }
 
   .hero-desc {
@@ -563,14 +662,14 @@
 // ===== DESKTOP 960px+ =====
 @media (min-width: 960px) {
   .hero {
-    padding-top: 110px;
+    padding-top: 90px;
   }
   .hero-heading h1 {
-    font-size: 7rem;
+    font-size: 3.4rem;
   }
   .hero-heading .tagline {
-    font-size: 1.3rem;
-    letter-spacing: 2px;
+    font-size: 1rem;
+    letter-spacing: 1px;
   }
 
   .hero-desc {

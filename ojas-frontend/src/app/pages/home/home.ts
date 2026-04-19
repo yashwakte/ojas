@@ -1,7 +1,11 @@
-import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { ProductService } from '../../services/product.service';
+import { CartService } from '../../services/cart.service';
+import { CheckoutService } from '../../services/checkout.service';
+import { AuthService } from '../../services/auth.service';
+import { Product } from '../../models/interfaces';
 
 @Component({
   selector: 'app-home',
@@ -11,9 +15,35 @@ import { ProductService } from '../../services/product.service';
 })
 export class Home {
   featuredProducts;
+  justAdded = signal<string | null>(null);
 
-  constructor(private productService: ProductService) {
+  constructor(
+    private productService: ProductService,
+    private cartService: CartService,
+    private checkoutService: CheckoutService,
+    private auth: AuthService,
+    private router: Router,
+  ) {
     this.featuredProducts = this.productService.products().slice(0, 6);
+  }
+
+  addToCart(product: Product): void {
+    if (!this.auth.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.cartService.addToCart(product);
+    this.justAdded.set(product.id);
+    setTimeout(() => this.justAdded.set(null), 2000);
+  }
+
+  buyNow(product: Product): void {
+    if (!this.auth.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.checkoutService.addItem(product);
+    this.router.navigate(['/checkout']);
   }
 
   onImgError(event: Event) {

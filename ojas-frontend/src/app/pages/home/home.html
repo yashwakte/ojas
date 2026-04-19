@@ -47,17 +47,36 @@
   <div class="pgrid">
     @for (p of featuredProducts; track p.id) {
       <div class="pcard">
-        <div class="pimg">
-          <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span
-            class="pcat"
-            >{{ p.category }}</span
-          >
-        </div>
+        <a class="pcard-link" [routerLink]="['/products', p.id]">
+          <div class="pimg">
+            <img
+              [src]="p.imageUrl"
+              [alt]="p.name"
+              loading="lazy"
+              (error)="onImgError($event)"
+            /><span class="pcat">{{ p.category }}</span>
+          </div>
+          <div class="pbody-top">
+            <h3>{{ p.name }}</h3>
+            <div class="pmeta">
+              <span>{{ p.weight }}</span
+              ><strong>₹{{ p.price }}</strong>
+            </div>
+          </div>
+        </a>
         <div class="pbody">
-          <h3>{{ p.name }}</h3>
-          <div class="pmeta">
-            <span>{{ p.weight }}</span
-            ><strong>₹{{ p.price }}</strong>
+          <div class="pactions">
+            <button
+              class="home-add-cart-btn"
+              [class.added]="justAdded() === p.id"
+              (click)="addToCart(p)"
+            >
+              <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+              {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
+            </button>
+            <button class="home-buy-now-btn" (click)="buyNow(p)">
+              <mat-icon>bolt</mat-icon> Buy Now
+            </button>
           </div>
         </div>
       </div>
