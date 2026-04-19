@@ -131,40 +131,46 @@
                     <input
                       matInput
                       [(ngModel)]="editHouseNo"
-                      placeholder="e.g. Flat 4B, Sunrise Apartments"
+                      placeholder="e.g. Flat 3A, Sanghvi Tower"
                     />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>Street / Road Name *</mat-label>
-                    <input matInput [(ngModel)]="editStreet" placeholder="e.g. 12, MG Road" />
+                    <input matInput [(ngModel)]="editStreet" placeholder="e.g. 5, Sanghvi Nagar Road" />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>Area / Locality / Colony *</mat-label>
-                    <input matInput [(ngModel)]="editArea" placeholder="e.g. Koramangala" />
+                    <input matInput [(ngModel)]="editArea" placeholder="e.g. Sanghvi, Aundh" />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>Landmark (optional)</mat-label>
-                    <input matInput [(ngModel)]="editLandmark" placeholder="e.g. Near City Mall" />
+                    <input matInput [(ngModel)]="editLandmark" placeholder="e.g. Near D-Mart Sanghvi" />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>City *</mat-label>
-                    <input matInput [(ngModel)]="editCity" placeholder="e.g. Bengaluru" />
+                    <input matInput [(ngModel)]="editCity" placeholder="e.g. Pune" />
                   </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>State *</mat-label>
-                    <input
-                      matInput
-                      [(ngModel)]="editState"
-                      [matAutocomplete]="editStateAuto"
-                      (ngModelChange)="filterEditStates($event)"
-                      placeholder="Search state..."
-                    />
-                    <mat-autocomplete #editStateAuto="matAutocomplete">
-                      @for (s of filteredEditStates; track s) {
-                        <mat-option [value]="s">{{ s }}</mat-option>
-                      }
-                    </mat-autocomplete>
-                  </mat-form-field>
+                  <div class="state-picker">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>State *</mat-label>
+                      <input
+                        matInput
+                        [(ngModel)]="editState"
+                        (ngModelChange)="filterEditStates($event)"
+                        (focus)="onStateFocus('edit')"
+                        (blur)="onStateBlur('edit')"
+                        placeholder="Search state..."
+                        autocomplete="off"
+                      />
+                    </mat-form-field>
+                    @if (editStateOpen && filteredEditStates.length > 0) {
+                      <div class="state-list">
+                        @for (s of filteredEditStates; track s) {
+                          <button type="button" class="state-option" (mousedown)="selectState('edit', s)">{{ s }}</button>
+                        }
+                      </div>
+                    }
+                  </div>
                   <mat-form-field appearance="outline" class="pincode-field">
                     <mat-label>Pincode *</mat-label>
                     <input
@@ -238,40 +244,46 @@
               <input
                 matInput
                 [(ngModel)]="newHouseNo"
-                placeholder="e.g. Flat 4B, Sunrise Apartments"
+                placeholder="e.g. Flat 3A, Sanghvi Tower"
               />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Street / Road Name *</mat-label>
-              <input matInput [(ngModel)]="newStreet" placeholder="e.g. 12, MG Road" />
+              <input matInput [(ngModel)]="newStreet" placeholder="e.g. 5, Sanghvi Nagar Road" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Area / Locality / Colony *</mat-label>
-              <input matInput [(ngModel)]="newArea" placeholder="e.g. Koramangala" />
+              <input matInput [(ngModel)]="newArea" placeholder="e.g. Sanghvi, Aundh" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Landmark (optional)</mat-label>
-              <input matInput [(ngModel)]="newLandmark" placeholder="e.g. Near City Mall" />
+              <input matInput [(ngModel)]="newLandmark" placeholder="e.g. Near D-Mart Sanghvi" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>City *</mat-label>
-              <input matInput [(ngModel)]="newCity" placeholder="e.g. Bengaluru" />
+              <input matInput [(ngModel)]="newCity" placeholder="e.g. Pune" />
             </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>State *</mat-label>
-              <input
-                matInput
-                [(ngModel)]="newState"
-                [matAutocomplete]="newStateAuto"
-                (ngModelChange)="filterNewStates($event)"
-                placeholder="Search state..."
-              />
-              <mat-autocomplete #newStateAuto="matAutocomplete">
-                @for (s of filteredNewStates; track s) {
-                  <mat-option [value]="s">{{ s }}</mat-option>
-                }
-              </mat-autocomplete>
-            </mat-form-field>
+            <div class="state-picker">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>State *</mat-label>
+                <input
+                  matInput
+                  [(ngModel)]="newState"
+                  (ngModelChange)="filterNewStates($event)"
+                  (focus)="onStateFocus('new')"
+                  (blur)="onStateBlur('new')"
+                  placeholder="Search state..."
+                  autocomplete="off"
+                />
+              </mat-form-field>
+              @if (newStateOpen && filteredNewStates.length > 0) {
+                <div class="state-list">
+                  @for (s of filteredNewStates; track s) {
+                    <button type="button" class="state-option" (mousedown)="selectState('new', s)">{{ s }}</button>
+                  }
+                </div>
+              }
+            </div>
             <mat-form-field appearance="outline" class="pincode-field">
               <mat-label>Pincode *</mat-label>
               <input

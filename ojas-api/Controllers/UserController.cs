@@ -46,10 +46,16 @@ public class UserController : ControllerBase
             .Set(u => u.FullName, request.FullName)
             .Set(u => u.Phone, request.Phone);
 
-        var result = await _db.Users.UpdateOneAsync(u => u.Id == userId, update);
-        if (result.MatchedCount == 0) return NotFound();
-
-        return NoContent();
+        try
+        {
+            var result = await _db.Users.UpdateOneAsync(u => u.Id == userId, update);
+            if (result.MatchedCount == 0) return NotFound();
+            return NoContent();
+        }
+        catch (MongoWriteException ex) when (ex.WriteError.Code == 11000)
+        {
+            return Conflict(new { message = "This phone number is already associated with another account." });
+        }
     }
 
     // GET /api/user/addresses

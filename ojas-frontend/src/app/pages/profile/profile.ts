@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
-import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
@@ -23,7 +24,6 @@ import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces
     MatFormFieldModule,
     MatCheckboxModule,
     MatSelectModule,
-    MatAutocompleteModule,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
@@ -68,6 +68,8 @@ export class Profile implements OnInit {
 
   filteredNewStates: string[] = [];
   filteredEditStates: string[] = [];
+  newStateOpen = false;
+  editStateOpen = false;
 
   readonly indianStates = [
     'Andhra Pradesh',
@@ -107,6 +109,8 @@ export class Profile implements OnInit {
     'Lakshadweep',
     'Puducherry',
   ];
+
+  private snackBar = inject(MatSnackBar);
 
   constructor(
     public auth: AuthService,
@@ -157,7 +161,17 @@ export class Profile implements OnInit {
           this.savingProfile.set(false);
           this.loadProfile();
         },
-        error: () => this.savingProfile.set(false),
+        error: (err: HttpErrorResponse) => {
+          this.savingProfile.set(false);
+          const message =
+            err.status === 409
+              ? (err.error?.message ?? 'Phone number is already in use.')
+              : 'Failed to save changes. Please try again.';
+          this.snackBar.open(message, 'Dismiss', {
+            duration: 4000,
+            panelClass: 'snack-error',
+          });
+        },
       });
   }
 
@@ -169,6 +183,34 @@ export class Profile implements OnInit {
   filterEditStates(value: string): void {
     const q = (value ?? '').toLowerCase();
     this.filteredEditStates = this.indianStates.filter((s) => s.toLowerCase().includes(q));
+  }
+
+  onStateFocus(type: 'new' | 'edit'): void {
+    if (type === 'new') {
+      this.filteredNewStates = [...this.indianStates];
+      this.newStateOpen = true;
+    } else {
+      this.filteredEditStates = [...this.indianStates];
+      this.editStateOpen = true;
+    }
+  }
+
+  onStateBlur(type: 'new' | 'edit'): void {
+    if (type === 'new') {
+      this.newStateOpen = false;
+    } else {
+      this.editStateOpen = false;
+    }
+  }
+
+  selectState(type: 'new' | 'edit', state: string): void {
+    if (type === 'new') {
+      this.newState = state;
+      this.newStateOpen = false;
+    } else {
+      this.editState = state;
+      this.editStateOpen = false;
+    }
   }
 
   get isNewAddressValid(): boolean {
@@ -223,6 +265,7 @@ export class Profile implements OnInit {
     this.newState = '';
     this.newPincode = '';
     this.newIsDefault = false;
+    this.newStateOpen = false;
     this.filteredNewStates = [...this.indianStates];
   }
 
@@ -305,6 +348,7 @@ export class Profile implements OnInit {
     this.editState = '';
     this.editPincode = '';
     this.editIsDefault = false;
+    this.editStateOpen = false;
     this.filteredEditStates = [...this.indianStates];
   }
 
