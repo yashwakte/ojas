@@ -33,23 +33,44 @@
     <div class="products-grid">
       @for (product of filteredProducts; track product.id; let i = $index) {
         <div class="product-card" [style.animation-delay]="i * 0.06 + 's'">
-          <div class="product-image">
-            <img
-              [src]="product.imageUrl"
-              [alt]="product.name"
-              loading="lazy"
-              (error)="onImgError($event)"
-            />
-            <div class="product-overlay">
-              <span class="product-badge">{{ product.category }}</span>
+          <a class="product-link" [routerLink]="['/products', product.id]">
+            <div class="product-image">
+              <img
+                [src]="product.imageUrl"
+                [alt]="product.name"
+                loading="lazy"
+                (error)="onImgError($event)"
+              />
+              <div class="product-overlay">
+                <span class="product-badge">{{ product.category }}</span>
+              </div>
             </div>
-          </div>
+            <div class="product-info-top">
+              <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
+              <p class="product-desc">{{ product.description }}</p>
+              <div class="product-meta">
+                <span class="product-weight">
+                  <mat-icon>scale</mat-icon> {{ product.weight }}
+                </span>
+                <span class="product-price">₹{{ product.price }}</span>
+              </div>
+            </div>
+          </a>
           <div class="product-info">
-            <h3 class="product-name">{{ product.name }}</h3>
-            <p class="product-desc">{{ product.description }}</p>
-            <div class="product-meta">
-              <span class="product-weight"> <mat-icon>scale</mat-icon> {{ product.weight }} </span>
-              <span class="product-price">₹{{ product.price }}</span>
+            <div class="product-actions">
+              <button
+                class="add-to-cart-btn"
+                [class.added]="justAdded() === product.id"
+                (click)="addToCart(product)"
+              >
+                <mat-icon>{{
+                  justAdded() === product.id ? 'check' : 'add_shopping_cart'
+                }}</mat-icon>
+                {{ justAdded() === product.id ? 'Added!' : 'Add to Cart' }}
+              </button>
+              <button class="buy-now-btn" (click)="buyNow(product)">
+                <mat-icon>bolt</mat-icon> Buy Now
+              </button>
             </div>
           </div>
         </div>
