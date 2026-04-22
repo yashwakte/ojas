@@ -77,6 +77,13 @@
             <ng-container>Sign In</ng-container>
           }
         </button>
+
+        @if (slowConnection) {
+          <p class="slow-connection-hint">
+            <mat-icon>hourglass_top</mat-icon>
+            Server is waking up, please wait…
+          </p>
+        }
       </form>
 
       <p class="auth-switch">Don't have an account? <a routerLink="/register">Create one</a></p>

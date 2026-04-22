@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,10 +25,12 @@ import { timeout } from 'rxjs';
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
-export class Login {
+export class Login implements OnDestroy {
   loginForm: FormGroup;
   loading = false;
+  slowConnection = false;
   hidePassword = true;
+  private slowTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -47,12 +49,22 @@ export class Login {
     if (this.loginForm.invalid) return;
 
     this.loading = true;
+    this.slowConnection = false;
+
+    // Show warm-up hint after 5s (Render free tier cold starts can take ~30s)
+    this.slowTimer = setTimeout(() => {
+      this.slowConnection = true;
+      this.cdr.detectChanges();
+    }, 5000);
+
     this.auth
       .login(this.loginForm.value)
-      .pipe(timeout(8000))
+      .pipe(timeout(35000))
       .subscribe({
         next: (res) => {
+          this.clearSlowTimer();
           this.loading = false;
+          this.slowConnection = false;
           this.cdr.detectChanges();
           this.auth.saveAuth(res);
           this.snackBar.open('Welcome back! 🎉', 'Close', {
@@ -62,7 +74,9 @@ export class Login {
           this.router.navigate(['/']);
         },
         error: (err) => {
+          this.clearSlowTimer();
           this.loading = false;
+          this.slowConnection = false;
           this.cdr.detectChanges();
           let msg = 'Something went wrong. Please try again.';
           if (err.status === 429) {
@@ -70,7 +84,7 @@ export class Login {
           } else if (err.status === 401 || err.status === 400) {
             msg = 'Invalid email or password';
           } else if (err.status === 0 || err.name === 'TimeoutError') {
-            msg = 'Server not reachable. Please try later.';
+            msg = 'Server is taking too long. Please try again.';
           }
           this.snackBar.open(msg, 'Close', {
             duration: 5000,
@@ -78,5 +92,16 @@ export class Login {
           });
         },
       });
+  }
+
+  private clearSlowTimer() {
+    if (this.slowTimer) {
+      clearTimeout(this.slowTimer);
+      this.slowTimer = null;
+    }
+  }
+
+  ngOnDestroy() {
+    this.clearSlowTimer();
   }
 }
