@@ -17,6 +17,10 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
+    [HttpGet("ping")]
+    [DisableRateLimiting]
+    public IActionResult Ping() => Ok("pong");
+
     [HttpGet("check-email")]
     [DisableRateLimiting]
     public async Task<IActionResult> CheckEmail([FromQuery] string email)

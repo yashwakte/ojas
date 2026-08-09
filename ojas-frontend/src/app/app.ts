@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Header } from './components/header/header';
 import { Footer } from './components/footer/footer';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -9,4 +10,10 @@ import { Footer } from './components/footer/footer';
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App {}
+export class App implements OnInit {
+  constructor(private auth: AuthService) {}
+
+  ngOnInit() {
+    this.auth.ping();
+  }
+}

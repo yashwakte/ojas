@@ -35,6 +35,11 @@ export class AuthService {
     return this.http.get<{ exists: boolean }>(`${this.apiUrl}/check-phone`, { params: { phone } });
   }
 
+  ping() {
+    // Fire-and-forget to wake up Render free-tier server on app load
+    this.http.get(`${this.apiUrl}/ping`, { responseType: 'text' }).subscribe({ error: () => {} });
+  }
+
   login(request: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request);
   }
