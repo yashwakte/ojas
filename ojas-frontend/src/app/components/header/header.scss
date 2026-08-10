@@ -24,16 +24,16 @@
 .header-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 72px;
+  height: 56px;
   transition: height 0.3s ease;
 }
 
 :host.scrolled .header-container {
-  height: 64px;
+  height: 52px;
 }
 
 .logo {
@@ -48,7 +48,7 @@
 }
 
 .logo-img {
-  height: 64px;
+  height: 40px;
   width: auto;
   object-fit: contain;
   display: block;

@@ -4,43 +4,56 @@
 
 // ===== HERO =====
 .hero {
-  text-align: center;
-  padding: 80px 20px 20px;
-  background: linear-gradient(175deg, #fff8f4 0%, #ffe6db 40%, #ffd0bd 100%);
+  position: relative;
+  width: 100%;
+  margin-top: 56px;
   overflow: hidden;
+  background: #fdf4ec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.hero-heading {
-  margin-bottom: 10px;
+.hero-banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 
-  h1 {
-    font-size: 2.6rem;
-    font-weight: 800;
-    color: var(--ojas-orange);
-    line-height: 1;
-    letter-spacing: -1px;
-    margin-bottom: 2px;
+@media (max-width: 900px) {
+  .hero {
+    margin-top: 64px;
+    height: auto;
   }
 
-  .tagline {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--ojas-orange-dark);
-    letter-spacing: 0.5px;
-    margin: 0;
+  .hero-banner-img {
+    height: auto;
   }
 }
 
-.hero-bottom {
-  max-width: 460px;
-  margin: 0 auto;
+@media (min-width: 901px) {
+  .hero {
+    margin-top: 56px;
+    padding: 10px 18px 0;
+    background: linear-gradient(175deg, #fff8f4 0%, #ffe6db 100%);
+  }
+
+  .hero-banner-img {
+    width: min(92vw, 1020px);
+    height: auto;
+    border-radius: 28px;
+    box-shadow: 0 14px 42px rgba(120, 73, 37, 0.18);
+  }
+
+  .hero-cta-section {
+    padding-top: 14px;
+  }
 }
 
-.hero-desc {
-  font-size: 0.85rem;
-  color: var(--ojas-text-light);
-  line-height: 1.55;
-  margin-bottom: 12px;
+.hero-cta-section {
+  text-align: center;
+  padding: 20px 20px 28px;
+  background: linear-gradient(175deg, #fff8f4 0%, #ffe6db 100%);
 }
 
 .hero-cta {
@@ -634,16 +647,6 @@
 
 // ===== TABLET 640px+ =====
 @media (min-width: 640px) {
-  .hero-heading h1 {
-    font-size: 3rem;
-  }
-  .hero-heading .tagline {
-    font-size: 0.95rem;
-  }
-
-  .hero-desc {
-    font-size: 0.95rem;
-  }
   .stitle {
     font-size: 1.7rem;
   }
@@ -661,20 +664,6 @@
 
 // ===== DESKTOP 960px+ =====
 @media (min-width: 960px) {
-  .hero {
-    padding-top: 90px;
-  }
-  .hero-heading h1 {
-    font-size: 3.4rem;
-  }
-  .hero-heading .tagline {
-    font-size: 1rem;
-    letter-spacing: 1px;
-  }
-
-  .hero-desc {
-    font-size: 1.05rem;
-  }
   .section {
     padding: 64px 48px;
   }
