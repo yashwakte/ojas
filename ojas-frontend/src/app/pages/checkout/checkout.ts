@@ -109,20 +109,8 @@ export class Checkout implements OnInit {
       error: () => {},
     });
 
-    // Phone: prefer user object, fall back to reading from the JWT claim
-    if (user?.phone) {
-      this.phone = user.phone;
-    } else {
-      const token = this.auth.getToken();
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          this.phone = payload['phone'] ?? '';
-        } catch {
-          this.phone = '';
-        }
-      }
-    }
+    // Phone: use profile info from persisted user state
+    this.phone = user?.phone ?? '';
 
     // Redirect if nothing to checkout
     if (this.checkoutService.items().length === 0) {

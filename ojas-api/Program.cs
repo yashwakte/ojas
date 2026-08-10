@@ -1,13 +1,38 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using OjasApi.Data;
 using OjasApi.Models;
 using OjasApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
+    throw new InvalidOperationException("Jwt:Key must be set and at least 32 characters.");
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+if (string.IsNullOrWhiteSpace(jwtIssuer))
+    throw new InvalidOperationException("Jwt:Issuer must be set.");
+
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+if (string.IsNullOrWhiteSpace(jwtAudience))
+    throw new InvalidOperationException("Jwt:Audience must be set.");
+
+var mongoConnectionString = builder.Configuration["MongoDb:ConnectionString"];
+if (string.IsNullOrWhiteSpace(mongoConnectionString))
+    throw new InvalidOperationException("MongoDb:ConnectionString must be set.");
+
+var productionOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?? ["https://ojas-atta.vercel.app"];
+
+var allowVercelPreviewOrigins = builder.Configuration.GetValue("Cors:AllowVercelPreviewOrigins", false);
 
 // MongoDB
 builder.Services.Configure<MongoDbSettings>(
@@ -21,16 +46,32 @@ builder.Services.AddScoped<OrderService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.SaveToken = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (string.IsNullOrWhiteSpace(context.Token) &&
+                    context.Request.Cookies.TryGetValue("ojas_auth", out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ClockSkew = TimeSpan.FromMinutes(1),
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 
@@ -44,17 +85,28 @@ builder.Services.AddCors(options =>
                 "https://localhost:4200"
               )
               .AllowAnyHeader()
-              .AllowAnyMethod();
+                            .AllowAnyMethod()
+                            .AllowCredentials();
     });
 
     options.AddPolicy("AllowProduction", policy =>
     {
-        policy.WithOrigins(
-                "https://ojas-atta.vercel.app",
-                "https://ojas-api-kl2q.onrender.com"
-              )
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (productionOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+                return true;
+
+            if (!allowVercelPreviewOrigins)
+                return false;
+
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                return false;
+
+            return uri.Scheme == Uri.UriSchemeHttps && uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase);
+        })
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
 });
 
@@ -88,8 +140,29 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
 
 var app = builder.Build();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
@@ -115,10 +188,16 @@ if (app.Environment.IsProduction())
 else
     app.UseCors("AllowAngular");
 
+app.UseHttpsRedirection();
+
+if (app.Environment.IsProduction())
+    app.UseHsts();
+
+app.UseResponseCompression();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.UseHttpsRedirection();
 }
 
 // Security headers
@@ -127,7 +206,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     await next();
 });
@@ -135,6 +214,28 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 
 app.UseAuthentication();
+
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true &&
+        (HttpMethods.IsPost(context.Request.Method) ||
+         HttpMethods.IsPut(context.Request.Method) ||
+         HttpMethods.IsPatch(context.Request.Method) ||
+         HttpMethods.IsDelete(context.Request.Method)))
+    {
+        var csrfCookie = context.Request.Cookies["ojas_csrf"];
+        var csrfHeader = context.Request.Headers["X-CSRF-Token"].ToString();
+        if (string.IsNullOrWhiteSpace(csrfCookie) || csrfCookie != csrfHeader)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { message = "Invalid CSRF token." });
+            return;
+        }
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 app.MapControllers();
 

@@ -10,7 +10,6 @@ export interface Product {
 }
 
 export interface AuthResponse {
-  token: string;
   fullName: string;
   email: string;
   phone: string;

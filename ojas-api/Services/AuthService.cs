@@ -18,50 +18,58 @@ public class AuthService
         _config = config;
     }
 
+    private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+    private static string NormalizePhone(string phone) => phone.Trim();
+
     public async Task<bool> EmailExistsAsync(string email) =>
-        await _db.Users.Find(u => u.Email == email).AnyAsync();
+        await _db.Users.Find(u => u.Email == NormalizeEmail(email)).AnyAsync();
 
     public async Task<bool> PhoneExistsAsync(string phone) =>
-        await _db.Users.Find(u => u.Phone == phone).AnyAsync();
+        await _db.Users.Find(u => u.Phone == NormalizePhone(phone)).AnyAsync();
 
-    public async Task<(AuthResponse? Response, string? ConflictField)> RegisterAsync(RegisterRequest request)
+    public async Task<(AuthResult? Result, string? ConflictField)> RegisterAsync(RegisterRequest request)
     {
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var normalizedPhone = NormalizePhone(request.Phone);
+
         var byEmail = await _db.Users
-            .Find(u => u.Email == request.Email)
+            .Find(u => u.Email == normalizedEmail)
             .FirstOrDefaultAsync();
         if (byEmail != null)
             return (null, "email");
 
         var byPhone = await _db.Users
-            .Find(u => u.Phone == request.Phone)
+            .Find(u => u.Phone == normalizedPhone)
             .FirstOrDefaultAsync();
         if (byPhone != null)
             return (null, "phone");
 
         var user = new User
         {
-            FullName = request.FullName,
-            Email = request.Email,
-            Phone = request.Phone,
+            FullName = request.FullName.Trim(),
+            Email = normalizedEmail,
+            Phone = normalizedPhone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
         };
 
         await _db.Users.InsertOneAsync(user);
         var token = GenerateToken(user);
-        return (new AuthResponse(token, user.FullName, user.Email, user.Phone), null);
+        return (new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone)), null);
     }
 
-    public async Task<AuthResponse?> LoginAsync(LoginRequest request)
+    public async Task<AuthResult?> LoginAsync(LoginRequest request)
     {
+        var normalizedEmail = NormalizeEmail(request.Email);
+
         var user = await _db.Users
-            .Find(u => u.Email == request.Email)
+            .Find(u => u.Email == normalizedEmail)
             .FirstOrDefaultAsync();
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return null;
 
         var token = GenerateToken(user);
-        return new AuthResponse(token, user.FullName, user.Email, user.Phone);
+        return new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone));
     }
 
     private string GenerateToken(User user)

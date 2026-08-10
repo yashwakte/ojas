@@ -10,12 +10,34 @@ namespace OjasApi.Controllers;
 [EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
+    private const string AuthCookieName = "ojas_auth";
+    private const string CsrfCookieName = "ojas_csrf";
     private readonly AuthService _authService;
+    private readonly IWebHostEnvironment _env;
 
-    public AuthController(AuthService authService)
+    public AuthController(AuthService authService, IWebHostEnvironment env)
     {
         _authService = authService;
+        _env = env;
     }
+
+    private CookieOptions BuildAuthCookieOptions() => new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.None,
+        Path = "/",
+        Expires = DateTimeOffset.UtcNow.AddHours(2)
+    };
+
+    private CookieOptions BuildCsrfCookieOptions() => new()
+    {
+        HttpOnly = false,
+        Secure = true,
+        SameSite = SameSiteMode.None,
+        Path = "/",
+        Expires = DateTimeOffset.UtcNow.AddHours(2)
+    };
 
     [HttpGet("ping")]
     [DisableRateLimiting]
@@ -48,7 +70,11 @@ public class AuthController : ControllerBase
                 : "Phone number already in use";
             return Conflict(new { message, field = conflictField });
         }
-        return Ok(result);
+
+        var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        Response.Cookies.Append(AuthCookieName, result!.Token, BuildAuthCookieOptions());
+        Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
+        return Ok(result.User);
     }
 
     [HttpPost("login")]
@@ -57,6 +83,29 @@ public class AuthController : ControllerBase
         var result = await _authService.LoginAsync(request);
         if (result == null)
             return Unauthorized(new { message = "Invalid email or password" });
-        return Ok(result);
+
+        var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
+        Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
+        return Ok(result.User);
+    }
+
+    [HttpPost("logout")]
+    [DisableRateLimiting]
+    public IActionResult Logout()
+    {
+        Response.Cookies.Delete(AuthCookieName, new CookieOptions
+        {
+            Path = "/",
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+        Response.Cookies.Delete(CsrfCookieName, new CookieOptions
+        {
+            Path = "/",
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+        return NoContent();
     }
 }

@@ -1,8 +1,18 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace OjasApi.Models;
 
-public record RegisterRequest(string FullName, string Email, string Phone, string Password);
-public record LoginRequest(string Email, string Password);
-public record AuthResponse(string Token, string FullName, string Email, string Phone);
+public record RegisterRequest(
+	[Required, MinLength(2), MaxLength(80)] string FullName,
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, MinLength(10), MaxLength(20)] string Phone,
+	[Required, MinLength(6), MaxLength(128)] string Password);
+
+public record LoginRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, MinLength(6), MaxLength(128)] string Password);
+public record AuthResponse(string FullName, string Email, string Phone);
+public record AuthResult(string Token, AuthResponse User);
 
 public record SavedAddressDto(string Label, string FullAddress, bool IsDefault);
 public record SaveAddressRequest(string Label, string FullAddress, bool IsDefault);
