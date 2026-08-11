@@ -165,6 +165,7 @@ export class Profile implements OnInit {
       .updateProfile({ fullName: this.editFullName, phone: this.editPhone })
       .subscribe({
         next: () => {
+          this.auth.updateUserInfo({ fullName: this.editFullName, phone: this.editPhone });
           this.editingProfile.set(false);
           this.savingProfile.set(false);
           this.loadProfile();

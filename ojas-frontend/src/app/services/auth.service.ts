@@ -85,6 +85,15 @@ export class AuthService {
     return null;
   }
 
+  updateUserInfo(updates: Partial<Pick<AuthResponse, 'fullName' | 'phone'>>): void {
+    const current = this._user();
+    if (current) {
+      const updated = { ...current, ...updates };
+      localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
+      this._user.set(updated);
+    }
+  }
+
   private loadUser(): AuthResponse | null {
     const data = localStorage.getItem('ojas_user');
     return data ? JSON.parse(data) : null;
