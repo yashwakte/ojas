@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -13,6 +13,7 @@ import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
+import { INDIAN_STATES } from '../../constants/indian-states';
 
 @Component({
   selector: 'app-profile',
@@ -74,60 +75,29 @@ export class Profile implements OnInit {
   editIsDefault = false;
   savingEditAddress = signal(false);
 
-  filteredNewStates: string[] = [];
-  filteredEditStates: string[] = [];
-  newStateOpen = false;
-  editStateOpen = false;
-
-  readonly indianStates = [
-    'Andhra Pradesh',
-    'Arunachal Pradesh',
-    'Assam',
-    'Bihar',
-    'Chhattisgarh',
-    'Goa',
-    'Gujarat',
-    'Haryana',
-    'Himachal Pradesh',
-    'Jharkhand',
-    'Karnataka',
-    'Kerala',
-    'Madhya Pradesh',
-    'Maharashtra',
-    'Manipur',
-    'Meghalaya',
-    'Mizoram',
-    'Nagaland',
-    'Odisha',
-    'Punjab',
-    'Rajasthan',
-    'Sikkim',
-    'Tamil Nadu',
-    'Telangana',
-    'Tripura',
-    'Uttar Pradesh',
-    'Uttarakhand',
-    'West Bengal',
-    'Andaman and Nicobar Islands',
-    'Chandigarh',
-    'Dadra and Nagar Haveli and Daman and Diu',
-    'Delhi',
-    'Jammu and Kashmir',
-    'Ladakh',
-    'Lakshadweep',
-    'Puducherry',
-  ];
+  readonly indianStates = INDIAN_STATES;
 
   private snackBar = inject(MatSnackBar);
+
+  // State filtering using signals for performance
+  newStateQuery = signal('');
+  editStateQuery = signal('');
+
+  readonly filteredNewStates = computed(() => {
+    const q = this.newStateQuery().toLowerCase();
+    return INDIAN_STATES.filter((s) => s.toLowerCase().includes(q));
+  });
+
+  readonly filteredEditStates = computed(() => {
+    const q = this.editStateQuery().toLowerCase();
+    return INDIAN_STATES.filter((s) => s.toLowerCase().includes(q));
+  });
 
   constructor(
     public auth: AuthService,
     private userService: UserService,
     private router: Router,
-  ) {
-    this.filteredNewStates = [...this.indianStates];
-    this.filteredEditStates = [...this.indianStates];
-  }
+  ) {}
 
   ngOnInit(): void {
     if (!this.auth.isLoggedIn()) {
@@ -185,40 +155,28 @@ export class Profile implements OnInit {
   }
 
   filterNewStates(value: string): void {
-    const q = (value ?? '').toLowerCase();
-    this.filteredNewStates = this.indianStates.filter((s) => s.toLowerCase().includes(q));
+    this.newStateQuery.set(value);
   }
 
   filterEditStates(value: string): void {
-    const q = (value ?? '').toLowerCase();
-    this.filteredEditStates = this.indianStates.filter((s) => s.toLowerCase().includes(q));
+    this.editStateQuery.set(value);
   }
 
   onStateFocus(type: 'new' | 'edit'): void {
     if (type === 'new') {
-      this.filteredNewStates = [...this.indianStates];
-      this.newStateOpen = true;
+      this.newStateQuery.set('');
     } else {
-      this.filteredEditStates = [...this.indianStates];
-      this.editStateOpen = true;
-    }
-  }
-
-  onStateBlur(type: 'new' | 'edit'): void {
-    if (type === 'new') {
-      this.newStateOpen = false;
-    } else {
-      this.editStateOpen = false;
+      this.editStateQuery.set('');
     }
   }
 
   selectState(type: 'new' | 'edit', state: string): void {
     if (type === 'new') {
       this.newState = state;
-      this.newStateOpen = false;
+      this.newStateQuery.set('');
     } else {
       this.editState = state;
-      this.editStateOpen = false;
+      this.editStateQuery.set('');
     }
   }
 
@@ -229,7 +187,7 @@ export class Profile implements OnInit {
       this.newStreet.trim() &&
       this.newArea.trim() &&
       this.newCity.trim() &&
-      this.indianStates.includes(this.newState) &&
+      INDIAN_STATES.includes(this.newState as any) &&
       this.newPincode.trim().length === 6 &&
       this.newLat !== null &&
       this.newLng !== null
@@ -281,8 +239,7 @@ export class Profile implements OnInit {
     this.newLng = null;
     this.showNewMapPicker.set(false);
     this.newIsDefault = false;
-    this.newStateOpen = false;
-    this.filteredNewStates = [...this.indianStates];
+    this.newStateQuery.set('');
   }
 
   deleteAddress(index: number): void {
@@ -298,7 +255,7 @@ export class Profile implements OnInit {
       this.editStreet.trim() &&
       this.editArea.trim() &&
       this.editCity.trim() &&
-      this.indianStates.includes(this.editState) &&
+      INDIAN_STATES.includes(this.editState as any) &&
       this.editPincode.trim().length === 6 &&
       this.editLat !== null &&
       this.editLng !== null
@@ -371,8 +328,7 @@ export class Profile implements OnInit {
     this.editLng = null;
     this.showEditMapPicker.set(false);
     this.editIsDefault = false;
-    this.editStateOpen = false;
-    this.filteredEditStates = [...this.indianStates];
+    this.editStateQuery.set('');
   }
 
   saveEditAddress(): void {

@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { PlaceOrderRequest, SaveAddressRequest, SavedAddress } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
+import { INDIAN_STATES } from '../../constants/indian-states';
 
 @Component({
   selector: 'app-checkout',
@@ -38,44 +39,7 @@ export class Checkout implements OnInit {
   saveNewAddress = false;
   saveNewAddressLabel = '';
 
-  readonly indianStates = [
-    'Andhra Pradesh',
-    'Arunachal Pradesh',
-    'Assam',
-    'Bihar',
-    'Chhattisgarh',
-    'Goa',
-    'Gujarat',
-    'Haryana',
-    'Himachal Pradesh',
-    'Jharkhand',
-    'Karnataka',
-    'Kerala',
-    'Madhya Pradesh',
-    'Maharashtra',
-    'Manipur',
-    'Meghalaya',
-    'Mizoram',
-    'Nagaland',
-    'Odisha',
-    'Punjab',
-    'Rajasthan',
-    'Sikkim',
-    'Tamil Nadu',
-    'Telangana',
-    'Tripura',
-    'Uttar Pradesh',
-    'Uttarakhand',
-    'West Bengal',
-    'Andaman and Nicobar Islands',
-    'Chandigarh',
-    'Dadra and Nagar Haveli and Daman and Diu',
-    'Delhi',
-    'Jammu and Kashmir',
-    'Ladakh',
-    'Lakshadweep',
-    'Puducherry',
-  ];
+  readonly indianStates = INDIAN_STATES;
 
   loading = signal(false);
   orderPlaced = signal(false);

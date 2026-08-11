@@ -157,15 +157,13 @@
                         matInput
                         [(ngModel)]="editState"
                         (ngModelChange)="filterEditStates($event)"
-                        (focus)="onStateFocus('edit')"
-                        (blur)="onStateBlur('edit')"
                         placeholder="Search state..."
                         autocomplete="off"
                       />
                     </mat-form-field>
-                    @if (editStateOpen && filteredEditStates.length > 0) {
+                    @if (editStateQuery() && filteredEditStates().length > 0) {
                       <div class="state-list">
-                        @for (s of filteredEditStates; track s) {
+                        @for (s of filteredEditStates(); track s) {
                           <button type="button" class="state-option" (mousedown)="selectState('edit', s)">{{ s }}</button>
                         }
                       </div>
@@ -300,15 +298,13 @@
                   matInput
                   [(ngModel)]="newState"
                   (ngModelChange)="filterNewStates($event)"
-                  (focus)="onStateFocus('new')"
-                  (blur)="onStateBlur('new')"
                   placeholder="Search state..."
                   autocomplete="off"
                 />
               </mat-form-field>
-              @if (newStateOpen && filteredNewStates.length > 0) {
+              @if (newStateQuery() && filteredNewStates().length > 0) {
                 <div class="state-list">
-                  @for (s of filteredNewStates; track s) {
+                  @for (s of filteredNewStates(); track s) {
                     <button type="button" class="state-option" (mousedown)="selectState('new', s)">{{ s }}</button>
                   }
                 </div>
