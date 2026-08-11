@@ -233,18 +233,12 @@ app.Use(async (context, next) =>
     {
         var csrfCookie = context.Request.Cookies["ojas_csrf"];
         var csrfHeader = context.Request.Headers["X-CSRF-Token"].ToString();
-        
-        Console.WriteLine($"[CSRF Debug] Path: {path}, Cookie: {csrfCookie?.Substring(0, Math.Min(10, csrfCookie.Length))}..., Header: {csrfHeader?.Substring(0, Math.Min(10, csrfHeader.Length))}...");
-
         if (string.IsNullOrWhiteSpace(csrfCookie) || csrfCookie != csrfHeader)
         {
-            Console.WriteLine($"[CSRF Debug] Validation FAILED - Cookie empty: {string.IsNullOrWhiteSpace(csrfCookie)}, Match: {csrfCookie == csrfHeader}");
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new { message = "Invalid CSRF token." });
             return;
         }
-        
-        Console.WriteLine($"[CSRF Debug] Validation PASSED");
     }
 
     await next();

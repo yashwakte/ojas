@@ -14,8 +14,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const needsCsrf = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
     const csrfToken = authService.getCsrfToken();
 
-    console.log('[AuthInterceptor]', { url: req.url, method, needsCsrf, csrfToken: csrfToken?.slice(0, 10) + '...' });
-
     if (needsCsrf && csrfToken) {
       cloned = req.clone({
         withCredentials: true,
@@ -31,9 +29,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       error: (err) => {
         if (err.status === 401) {
           authService.logout();
-        }
-        if (err.status === 403) {
-          console.error('[AuthInterceptor] 403 Forbidden:', err.error);
         }
       },
     }),
