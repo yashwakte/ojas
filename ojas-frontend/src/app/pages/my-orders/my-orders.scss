@@ -146,6 +146,14 @@
     background: #fff8e1;
     color: #f59e0b;
   }
+  &.status-confirmed {
+    background: #e8f1ff;
+    color: #2850a7;
+  }
+  &.status-packed {
+    background: #f2edff;
+    color: #5f3dc4;
+  }
   &.status-shipped {
     background: #e8f4fd;
     color: #2563eb;

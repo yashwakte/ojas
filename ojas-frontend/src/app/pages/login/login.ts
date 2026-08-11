@@ -71,7 +71,7 @@ export class Login implements OnDestroy {
             duration: 3000,
             panelClass: 'snack-success',
           });
-          this.router.navigate(['/']);
+          this.router.navigate([this.auth.getDefaultRouteForRole(res.role)]);
         },
         error: (err) => {
           this.clearSlowTimer();

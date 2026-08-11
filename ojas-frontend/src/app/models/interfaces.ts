@@ -13,7 +13,10 @@ export interface AuthResponse {
   fullName: string;
   email: string;
   phone: string;
+  role: UserRole;
 }
+
+export type UserRole = 'customer' | 'admin' | 'delivery';
 
 export interface RegisterRequest {
   fullName: string;
@@ -44,6 +47,8 @@ export interface PlaceOrderRequest {
   fullName: string;
   phone: string;
   address: string;
+  latitude: number;
+  longitude: number;
   notes: string;
   items: OrderItem[];
 }
@@ -53,22 +58,57 @@ export interface OrderResponse {
   fullName: string;
   phone: string;
   address: string;
+  latitude: number;
+  longitude: number;
+  addressMapLink?: string | null;
   notes: string;
   items: OrderItem[];
   totalAmount: number;
   status: string;
   createdAt: string;
+  deliveryPartnerId?: string | null;
+  deliveryPartnerName?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface StaffUserResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+}
+
+export interface CreateStaffRequest {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: Exclude<UserRole, 'customer'>;
+}
+
+export interface UpdateOrderStatusRequest {
+  status: string;
+}
+
+export interface AssignDeliveryPartnerRequest {
+  deliveryPartnerId: string;
 }
 
 export interface SavedAddress {
   label: string;
   fullAddress: string;
+  latitude: number;
+  longitude: number;
+  mapLink?: string | null;
   isDefault: boolean;
 }
 
 export interface SaveAddressRequest {
   label: string;
   fullAddress: string;
+  latitude: number;
+  longitude: number;
   isDefault: boolean;
 }
 

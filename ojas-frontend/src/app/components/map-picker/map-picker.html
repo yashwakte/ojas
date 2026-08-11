@@ -1,0 +1,28 @@
+<div class="map-picker">
+  <div class="map-picker-header">
+    <p>Drag the map so the pin points to your exact delivery location.</p>
+    <button type="button" class="locate-btn" (click)="useCurrentLocation()" [disabled]="locating()">
+      <mat-icon>{{ locating() ? 'sync' : 'my_location' }}</mat-icon>
+      {{ locating() ? 'Locating...' : 'Use current location' }}
+    </button>
+  </div>
+
+  @if (locateError()) {
+    <p class="locate-error">{{ locateError() }}</p>
+  }
+
+  <div class="map-shell">
+    <div #mapContainer class="map-container"></div>
+    <div class="center-pin">
+      <mat-icon>location_on</mat-icon>
+    </div>
+  </div>
+
+  <div class="map-picker-actions">
+    <button type="button" class="cancel-btn" (click)="cancel()">Cancel</button>
+    <button type="button" class="confirm-btn" (click)="confirm()">
+      <mat-icon>check_circle</mat-icon>
+      Confirm Pinned Location
+    </button>
+  </div>
+</div>

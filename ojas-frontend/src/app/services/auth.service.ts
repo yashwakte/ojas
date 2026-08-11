@@ -2,7 +2,14 @@ import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
-import { AuthResponse, LoginRequest, RegisterRequest } from '../models/interfaces';
+import {
+  AuthResponse,
+  CreateStaffRequest,
+  LoginRequest,
+  RegisterRequest,
+  StaffUserResponse,
+  UserRole,
+} from '../models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -12,6 +19,9 @@ export class AuthService {
 
   readonly user = this._user.asReadonly();
   readonly isLoggedIn = computed(() => !!this._user());
+  readonly role = computed(() => this._user()?.role ?? 'customer');
+  readonly isAdmin = computed(() => this.role() === 'admin');
+  readonly isDelivery = computed(() => this.role() === 'delivery');
 
   constructor(
     private http: HttpClient,
@@ -43,6 +53,10 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request);
   }
 
+  createStaff(request: CreateStaffRequest) {
+    return this.http.post<StaffUserResponse>(`${this.apiUrl}/staff`, request);
+  }
+
   saveAuth(response: AuthResponse) {
     localStorage.setItem(this.USER_KEY, JSON.stringify(response));
     this._user.set(response);
@@ -53,6 +67,12 @@ export class AuthService {
     localStorage.removeItem(this.USER_KEY);
     this._user.set(null);
     this.router.navigate(['/']);
+  }
+
+  getDefaultRouteForRole(role: UserRole = this.role()): string {
+    if (role === 'admin') return '/admin/orders';
+    if (role === 'delivery') return '/delivery/orders';
+    return '/';
   }
 
   getToken(): string | null {

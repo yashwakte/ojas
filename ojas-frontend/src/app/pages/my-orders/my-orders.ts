@@ -34,6 +34,10 @@ export class MyOrders implements OnInit {
 
   getStatusClass(status: string): string {
     switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'status-confirmed';
+      case 'packed':
+        return 'status-packed';
       case 'delivered':
         return 'status-delivered';
       case 'shipped':

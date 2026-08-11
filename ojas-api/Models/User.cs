@@ -21,11 +21,30 @@ public class User
     [BsonElement("passwordHash")]
     public required string PasswordHash { get; set; }
 
+    [BsonElement("role")]
+    public string Role { get; set; } = UserRoles.Customer;
+
+    [BsonElement("isEmailVerified")]
+    public bool IsEmailVerified { get; set; }
+
+    [BsonElement("isPhoneVerified")]
+    public bool IsPhoneVerified { get; set; }
+
+    [BsonElement("registeredDeviceId")]
+    public string? RegisteredDeviceId { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [BsonElement("savedAddresses")]
     public List<SavedAddress> SavedAddresses { get; set; } = [];
+}
+
+public static class UserRoles
+{
+    public const string Customer = "customer";
+    public const string Admin = "admin";
+    public const string Delivery = "delivery";
 }
 
 public class SavedAddress
@@ -35,6 +54,15 @@ public class SavedAddress
 
     [BsonElement("fullAddress")]
     public string FullAddress { get; set; } = string.Empty;
+
+    [BsonElement("latitude")]
+    public double Latitude { get; set; }
+
+    [BsonElement("longitude")]
+    public double Longitude { get; set; }
+
+    [BsonElement("mapLink")]
+    public string? MapLink { get; set; }
 
     [BsonElement("isDefault")]
     public bool IsDefault { get; set; }

@@ -12,6 +12,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
+import { MapPicker } from '../../components/map-picker/map-picker';
 
 @Component({
   selector: 'app-profile',
@@ -24,6 +25,7 @@ import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces
     MatFormFieldModule,
     MatCheckboxModule,
     MatSelectModule,
+    MapPicker,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
@@ -50,6 +52,9 @@ export class Profile implements OnInit {
   newCity = '';
   newState = '';
   newPincode = '';
+  newLat: number | null = null;
+  newLng: number | null = null;
+  showNewMapPicker = signal(false);
   newIsDefault = false;
   savingAddress = signal(false);
 
@@ -63,6 +68,9 @@ export class Profile implements OnInit {
   editCity = '';
   editState = '';
   editPincode = '';
+  editLat: number | null = null;
+  editLng: number | null = null;
+  showEditMapPicker = signal(false);
   editIsDefault = false;
   savingEditAddress = signal(false);
 
@@ -221,7 +229,9 @@ export class Profile implements OnInit {
       this.newArea.trim() &&
       this.newCity.trim() &&
       this.indianStates.includes(this.newState) &&
-      this.newPincode.trim().length === 6
+      this.newPincode.trim().length === 6 &&
+      this.newLat !== null &&
+      this.newLng !== null
     );
   }
 
@@ -242,6 +252,8 @@ export class Profile implements OnInit {
     const req: SaveAddressRequest = {
       label: this.newLabel.trim(),
       fullAddress,
+      latitude: this.newLat!,
+      longitude: this.newLng!,
       isDefault: this.newIsDefault,
     };
     this.userService.saveAddress(req).subscribe({
@@ -264,6 +276,9 @@ export class Profile implements OnInit {
     this.newCity = '';
     this.newState = '';
     this.newPincode = '';
+    this.newLat = null;
+    this.newLng = null;
+    this.showNewMapPicker.set(false);
     this.newIsDefault = false;
     this.newStateOpen = false;
     this.filteredNewStates = [...this.indianStates];
@@ -283,7 +298,9 @@ export class Profile implements OnInit {
       this.editArea.trim() &&
       this.editCity.trim() &&
       this.indianStates.includes(this.editState) &&
-      this.editPincode.trim().length === 6
+      this.editPincode.trim().length === 6 &&
+      this.editLat !== null &&
+      this.editLng !== null
     );
   }
 
@@ -291,6 +308,8 @@ export class Profile implements OnInit {
     const addr = this.profile()?.savedAddresses?.[index];
     if (!addr) return;
     this.editLabel = addr.label;
+    this.editLat = addr.latitude || addr.longitude ? addr.latitude : null;
+    this.editLng = addr.latitude || addr.longitude ? addr.longitude : null;
     this.editIsDefault = addr.isDefault;
     this.parseFullAddress(addr.fullAddress);
     this.showAddressForm.set(false);
@@ -347,6 +366,9 @@ export class Profile implements OnInit {
     this.editCity = '';
     this.editState = '';
     this.editPincode = '';
+    this.editLat = null;
+    this.editLng = null;
+    this.showEditMapPicker.set(false);
     this.editIsDefault = false;
     this.editStateOpen = false;
     this.filteredEditStates = [...this.indianStates];
@@ -373,6 +395,8 @@ export class Profile implements OnInit {
         const req: SaveAddressRequest = {
           label: this.editLabel.trim(),
           fullAddress,
+          latitude: this.editLat!,
+          longitude: this.editLng!,
           isDefault: this.editIsDefault,
         };
         this.userService.saveAddress(req).subscribe({
@@ -400,5 +424,17 @@ export class Profile implements OnInit {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  }
+
+  onNewLocationConfirmed(location: { lat: number; lng: number }): void {
+    this.newLat = location.lat;
+    this.newLng = location.lng;
+    this.showNewMapPicker.set(false);
+  }
+
+  onEditLocationConfirmed(location: { lat: number; lng: number }): void {
+    this.editLat = location.lat;
+    this.editLng = location.lng;
+    this.showEditMapPicker.set(false);
   }
 }

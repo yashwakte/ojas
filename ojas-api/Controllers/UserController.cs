@@ -31,7 +31,7 @@ public class UserController : ControllerBase
         var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
         if (user == null) return NotFound();
 
-        var addresses = (user.SavedAddresses ?? []).Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.IsDefault)).ToList();
+        var addresses = (user.SavedAddresses ?? []).Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault)).ToList();
         return Ok(new UserProfileResponse(user.Id!, user.FullName, user.Email, user.Phone, user.CreatedAt, addresses));
     }
 
@@ -68,7 +68,7 @@ public class UserController : ControllerBase
         var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
         if (user == null) return NotFound();
 
-        return Ok(user.SavedAddresses.Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.IsDefault)).ToList());
+        return Ok(user.SavedAddresses.Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault)).ToList());
     }
 
     // POST /api/user/addresses
@@ -77,6 +77,9 @@ public class UserController : ControllerBase
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
+
+        if (request.Latitude is null || request.Longitude is null)
+            return BadRequest(new { message = "Please pin your exact location on the map." });
 
         // Ensure savedAddresses array exists for documents created before this field was added
         await _db.Users.UpdateOneAsync(
@@ -91,6 +94,9 @@ public class UserController : ControllerBase
         {
             Label = request.Label,
             FullAddress = request.FullAddress,
+            Latitude = request.Latitude.Value,
+            Longitude = request.Longitude.Value,
+            MapLink = BuildMapLink(request.Latitude.Value, request.Longitude.Value),
             IsDefault = request.IsDefault,
         };
 
@@ -126,5 +132,16 @@ public class UserController : ControllerBase
         await _db.Users.UpdateOneAsync(u => u.Id == userId, update);
 
         return Ok(new { message = "Address removed." });
+    }
+
+    private static bool IsValidHttpUrl(string value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    internal static string BuildMapLink(double latitude, double longitude)
+    {
+        return $"https://www.google.com/maps?q={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)},{longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
     }
 }

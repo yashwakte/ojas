@@ -39,6 +39,15 @@ public class Order
     [BsonElement("address")]
     public required string Address { get; set; }
 
+    [BsonElement("latitude")]
+    public double Latitude { get; set; }
+
+    [BsonElement("longitude")]
+    public double Longitude { get; set; }
+
+    [BsonElement("addressMapLink")]
+    public string? AddressMapLink { get; set; }
+
     [BsonElement("notes")]
     public string Notes { get; set; } = string.Empty;
 
@@ -51,6 +60,15 @@ public class Order
     [BsonElement("status")]
     public string Status { get; set; } = "Pending";
 
+    [BsonElement("deliveryPartnerId")]
+    public string? DeliveryPartnerId { get; set; }
+
+    [BsonElement("deliveryPartnerName")]
+    public string? DeliveryPartnerName { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [BsonElement("updatedAt")]
+    public DateTime? UpdatedAt { get; set; }
 }

@@ -389,6 +389,95 @@
   padding-left: 24px;
 }
 
+.address-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  margin-left: 24px;
+  color: var(--ojas-orange);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.field-error {
+  margin: -4px 0 0;
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.pin-location-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pin-location-label {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ojas-text);
+}
+
+.pin-location-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  border: 1.5px dashed var(--ojas-orange);
+  background: rgba(242, 90, 26, 0.05);
+  color: var(--ojas-orange);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+}
+
+.pin-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  background: rgba(22, 163, 74, 0.08);
+  color: #16a34a;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 1.1rem;
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+}
+
+.change-pin-btn {
+  border: none;
+  background: none;
+  color: var(--ojas-orange);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+}
+
 .delete-address-btn {
   color: #dc2626 !important;
   flex-shrink: 0;

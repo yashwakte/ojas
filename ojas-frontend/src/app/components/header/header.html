@@ -1,36 +1,40 @@
 <header class="header">
   <div class="header-container">
-    <a routerLink="/" class="logo">
+    <a [routerLink]="homeRoute()" class="logo">
       <img src="/images/logo.png" alt="Ojas - शुद्ध आहार...शुद्ध विचार" class="logo-img" />
     </a>
 
     <!-- Desktop nav links only -->
-    <nav class="nav-desktop">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
-        >Home</a
-      >
-      <a routerLink="/products" routerLinkActive="active">Products</a>
-    </nav>
+    @if (isCustomerArea()) {
+      <nav class="nav-desktop">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+          >Home</a
+        >
+        <a routerLink="/products" routerLinkActive="active">Products</a>
+      </nav>
+    }
 
     <!-- Desktop right: icons + user menu (hidden on mobile) -->
     <div class="header-right">
       @if (auth.isLoggedIn()) {
-        <a
-          routerLink="/cart"
-          class="icon-btn cart-btn"
-          [class.cart-bounce]="cartBounce()"
-          aria-label="Cart"
-        >
-          <mat-icon>shopping_cart</mat-icon>
-          @if (cart.items().length > 0) {
-            <span class="icon-badge">{{ cart.items().length }}</span>
+        @if (auth.role() === 'customer') {
+          <a
+            routerLink="/cart"
+            class="icon-btn cart-btn"
+            [class.cart-bounce]="cartBounce()"
+            aria-label="Cart"
+          >
+            <mat-icon>shopping_cart</mat-icon>
+            @if (cart.items().length > 0) {
+              <span class="icon-badge">{{ cart.items().length }}</span>
+            }
+          </a>
+          @if (activeCheckoutCount() > 0) {
+            <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
+              <mat-icon>shopping_bag</mat-icon>
+              <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
+            </button>
           }
-        </a>
-        @if (activeCheckoutCount() > 0) {
-          <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
-            <mat-icon>shopping_bag</mat-icon>
-            <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
-          </button>
         }
         <button [matMenuTriggerFor]="userMenu" class="user-btn">
           <div class="user-avatar">{{ getInitials() }}</div>
@@ -46,18 +50,32 @@
             </div>
           </div>
           <mat-divider></mat-divider>
-          <a mat-menu-item routerLink="/profile">
-            <mat-icon>account_circle</mat-icon>
-            <span>Profile</span>
-          </a>
-          <a mat-menu-item routerLink="/my-orders">
-            <mat-icon>receipt_long</mat-icon>
-            <span>Your Orders</span>
-          </a>
-          <a mat-menu-item routerLink="/offers">
-            <mat-icon>local_offer</mat-icon>
-            <span>Offers &amp; Deals</span>
-          </a>
+          @if (auth.role() === 'customer') {
+            <a mat-menu-item routerLink="/profile">
+              <mat-icon>account_circle</mat-icon>
+              <span>Profile</span>
+            </a>
+            <a mat-menu-item routerLink="/my-orders">
+              <mat-icon>receipt_long</mat-icon>
+              <span>Your Orders</span>
+            </a>
+            <a mat-menu-item routerLink="/offers">
+              <mat-icon>local_offer</mat-icon>
+              <span>Offers &amp; Deals</span>
+            </a>
+          }
+          @if (auth.isAdmin()) {
+            <a mat-menu-item routerLink="/admin/orders">
+              <mat-icon>dashboard</mat-icon>
+              <span>Admin Panel</span>
+            </a>
+          }
+          @if (auth.isDelivery()) {
+            <a mat-menu-item routerLink="/delivery/orders">
+              <mat-icon>local_shipping</mat-icon>
+              <span>Delivery Hub</span>
+            </a>
+          }
           <mat-divider></mat-divider>
           <button mat-menu-item (click)="auth.logout()" class="logout-item">
             <mat-icon>logout</mat-icon>
@@ -72,7 +90,7 @@
 
     <!-- Mobile: cart icon(s) + hamburger (hidden on desktop) -->
     <div class="header-mobile-right">
-      @if (auth.isLoggedIn()) {
+      @if (auth.isLoggedIn() && auth.role() === 'customer') {
         <a
           routerLink="/cart"
           class="icon-btn cart-btn"
@@ -106,36 +124,56 @@
 
   @if (menuOpen) {
     <nav class="nav-mobile">
-      <a routerLink="/" (click)="toggleMenu()">Home</a>
-      <a routerLink="/products" (click)="toggleMenu()">Products</a>
+      @if (isCustomerArea()) {
+        <a routerLink="/" (click)="toggleMenu()">Home</a>
+        <a routerLink="/products" (click)="toggleMenu()">Products</a>
+      }
       @if (auth.isLoggedIn()) {
-        <a routerLink="/cart" (click)="toggleMenu()">
-          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
-            >shopping_cart</mat-icon
-          >
-          Cart
-          @if (cart.items().length > 0) {
-            ({{ cart.items().length }})
-          }
-        </a>
-        <a routerLink="/profile" (click)="toggleMenu()">
-          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
-            >account_circle</mat-icon
-          >
-          Profile
-        </a>
-        <a routerLink="/my-orders" (click)="toggleMenu()">
-          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
-            >receipt_long</mat-icon
-          >
-          Your Orders
-        </a>
-        <a routerLink="/offers" (click)="toggleMenu()">
-          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
-            >local_offer</mat-icon
-          >
-          Offers &amp; Deals
-        </a>
+        @if (auth.role() === 'customer') {
+          <a routerLink="/cart" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >shopping_cart</mat-icon
+            >
+            Cart
+            @if (cart.items().length > 0) {
+              ({{ cart.items().length }})
+            }
+          </a>
+          <a routerLink="/profile" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >account_circle</mat-icon
+            >
+            Profile
+          </a>
+          <a routerLink="/my-orders" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >receipt_long</mat-icon
+            >
+            Your Orders
+          </a>
+          <a routerLink="/offers" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >local_offer</mat-icon
+            >
+            Offers &amp; Deals
+          </a>
+        }
+        @if (auth.isAdmin()) {
+          <a routerLink="/admin/orders" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >dashboard</mat-icon
+            >
+            Admin Panel
+          </a>
+        }
+        @if (auth.isDelivery()) {
+          <a routerLink="/delivery/orders" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >local_shipping</mat-icon
+            >
+            Delivery Hub
+          </a>
+        }
         <a (click)="auth.logout(); toggleMenu()" class="mobile-logout">
           <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
             >logout</mat-icon

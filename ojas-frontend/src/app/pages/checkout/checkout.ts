@@ -8,10 +8,11 @@ import { OrderService } from '../../services/order.service';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { PlaceOrderRequest, SaveAddressRequest, SavedAddress } from '../../models/interfaces';
+import { MapPicker } from '../../components/map-picker/map-picker';
 
 @Component({
   selector: 'app-checkout',
-  imports: [RouterLink, FormsModule, MatIconModule],
+  imports: [RouterLink, FormsModule, MatIconModule, MapPicker],
   templateUrl: './checkout.html',
   styleUrl: './checkout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,6 +30,9 @@ export class Checkout implements OnInit {
   city = '';
   state = '';
   pincode = '';
+  manualLat: number | null = null;
+  manualLng: number | null = null;
+  showManualMapPicker = signal(false);
 
   // Save new address
   saveNewAddress = false;
@@ -126,7 +130,9 @@ export class Checkout implements OnInit {
       this.area.trim() &&
       this.city.trim() &&
       this.state &&
-      this.pincode.trim().length === 6
+      this.pincode.trim().length === 6 &&
+      this.manualLat !== null &&
+      this.manualLng !== null
     );
   }
 
@@ -145,11 +151,16 @@ export class Checkout implements OnInit {
 
   placeOrder(): void {
     this.errorMsg.set('');
-    const deliveryAddress = this.selectedSavedAddress()?.fullAddress ?? this.composedAddress;
+    const selectedAddress = this.selectedSavedAddress();
+    const deliveryAddress = selectedAddress?.fullAddress ?? this.composedAddress;
+    const latitude = selectedAddress?.latitude ?? this.manualLat!;
+    const longitude = selectedAddress?.longitude ?? this.manualLng!;
     const request: PlaceOrderRequest = {
       fullName: this.fullName,
       phone: this.phone,
       address: deliveryAddress,
+      latitude,
+      longitude,
       notes: this.notes,
       items: this.checkoutService.items().map((i) => ({
         productId: i.product.id,
@@ -178,6 +189,8 @@ export class Checkout implements OnInit {
           const req: SaveAddressRequest = {
             label: this.saveNewAddressLabel.trim(),
             fullAddress: deliveryAddress,
+            latitude,
+            longitude,
             isDefault: false,
           };
           this.userService.saveAddress(req).subscribe({ error: () => {} });
@@ -205,6 +218,12 @@ export class Checkout implements OnInit {
 
   useNewAddress(): void {
     this.selectedSavedAddress.set(null);
+  }
+
+  onManualLocationConfirmed(location: { lat: number; lng: number }): void {
+    this.manualLat = location.lat;
+    this.manualLng = location.lng;
+    this.showManualMapPicker.set(false);
   }
 
   incrementCartQty(index: number): void {

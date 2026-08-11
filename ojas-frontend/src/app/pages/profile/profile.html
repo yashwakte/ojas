@@ -171,15 +171,39 @@
                       </div>
                     }
                   </div>
-                  <mat-form-field appearance="outline" class="pincode-field">
-                    <mat-label>Pincode *</mat-label>
-                    <input
-                      matInput
-                      [(ngModel)]="editPincode"
-                      placeholder="6-digit pincode"
-                      maxlength="6"
+                <mat-form-field appearance="outline" class="pincode-field">
+                  <mat-label>Pincode *</mat-label>
+                  <input
+                    matInput
+                    [(ngModel)]="editPincode"
+                    placeholder="6-digit pincode"
+                    maxlength="6"
+                  />
+                </mat-form-field>
+                </div>
+                <div class="pin-location-block">
+                  <p class="pin-location-label">Pin Your Exact Location *</p>
+                  @if (showEditMapPicker()) {
+                    <app-map-picker
+                      [initialLat]="editLat"
+                      [initialLng]="editLng"
+                      (locationConfirmed)="onEditLocationConfirmed($event)"
+                      (cancelled)="showEditMapPicker.set(false)"
                     />
-                  </mat-form-field>
+                  } @else if (editLat !== null && editLng !== null) {
+                    <div class="pin-confirmed">
+                      <mat-icon>location_on</mat-icon>
+                      <span>Location pinned</span>
+                      <button type="button" class="change-pin-btn" (click)="showEditMapPicker.set(true)">
+                        Change
+                      </button>
+                    </div>
+                  } @else {
+                    <button type="button" class="pin-location-btn" (click)="showEditMapPicker.set(true)">
+                      <mat-icon>add_location_alt</mat-icon>
+                      Pin location on map
+                    </button>
+                  }
                 </div>
                 <mat-checkbox [(ngModel)]="editIsDefault" color="primary"
                   >Set as default address</mat-checkbox
@@ -207,6 +231,12 @@
                   }
                 </div>
                 <p class="address-text">{{ addr.fullAddress }}</p>
+                @if (addr.mapLink) {
+                  <a class="address-map-link" [href]="addr.mapLink" target="_blank" rel="noopener noreferrer">
+                    <mat-icon>map</mat-icon>
+                    Open saved map pin
+                  </a>
+                }
               </div>
               <div class="address-actions">
                 <button
@@ -293,6 +323,31 @@
                 maxlength="6"
               />
             </mat-form-field>
+          </div>
+
+          <div class="pin-location-block">
+            <p class="pin-location-label">Pin Your Exact Location *</p>
+            @if (showNewMapPicker()) {
+              <app-map-picker
+                [initialLat]="newLat"
+                [initialLng]="newLng"
+                (locationConfirmed)="onNewLocationConfirmed($event)"
+                (cancelled)="showNewMapPicker.set(false)"
+              />
+            } @else if (newLat !== null && newLng !== null) {
+              <div class="pin-confirmed">
+                <mat-icon>location_on</mat-icon>
+                <span>Location pinned</span>
+                <button type="button" class="change-pin-btn" (click)="showNewMapPicker.set(true)">
+                  Change
+                </button>
+              </div>
+            } @else {
+              <button type="button" class="pin-location-btn" (click)="showNewMapPicker.set(true)">
+                <mat-icon>add_location_alt</mat-icon>
+                Pin location on map
+              </button>
+            }
           </div>
 
           <mat-checkbox [(ngModel)]="newIsDefault" color="primary"

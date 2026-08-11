@@ -49,12 +49,13 @@ public class AuthService
             FullName = request.FullName.Trim(),
             Email = normalizedEmail,
             Phone = normalizedPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = UserRoles.Customer
         };
 
         await _db.Users.InsertOneAsync(user);
         var token = GenerateToken(user);
-        return (new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone)), null);
+        return (new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone, user.Role)), null);
     }
 
     public async Task<AuthResult?> LoginAsync(LoginRequest request)
@@ -68,12 +69,53 @@ public class AuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return null;
 
+        if (string.IsNullOrWhiteSpace(user.Role))
+            user.Role = UserRoles.Customer;
+
         var token = GenerateToken(user);
-        return new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone));
+        return new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone, user.Role));
+    }
+
+    public async Task<(StaffUserResponse? Staff, string? ConflictField, string? Error)> CreateStaffAsync(CreateStaffRequest request)
+    {
+        var normalizedRole = request.Role.Trim().ToLowerInvariant();
+        if (normalizedRole is not (UserRoles.Admin or UserRoles.Delivery))
+            return (null, null, "Role must be either 'admin' or 'delivery'.");
+
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var normalizedPhone = NormalizePhone(request.Phone);
+
+        var byEmail = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
+        if (byEmail != null)
+            return (null, "email", null);
+
+        var byPhone = await _db.Users.Find(u => u.Phone == normalizedPhone).FirstOrDefaultAsync();
+        if (byPhone != null)
+            return (null, "phone", null);
+
+        var user = new User
+        {
+            FullName = request.FullName.Trim(),
+            Email = normalizedEmail,
+            Phone = normalizedPhone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = normalizedRole,
+            IsEmailVerified = true,
+            IsPhoneVerified = true
+        };
+
+        await _db.Users.InsertOneAsync(user);
+        return (
+            new StaffUserResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role),
+            null,
+            null
+        );
     }
 
     private string GenerateToken(User user)
     {
+        var role = string.IsNullOrWhiteSpace(user.Role) ? UserRoles.Customer : user.Role;
+
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -84,6 +126,7 @@ public class AuthService
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Name, user.FullName),
             new Claim("phone", user.Phone),
+            new Claim(ClaimTypes.Role, role),
         };
 
         var token = new JwtSecurityToken(

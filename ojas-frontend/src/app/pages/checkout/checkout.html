@@ -95,6 +95,17 @@
                   <span class="selected-addr-badge">Selected</span>
                 </div>
                 <p class="selected-addr-text">{{ selectedSavedAddress()!.fullAddress }}</p>
+                @if (selectedSavedAddress()!.mapLink) {
+                  <a
+                    class="selected-addr-map-link"
+                    [href]="selectedSavedAddress()!.mapLink"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <mat-icon>map</mat-icon>
+                    Open saved map pin
+                  </a>
+                }
                 <button type="button" class="use-new-addr-btn" (click)="useNewAddress()">
                   <mat-icon>edit_location_alt</mat-icon> Enter a different address
                 </button>
@@ -178,6 +189,31 @@
                     maxlength="6"
                   />
                 </div>
+              </div>
+
+              <div class="pin-location-block">
+                <p class="pin-location-label">Pin Your Exact Location *</p>
+                @if (showManualMapPicker()) {
+                  <app-map-picker
+                    [initialLat]="manualLat"
+                    [initialLng]="manualLng"
+                    (locationConfirmed)="onManualLocationConfirmed($event)"
+                    (cancelled)="showManualMapPicker.set(false)"
+                  />
+                } @else if (manualLat !== null && manualLng !== null) {
+                  <div class="pin-confirmed">
+                    <mat-icon>location_on</mat-icon>
+                    <span>Location pinned</span>
+                    <button type="button" class="change-pin-btn" (click)="showManualMapPicker.set(true)">
+                      Change
+                    </button>
+                  </div>
+                } @else {
+                  <button type="button" class="pin-location-btn" (click)="showManualMapPicker.set(true)">
+                    <mat-icon>add_location_alt</mat-icon>
+                    Pin location on map
+                  </button>
+                }
               </div>
 
               <!-- Save address prompt -->

@@ -78,4 +78,12 @@ export class Header {
       .toUpperCase()
       .slice(0, 2);
   }
+
+  isCustomerArea(): boolean {
+    return !this.auth.isLoggedIn() || this.auth.role() === 'customer';
+  }
+
+  homeRoute(): string {
+    return this.auth.getDefaultRouteForRole();
+  }
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 using OjasApi.Models;
 using OjasApi.Services;
 
@@ -108,4 +109,24 @@ public class AuthController : ControllerBase
         });
         return NoContent();
     }
+
+    [HttpPost("staff")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<ActionResult<StaffUserResponse>> CreateStaff([FromBody] CreateStaffRequest request)
+    {
+        var (staff, conflictField, error) = await _authService.CreateStaffAsync(request);
+        if (error != null)
+            return BadRequest(new { message = error });
+
+        if (staff == null)
+        {
+            var message = conflictField == "email"
+                ? "Email already registered"
+                : "Phone number already in use";
+            return Conflict(new { message, field = conflictField });
+        }
+
+        return Ok(staff);
+    }
+
 }
