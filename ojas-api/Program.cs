@@ -217,7 +217,15 @@ app.UseAuthentication();
 
 app.Use(async (context, next) =>
 {
-    if (context.User.Identity?.IsAuthenticated == true &&
+    // Login/register/logout establish or clear the session cookie itself, so a stale
+    // still-valid auth cookie from a prior session must not block them with a CSRF check.
+    var path = context.Request.Path;
+    var isAuthBootstrapEndpoint = path.StartsWithSegments("/api/auth/login") ||
+        path.StartsWithSegments("/api/auth/register") ||
+        path.StartsWithSegments("/api/auth/logout");
+
+    if (!isAuthBootstrapEndpoint &&
+        context.User.Identity?.IsAuthenticated == true &&
         (HttpMethods.IsPost(context.Request.Method) ||
          HttpMethods.IsPut(context.Request.Method) ||
          HttpMethods.IsPatch(context.Request.Method) ||
