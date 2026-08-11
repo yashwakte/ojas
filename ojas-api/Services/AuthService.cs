@@ -55,7 +55,7 @@ public class AuthService
 
         await _db.Users.InsertOneAsync(user);
         var token = GenerateToken(user);
-        return (new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone, user.Role)), null);
+        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role)), null);
     }
 
     public async Task<AuthResult?> LoginAsync(LoginRequest request)
@@ -73,7 +73,7 @@ public class AuthService
             user.Role = UserRoles.Customer;
 
         var token = GenerateToken(user);
-        return new AuthResult(token, new AuthResponse(user.FullName, user.Email, user.Phone, user.Role));
+        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role));
     }
 
     public async Task<(StaffUserResponse? Staff, string? ConflictField, string? Error)> CreateStaffAsync(CreateStaffRequest request)

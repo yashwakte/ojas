@@ -19,7 +19,7 @@ export class CartService {
     // Reload cart whenever the logged-in user changes (login / logout / account switch)
     effect(() => {
       const user = this.auth.user();
-      this._items.set(user ? this.load(user.email) : []);
+      this._items.set(user ? this.load(user.id) : []);
     });
   }
 
@@ -54,22 +54,22 @@ export class CartService {
 
   clearCart(): void {
     this._items.set([]);
-    const email = this.auth.user()?.email;
-    if (email) localStorage.removeItem(this.key(email));
+    const userId = this.auth.user()?.id;
+    if (userId) localStorage.removeItem(this.key(userId));
   }
 
-  private key(email: string): string {
-    return `ojas_cart_${email}`;
+  private key(userId: string): string {
+    return `ojas_cart_${userId}`;
   }
 
   private save(): void {
-    const email = this.auth.user()?.email;
-    if (email) localStorage.setItem(this.key(email), JSON.stringify(this._items()));
+    const userId = this.auth.user()?.id;
+    if (userId) localStorage.setItem(this.key(userId), JSON.stringify(this._items()));
   }
 
-  private load(email: string): CartItem[] {
+  private load(userId: string): CartItem[] {
     try {
-      const raw = localStorage.getItem(this.key(email));
+      const raw = localStorage.getItem(this.key(userId));
       return raw ? (JSON.parse(raw) as CartItem[]) : [];
     } catch {
       return [];

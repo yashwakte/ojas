@@ -19,7 +19,7 @@ public record CreateStaffRequest(
 	[Required, MinLength(6), MaxLength(128)] string Password,
 	[Required] string Role);
 
-public record AuthResponse(string FullName, string Email, string Phone, string Role, string CsrfToken = "");
+public record AuthResponse(string Id, string FullName, string Email, string Phone, string Role, string CsrfToken = "");
 public record AuthResult(string Token, AuthResponse User);
 
 public record StaffUserResponse(string Id, string FullName, string Email, string Phone, string Role);
