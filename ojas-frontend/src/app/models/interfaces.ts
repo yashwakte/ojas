@@ -14,6 +14,7 @@ export interface AuthResponse {
   email: string;
   phone: string;
   role: UserRole;
+  csrfToken?: string;
 }
 
 export type UserRole = 'customer' | 'admin' | 'delivery';

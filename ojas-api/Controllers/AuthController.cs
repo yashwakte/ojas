@@ -75,7 +75,7 @@ public class AuthController : ControllerBase
         var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         Response.Cookies.Append(AuthCookieName, result!.Token, BuildAuthCookieOptions());
         Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
-        return Ok(result.User);
+        return Ok(result.User with { CsrfToken = csrfToken });
     }
 
     [HttpPost("login")]
@@ -88,7 +88,7 @@ public class AuthController : ControllerBase
         var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
         Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
-        return Ok(result.User);
+        return Ok(result.User with { CsrfToken = csrfToken });
     }
 
     [HttpPost("logout")]

@@ -75,6 +75,12 @@ export class AuthService {
     return '/';
   }
 
+  // Backend and frontend are on different domains, so document.cookie can't read the
+  // CSRF cookie set by the API - it's delivered in the login/register response body instead.
+  getCsrfToken(): string | null {
+    return this._user()?.csrfToken ?? null;
+  }
+
   getToken(): string | null {
     return null;
   }

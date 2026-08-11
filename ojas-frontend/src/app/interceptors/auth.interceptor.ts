@@ -12,15 +12,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (isApiRequest) {
     const method = req.method.toUpperCase();
     const needsCsrf = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
-    const csrfToken = document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('ojas_csrf='))
-      ?.split('=')[1];
+    const csrfToken = authService.getCsrfToken();
 
     if (needsCsrf && csrfToken) {
       cloned = req.clone({
         withCredentials: true,
-        setHeaders: { 'X-CSRF-Token': decodeURIComponent(csrfToken) },
+        setHeaders: { 'X-CSRF-Token': csrfToken },
       });
     } else {
       cloned = req.clone({ withCredentials: true });
