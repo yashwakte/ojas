@@ -115,6 +115,7 @@ export interface SaveAddressRequest {
 
 export interface UpdateProfileRequest {
   fullName: string;
+  email: string;
   phone: string;
 }
 

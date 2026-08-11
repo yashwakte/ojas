@@ -26,7 +26,7 @@ public record StaffUserResponse(string Id, string FullName, string Email, string
 
 public record SavedAddressDto(string Label, string FullAddress, double Latitude, double Longitude, string? MapLink, bool IsDefault);
 public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault);
-public record UpdateProfileRequest(string FullName, string Phone);
+public record UpdateProfileRequest(string FullName, string Email, string Phone);
 public record UserProfileResponse(string Id, string FullName, string Email, string Phone, DateTime CreatedAt, List<SavedAddressDto> SavedAddresses);
 
 public record OrderItemDto(string ProductId, string ProductName, decimal Price, string Weight, int Quantity);

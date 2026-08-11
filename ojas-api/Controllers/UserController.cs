@@ -42,8 +42,28 @@ public class UserController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
+        var currentUser = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
+        if (currentUser == null) return NotFound();
+
+        // Check for duplicate email (if changed)
+        if (!string.Equals(currentUser.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var emailExists = await _db.Users.Find(u => u.Email == request.Email && u.Id != userId).AnyAsync();
+            if (emailExists)
+                return Conflict(new { message = "This email is already registered.", field = "email" });
+        }
+
+        // Check for duplicate phone (if changed)
+        if (!string.Equals(currentUser.Phone, request.Phone, StringComparison.OrdinalIgnoreCase))
+        {
+            var phoneExists = await _db.Users.Find(u => u.Phone == request.Phone && u.Id != userId).AnyAsync();
+            if (phoneExists)
+                return Conflict(new { message = "This phone number is already associated with another account.", field = "phone" });
+        }
+
         var update = Builders<User>.Update
             .Set(u => u.FullName, request.FullName)
+            .Set(u => u.Email, request.Email)
             .Set(u => u.Phone, request.Phone);
 
         try
@@ -54,7 +74,7 @@ public class UserController : ControllerBase
         }
         catch (MongoWriteException ex) when (ex.WriteError.Code == 11000)
         {
-            return Conflict(new { message = "This phone number is already associated with another account." });
+            return Conflict(new { message = "This phone number is already associated with another account.", field = "phone" });
         }
     }
 

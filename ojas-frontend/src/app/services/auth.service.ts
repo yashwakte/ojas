@@ -85,7 +85,7 @@ export class AuthService {
     return null;
   }
 
-  updateUserInfo(updates: Partial<Pick<AuthResponse, 'fullName' | 'phone'>>): void {
+  updateUserInfo(updates: Partial<Pick<AuthResponse, 'fullName' | 'email' | 'phone'>>): void {
     const current = this._user();
     if (current) {
       const updated = { ...current, ...updates };

@@ -40,6 +40,7 @@ export class Profile implements OnInit {
   // Edit profile
   editingProfile = signal(false);
   editFullName = '';
+  editEmail = '';
   editPhone = '';
   savingProfile = signal(false);
 
@@ -125,6 +126,7 @@ export class Profile implements OnInit {
     const p = this.profile();
     if (!p) return;
     this.editFullName = p.fullName;
+    this.editEmail = p.email;
     this.editPhone = p.phone;
     this.editingProfile.set(true);
   }
@@ -132,10 +134,10 @@ export class Profile implements OnInit {
   saveProfile(): void {
     this.savingProfile.set(true);
     this.userService
-      .updateProfile({ fullName: this.editFullName, phone: this.editPhone })
+      .updateProfile({ fullName: this.editFullName, email: this.editEmail, phone: this.editPhone })
       .subscribe({
         next: () => {
-          this.auth.updateUserInfo({ fullName: this.editFullName, phone: this.editPhone });
+          this.auth.updateUserInfo({ fullName: this.editFullName, email: this.editEmail, phone: this.editPhone });
           this.editingProfile.set(false);
           this.savingProfile.set(false);
           this.loadProfile();
@@ -144,7 +146,7 @@ export class Profile implements OnInit {
           this.savingProfile.set(false);
           const message =
             err.status === 409
-              ? (err.error?.message ?? 'Phone number is already in use.')
+              ? (err.error?.message ?? 'This email or phone is already in use.')
               : 'Failed to save changes. Please try again.';
           this.snackBar.open(message, 'Dismiss', {
             duration: 4000,
