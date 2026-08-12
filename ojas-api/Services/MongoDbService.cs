@@ -24,6 +24,8 @@ public class MongoDbService
     public IMongoCollection<Product> Products => _database.GetCollection<Product>("products");
     public IMongoCollection<User> Users => _database.GetCollection<User>("users");
     public IMongoCollection<Order> Orders => _database.GetCollection<Order>("orders");
+    public IMongoCollection<DeliveryCharges> DeliveryCharges => _database.GetCollection<DeliveryCharges>("delivery_charges");
+    public IMongoCollection<CampaignBanner> CampaignBanners => _database.GetCollection<CampaignBanner>("campaign_banner");
 
     private void TryEnsureIndexes()
     {

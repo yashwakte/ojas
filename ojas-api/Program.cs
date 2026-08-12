@@ -41,6 +41,8 @@ builder.Services.AddSingleton<MongoDbService>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<DeliveryChargesService>();
+builder.Services.AddScoped<CampaignBannerService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -175,6 +177,7 @@ _ = Task.Run(async () =>
         using var scope = app.Services.CreateScope();
         var productService = scope.ServiceProvider.GetRequiredService<ProductService>();
         await productService.SeedAsync(SeedData.GetProducts());
+        await productService.MigrateLegacyProductsAsync();
         Console.WriteLine("✅ Product seed data loaded successfully.");
     }
     catch (Exception ex)
