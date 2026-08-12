@@ -760,6 +760,19 @@
   font-weight: 600;
 }
 
+.delivery-status {
+  font-style: italic;
+  color: var(--ojas-text-light);
+}
+
+.delivery-distance {
+  font-size: 0.78rem;
+
+  span {
+    color: var(--ojas-text-light);
+  }
+}
+
 // ===== ORDER SUCCESS =====
 .order-success {
   text-align: center;

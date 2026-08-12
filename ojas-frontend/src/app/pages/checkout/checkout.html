@@ -329,12 +329,26 @@
             </div>
             <div class="total-row">
               <span>Delivery</span>
-              <span class="free">FREE</span>
+              @if (deliveryLoading()) {
+                <span class="delivery-status">Calculating…</span>
+              } @else if (deliveryDistanceKm() === null) {
+                <span class="delivery-status">Pin address to calculate</span>
+              } @else if (deliveryCharge() === 0) {
+                <span class="free">FREE</span>
+              } @else {
+                <span>₹{{ deliveryCharge() }}</span>
+              }
             </div>
+            @if (deliveryDistanceKm() !== null && !deliveryLoading()) {
+              <div class="total-row delivery-distance">
+                <span>Distance from warehouse</span>
+                <span>{{ deliveryDistanceKm()!.toFixed(1) }} km</span>
+              </div>
+            }
             <div class="total-divider"></div>
             <div class="total-row grand">
               <strong>Total</strong>
-              <strong class="grand-amount">₹{{ totalAmount() }}</strong>
+              <strong class="grand-amount">₹{{ grandTotal() | number: '1.2-2' }}</strong>
             </div>
           </div>
         </div>

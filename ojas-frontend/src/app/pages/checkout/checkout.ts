@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, signal, computed } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -7,13 +8,14 @@ import { CheckoutService } from '../../services/checkout.service';
 import { OrderService } from '../../services/order.service';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
+import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { PlaceOrderRequest, SaveAddressRequest, SavedAddress } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
 import { INDIAN_STATES } from '../../constants/indian-states';
 
 @Component({
   selector: 'app-checkout',
-  imports: [RouterLink, FormsModule, MatIconModule, MapPicker],
+  imports: [RouterLink, FormsModule, MatIconModule, MapPicker, DecimalPipe],
   templateUrl: './checkout.html',
   styleUrl: './checkout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -48,9 +50,15 @@ export class Checkout implements OnInit {
   savedAddresses = signal<SavedAddress[]>([]);
   selectedSavedAddress = signal<SavedAddress | null>(null);
 
+  deliveryCharge = signal(0);
+  deliveryDistanceKm = signal<number | null>(null);
+  deliveryLoading = signal(false);
+
   readonly totalAmount = computed(() =>
     this.checkoutService.items().reduce((sum, i) => sum + i.product.price * i.quantity, 0),
   );
+
+  readonly grandTotal = computed(() => this.totalAmount() + this.deliveryCharge());
 
   constructor(
     private cartService: CartService,
@@ -58,6 +66,7 @@ export class Checkout implements OnInit {
     private orderService: OrderService,
     public auth: AuthService,
     private userService: UserService,
+    private deliveryChargesService: DeliveryChargesService,
     private router: Router,
   ) {}
 
@@ -72,7 +81,10 @@ export class Checkout implements OnInit {
       next: (profile) => {
         this.savedAddresses.set(profile.savedAddresses ?? []);
         const def = profile.savedAddresses?.find((a) => a.isDefault);
-        if (def) this.selectedSavedAddress.set(def);
+        if (def) {
+          this.selectedSavedAddress.set(def);
+          this.updateDeliveryEstimate();
+        }
       },
       error: () => {},
     });
@@ -178,16 +190,45 @@ export class Checkout implements OnInit {
     } else {
       this.selectedSavedAddress.set(addr);
     }
+    this.updateDeliveryEstimate();
   }
 
   useNewAddress(): void {
     this.selectedSavedAddress.set(null);
+    this.updateDeliveryEstimate();
   }
 
   onManualLocationConfirmed(location: { lat: number; lng: number }): void {
     this.manualLat = location.lat;
     this.manualLng = location.lng;
     this.showManualMapPicker.set(false);
+    this.updateDeliveryEstimate();
+  }
+
+  private updateDeliveryEstimate(): void {
+    const selectedAddress = this.selectedSavedAddress();
+    const latitude = selectedAddress?.latitude ?? this.manualLat;
+    const longitude = selectedAddress?.longitude ?? this.manualLng;
+
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+      this.deliveryCharge.set(0);
+      this.deliveryDistanceKm.set(null);
+      return;
+    }
+
+    this.deliveryLoading.set(true);
+    this.deliveryChargesService.previewCharge(latitude, longitude).subscribe({
+      next: (result) => {
+        this.deliveryCharge.set(result.charge);
+        this.deliveryDistanceKm.set(result.distanceKm);
+        this.deliveryLoading.set(false);
+      },
+      error: () => {
+        this.deliveryCharge.set(0);
+        this.deliveryDistanceKm.set(null);
+        this.deliveryLoading.set(false);
+      },
+    });
   }
 
   incrementCartQty(index: number): void {
