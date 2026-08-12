@@ -11,6 +11,16 @@
           >Home</a
         >
         <a routerLink="/products" routerLinkActive="active">Products</a>
+        <div class="nav-dropdown">
+          <a routerLink="/products" class="nav-dropdown-trigger">
+            Shop by Category <mat-icon class="dropdown-caret">expand_more</mat-icon>
+          </a>
+          <div class="nav-dropdown-panel">
+            @for (cat of categories; track cat) {
+              <a [routerLink]="['/products']" [queryParams]="{ category: cat }">{{ cat }}</a>
+            }
+          </div>
+        </div>
       </nav>
     }
 
@@ -127,6 +137,25 @@
       @if (isCustomerArea()) {
         <a routerLink="/" (click)="toggleMenu()">Home</a>
         <a routerLink="/products" (click)="toggleMenu()">Products</a>
+        <button
+          type="button"
+          class="mobile-category-toggle"
+          [class.open]="categoryMenuOpen()"
+          (click)="toggleCategoryMenu()"
+          [attr.aria-expanded]="categoryMenuOpen()"
+        >
+          Shop by Category
+          <mat-icon>{{ categoryMenuOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        @if (categoryMenuOpen()) {
+          <div class="mobile-category-list">
+            @for (cat of categories; track cat) {
+              <a [routerLink]="['/products']" [queryParams]="{ category: cat }" (click)="toggleMenu()">{{
+                cat
+              }}</a>
+            }
+          </div>
+        }
       }
       @if (auth.isLoggedIn()) {
         @if (auth.role() === 'customer') {

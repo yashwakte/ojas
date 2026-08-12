@@ -9,6 +9,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
+import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 
 @Component({
   selector: 'app-header',
@@ -32,6 +33,9 @@ export class Header {
   menuOpen = false;
   isScrolled = false;
   cartBounce = signal(false);
+  categoryMenuOpen = signal(false);
+
+  readonly categories = PRODUCT_CATEGORIES;
 
   private _prevCount = 0;
 
@@ -58,6 +62,13 @@ export class Header {
 
   toggleMenu() {
     this.menuOpen = !this.menuOpen;
+    if (!this.menuOpen) {
+      this.categoryMenuOpen.set(false);
+    }
+  }
+
+  toggleCategoryMenu(): void {
+    this.categoryMenuOpen.update((open) => !open);
   }
 
   goToCheckout(): void {
