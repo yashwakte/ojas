@@ -1,0 +1,287 @@
+<section class="delivery-charges-management">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Logistics</p>
+      <h1>Delivery Charges Configuration</h1>
+      <p class="subtitle">Configure distance-based delivery pricing from Sangvi, Pune warehouse</p>
+    </div>
+    @if (!editing() && config()) {
+      <button mat-flat-button class="edit-btn" (click)="startEditing()" [disabled]="submitting()">
+        <mat-icon>edit</mat-icon>
+        Edit Configuration
+      </button>
+    }
+  </header>
+
+  @if (error()) {
+    <div class="alert error">{{ error() }}</div>
+  }
+
+  @if (loading() && !config()) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading configuration...</p>
+    </div>
+  } @else {
+    <mat-card class="config-card" [class.editing]="editing()">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>local_shipping</mat-icon>
+          Delivery Pricing Rules
+        </mat-card-title>
+        <mat-card-subtitle>
+          @if (config()?.isActive) {
+            <mat-chip color="primary" selected>Active</mat-chip>
+          } @else {
+            <mat-chip color="warn" selected>Inactive</mat-chip>
+          }
+          @if (config()?.id) {
+            <span class="config-id">Config ID: {{ config()!.id.slice(0, 8).toUpperCase() }}</span>
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        @if (!editing()) {
+          <div class="config-display">
+            <div class="config-grid">
+              <div class="config-item highlight">
+                <div class="config-label">Free Delivery Up To</div>
+                <div class="config-value">
+                  <span class="distance-value">{{ config()?.freeDeliveryUpToKm }}</span>
+                  <span class="distance-unit">km</span>
+                </div>
+                <div class="config-description">No delivery charges within this radius</div>
+              </div>
+
+              <div class="config-item highlight">
+                <div class="config-label">Per KM Charge After</div>
+                <div class="config-value">
+                  <span class="currency-symbol">₹</span>
+                  <span class="price-value">{{ config()?.perKmChargeAfterFree }}</span>
+                  <span class="price-unit">/km</span>
+                </div>
+                <div class="config-description">Charged for each km beyond free radius</div>
+              </div>
+
+              <div class="config-item">
+                <div class="config-label">Warehouse Location</div>
+                <div class="config-value address">{{ config()?.warehouseAddress }}</div>
+                <div class="config-description coordinates">
+                  Lat: {{ formatCoordinate(config()?.warehouseLatitude ?? 0) }},
+                  Lng: {{ formatCoordinate(config()?.warehouseLongitude ?? 0) }}
+                </div>
+              </div>
+
+              <div class="config-item">
+                <div class="config-label">Status</div>
+                <div class="config-value">
+                  <mat-slide-toggle
+                    [checked]="config()?.isActive ?? false"
+                    (change)="toggleActive($event)"
+                    [disabled]="submitting()"
+                    color="primary">
+                  </mat-slide-toggle>
+                </div>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
+
+            <div class="pricing-examples">
+              <h3>Pricing Examples</h3>
+              <p class="examples-note">Based on current configuration (from Sangvi, Pune warehouse)</p>
+
+              <div class="examples-grid">
+                @for (dist of distanceExamples; track dist) {
+                  <div class="example-card" [class.free]="isFreeDelivery(dist)">
+                    <div class="example-distance">{{ dist }} km</div>
+                    <div class="example-charge" [class.free]="isFreeDelivery(dist)">
+                      @if (isFreeDelivery(dist)) {
+                        <span class="free-text">FREE</span>
+                      } @else {
+                        <span class="charge-text">{{ calculateCharge(dist) | currency:'INR':'symbol':'1.0-0' }}</span>
+                      }
+                    </div>
+                    <div class="example-breakdown">{{ getBreakdown(dist) }}</div>
+                  </div>
+                }
+              </div>
+            </div>
+
+          </div>
+        } @else {
+          <form #chargesForm="ngForm" (ngSubmit)="saveConfig()" class="config-form">
+            <div class="form-section">
+              <h3>Warehouse Location</h3>
+              <p class="section-hint">Default: Sangvi, Pune. Update coordinates for accurate distance calculation.</p>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Warehouse Address *</mat-label>
+                  <textarea matInput
+                    name="warehouseAddress"
+                    [(ngModel)]="formData().warehouseAddress"
+                    (ngModelChange)="formData.update(d => ({...d, warehouseAddress: $event}))"
+                    required
+                    rows="2"
+                    maxlength="200"
+                    placeholder="Full address of the warehouse"
+                    [class.error]="hasError('warehouseAddress')"></textarea>
+                  @if (hasError('warehouseAddress')) {
+                    <mat-error>{{ getError('warehouseAddress') }}</mat-error>
+                  }
+                  <mat-hint align="end">{{ formData().warehouseAddress?.length || 0 }}/200</mat-hint>
+                </mat-form-field>
+              </div>
+
+              <div class="form-row two-col">
+                <mat-form-field appearance="outline">
+                  <mat-label>Latitude *</mat-label>
+                  <input matInput type="number"
+                    name="warehouseLatitude"
+                    [(ngModel)]="formData().warehouseLatitude"
+                    (ngModelChange)="formData.update(d => ({...d, warehouseLatitude: $event}))"
+                    required
+                    step="0.000001"
+                    min="-90"
+                    max="90"
+                    placeholder="e.g., 18.567200"
+                    [class.error]="hasError('warehouseLatitude')">
+                  @if (hasError('warehouseLatitude')) {
+                    <mat-error>{{ getError('warehouseLatitude') }}</mat-error>
+                  }
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Longitude *</mat-label>
+                  <input matInput type="number"
+                    name="warehouseLongitude"
+                    [(ngModel)]="formData().warehouseLongitude"
+                    (ngModelChange)="formData.update(d => ({...d, warehouseLongitude: $event}))"
+                    required
+                    step="0.000001"
+                    min="-180"
+                    max="180"
+                    placeholder="e.g., 73.779300"
+                    [class.error]="hasError('warehouseLongitude')">
+                  @if (hasError('warehouseLongitude')) {
+                    <mat-error>{{ getError('warehouseLongitude') }}</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
+
+            <div class="form-section">
+              <h3>Delivery Pricing Rules</h3>
+
+              <div class="form-row two-col">
+                <mat-form-field appearance="outline">
+                  <mat-label>Free Delivery Up To (km) *</mat-label>
+                  <input matInput type="number"
+                    name="freeDeliveryUpToKm"
+                    [(ngModel)]="formData().freeDeliveryUpToKm"
+                    (ngModelChange)="formData.update(d => ({...d, freeDeliveryUpToKm: $event}))"
+                    required
+                    step="0.1"
+                    min="0"
+                    max="500"
+                    placeholder="e.g., 7"
+                    [class.error]="hasError('freeDeliveryUpToKm')">
+                  @if (hasError('freeDeliveryUpToKm')) {
+                    <mat-error>{{ getError('freeDeliveryUpToKm') }}</mat-error>
+                  }
+                  <mat-hint>Distance in km for free delivery</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Per KM Charge After Free (₹) *</mat-label>
+                  <input matInput type="number"
+                    name="perKmChargeAfterFree"
+                    [(ngModel)]="formData().perKmChargeAfterFree"
+                    (ngModelChange)="formData.update(d => ({...d, perKmChargeAfterFree: $event}))"
+                    required
+                    step="0.01"
+                    min="0"
+                    max="1000"
+                    placeholder="e.g., 10"
+                    [class.error]="hasError('perKmChargeAfterFree')">
+                  @if (hasError('perKmChargeAfterFree')) {
+                    <mat-error>{{ getError('perKmChargeAfterFree') }}</mat-error>
+                  }
+                  <mat-hint>Charge per km beyond free radius</mat-hint>
+                </mat-form-field>
+              </div>
+
+              <div class="form-row checkbox-row">
+                <mat-slide-toggle
+                  name="isActive"
+                  [(ngModel)]="formData().isActive"
+                  (ngModelChange)="formData.update(d => ({...d, isActive: $event}))"
+                  color="primary">
+                  Configuration is active
+                </mat-slide-toggle>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
+
+            <div class="form-section test-section">
+              <h3>Test Distance Calculation</h3>
+              <p class="section-hint">Enter a distance to preview the delivery charge</p>
+
+              <div class="form-row two-col">
+                <mat-form-field appearance="outline">
+                  <mat-label>Test Distance (km)</mat-label>
+                  <input matInput type="number"
+                    [ngModel]="testDistanceInput()"
+                    (ngModelChange)="testDistanceInput.set($event)"
+                    step="0.1"
+                    min="0"
+                    placeholder="e.g., 8.5">
+                </mat-form-field>
+
+                <button type="button" mat-stroked-button (click)="testDistanceCalculation(testDistanceInput() ?? 0)" [disabled]="testDistanceInput() === null || (testDistanceInput() ?? 0) < 0">
+                  <mat-icon>calculate</mat-icon>
+                  Calculate
+                </button>
+              </div>
+
+              @if (testResult()) {
+                <div class="test-result" [class.free]="testResult()!.isFree">
+                  <div class="result-header">
+                    <mat-icon>{{ testResult()!.isFree ? 'celebration' : 'local_shipping' }}</mat-icon>
+                    <span>{{ testResult()!.isFree ? 'Free Delivery' : 'Delivery Charge' }}</span>
+                  </div>
+                  <div class="result-amount" [class.free]="testResult()!.isFree">
+                    @if (testResult()!.isFree) {
+                      FREE
+                    } @else {
+                      {{ testResult()!.charge | currency:'INR':'symbol':'1.0-0' }}
+                    }
+                  </div>
+                  <div class="result-breakdown">{{ testResult()!.breakdown }}</div>
+                  <button type="button" mat-icon-button (click)="clearTest()" matTooltip="Clear" class="clear-test-btn">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+
+            <div class="form-actions">
+              <button type="button" mat-stroked-button (click)="cancelEditing()">
+                Cancel
+              </button>
+              <button type="submit" mat-flat-button color="primary" [disabled]="submitting()">
+                <mat-icon>{{ submitting() ? 'hourglass_empty' : 'save' }}</mat-icon>
+                {{ submitting() ? 'Saving...' : 'Save Configuration' }}
+              </button>
+            </div>
+          </form>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</section>
