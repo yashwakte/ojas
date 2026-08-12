@@ -3,7 +3,7 @@ using OjasApi.Models;
 
 namespace OjasApi.Services;
 
-public class OrderService(MongoDbService db)
+public class OrderService(IMongoDbService db)
 {
     private readonly IMongoCollection<Order> _orders = db.Orders;
 

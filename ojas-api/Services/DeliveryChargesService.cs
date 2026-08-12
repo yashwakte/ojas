@@ -5,9 +5,9 @@ namespace OjasApi.Services;
 
 public class DeliveryChargesService
 {
-    private readonly MongoDbService _db;
+    private readonly IMongoDbService _db;
 
-    public DeliveryChargesService(MongoDbService db)
+    public DeliveryChargesService(IMongoDbService db)
     {
         _db = db;
     }

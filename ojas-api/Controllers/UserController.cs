@@ -12,9 +12,9 @@ namespace OjasApi.Controllers;
 [Authorize]
 public class UserController : ControllerBase
 {
-    private readonly MongoDbService _db;
+    private readonly IMongoDbService _db;
 
-    public UserController(MongoDbService db)
+    public UserController(IMongoDbService db)
     {
         _db = db;
     }

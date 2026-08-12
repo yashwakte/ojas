@@ -38,6 +38,7 @@ var allowVercelPreviewOrigins = builder.Configuration.GetValue("Cors:AllowVercel
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDb"));
 builder.Services.AddSingleton<MongoDbService>();
+builder.Services.AddSingleton<IMongoDbService>(sp => sp.GetRequiredService<MongoDbService>());
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
@@ -251,3 +252,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Exposed so WebApplicationFactory<Program> in the test project can bootstrap this app in-memory.
+public partial class Program { }

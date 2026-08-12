@@ -6,9 +6,9 @@ namespace OjasApi.Services;
 
 public class ProductService
 {
-    private readonly MongoDbService _db;
+    private readonly IMongoDbService _db;
 
-    public ProductService(MongoDbService db)
+    public ProductService(IMongoDbService db)
     {
         _db = db;
     }

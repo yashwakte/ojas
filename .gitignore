@@ -3,6 +3,8 @@ ojas-api/bin/
 ojas-api/obj/
 ojas-api/appsettings.json
 ojas-api/appsettings.Development.json
+ojas-api.Tests/bin/
+ojas-api.Tests/obj/
 
 # Frontend
 ojas-frontend/node_modules/

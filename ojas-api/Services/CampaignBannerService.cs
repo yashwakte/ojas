@@ -5,9 +5,9 @@ namespace OjasApi.Services;
 
 public class CampaignBannerService
 {
-    private readonly MongoDbService _db;
+    private readonly IMongoDbService _db;
 
-    public CampaignBannerService(MongoDbService db)
+    public CampaignBannerService(IMongoDbService db)
     {
         _db = db;
     }

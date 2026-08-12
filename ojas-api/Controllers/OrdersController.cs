@@ -13,10 +13,10 @@ namespace OjasApi.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly OrderService _orderService;
-    private readonly MongoDbService _db;
+    private readonly IMongoDbService _db;
     private readonly DeliveryChargesService _deliveryChargesService;
 
-    public OrdersController(OrderService orderService, MongoDbService db, DeliveryChargesService deliveryChargesService)
+    public OrdersController(OrderService orderService, IMongoDbService db, DeliveryChargesService deliveryChargesService)
     {
         _orderService = orderService;
         _db = db;

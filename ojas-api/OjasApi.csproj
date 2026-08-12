@@ -14,4 +14,9 @@
     <PackageReference Include="MongoDB.Driver" Version="3.7.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Lets the test assembly exercise internal members (e.g. UserController.BuildMapLink) directly. -->
+    <InternalsVisibleTo Include="OjasApi.Tests" />
+  </ItemGroup>
+
 </Project>

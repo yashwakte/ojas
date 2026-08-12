@@ -4,7 +4,7 @@ using OjasApi.Models;
 
 namespace OjasApi.Services;
 
-public class MongoDbService
+public class MongoDbService : IMongoDbService
 {
     private readonly IMongoDatabase _database;
     private readonly ILogger<MongoDbService> _logger;

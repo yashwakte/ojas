@@ -9,10 +9,10 @@ namespace OjasApi.Services;
 
 public class AuthService
 {
-    private readonly MongoDbService _db;
+    private readonly IMongoDbService _db;
     private readonly IConfiguration _config;
 
-    public AuthService(MongoDbService db, IConfiguration config)
+    public AuthService(IMongoDbService db, IConfiguration config)
     {
         _db = db;
         _config = config;
