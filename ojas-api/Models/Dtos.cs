@@ -43,9 +43,13 @@ public record OrderResponse(
 	string? AddressMapLink,
 	string Notes,
 	List<OrderItemDto> Items,
+	decimal DeliveryCharge,
+	double DeliveryDistanceKm,
 	decimal TotalAmount,
 	string Status,
 	DateTime CreatedAt,
 	string? DeliveryPartnerId,
 	string? DeliveryPartnerName,
 	DateTime? UpdatedAt);
+
+public record DeliveryChargeCalculationResponse(double DistanceKm, decimal Charge, bool IsFree);

@@ -54,6 +54,12 @@ public class Order
     [BsonElement("items")]
     public List<OrderItem> Items { get; set; } = [];
 
+    [BsonElement("deliveryCharge")]
+    public decimal DeliveryCharge { get; set; }
+
+    [BsonElement("deliveryDistanceKm")]
+    public double DeliveryDistanceKm { get; set; }
+
     [BsonElement("totalAmount")]
     public decimal TotalAmount { get; set; }
 

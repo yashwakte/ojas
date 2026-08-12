@@ -14,11 +14,13 @@ public class OrdersController : ControllerBase
 {
     private readonly OrderService _orderService;
     private readonly MongoDbService _db;
+    private readonly DeliveryChargesService _deliveryChargesService;
 
-    public OrdersController(OrderService orderService, MongoDbService db)
+    public OrdersController(OrderService orderService, MongoDbService db, DeliveryChargesService deliveryChargesService)
     {
         _orderService = orderService;
         _db = db;
+        _deliveryChargesService = deliveryChargesService;
     }
 
     private static OrderResponse ToResponse(Order order)
@@ -33,6 +35,8 @@ public class OrdersController : ControllerBase
             order.AddressMapLink,
             order.Notes,
             order.Items.Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.Price, i.Weight, i.Quantity)).ToList(),
+            order.DeliveryCharge,
+            order.DeliveryDistanceKm,
             order.TotalAmount,
             order.Status,
             order.CreatedAt,
@@ -62,7 +66,10 @@ public class OrdersController : ControllerBase
             Quantity = i.Quantity,
         }).ToList();
 
-        var totalAmount = items.Sum(i => i.Price * i.Quantity);
+        var itemsTotal = items.Sum(i => i.Price * i.Quantity);
+
+        // Delivery charge is always computed server-side from the warehouse config, never trusted from the client.
+        var (distanceKm, deliveryCharge, _) = await _deliveryChargesService.CalculateDeliveryChargeAsync(request.Latitude.Value, request.Longitude.Value);
 
         var order = new Order
         {
@@ -75,30 +82,14 @@ public class OrdersController : ControllerBase
             AddressMapLink = UserController.BuildMapLink(request.Latitude.Value, request.Longitude.Value),
             Notes = request.Notes ?? string.Empty,
             Items = items,
-            TotalAmount = totalAmount,
+            DeliveryCharge = deliveryCharge,
+            DeliveryDistanceKm = distanceKm,
+            TotalAmount = Math.Round(itemsTotal + deliveryCharge, 2, MidpointRounding.AwayFromZero),
         };
 
         var created = await _orderService.CreateOrderAsync(order);
 
-        var response = new OrderResponse(
-            created.Id!,
-            created.FullName,
-            created.Phone,
-            created.Address,
-            created.Latitude,
-            created.Longitude,
-            created.AddressMapLink,
-            created.Notes,
-            created.Items.Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.Price, i.Weight, i.Quantity)).ToList(),
-            created.TotalAmount,
-            created.Status,
-            created.CreatedAt,
-            created.DeliveryPartnerId,
-            created.DeliveryPartnerName,
-            created.UpdatedAt
-        );
-
-        return Ok(response);
+        return Ok(ToResponse(created));
     }
 
     [HttpGet("my")]
