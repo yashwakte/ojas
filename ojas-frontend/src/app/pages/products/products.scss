@@ -148,6 +148,9 @@
 }
 
 .product-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   border-radius: var(--ojas-radius);
   overflow: hidden;
   background: #fff;
@@ -208,6 +211,7 @@
 
 .product-info {
   padding: 0 20px 20px;
+  margin-top: auto;
 }
 
 .product-name {
@@ -241,10 +245,35 @@
   margin-bottom: 14px;
 }
 
-.product-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.product-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-family: 'Poppins', sans-serif;
+
+  .original-price {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ojas-text-light);
+    text-decoration: line-through;
+  }
+
+  .sale-price {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--ojas-orange);
+  }
+
+  .discount-badge {
+    background: var(--ojas-orange);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+  }
 }
 
 .product-weight {
@@ -260,13 +289,6 @@
     width: 16px;
     height: 16px;
   }
-}
-
-.product-price {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--ojas-orange);
-  font-family: 'Poppins', sans-serif;
 }
 
 .add-to-cart-btn {

@@ -1,5 +1,5 @@
-import { Component, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,16 +8,18 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { Product } from '../../models/interfaces';
+import { DecimalPipe } from '@angular/common';
+import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 
 @Component({
   selector: 'app-products',
-  imports: [RouterLink, MatButtonModule, MatIconModule],
+  imports: [RouterLink, MatButtonModule, MatIconModule, DecimalPipe],
   templateUrl: './products.html',
   styleUrl: './products.scss',
 })
-export class Products {
+export class Products implements OnInit {
   selectedCategory = 'All';
-  categories = ['All', 'Flour', 'Grains', 'Health Mix'];
+  categories = ['All', ...PRODUCT_CATEGORIES];
   justAdded = signal<string | null>(null);
 
   constructor(
@@ -25,8 +27,16 @@ export class Products {
     private cartService: CartService,
     private checkoutService: CheckoutService,
     private auth: AuthService,
+    private route: ActivatedRoute,
     private router: Router,
   ) {}
+
+  ngOnInit(): void {
+    const category = this.route.snapshot.queryParamMap.get('category');
+    if (category && (this.categories as string[]).includes(category)) {
+      this.selectedCategory = category;
+    }
+  }
 
   get filteredProducts(): Product[] {
     const all = this.productService.products();

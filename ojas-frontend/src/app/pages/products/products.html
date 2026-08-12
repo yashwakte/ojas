@@ -45,16 +45,24 @@
                 <span class="product-badge">{{ product.category }}</span>
               </div>
             </div>
-            <div class="product-info-top">
-              <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
-              <p class="product-desc">{{ product.description }}</p>
-              <div class="product-meta">
-                <span class="product-weight">
-                  <mat-icon>scale</mat-icon> {{ product.weight }}
-                </span>
-                <span class="product-price">₹{{ product.price }}</span>
-              </div>
+<div class="product-info-top">
+            <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
+            <p class="product-desc">{{ product.description }}</p>
+            <div class="product-meta">
+              <span class="product-weight">
+                <mat-icon>scale</mat-icon> {{ product.weight }}
+              </span>
+              <span class="product-price">
+                @if (product.discount && product.discount > 0) {
+                  <span class="original-price">₹{{ product.price }}</span>
+                  <span class="sale-price">₹{{ product.price - (product.price * product.discount / 100) | number:'1.0-0' }}</span>
+                  <span class="discount-badge">{{ product.discount }}% OFF</span>
+                } @else {
+                  ₹{{ product.price }}
+                }
+              </span>
             </div>
+          </div>
           </a>
           <div class="product-info">
             <div class="product-actions">
