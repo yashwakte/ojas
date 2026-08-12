@@ -1,0 +1,166 @@
+<section class="campaign-banner-management">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Home Page</p>
+      <h1>Campaign Banner</h1>
+      <p class="subtitle">Show a seasonal or festive banner at the top of the home page</p>
+    </div>
+    @if (config()?.isActive) {
+      <mat-chip color="primary" selected>Live on Home Page</mat-chip>
+    } @else {
+      <mat-chip color="warn" selected>Hidden</mat-chip>
+    }
+  </header>
+
+  @if (loading() && !config()) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading configuration...</p>
+    </div>
+  } @else {
+    <mat-card class="config-card">
+      <mat-card-content>
+        <form #bannerForm="ngForm" (ngSubmit)="saveConfig()" class="banner-form">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Banner Title *</mat-label>
+              <input matInput
+                name="title"
+                [ngModel]="formData().title"
+                (ngModelChange)="formData.update(d => ({...d, title: $event}))"
+                required
+                maxlength="100"
+                placeholder="e.g., Diwali Dhamaka — Flat 20% Off"
+                [class.error]="hasError('title')">
+              @if (hasError('title')) {
+                <mat-error>{{ getError('title') }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Subtitle</mat-label>
+              <textarea matInput
+                name="subtitle"
+                [ngModel]="formData().subtitle"
+                (ngModelChange)="formData.update(d => ({...d, subtitle: $event}))"
+                rows="2"
+                maxlength="200"
+                placeholder="e.g., Celebrate the festival of lights with pure, traditional flours."
+                [class.error]="hasError('subtitle')"></textarea>
+              @if (hasError('subtitle')) {
+                <mat-error>{{ getError('subtitle') }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline">
+              <mat-label>Button Text</mat-label>
+              <input matInput
+                name="ctaText"
+                [ngModel]="formData().ctaText"
+                (ngModelChange)="formData.update(d => ({...d, ctaText: $event}))"
+                maxlength="30"
+                placeholder="e.g., Shop Now">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Button Link</mat-label>
+              <input matInput
+                name="ctaLink"
+                [ngModel]="formData().ctaLink"
+                (ngModelChange)="formData.update(d => ({...d, ctaLink: $event}))"
+                maxlength="200"
+                placeholder="e.g., /products?category=Upwas">
+            </mat-form-field>
+          </div>
+
+          <div class="form-row checkbox-row">
+            <mat-slide-toggle
+              name="isActive"
+              [ngModel]="formData().isActive"
+              (ngModelChange)="formData.update(d => ({...d, isActive: $event}))"
+              color="primary">
+              Show this banner on the home page
+            </mat-slide-toggle>
+          </div>
+
+          @if (formData().title) {
+            <div class="banner-preview" [class.inactive]="!formData().isActive">
+              <p class="preview-label">Preview</p>
+              <div class="preview-banner">
+                <h3>{{ formData().title }}</h3>
+                @if (formData().subtitle) {
+                  <p>{{ formData().subtitle }}</p>
+                }
+                @if (formData().ctaText) {
+                  <span class="preview-cta">{{ formData().ctaText }}</span>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="product-picker-section">
+            <h3>Featured Products for This Campaign</h3>
+            <p class="section-hint">
+              Shown in a row under the banner on the home page.
+              {{ (formData().featuredProductIds ?? []).length }} selected.
+            </p>
+
+            <mat-form-field appearance="outline" class="full-width search-field">
+              <mat-label>Search products</mat-label>
+              <input matInput [ngModel]="productSearch()" (ngModelChange)="productSearch.set($event)" name="productSearch" placeholder="Type a product name...">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+
+            <div class="product-picker-list">
+              @for (p of filteredProducts(); track p.id) {
+                <label class="product-picker-row">
+                  <input type="checkbox" [checked]="isFeatured(p.id)" (change)="toggleFeatured(p.id)">
+                  <img [src]="p.imageUrl" [alt]="p.name" class="product-picker-thumb">
+                  <span class="product-picker-name">{{ p.name }}</span>
+                  <span class="product-picker-cat">{{ p.category }}</span>
+                </label>
+              }
+              @if (filteredProducts().length === 0) {
+                <p class="section-hint">No products match your search.</p>
+              }
+            </div>
+          </div>
+
+          <div class="product-picker-section">
+            <h3>Most Loved Fallback</h3>
+            <p class="section-hint">
+              "Most Loved" normally shows real bestsellers based on orders. Until you have enough sales
+              data, pick which products should appear there instead.
+              {{ (formData().fallbackBestsellerProductIds ?? []).length }} selected.
+            </p>
+
+            <div class="product-picker-list">
+              @for (p of filteredProducts(); track p.id) {
+                <label class="product-picker-row">
+                  <input type="checkbox" [checked]="isFallbackBestseller(p.id)" (change)="toggleFallbackBestseller(p.id)">
+                  <img [src]="p.imageUrl" [alt]="p.name" class="product-picker-thumb">
+                  <span class="product-picker-name">{{ p.name }}</span>
+                  <span class="product-picker-cat">{{ p.category }}</span>
+                </label>
+              }
+              @if (filteredProducts().length === 0) {
+                <p class="section-hint">No products match your search.</p>
+              }
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" mat-flat-button color="primary" [disabled]="submitting()">
+              <mat-icon>{{ submitting() ? 'hourglass_empty' : 'save' }}</mat-icon>
+              {{ submitting() ? 'Saving...' : 'Save Banner' }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>
