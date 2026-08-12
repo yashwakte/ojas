@@ -73,6 +73,7 @@ public class ProductService
         foreach (var doc in ranked)
         {
             var productId = doc["_id"].AsString;
+            if (!ObjectId.TryParse(productId, out _)) continue;
             var product = await GetByIdAsync(productId);
             if (product != null && product.IsAvailable)
                 products.Add(product);
@@ -85,6 +86,7 @@ public class ProductService
             foreach (var productId in banner?.FallbackBestsellerProductIds ?? [])
             {
                 if (products.Count >= limit) break;
+                if (!ObjectId.TryParse(productId, out _)) continue;
                 var product = await GetByIdAsync(productId);
                 if (product != null && product.IsAvailable && products.All(p => p.Id != productId))
                     products.Add(product);

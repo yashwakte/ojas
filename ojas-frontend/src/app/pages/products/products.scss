@@ -214,6 +214,16 @@
   margin-top: auto;
 }
 
+.product-actions {
+  display: flex;
+  gap: 10px;
+
+  > button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 .product-name {
   font-family: 'Poppins', sans-serif;
   font-weight: 600;

@@ -34,6 +34,7 @@ export class Header {
   isScrolled = false;
   cartBounce = signal(false);
   categoryMenuOpen = signal(false);
+  desktopCategoryOpen = signal(false);
 
   readonly categories = PRODUCT_CATEGORIES;
 
@@ -69,6 +70,22 @@ export class Header {
 
   toggleCategoryMenu(): void {
     this.categoryMenuOpen.update((open) => !open);
+  }
+
+  openDesktopCategoryMenu(): void {
+    this.desktopCategoryOpen.set(true);
+  }
+
+  closeDesktopCategoryMenu(): void {
+    this.desktopCategoryOpen.set(false);
+  }
+
+  onDesktopCategoryFocusOut(event: FocusEvent): void {
+    const container = event.currentTarget as HTMLElement;
+    const next = event.relatedTarget as HTMLElement | null;
+    if (!next || !container.contains(next)) {
+      this.closeDesktopCategoryMenu();
+    }
   }
 
   goToCheckout(): void {

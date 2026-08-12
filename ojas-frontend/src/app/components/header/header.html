@@ -11,13 +11,31 @@
           >Home</a
         >
         <a routerLink="/products" routerLinkActive="active">Products</a>
-        <div class="nav-dropdown">
-          <a routerLink="/products" class="nav-dropdown-trigger">
+        <div
+          class="nav-dropdown"
+          [class.open]="desktopCategoryOpen()"
+          (mouseenter)="openDesktopCategoryMenu()"
+          (mouseleave)="closeDesktopCategoryMenu()"
+          (focusin)="openDesktopCategoryMenu()"
+          (focusout)="onDesktopCategoryFocusOut($event)"
+        >
+          <a
+            routerLink="/products"
+            class="nav-dropdown-trigger"
+            [attr.aria-expanded]="desktopCategoryOpen()"
+            (click)="closeDesktopCategoryMenu()"
+          >
             Shop by Category <mat-icon class="dropdown-caret">expand_more</mat-icon>
           </a>
           <div class="nav-dropdown-panel">
+            <span class="nav-dropdown-heading">Categories</span>
             @for (cat of categories; track cat) {
-              <a [routerLink]="['/products']" [queryParams]="{ category: cat }">{{ cat }}</a>
+              <a
+                [routerLink]="['/products']"
+                [queryParams]="{ category: cat }"
+                (click)="closeDesktopCategoryMenu()"
+                >{{ cat }}</a
+              >
             }
           </div>
         </div>
