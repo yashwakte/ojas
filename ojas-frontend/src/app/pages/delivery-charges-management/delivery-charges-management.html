@@ -236,8 +236,10 @@
                 <mat-form-field appearance="outline">
                   <mat-label>Test Distance (km)</mat-label>
                   <input matInput type="number"
+                    name="testDistanceInput"
                     [ngModel]="testDistanceInput()"
                     (ngModelChange)="testDistanceInput.set($event)"
+                    [ngModelOptions]="{standalone: true}"
                     step="0.1"
                     min="0"
                     placeholder="e.g., 8.5">
