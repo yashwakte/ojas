@@ -3,10 +3,86 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  discount: number;
   category: string;
   imageUrl: string;
+  galleryImageUrls: string[];
   weight: string;
   isAvailable: boolean;
+  ingredients: string;
+  benefits: string;
+  storageInfo: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  description: string;
+  price: number;
+  discount: number;
+  category: string;
+  imageUrl: string;
+  galleryImageUrls: string[];
+  weight: string;
+  isAvailable: boolean;
+  ingredients: string;
+  benefits: string;
+  storageInfo: string;
+}
+
+export interface UpdateProductRequest extends Partial<CreateProductRequest> {
+  id: string;
+}
+
+export interface DeliveryChargesConfig {
+  id: string;
+  warehouseAddress: string;
+  warehouseLatitude: number;
+  warehouseLongitude: number;
+  freeDeliveryUpToKm: number;
+  perKmChargeAfterFree: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateDeliveryChargesRequest {
+  warehouseAddress?: string;
+  warehouseLatitude?: number;
+  warehouseLongitude?: number;
+  freeDeliveryUpToKm?: number;
+  perKmChargeAfterFree?: number;
+  isActive?: boolean;
+}
+
+export interface DeliveryChargeCalculation {
+  distanceKm: number;
+  charge: number;
+  isFree: boolean;
+}
+
+export interface CampaignBannerConfig {
+  id: string;
+  title: string;
+  subtitle: string;
+  ctaText: string;
+  ctaLink: string;
+  isActive: boolean;
+  featuredProductIds: string[];
+  fallbackBestsellerProductIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateCampaignBannerRequest {
+  title?: string;
+  subtitle?: string;
+  ctaText?: string;
+  ctaLink?: string;
+  isActive?: boolean;
+  featuredProductIds?: string[];
+  fallbackBestsellerProductIds?: string[];
 }
 
 export interface AuthResponse {
@@ -65,6 +141,8 @@ export interface OrderResponse {
   addressMapLink?: string | null;
   notes: string;
   items: OrderItem[];
+  deliveryCharge: number;
+  deliveryDistanceKm: number;
   totalAmount: number;
   status: string;
   createdAt: string;

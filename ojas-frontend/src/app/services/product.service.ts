@@ -1,18 +1,96 @@
-import { Injectable, signal } from '@angular/core';
-import { Product } from '../models/interfaces';
-import { PRODUCTS } from '../data/products';
+import { Injectable, signal, computed } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { map, Observable, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
+import {
+  Product,
+  CreateProductRequest,
+  UpdateProductRequest,
+} from '../models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
-  private readonly _products = signal<Product[]>(PRODUCTS);
+  private readonly apiUrl = `${environment.apiUrl}/products`;
+  private readonly _products = signal<Product[]>([]);
+  private readonly _loading = signal(false);
+  private readonly _error = signal<string | null>(null);
 
   readonly products = this._products.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  readonly error = this._error.asReadonly();
+
+  constructor(private http: HttpClient) {
+    this.loadProducts();
+  }
+
+  loadProducts(): void {
+    this._loading.set(true);
+    this._error.set(null);
+    this.http.get<Product[]>(this.apiUrl).subscribe({
+      next: (products) => {
+        this._products.set(products.map((product) => this.normalizeProduct(product)));
+        this._loading.set(false);
+      },
+      error: () => {
+        this._error.set('Failed to load products');
+        this._loading.set(false);
+      },
+    });
+  }
 
   getProduct(id: string): Product | undefined {
-    return PRODUCTS.find((p) => p.id === id);
+    return this._products().find((p) => p.id === id);
   }
 
   getByCategory(category: string): Product[] {
-    return PRODUCTS.filter((p) => p.category === category);
+    return this._products().filter((p) => p.category === category);
+  }
+
+  getBestsellers(limit = 6): Observable<Product[]> {
+    return this.http
+      .get<Product[]>(`${this.apiUrl}/bestsellers`, { params: { limit } })
+      .pipe(map((products) => products.map((product) => this.normalizeProduct(product))));
+  }
+
+  createProduct(request: CreateProductRequest): Observable<Product> {
+    return this.http.post<Product>(this.apiUrl, request).pipe(
+      map((product) => this.normalizeProduct(product)),
+      tap((product) => this._products.update((products) => [...products, product])),
+    );
+  }
+
+  updateProduct(request: UpdateProductRequest): Observable<Product> {
+    return this.http.patch<Product>(`${this.apiUrl}/${request.id}`, request).pipe(
+      map((product) => this.normalizeProduct(product)),
+      tap((product) =>
+        this._products.update((products) =>
+          products.map((current) => (current.id === product.id ? product : current)),
+        ),
+      ),
+    );
+  }
+
+  deleteProduct(id: string): Observable<void> {
+    return this.http
+      .delete<void>(`${this.apiUrl}/${id}`)
+      .pipe(tap(() => this._products.update((products) => products.filter((product) => product.id !== id))));
+  }
+
+  clearError(): void {
+    this._error.set(null);
+  }
+
+  private normalizeProduct(product: Product): Product {
+    return {
+      ...product,
+      discount: product.discount ?? 0,
+      imageUrl: product.imageUrl ?? '',
+      galleryImageUrls: product.galleryImageUrls ?? [],
+      isAvailable: product.isAvailable ?? true,
+      ingredients: product.ingredients || 'See the product description for ingredient details.',
+      benefits: product.benefits || 'See the product description for nutritional and usage benefits.',
+      storageInfo: product.storageInfo || 'Store in a cool, dry place in an airtight container.',
+      updatedAt: product.updatedAt ?? product.createdAt,
+    };
   }
 }
