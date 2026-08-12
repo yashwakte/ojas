@@ -17,8 +17,31 @@
         <!-- Image Section -->
         <div class="image-section">
           <div class="image-wrapper">
-            <img [src]="p.imageUrl" [alt]="p.name" (error)="onImgError($event)" />
+            <img [src]="galleryImages()[activeImageIndex()]" [alt]="p.name" (error)="onImgError($event)" />
           </div>
+          @if (p.discount && p.discount > 0) {
+            <div class="discount-badge">{{ p.discount }}% OFF</div>
+          }
+          @if (!p.isAvailable) {
+            <div class="out-of-stock-badge">Out of Stock</div>
+          }
+
+          @if (galleryImages().length > 1) {
+            <div class="thumbnail-strip">
+              @for (img of galleryImages(); track $index) {
+                <button
+                  type="button"
+                  class="thumbnail-btn"
+                  [class.active]="activeImageIndex() === $index"
+                  (click)="selectImage($index)"
+                  [attr.aria-label]="'View image ' + ($index + 1)"
+                  [attr.aria-current]="activeImageIndex() === $index"
+                >
+                  <img [src]="img" [alt]="p.name + ' thumbnail ' + ($index + 1)" (error)="onImgError($event)" />
+                </button>
+              }
+            </div>
+          }
         </div>
 
         <!-- Info Section -->
@@ -34,8 +57,17 @@
 
           <!-- Price -->
           <div class="price-section">
-            <span class="detail-price">&#8377;{{ p.price }}</span>
-            <span class="price-note">(Inclusive of all taxes)</span>
+            @if (p.discount && p.discount > 0) {
+              <span class="detail-price discounted">
+                <span class="original-price">&#8377;{{ p.price }}</span>
+                <span class="sale-price">&#8377;{{ discountedPrice() | number:'1.0-0' }}</span>
+              </span>
+              <span class="price-note">(Inclusive of all taxes)</span>
+              <span class="discount-tag">{{ p.discount }}% OFF</span>
+            } @else {
+              <span class="detail-price">&#8377;{{ p.price }}</span>
+              <span class="price-note">(Inclusive of all taxes)</span>
+            }
           </div>
 
           <!-- Weight -->
@@ -58,6 +90,81 @@
                 <mat-icon>{{ descExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
               </button>
             }
+          </div>
+
+          <!-- Detailed Product Info (Ingredients, Benefits, Storage) -->
+          @if (p.ingredients || p.benefits || p.storageInfo) {
+            <div class="accordion-group">
+              @if (p.ingredients) {
+                <div class="accordion-item">
+                  <button
+                    class="accordion-header"
+                    (click)="toggleSection('ingredients')"
+                    [attr.aria-expanded]="isSectionExpanded('ingredients')"
+                  >
+                    <mat-icon>eco</mat-icon>
+                    <span>Ingredients</span>
+                    <mat-icon class="chevron">{{
+                      isSectionExpanded('ingredients') ? 'expand_less' : 'expand_more'
+                    }}</mat-icon>
+                  </button>
+                  @if (isSectionExpanded('ingredients')) {
+                    <div class="accordion-content">
+                      <p>{{ p.ingredients }}</p>
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (p.benefits) {
+                <div class="accordion-item">
+                  <button
+                    class="accordion-header"
+                    (click)="toggleSection('benefits')"
+                    [attr.aria-expanded]="isSectionExpanded('benefits')"
+                  >
+                    <mat-icon>favorite</mat-icon>
+                    <span>Benefits</span>
+                    <mat-icon class="chevron">{{
+                      isSectionExpanded('benefits') ? 'expand_less' : 'expand_more'
+                    }}</mat-icon>
+                  </button>
+                  @if (isSectionExpanded('benefits')) {
+                    <div class="accordion-content">
+                      <p>{{ p.benefits }}</p>
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (p.storageInfo) {
+                <div class="accordion-item">
+                  <button
+                    class="accordion-header"
+                    (click)="toggleSection('storage')"
+                    [attr.aria-expanded]="isSectionExpanded('storage')"
+                  >
+                    <mat-icon>inventory</mat-icon>
+                    <span>Storage Information</span>
+                    <mat-icon class="chevron">{{
+                      isSectionExpanded('storage') ? 'expand_less' : 'expand_more'
+                    }}</mat-icon>
+                  </button>
+                  @if (isSectionExpanded('storage')) {
+                    <div class="accordion-content">
+                      <p>{{ p.storageInfo }}</p>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Trust Badges -->
+          <div class="trust-badges">
+            <span><mat-icon>lock</mat-icon> Secure Payments</span>
+            <span><mat-icon>payments</mat-icon> Cash on Delivery</span>
+            <span><mat-icon>verified</mat-icon> Quality Assured</span>
           </div>
 
           <!-- Quantity Selector -->
@@ -114,8 +221,12 @@
             <div class="delivery-item">
               <mat-icon>local_shipping</mat-icon>
               <div>
-                <strong>Free Delivery</strong>
-                <span>On all orders across Pune</span>
+                <strong>Delivery Charge</strong>
+                @if (freeDeliveryUpToKm(); as freeKm) {
+                  <span>Free within {{ freeKm }} km of our warehouse, then a small per-km charge</span>
+                } @else {
+                  <span>Calculated at checkout based on your delivery address</span>
+                }
               </div>
             </div>
             <div class="delivery-item">
@@ -155,12 +266,22 @@
                     loading="lazy"
                     (error)="onImgError($event)"
                   />
+                  @if (sp.discount && sp.discount > 0) {
+                    <span class="similar-discount">{{ sp.discount }}% OFF</span>
+                  }
                 </div>
                 <div class="similar-body">
                   <h4>{{ sp.name }}</h4>
                   <div class="similar-meta">
                     <span class="similar-weight">{{ sp.weight }}</span>
-                    <strong class="similar-price">&#8377;{{ sp.price }}</strong>
+                    <strong class="similar-price">
+                      @if (sp.discount && sp.discount > 0) {
+                        <span class="original">&#8377;{{ sp.price }}</span>
+                        <span class="sale">&#8377;{{ sp.price - (sp.price * sp.discount / 100) | number:'1.0-0' }}</span>
+                      } @else {
+                        &#8377;{{ sp.price }}
+                      }
+                    </strong>
                   </div>
                 </div>
               </a>
