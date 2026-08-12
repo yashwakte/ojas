@@ -1,30 +1,76 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { DecimalPipe } from '@angular/common';
 import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
+import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { Product } from '../../models/interfaces';
+import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, MatIconModule],
+  imports: [RouterLink, MatIconModule, DecimalPipe],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
-export class Home {
-  featuredProducts;
+export class Home implements OnInit {
+  private productService = inject(ProductService);
+  private cartService = inject(CartService);
+  private checkoutService = inject(CheckoutService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private campaignBannerService = inject(CampaignBannerService);
+
   justAdded = signal<string | null>(null);
 
-  constructor(
-    private productService: ProductService,
-    private cartService: CartService,
-    private checkoutService: CheckoutService,
-    private auth: AuthService,
-    private router: Router,
-  ) {
-    this.featuredProducts = this.productService.products().slice(0, 6);
+  readonly banner = computed(() => this.campaignBannerService.config());
+
+  readonly campaignFeaturedProducts = computed(() => {
+    const ids = this.banner()?.featuredProductIds ?? [];
+    if (ids.length === 0) return [];
+    const products = this.productService.products();
+    return ids
+      .map((id) => products.find((p) => p.id === id))
+      .filter((p): p is Product => !!p && p.isAvailable);
+  });
+
+  readonly bestsellers = signal<Product[]>([]);
+  readonly bestsellersLoading = signal(true);
+
+  readonly festiveSavings = computed(() =>
+    this.productService
+      .products()
+      .filter((p) => p.discount > 0 && p.isAvailable)
+      .slice(0, 8),
+  );
+
+  readonly upwasSpecials = computed(() =>
+    this.productService
+      .products()
+      .filter((p) => p.category === 'Upwas' && p.isAvailable)
+      .slice(0, 8),
+  );
+
+  readonly categoryTiles = [
+    { name: 'Flour', icon: 'grain', desc: 'Stone-ground daily' },
+    { name: 'Grains', icon: 'rice_bowl', desc: 'Whole grain goodness' },
+    { name: 'Health Mix', icon: 'favorite', desc: 'Nutrient-rich blends' },
+    { name: 'Upwas', icon: 'self_improvement', desc: 'Fasting friendly' },
+    { name: 'Premium Atta', icon: 'bakery_dining', desc: 'Everyday rotis & bhakris' },
+    { name: 'Powder Box', icon: 'science', desc: 'Kitchen essentials' },
+  ] satisfies { name: (typeof PRODUCT_CATEGORIES)[number]; icon: string; desc: string }[];
+
+  ngOnInit(): void {
+    this.productService.getBestsellers(6).subscribe({
+      next: (products) => {
+        this.bestsellers.set(products);
+        this.bestsellersLoading.set(false);
+      },
+      error: () => this.bestsellersLoading.set(false),
+    });
   }
 
   addToCart(product: Product): void {

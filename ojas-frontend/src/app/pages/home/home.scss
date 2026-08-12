@@ -89,33 +89,64 @@
 .btn-primary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 13px 26px;
+  gap: 10px;
+  padding: 16px 32px;
   background: var(--ojas-orange);
   color: #fff;
-  border-radius: 14px;
+  border-radius: 16px;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 1rem;
   text-decoration: none;
-  box-shadow: 0 6px 24px rgba(242, 90, 26, 0.3);
+  box-shadow: 0 8px 28px rgba(242, 90, 26, 0.35);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   mat-icon {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
     transition: transform 0.3s;
   }
   &:hover {
     background: var(--ojas-orange-dark);
-    transform: translateY(-2px);
-    box-shadow: 0 10px 36px rgba(242, 90, 26, 0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(242, 90, 26, 0.45);
     mat-icon {
-      transform: translateX(4px);
+      transform: translateX(5px);
     }
   }
   &.sm {
-    padding: 11px 22px;
-    font-size: 0.82rem;
+    padding: 12px 24px;
+    font-size: 0.85rem;
+  }
+  &.btn-lg {
+    padding: 18px 36px;
+    font-size: 1.05rem;
+    border-radius: 18px;
+  }
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 32px;
+  background: transparent;
+  color: var(--ojas-orange);
+  border: 2.5px solid var(--ojas-orange);
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  &:hover {
+    background: var(--ojas-orange);
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(242, 90, 26, 0.35);
+  }
+  &.btn-lg {
+    padding: 18px 36px;
+    font-size: 1.05rem;
+    border-radius: 18px;
   }
 }
 
@@ -196,6 +227,103 @@
 .ctr {
   text-align: center;
   margin-top: 24px;
+}
+.section-subtitle {
+  text-align: center;
+  color: var(--ojas-text-light);
+  margin: -16px 0 24px;
+  font-size: 0.9rem;
+}
+
+// ===== CAMPAIGN BANNER =====
+.campaign-banner {
+  padding: 32px 20px;
+  background: linear-gradient(120deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
+}
+.campaign-banner-inner {
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+  color: #fff;
+
+  h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin: 0 0 8px;
+  }
+
+  p {
+    margin: 0 0 18px;
+    opacity: 0.92;
+    font-size: 0.95rem;
+  }
+}
+
+// ===== FESTIVE / UPWAS ACCENTS =====
+.festive-section {
+  background: linear-gradient(175deg, #fff8f4 0%, #ffe6db 100%);
+  border-radius: 24px;
+  margin: 0 20px;
+  width: auto;
+}
+.upwas-section {
+  background: #fdf4ec;
+  border-radius: 24px;
+  margin: 0 20px;
+  width: auto;
+}
+
+// ===== SHOP BY CATEGORY =====
+.category-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.category-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 22px 14px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  text-decoration: none;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px rgba(242, 90, 26, 0.15);
+  }
+
+  h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+    margin: 4px 0 0;
+  }
+
+  p {
+    font-size: 0.72rem;
+    color: var(--ojas-text-light);
+    margin: 0;
+  }
+}
+.category-tile-ico {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(242, 90, 26, 0.1);
+  color: var(--ojas-orange);
 }
 
 // ===== WHY =====
@@ -306,10 +434,21 @@
   }
 }
 
-.pgrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+// Horizontal-scroll product carousel: ~1.3 cards on mobile, 4 cards at desktop width.
+.pscroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ojas-orange-light) transparent;
+
+  .pcard {
+    flex: 0 0 76%;
+    scroll-snap-align: start;
+  }
 }
 .pcard-link {
   text-decoration: none;
@@ -328,6 +467,8 @@
   }
 }
 .pcard {
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border-radius: 14px;
   overflow: hidden;
@@ -369,6 +510,7 @@
 }
 .pbody {
   padding: 0 12px 10px;
+  margin-top: auto;
 }
 .pmeta {
   display: flex;
@@ -383,6 +525,35 @@
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--ojas-orange);
+  }
+}
+.pprice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+
+  .original-price {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--ojas-text-light);
+    text-decoration: line-through;
+  }
+
+  .sale-price {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ojas-orange);
+  }
+
+  .discount-badge {
+    background: var(--ojas-orange);
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-top: 1px;
   }
 }
 
@@ -643,6 +814,30 @@
       height: 18px;
     }
   }
+
+  .campaign-banner {
+    padding: 24px 16px;
+  }
+  .campaign-banner-inner h2 {
+    font-size: 1.2rem;
+  }
+  .campaign-banner-inner p {
+    font-size: 0.85rem;
+  }
+
+  .category-tiles {
+    gap: 10px;
+  }
+  .category-tile {
+    padding: 16px 8px;
+  }
+}
+
+// ===== SMALL PHONE 480px+ =====
+@media (min-width: 480px) {
+  .pscroll .pcard {
+    flex-basis: 58%;
+  }
 }
 
 // ===== TABLET 640px+ =====
@@ -650,15 +845,21 @@
   .stitle {
     font-size: 1.7rem;
   }
-  .pgrid {
-    grid-template-columns: repeat(3, 1fr);
+  .pscroll {
     gap: 16px;
+
+    .pcard {
+      flex-basis: 44%;
+    }
   }
   .pimg {
     height: 150px;
   }
   .pbody h3 {
     font-size: 0.85rem;
+  }
+  .category-tiles {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -682,11 +883,15 @@
   .why-card {
     flex: unset;
   }
-  .pgrid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
+  .pscroll {
+    gap: 20px;
     max-width: 1100px;
     margin: 0 auto;
+    padding-bottom: 4px;
+
+    .pcard {
+      flex-basis: 23%;
+    }
   }
   .pimg {
     height: 200px;
@@ -696,6 +901,9 @@
   }
   .pbody h3 {
     font-size: 0.92rem;
+  }
+  .category-tiles {
+    grid-template-columns: repeat(6, 1fr);
   }
   .pmeta strong {
     font-size: 1.1rem;

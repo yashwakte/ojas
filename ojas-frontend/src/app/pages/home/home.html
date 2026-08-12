@@ -5,15 +5,141 @@
 
 <section class="hero-cta-section">
   <div class="hero-cta">
-    <a routerLink="/products" class="btn-primary"
+    <a routerLink="/products" class="btn-primary btn-lg"
       >Explore Products <mat-icon>arrow_forward</mat-icon></a
     >
-    <a routerLink="/register" class="btn-ghost">Join Us</a>
+    <a routerLink="/register" class="btn-outline btn-lg">Join Our Journey</a>
   </div>
   <div class="trust-strip">
     <span><mat-icon>eco</mat-icon> 100% Natural</span>
     <span><mat-icon>verified</mat-icon> No Preservatives</span>
     <span><mat-icon>local_shipping</mat-icon> Fresh Delivery</span>
+  </div>
+</section>
+
+<!-- CAMPAIGN BANNER -->
+@if (banner(); as b) {
+  @if (b.isActive) {
+    <section class="campaign-banner">
+      <div class="campaign-banner-inner">
+        <h2>{{ b.title }}</h2>
+        @if (b.subtitle) {
+          <p>{{ b.subtitle }}</p>
+        }
+        @if (b.ctaText) {
+          <a [routerLink]="b.ctaLink || '/products'" class="btn-white">{{ b.ctaText }} <mat-icon>arrow_forward</mat-icon></a>
+        }
+      </div>
+    </section>
+
+    <!-- CAMPAIGN FEATURED PRODUCTS -->
+    @if (campaignFeaturedProducts().length > 0) {
+      <section class="section products-section campaign-featured-section">
+        <div class="tag"><span>FEATURED</span></div>
+        <h2 class="stitle">Handpicked for This Campaign</h2>
+
+        <div class="pscroll">
+          @for (p of campaignFeaturedProducts(); track p.id) {
+            <div class="pcard">
+              <a class="pcard-link" [routerLink]="['/products', p.id]">
+                <div class="pimg">
+                  <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
+                </div>
+                <div class="pbody-top">
+                  <h3>{{ p.name }}</h3>
+                  <div class="pmeta">
+                    <span>{{ p.weight }}</span>
+                    <span class="pprice">
+                      @if (p.discount && p.discount > 0) {
+                        <span class="original-price">₹{{ p.price }}</span>
+                        <span class="sale-price"
+                          >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
+                        >
+                        <span class="discount-badge">{{ p.discount }}% OFF</span>
+                      } @else {
+                        <strong>₹{{ p.price }}</strong>
+                      }
+                    </span>
+                  </div>
+                </div>
+              </a>
+              <div class="pbody">
+                <div class="pactions">
+                  <button
+                    class="home-add-cart-btn"
+                    [class.added]="justAdded() === p.id"
+                    (click)="addToCart(p)"
+                  >
+                    <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                    {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
+                  </button>
+                  <button class="home-buy-now-btn" (click)="buyNow(p)">
+                    <mat-icon>bolt</mat-icon> Buy Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+  }
+}
+
+<!-- MOST LOVED -->
+<section class="section products-section">
+  <div class="tag"><span>BESTSELLERS</span></div>
+  <h2 class="stitle">Most Loved by Our Customers</h2>
+
+  @if (!bestsellersLoading() && bestsellers().length > 0) {
+    <div class="pscroll">
+      @for (p of bestsellers(); track p.id) {
+        <div class="pcard">
+          <a class="pcard-link" [routerLink]="['/products', p.id]">
+            <div class="pimg">
+              <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
+            </div>
+            <div class="pbody-top">
+              <h3>{{ p.name }}</h3>
+              <div class="pmeta">
+                <span>{{ p.weight }}</span>
+                <span class="pprice">
+                  @if (p.discount && p.discount > 0) {
+                    <span class="original-price">₹{{ p.price }}</span>
+                    <span class="sale-price"
+                      >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
+                    >
+                    <span class="discount-badge">{{ p.discount }}% OFF</span>
+                  } @else {
+                    <strong>₹{{ p.price }}</strong>
+                  }
+                </span>
+              </div>
+            </div>
+          </a>
+          <div class="pbody">
+            <div class="pactions">
+              <button
+                class="home-add-cart-btn"
+                [class.added]="justAdded() === p.id"
+                (click)="addToCart(p)"
+              >
+                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
+              </button>
+              <button class="home-buy-now-btn" (click)="buyNow(p)">
+                <mat-icon>bolt</mat-icon> Buy Now
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+  <div class="ctr">
+    <a routerLink="/products" class="btn-primary sm"
+      >View All Products <mat-icon>arrow_forward</mat-icon></a
+    >
   </div>
 </section>
 
@@ -33,55 +159,124 @@
   </div>
 </section>
 
-<!-- PRODUCTS -->
-<section class="section products-section">
-  <div class="tag"><span>OUR COLLECTION</span></div>
-  <h2 class="stitle">Handpicked for Your Kitchen</h2>
+<!-- FESTIVE SAVINGS -->
+@if (festiveSavings().length > 0) {
+  <section class="section products-section festive-section">
+    <div class="tag"><span>LIMITED TIME</span></div>
+    <h2 class="stitle">Festive Savings</h2>
 
-  <div class="pgrid">
-    @for (p of featuredProducts; track p.id) {
-      <div class="pcard">
-        <a class="pcard-link" [routerLink]="['/products', p.id]">
-          <div class="pimg">
-            <img
-              [src]="p.imageUrl"
-              [alt]="p.name"
-              loading="lazy"
-              (error)="onImgError($event)"
-            /><span class="pcat">{{ p.category }}</span>
-          </div>
-          <div class="pbody-top">
-            <h3>{{ p.name }}</h3>
-            <div class="pmeta">
-              <span>{{ p.weight }}</span
-              ><strong>₹{{ p.price }}</strong>
+    <div class="pscroll">
+      @for (p of festiveSavings(); track p.id) {
+        <div class="pcard">
+          <a class="pcard-link" [routerLink]="['/products', p.id]">
+            <div class="pimg">
+              <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
+            </div>
+            <div class="pbody-top">
+              <h3>{{ p.name }}</h3>
+              <div class="pmeta">
+                <span>{{ p.weight }}</span>
+                <span class="pprice">
+                  <span class="original-price">₹{{ p.price }}</span>
+                  <span class="sale-price"
+                    >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
+                  >
+                  <span class="discount-badge">{{ p.discount }}% OFF</span>
+                </span>
+              </div>
+            </div>
+          </a>
+          <div class="pbody">
+            <div class="pactions">
+              <button
+                class="home-add-cart-btn"
+                [class.added]="justAdded() === p.id"
+                (click)="addToCart(p)"
+              >
+                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
+              </button>
+              <button class="home-buy-now-btn" (click)="buyNow(p)">
+                <mat-icon>bolt</mat-icon> Buy Now
+              </button>
             </div>
           </div>
-        </a>
-        <div class="pbody">
-          <div class="pactions">
-            <button
-              class="home-add-cart-btn"
-              [class.added]="justAdded() === p.id"
-              (click)="addToCart(p)"
-            >
-              <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-              {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
-            </button>
-            <button class="home-buy-now-btn" (click)="buyNow(p)">
-              <mat-icon>bolt</mat-icon> Buy Now
-            </button>
-          </div>
         </div>
-      </div>
+      }
+    </div>
+  </section>
+}
+
+<!-- SHOP BY CATEGORY -->
+<section class="section category-section">
+  <div class="tag"><span>CATEGORIES</span></div>
+  <h2 class="stitle">Shop by Category</h2>
+
+  <div class="category-tiles">
+    @for (c of categoryTiles; track c.name) {
+      <a class="category-tile" [routerLink]="['/products']" [queryParams]="{ category: c.name }">
+        <div class="category-tile-ico">
+          <mat-icon>{{ c.icon }}</mat-icon>
+        </div>
+        <h3>{{ c.name }}</h3>
+        <p>{{ c.desc }}</p>
+      </a>
     }
   </div>
-  <div class="ctr">
-    <a routerLink="/products" class="btn-primary sm"
-      >View All Products <mat-icon>arrow_forward</mat-icon></a
-    >
-  </div>
 </section>
+
+<!-- UPWAS SPECIALS -->
+@if (upwasSpecials().length > 0) {
+  <section class="section products-section upwas-section">
+    <div class="tag"><span>FASTING SPECIALS</span></div>
+    <h2 class="stitle">Upwas Specials</h2>
+    <p class="section-subtitle">Pure, grain-free flours crafted for your fasting days</p>
+
+    <div class="pscroll">
+      @for (p of upwasSpecials(); track p.id) {
+        <div class="pcard">
+          <a class="pcard-link" [routerLink]="['/products', p.id]">
+            <div class="pimg">
+              <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
+            </div>
+            <div class="pbody-top">
+              <h3>{{ p.name }}</h3>
+              <div class="pmeta">
+                <span>{{ p.weight }}</span>
+                <span class="pprice">
+                  @if (p.discount && p.discount > 0) {
+                    <span class="original-price">₹{{ p.price }}</span>
+                    <span class="sale-price"
+                      >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
+                    >
+                    <span class="discount-badge">{{ p.discount }}% OFF</span>
+                  } @else {
+                    <strong>₹{{ p.price }}</strong>
+                  }
+                </span>
+              </div>
+            </div>
+          </a>
+          <div class="pbody">
+            <div class="pactions">
+              <button
+                class="home-add-cart-btn"
+                [class.added]="justAdded() === p.id"
+                (click)="addToCart(p)"
+              >
+                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
+              </button>
+              <button class="home-buy-now-btn" (click)="buyNow(p)">
+                <mat-icon>bolt</mat-icon> Buy Now
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+}
 
 <!-- PROCESS -->
 <section class="section process-section">
