@@ -1,0 +1,358 @@
+<section class="admin-dashboard">
+  <header class="dashboard-header">
+    <div class="header-left">
+      <p class="eyebrow">Administration</p>
+      <h1>Admin Dashboard</h1>
+      <p class="subtitle">Manage orders, products, delivery partners & pricing</p>
+    </div>
+    <div class="header-right">
+      <button mat-stroked-button class="refresh-btn" (click)="refreshCurrentTab()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-stroked-button class="logout-btn" (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        Logout
+      </button>
+    </div>
+  </header>
+
+  <section class="kpi-row">
+    <article class="kpi-card">
+      <span class="kpi-label">Total Orders</span>
+      <strong>{{ orders().length }}</strong>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Pending</span>
+      <strong>{{ pendingCount() }}</strong>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">In Fulfillment</span>
+      <strong>{{ activeDeliveryCount() }}</strong>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Revenue (Delivered)</span>
+      <strong>{{ totalRevenue() | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Products</span>
+      <strong>{{ productsCount() }}</strong>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Delivery Partners</span>
+      <strong>{{ deliveryPartners().length }}</strong>
+    </article>
+  </section>
+
+  <mat-tab-group
+    [selectedIndex]="getTabIndex()"
+    (selectedTabChange)="onTabChange($event)"
+    class="dashboard-tabs"
+    animationDuration="200ms"
+  >
+    <!-- Orders Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>receipt_long</mat-icon>
+        <span>Orders</span>
+        @if (pendingCount() > 0) {
+          <span class="tab-badge">{{ pendingCount() }}</span>
+        }
+      </ng-template>
+
+      <div class="tab-content">
+        @if (loadingOrders()) {
+          <div class="state-box loading">Loading orders...</div>
+        } @else if (ordersError()) {
+          <div class="state-box error">{{ ordersError() }}</div>
+        } @else {
+          <div class="orders-toolbar">
+            <h2>Orders Management</h2>
+            <select
+              [ngModel]="statusFilter()"
+              (ngModelChange)="setStatusFilter($event)"
+              class="filter-select"
+            >
+              <option value="all">All Statuses</option>
+              @for (status of statusOptions; track status) {
+                <option [value]="status.toLowerCase()">{{ status }}</option>
+              }
+            </select>
+          </div>
+
+          @if (filteredOrders().length === 0) {
+            <div class="state-box">No orders for the selected status.</div>
+          } @else {
+            <div class="orders-grid">
+              @for (order of filteredOrders(); track order.id) {
+                <article class="order-card">
+                  <div class="order-card-head">
+                    <div>
+                      <span class="order-id">Order #{{ order.id.slice(-8).toUpperCase() }}</span>
+                      <p>{{ order.createdAt | date: 'dd MMM, h:mm a' }}</p>
+                    </div>
+                    <span class="status-pill" [class]="statusClass(order.status)">{{
+                      order.status
+                    }}</span>
+                  </div>
+
+                  <div class="order-customer">
+                    <p><mat-icon>person</mat-icon> {{ order.fullName }}</p>
+                    <p><mat-icon>call</mat-icon> {{ order.phone }}</p>
+                    <p><mat-icon>location_on</mat-icon> {{ order.address }}</p>
+                  </div>
+
+                  <div class="items-list">
+                    @for (item of order.items; track item.productId) {
+                      <div>
+                        <span>{{ item.productName }} x {{ item.quantity }}</span>
+                        <strong>{{
+                          item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                        }}</strong>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="order-total">
+                    Total: {{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+                  </div>
+
+                  <div class="action-row">
+                    <div class="field-col">
+                      <label>Status</label>
+                      <div class="inline-control">
+                        <select
+                          [ngModel]="statusDraft()[order.id]"
+                          (ngModelChange)="setStatusDraft(order.id, $event)"
+                          [disabled]="busyOrderAction() === order.id + '-status'"
+                        >
+                          @for (status of statusOptions; track status) {
+                            <option [value]="status">{{ status }}</option>
+                          }
+                        </select>
+                        <button
+                          mat-stroked-button
+                          [disabled]="busyOrderAction() === order.id + '-status'"
+                          (click)="updateOrderStatus(order)"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="field-col">
+                      <label>Delivery Partner</label>
+                      <div class="inline-control">
+                        <select
+                          [ngModel]="deliveryDraft()[order.id]"
+                          (ngModelChange)="setDeliveryDraft(order.id, $event)"
+                          [disabled]="busyOrderAction() === order.id + '-assign'"
+                        >
+                          <option value="">Unassigned</option>
+                          @for (partner of deliveryPartners(); track partner.id) {
+                            <option [value]="partner.id">{{ partner.fullName }}</option>
+                          }
+                        </select>
+                        <button
+                          mat-stroked-button
+                          [disabled]="
+                            busyOrderAction() === order.id + '-assign' || !deliveryDraft()[order.id]
+                          "
+                          (click)="assignDelivery(order)"
+                        >
+                          Assign
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        }
+      </div>
+    </mat-tab>
+
+    <!-- Products Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>inventory_2</mat-icon>
+        <span>Products</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <app-product-management></app-product-management>
+      </div>
+    </mat-tab>
+
+    <!-- Delivery Partners Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>delivery_dining</mat-icon>
+        <span>Delivery Partners</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <section class="partners-section">
+          <div class="section-header">
+            <div>
+              <h2>Delivery Partners</h2>
+              <p>Manage delivery partner accounts</p>
+            </div>
+          </div>
+
+          @if (loadingPartners()) {
+            <div class="state-box loading">Loading partners...</div>
+          } @else if (partnersError()) {
+            <div class="state-box error">{{ partnersError() }}</div>
+          } @else {
+            <mat-card class="staff-card">
+              <mat-card-header>
+                <mat-card-title>Create Staff Credential</mat-card-title>
+                <mat-card-subtitle
+                  >Add delivery or admin accounts from one place.</mat-card-subtitle
+                >
+              </mat-card-header>
+              <mat-card-content>
+                <div class="staff-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Full Name</mat-label>
+                    <input
+                      matInput
+                      [(ngModel)]="staffForm().fullName"
+                      (ngModelChange)="updateStaffField('fullName', $event)"
+                      placeholder="Full name"
+                    />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Email</mat-label>
+                    <input
+                      matInput
+                      type="email"
+                      [(ngModel)]="staffForm().email"
+                      (ngModelChange)="updateStaffField('email', $event)"
+                      placeholder="Email"
+                    />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Phone</mat-label>
+                    <input
+                      matInput
+                      [(ngModel)]="staffForm().phone"
+                      (ngModelChange)="updateStaffField('phone', $event)"
+                      placeholder="Phone"
+                    />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="password-field">
+                    <mat-label>Temporary Password</mat-label>
+                    <input
+                      [type]="showStaffPassword() ? 'text' : 'password'"
+                      matInput
+                      [(ngModel)]="staffForm().password"
+                      (ngModelChange)="updateStaffField('password', $event)"
+                      placeholder="Temporary password"
+                    />
+                    <button
+                      mat-icon-button
+                      matSuffix
+                      type="button"
+                      (click)="toggleStaffPasswordVisibility()"
+                      [attr.aria-label]="showStaffPassword() ? 'Hide password' : 'Show password'"
+                    >
+                      <mat-icon>{{
+                        showStaffPassword() ? 'visibility_off' : 'visibility'
+                      }}</mat-icon>
+                    </button>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Role</mat-label>
+                    <mat-select
+                      [(ngModel)]="staffForm().role"
+                      (ngModelChange)="updateStaffField('role', $event)"
+                    >
+                      <mat-option value="delivery">Delivery Partner</mat-option>
+                      <mat-option value="admin">Admin</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <button
+                    mat-flat-button
+                    class="create-btn"
+                    [disabled]="creatingStaff()"
+                    (click)="createStaffAccount()"
+                  >
+                    <mat-icon>{{ creatingStaff() ? 'hourglass_empty' : 'person_add' }}</mat-icon>
+                    {{ creatingStaff() ? 'Creating...' : 'Create Account' }}
+                  </button>
+                </div>
+                @if (staffMessage()) {
+                  <p class="staff-success">{{ staffMessage() }}</p>
+                }
+                @if (staffError()) {
+                  <p class="staff-error">{{ staffError() }}</p>
+                }
+              </mat-card-content>
+            </mat-card>
+
+            <mat-card class="partners-list-card">
+              <mat-card-header>
+                <mat-card-title>Existing Delivery Partners</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                @if (deliveryPartners().length === 0) {
+                  <div class="state-box">No delivery partners yet. Create one above.</div>
+                } @else {
+                  <div class="partners-grid">
+                    @for (partner of deliveryPartners(); track partner.id) {
+                      <div class="partner-card">
+                        <div class="partner-avatar">
+                          <mat-icon>person</mat-icon>
+                        </div>
+                        <div class="partner-info">
+                          <h4>{{ partner.fullName }}</h4>
+                          <p><mat-icon>email</mat-icon> {{ partner.email }}</p>
+                          <p><mat-icon>call</mat-icon> {{ partner.phone }}</p>
+                        </div>
+                        <mat-chip-set>
+                          <mat-chip
+                            [color]="partner.role === 'admin' ? 'primary' : 'accent'"
+                            selected
+                          >
+                            {{ partner.role }}
+                          </mat-chip>
+                        </mat-chip-set>
+                      </div>
+                    }
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
+          }
+        </section>
+      </div>
+    </mat-tab>
+
+    <!-- Delivery Charges Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>local_shipping</mat-icon>
+        <span>Delivery Charges</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <app-delivery-charges-management></app-delivery-charges-management>
+      </div>
+    </mat-tab>
+
+    <!-- Campaign Banner Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>campaign</mat-icon>
+        <span>Campaign Banner</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <app-campaign-banner-management></app-campaign-banner-management>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</section>

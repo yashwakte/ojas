@@ -1,0 +1,388 @@
+<section class="product-management">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Inventory</p>
+      <h1>Product Management</h1>
+      <p class="subtitle">Add, edit, and manage all products with detailed specifications</p>
+    </div>
+    <button mat-flat-button class="add-btn" (click)="openAddForm()" [disabled]="submitting()">
+      <mat-icon>add</mat-icon>
+      Add Product
+    </button>
+  </header>
+
+  @if (error()) {
+    <div class="alert error">{{ error() }}</div>
+  }
+
+@if (showForm()) {
+    <mat-card class="product-form-card">
+      <mat-card-header>
+        <mat-card-title>{{ editingProduct() ? 'Edit Product' : 'Add New Product' }}</mat-card-title>
+        <mat-card-subtitle>Fill in all details carefully. Fields marked with * are required.</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <form #productForm="ngForm" (ngSubmit)="submitForm()" class="product-form">
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Product Name <span aria-hidden="true">*</span></span>
+              <input class="form-control"
+                name="name"
+                [ngModel]="formData().name"
+                (ngModelChange)="formData.update(d => ({...d, name: $event}))"
+                required
+                maxlength="100"
+                [class.error]="hasError('name')">
+              @if (hasError('name')) {
+                <span class="field-error">{{ getError('name') }}</span>
+              }
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Category <span aria-hidden="true">*</span></span>
+              <select class="form-control" name="category" [ngModel]="formData().category" (ngModelChange)="formData.update(d => ({...d, category: $event}))" required>
+                @for (cat of categories; track cat) {
+                  <option [value]="cat">{{ cat }}</option>
+                }
+              </select>
+              @if (hasError('category')) {
+                <span class="field-error">{{ getError('category') }}</span>
+              }
+            </label>
+          </div>
+
+          <div class="form-row two-col">
+            <label class="form-field">
+              <span class="form-label">Price (INR) <span aria-hidden="true">*</span></span>
+              <input class="form-control" type="number"
+                name="price"
+                [ngModel]="formData().price"
+                (ngModelChange)="formData.update(d => ({...d, price: $event}))"
+                required
+                min="0"
+                step="0.01"
+                [class.error]="hasError('price')">
+              @if (hasError('price')) {
+                <span class="field-error">{{ getError('price') }}</span>
+              }
+            </label>
+
+            <label class="form-field">
+              <span class="form-label">Discount (%)</span>
+              <input class="form-control" type="number"
+                name="discount"
+                [ngModel]="formData().discount"
+                (ngModelChange)="formData.update(d => ({...d, discount: $event}))"
+                min="0"
+                max="100"
+                step="1"
+                [class.error]="hasError('discount')">
+              @if (hasError('discount')) {
+                <span class="field-error">{{ getError('discount') }}</span>
+              }
+              <span class="field-hint">0–100%</span>
+            </label>
+          </div>
+
+          @if (formData().discount > 0) {
+            <div class="discount-preview">
+              <span>Discounted Price: </span>
+              <strong>{{ discountedPrice() | currency:'INR':'symbol':'1.2-2' }}</strong>
+              <span class="original-price">{{ formData().price | currency:'INR':'symbol':'1.2-2' }}</span>
+            </div>
+          }
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Weight <span aria-hidden="true">*</span></span>
+              <input class="form-control"
+                name="weight"
+                [ngModel]="formData().weight"
+                (ngModelChange)="formData.update(d => ({...d, weight: $event}))"
+                required
+                placeholder="e.g., 500g, 1kg, 250g"
+                [class.error]="hasError('weight')">
+              @if (hasError('weight')) {
+                <span class="field-error">{{ getError('weight') }}</span>
+              }
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Product Image URL <span aria-hidden="true">*</span></span>
+              <input class="form-control"
+                name="imageUrl"
+                [ngModel]="formData().imageUrl"
+                (ngModelChange)="formData.update(d => ({...d, imageUrl: $event})); onImageUrlChange()"
+                required
+                placeholder="https://example.com/image.jpg or upload below"
+                [class.error]="hasError('imageUrl')">
+              @if (hasError('imageUrl')) {
+                <span class="field-error">{{ getError('imageUrl') }}</span>
+              }
+              <span class="field-hint">Use an image URL, a local /images path, or upload a file below.</span>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="file-upload-label">
+              <input type="file" accept="image/*" (change)="onFileSelected($event)" hidden #fileInput>
+              <button type="button" mat-stroked-button (click)="fileInput.click()">
+                <mat-icon>upload</mat-icon>
+                Upload Image (Max 5MB)
+              </button>
+            </label>
+          </div>
+
+          @if (previewImage()) {
+            <div class="image-preview">
+              <img [src]="previewImage()" alt="Product preview" (error)="onPreviewImageError($event)" />
+              <span class="preview-label">Preview</span>
+            </div>
+          }
+
+          <div class="form-row">
+            <div class="form-field">
+              <span class="form-label">Additional Gallery Images <span class="optional">(up to {{ maxGalleryImages }})</span></span>
+              <span class="field-hint">Shown on the product detail page alongside the main image above.</span>
+
+              @for (url of formData().galleryImageUrls; track $index) {
+                <div class="gallery-image-row">
+                  <input class="form-control"
+                    [ngModel]="url"
+                    [name]="'galleryImageUrl' + $index"
+                    (ngModelChange)="updateGalleryImageUrl($index, $event)"
+                    placeholder="https://example.com/image.jpg or upload"
+                  />
+                  <label class="file-upload-label">
+                    <input type="file" accept="image/*" (change)="onGalleryFileSelected($event, $index)" hidden #galleryFileInput>
+                    <button type="button" mat-stroked-button (click)="galleryFileInput.click()">
+                      <mat-icon>upload</mat-icon>
+                    </button>
+                  </label>
+                  <button type="button" mat-icon-button color="warn" (click)="removeGalleryImage($index)" aria-label="Remove image">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                  @if (url && isValidImageSource(url)) {
+                    <img class="gallery-image-thumb" [src]="url" alt="Gallery preview" (error)="onPreviewImageError($event)" />
+                  }
+                </div>
+              }
+
+              @if (hasError('galleryImageUrls')) {
+                <span class="field-error">{{ getError('galleryImageUrls') }}</span>
+              }
+
+              @if (formData().galleryImageUrls.length < maxGalleryImages) {
+                <button type="button" mat-stroked-button class="add-gallery-btn" (click)="addGalleryImageSlot()">
+                  <mat-icon>add_photo_alternate</mat-icon>
+                  Add Another Image
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Description <span aria-hidden="true">*</span></span>
+              <textarea class="form-control"
+                name="description"
+                [ngModel]="formData().description"
+                (ngModelChange)="formData.update(d => ({...d, description: $event}))"
+                required
+                rows="4"
+                maxlength="2000"
+                [class.error]="hasError('description')"></textarea>
+              @if (hasError('description')) {
+                <span class="field-error">{{ getError('description') }}</span>
+              }
+              <span class="field-hint field-hint-end">{{ formData().description.length }}/2000</span>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Ingredients <span aria-hidden="true">*</span></span>
+              <textarea class="form-control"
+                name="ingredients"
+                [ngModel]="formData().ingredients"
+                (ngModelChange)="formData.update(d => ({...d, ingredients: $event}))"
+                required
+                rows="4"
+                maxlength="3000"
+                placeholder="List all ingredients used in the product..."
+                [class.error]="hasError('ingredients')"></textarea>
+              @if (hasError('ingredients')) {
+                <span class="field-error">{{ getError('ingredients') }}</span>
+              }
+              <span class="field-hint field-hint-end">{{ formData().ingredients.length }}/3000</span>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Benefits <span aria-hidden="true">*</span></span>
+              <textarea class="form-control"
+                name="benefits"
+                [ngModel]="formData().benefits"
+                (ngModelChange)="formData.update(d => ({...d, benefits: $event}))"
+                required
+                rows="4"
+                maxlength="3000"
+                placeholder="Describe health benefits, nutritional value, usage benefits..."
+                [class.error]="hasError('benefits')"></textarea>
+              @if (hasError('benefits')) {
+                <span class="field-error">{{ getError('benefits') }}</span>
+              }
+              <span class="field-hint field-hint-end">{{ formData().benefits.length }}/3000</span>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">Storage Information <span aria-hidden="true">*</span></span>
+              <textarea class="form-control"
+                name="storageInfo"
+                [ngModel]="formData().storageInfo"
+                (ngModelChange)="formData.update(d => ({...d, storageInfo: $event}))"
+                required
+                rows="3"
+                maxlength="2000"
+                placeholder="Storage conditions, shelf life, temperature requirements..."
+                [class.error]="hasError('storageInfo')"></textarea>
+              @if (hasError('storageInfo')) {
+                <span class="field-error">{{ getError('storageInfo') }}</span>
+              }
+              <span class="field-hint field-hint-end">{{ formData().storageInfo.length }}/2000</span>
+            </label>
+          </div>
+
+          <div class="form-row checkbox-row">
+            <label class="checkbox-control">
+              <input type="checkbox"
+              name="isAvailable"
+              [ngModel]="formData().isAvailable"
+              (ngModelChange)="formData.update(d => ({...d, isAvailable: $event}))">
+              <span>Product is available for purchase</span>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" mat-stroked-button (click)="closeForm()">
+              Cancel
+            </button>
+            <button type="submit" mat-flat-button class="submit-btn" [disabled]="submitting()">
+              <mat-icon>{{ submitting() ? 'hourglass_empty' : (editingProduct() ? 'save' : 'add') }}</mat-icon>
+              {{ submitting() ? 'Saving...' : (editingProduct() ? 'Update Product' : 'Create Product') }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (!showForm()) {
+    <div class="products-section">
+      @if (loading()) {
+        <div class="loading-state">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading products...</p>
+        </div>
+      } @else if (products().length === 0) {
+        <div class="empty-state">
+          <mat-icon>inventory_2</mat-icon>
+          <h3>No Products Yet</h3>
+          <p>Click "Add Product" to create your first product</p>
+        </div>
+      } @else {
+        <div class="category-filter">
+          <button
+            type="button"
+            class="filter-chip"
+            [class.active]="categoryFilter() === 'All'"
+            (click)="selectCategoryFilter('All')"
+          >
+            All <span class="chip-count">{{ products().length }}</span>
+          </button>
+          @for (cat of categories; track cat) {
+            <button
+              type="button"
+              class="filter-chip"
+              [class.active]="categoryFilter() === cat"
+              (click)="selectCategoryFilter(cat)"
+            >
+              {{ cat }} <span class="chip-count">{{ categoryCounts()[cat] || 0 }}</span>
+            </button>
+          }
+        </div>
+
+        @if (filteredProducts().length === 0) {
+          <div class="empty-state">
+            <mat-icon>inventory_2</mat-icon>
+            <h3>No Products in This Category</h3>
+            <p>Try a different category filter.</p>
+          </div>
+        } @else {
+        <div class="products-grid">
+          @for (product of filteredProducts(); track product.id) {
+            <mat-card class="product-card">
+              <div class="product-image">
+                <img [src]="product.imageUrl" [alt]="product.name" loading="lazy" />
+                @if (!product.isAvailable) {
+                  <span class="unavailable-badge">Unavailable</span>
+                }
+                @if (product.discount > 0) {
+                  <span class="discount-badge">{{ product.discount }}% OFF</span>
+                }
+              </div>
+
+              <mat-card-content class="product-content">
+                <div class="product-header">
+                  <h3>{{ product.name }}</h3>
+                  <span class="category-chip">{{ product.category }}</span>
+                </div>
+
+                <p class="product-description">{{ product.description }}</p>
+
+                <div class="product-meta">
+                  <span class="weight"><mat-icon>scale</mat-icon> {{ product.weight }}</span>
+                  <span class="availability" [class.available]="product.isAvailable" [class.unavailable]="!product.isAvailable">
+                    <mat-icon>{{ product.isAvailable ? 'check_circle' : 'cancel' }}</mat-icon>
+                    {{ product.isAvailable ? 'Available' : 'Unavailable' }}
+                  </span>
+                </div>
+
+                <div class="product-price">
+                  @if (product.discount > 0) {
+                    <span class="original-price">{{ product.price | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="sale-price">{{ product.price - (product.price * product.discount / 100) | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="discount-tag">{{ product.discount }}% OFF</span>
+                  } @else {
+                    <span class="price">{{ product.price | currency:'INR':'symbol':'1.0-0' }}</span>
+                  }
+                </div>
+              </mat-card-content>
+
+              <mat-card-actions class="product-actions">
+                <button mat-icon-button (click)="editProduct(product)" matTooltip="Edit" color="primary">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="toggleAvailability(product)" matTooltip="{{ product.isAvailable ? 'Mark Unavailable' : 'Mark Available' }}" [color]="product.isAvailable ? 'warn' : 'primary'">
+                  <mat-icon>{{ product.isAvailable ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteProduct(product)" matTooltip="Delete" color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </mat-card-actions>
+            </mat-card>
+          }
+        </div>
+        }
+      }
+    </div>
+  }
+</section>

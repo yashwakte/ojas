@@ -4,7 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { UserRole } from '../models/interfaces';
 
 function routeForRole(role: UserRole): string {
-  if (role === 'admin') return '/admin/orders';
+  if (role === 'admin') return '/admin';
   if (role === 'delivery') return '/delivery/orders';
   return '/';
 }

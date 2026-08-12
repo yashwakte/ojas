@@ -70,7 +70,7 @@ export class AuthService {
   }
 
   getDefaultRouteForRole(role: UserRole = this.role()): string {
-    if (role === 'admin') return '/admin/orders';
+    if (role === 'admin') return '/admin';
     if (role === 'delivery') return '/delivery/orders';
     return '/';
   }

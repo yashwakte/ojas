@@ -61,8 +61,8 @@ export const routes: Routes = [
     canActivate: [storefrontGuard],
   },
   {
-    path: 'admin/orders',
-    loadComponent: () => import('./pages/admin-orders/admin-orders').then((m) => m.AdminOrders),
+    path: 'admin',
+    loadComponent: () => import('./pages/admin-dashboard/admin-dashboard').then((m) => m.AdminDashboard),
     canActivate: [adminGuard],
   },
   {
