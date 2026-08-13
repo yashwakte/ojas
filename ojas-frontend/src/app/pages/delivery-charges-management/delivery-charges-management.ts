@@ -197,7 +197,14 @@ export class DeliveryChargesManagement implements OnInit {
 
   testDistanceCalculation(distance: number): void {
     this.testDistance.set(distance);
-    const result = this.deliveryChargesService.calculateDeliveryCharge(distance);
+    // Preview against the rules currently in the form (even if unsaved) rather than
+    // the last-saved config, so testing reflects the values the admin just typed.
+    const data = this.formData();
+    const result = this.deliveryChargesService.calculateDeliveryCharge(distance, {
+      freeDeliveryUpToKm: data.freeDeliveryUpToKm ?? 0,
+      perKmChargeAfterFree: data.perKmChargeAfterFree ?? 0,
+      isActive: data.isActive ?? true,
+    });
     this.testResult.set(result);
   }
 
@@ -233,11 +240,11 @@ export class DeliveryChargesManagement implements OnInit {
   }
 
   private showSuccess(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'snack-success' });
   }
 
   private showError(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'error-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'snack-error' });
   }
 
   getError(field: keyof UpdateDeliveryChargesRequest): string | undefined {

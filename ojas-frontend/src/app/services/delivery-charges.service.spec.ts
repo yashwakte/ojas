@@ -110,5 +110,28 @@ describe('DeliveryChargesService', () => {
       expect(result.charge).toBe(30);
       expect(result.breakdown).toContain('7 km free');
     });
+
+    it('uses an explicitly-passed rules override instead of the saved config', () => {
+      flushInitialLoad(); // saved: freeUpTo 7km, 10/km after
+      const result = service.calculateDeliveryCharge(10, {
+        freeDeliveryUpToKm: 2,
+        perKmChargeAfterFree: 25,
+        isActive: true,
+      });
+      expect(result.isFree).toBeFalse();
+      expect(result.charge).toBe(200); // 8km chargeable * 25
+      expect(result.breakdown).toContain('2 km free');
+    });
+
+    it('treats an explicit override with isActive false as free, ignoring the saved config', () => {
+      flushInitialLoad(); // saved config is active
+      const result = service.calculateDeliveryCharge(10, {
+        freeDeliveryUpToKm: 0,
+        perKmChargeAfterFree: 25,
+        isActive: false,
+      });
+      expect(result.isFree).toBeTrue();
+      expect(result.charge).toBe(0);
+    });
   });
 });

@@ -263,6 +263,28 @@ describe('DeliveryChargesManagement', () => {
     expect(fixture.componentInstance.testResult()).toBeNull();
   });
 
+  it('testDistanceCalculation previews against the in-progress form values, not the last-saved config', () => {
+    deliveryChargesServiceSpy.calculateDeliveryCharge.and.returnValue({ charge: 0, isFree: true, breakdown: 'x' });
+    const { fixture } = create();
+    configSignal.set(config); // saved config, deliberately different from the form edits below
+    TestBed.flushEffects();
+    fixture.componentInstance.startEditing();
+    fixture.componentInstance.formData.update((d) => ({
+      ...d,
+      freeDeliveryUpToKm: 2,
+      perKmChargeAfterFree: 25,
+      isActive: true,
+    }));
+
+    fixture.componentInstance.testDistanceCalculation(12);
+
+    expect(deliveryChargesServiceSpy.calculateDeliveryCharge).toHaveBeenCalledWith(12, {
+      freeDeliveryUpToKm: 2,
+      perKmChargeAfterFree: 25,
+      isActive: true,
+    });
+  });
+
   it('formatCoordinate formats to 6 decimal places', () => {
     const { fixture } = create();
     expect(fixture.componentInstance.formatCoordinate(18.5)).toBe('18.500000');

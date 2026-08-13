@@ -55,8 +55,13 @@ export class DeliveryChargesService {
     });
   }
 
-  calculateDeliveryCharge(distanceKm: number): { charge: number; isFree: boolean; breakdown: string } {
-    const config = this._config();
+  calculateDeliveryCharge(
+    distanceKm: number,
+    // Defaults to the saved config, but callers previewing unsaved edits (e.g. the
+    // admin's "Test Distance Calculation" tool) can pass the in-progress form values
+    // instead so the preview reflects what they just typed, not the last saved rules.
+    config: Pick<DeliveryChargesConfig, 'freeDeliveryUpToKm' | 'perKmChargeAfterFree' | 'isActive'> | null = this._config(),
+  ): { charge: number; isFree: boolean; breakdown: string } {
     if (!config || !config.isActive) {
       return { charge: 0, isFree: true, breakdown: 'Delivery charges not configured' };
     }
