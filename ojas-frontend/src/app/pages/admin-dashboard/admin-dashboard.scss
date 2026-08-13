@@ -77,6 +77,13 @@
   }
 }
 
+// Mobile-only fast-track tab switcher (see @media 768px below for the visible,
+// fixed-bottom-bar version). Hidden on desktop, where the mat-tab-group header
+// already gives one-tap access to every tab.
+.mobile-tab-bar {
+  display: none;
+}
+
 .dashboard-tabs {
   ::ng-deep {
     .mat-mdc-tab-header {
@@ -621,22 +628,82 @@
     }
   }
 
-  ::ng-deep {
-    .mat-mdc-tab {
-      padding: 0 12px;
-      height: 42px;
-
-      .mat-mdc-tab-label {
-        font-size: 0.78rem;
-        gap: 6px;
-
-        mat-icon {
-          font-size: 18px;
-          width: 18px;
-          height: 18px;
-        }
-      }
+  // The mat-tab-group header requires a scroll-arrow tap to reach off-screen
+  // tabs on narrow phones. Replace it with the always-visible bottom bar below.
+  .dashboard-tabs {
+    ::ng-deep .mat-mdc-tab-header {
+      display: none;
     }
+  }
+
+  .admin-dashboard {
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-tab-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: #fff;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px;
+    background: none;
+    border: none;
+    border-radius: 12px;
+    color: var(--ojas-text-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    mat-icon {
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
+    }
+
+    &.active {
+      color: var(--ojas-orange);
+      background: rgba(242, 90, 26, 0.08);
+    }
+  }
+
+  .mobile-tab-icon {
+    position: relative;
+  }
+
+  .mobile-tab-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 50px;
+    background: #e53935;
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    line-height: 15px;
+    text-align: center;
+    border: 1.5px solid #fff;
+  }
+
+  .mobile-tab-label {
+    font-size: 0.62rem;
+    font-weight: 600;
   }
 
   .orders-grid {

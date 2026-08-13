@@ -67,11 +67,11 @@ export class AdminDashboard implements OnInit {
   private snackBar = inject(MatSnackBar);
 
   readonly tabs = [
-    { id: 'orders', label: 'Orders', icon: 'receipt_long' },
-    { id: 'products', label: 'Products', icon: 'inventory_2' },
-    { id: 'delivery-partners', label: 'Delivery Partners', icon: 'delivery_dining' },
-    { id: 'delivery-charges', label: 'Delivery Charges', icon: 'local_shipping' },
-    { id: 'campaign-banner', label: 'Campaign Banner', icon: 'campaign' },
+    { id: 'orders', label: 'Orders', shortLabel: 'Orders', icon: 'receipt_long' },
+    { id: 'products', label: 'Products', shortLabel: 'Products', icon: 'inventory_2' },
+    { id: 'delivery-partners', label: 'Delivery Partners', shortLabel: 'Partners', icon: 'delivery_dining' },
+    { id: 'delivery-charges', label: 'Delivery Charges', shortLabel: 'Charges', icon: 'local_shipping' },
+    { id: 'campaign-banner', label: 'Campaign Banner', shortLabel: 'Banners', icon: 'campaign' },
   ] as const;
 
   readonly activeTab = signal<AdminTab>('orders');
@@ -158,6 +158,10 @@ export class AdminDashboard implements OnInit {
 
   onTabChange(event: { index: number }): void {
     this.activeTab.set(this.tabs[event.index].id as AdminTab);
+  }
+
+  selectTab(id: AdminTab): void {
+    this.activeTab.set(id);
   }
 
   refreshCurrentTab(): void {

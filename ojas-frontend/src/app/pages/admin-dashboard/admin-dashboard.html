@@ -44,6 +44,26 @@
     </article>
   </section>
 
+  <!-- Mobile-only fast-track tab switcher: always-visible bottom bar, no scroll arrows -->
+  <nav class="mobile-tab-bar" aria-label="Admin sections">
+    @for (t of tabs; track t.id) {
+      <button
+        type="button"
+        class="mobile-tab-btn"
+        [class.active]="activeTab() === t.id"
+        (click)="selectTab(t.id)"
+      >
+        <span class="mobile-tab-icon">
+          <mat-icon>{{ t.icon }}</mat-icon>
+          @if (t.id === 'orders' && pendingCount() > 0) {
+            <span class="mobile-tab-badge">{{ pendingCount() }}</span>
+          }
+        </span>
+        <span class="mobile-tab-label">{{ t.shortLabel }}</span>
+      </button>
+    }
+  </nav>
+
   <mat-tab-group
     [selectedIndex]="getTabIndex()"
     (selectedTabChange)="onTabChange($event)"
