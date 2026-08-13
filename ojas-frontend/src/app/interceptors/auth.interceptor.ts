@@ -27,7 +27,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(cloned).pipe(
     tap({
       error: (err) => {
-        if (err.status === 401) {
+        // Only auto-logout for a 401 on an already-authenticated session (i.e. the
+        // session expired server-side). A 401 while logged out - e.g. wrong
+        // credentials on the login form - must not force a redirect away from
+        // the page the user is on.
+        if (err.status === 401 && authService.isLoggedIn()) {
           authService.logout();
         }
       },

@@ -49,6 +49,13 @@ export class AuthService {
     this.http.get(`${this.apiUrl}/ping`, { responseType: 'text' }).subscribe({ error: () => {} });
   }
 
+  // Fire-and-forget on app load: if the session cookie has expired server-side,
+  // this 401s and the auth interceptor logs the stale client-side state out
+  // immediately instead of waiting for the user to trigger it themselves.
+  validateSession() {
+    return this.http.get(`${this.apiUrl}/session`, { responseType: 'text' });
+  }
+
   login(request: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request);
   }

@@ -44,6 +44,15 @@ public class AuthController : ControllerBase
     [DisableRateLimiting]
     public IActionResult Ping() => Ok("pong");
 
+    // Lightweight check the frontend calls once on app load so a session that
+    // expired server-side (e.g. the browser was left open for days) is detected
+    // immediately, instead of only surfacing the next time the user happens to
+    // trigger an authenticated request.
+    [HttpGet("session")]
+    [Authorize]
+    [DisableRateLimiting]
+    public IActionResult Session() => Ok();
+
     [HttpGet("check-email")]
     [DisableRateLimiting]
     public async Task<IActionResult> CheckEmail([FromQuery] string email)

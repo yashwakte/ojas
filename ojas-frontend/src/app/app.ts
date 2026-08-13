@@ -15,5 +15,9 @@ export class App implements OnInit {
 
   ngOnInit() {
     this.auth.ping();
+
+    if (this.auth.isLoggedIn()) {
+      this.auth.validateSession().subscribe({ error: () => {} });
+    }
   }
 }

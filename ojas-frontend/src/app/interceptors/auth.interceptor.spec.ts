@@ -81,12 +81,21 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
-  it('calls authService.logout() when a request receives a 401', () => {
+  it('calls authService.logout() when an already-logged-in session receives a 401 (session expired)', () => {
+    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'tok-123' });
     spyOn(auth, 'logout');
     http.get(`${environment.apiUrl}/user/profile`).subscribe({ error: () => {} });
     const req = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
     req.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
     expect(auth.logout).toHaveBeenCalled();
+  });
+
+  it('does not call authService.logout() on a 401 while logged out (e.g. wrong login credentials)', () => {
+    spyOn(auth, 'logout');
+    http.post(`${environment.apiUrl}/auth/login`, {}).subscribe({ error: () => {} });
+    const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
+    req.flush('invalid credentials', { status: 401, statusText: 'Unauthorized' });
+    expect(auth.logout).not.toHaveBeenCalled();
   });
 
   it('does not call authService.logout() on non-401 errors', () => {

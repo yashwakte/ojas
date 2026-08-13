@@ -383,11 +383,11 @@ export class ProductManagement implements OnInit {
   }
 
   private showSuccess(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'snack-success' });
   }
 
   private showError(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'error-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'snack-error' });
   }
 
   getError(field: keyof CreateProductRequest): string | undefined {
