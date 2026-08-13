@@ -43,6 +43,115 @@
   color: var(--ojas-text-light);
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--ojas-text-light);
+  border: 1px dashed rgba(242, 90, 26, 0.28);
+  border-radius: 16px;
+  background: #fffaf7;
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: var(--ojas-orange-light);
+  }
+}
+
+.campaign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.campaign-list-card {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.campaign-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.campaign-list-thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: linear-gradient(120deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  mat-icon {
+    color: #fff;
+  }
+}
+
+.campaign-list-info {
+  flex: 1;
+  min-width: 0;
+
+  h3 {
+    margin: 0 0 2px;
+    font-size: 0.95rem;
+    color: var(--ojas-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--ojas-text-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.campaign-list-featured-hint {
+  margin-top: 2px !important;
+  font-size: 0.72rem !important;
+}
+
+.campaign-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+
+  button[color='warn'] mat-icon {
+    color: #dc2626;
+  }
+}
+
+.form-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--ojas-text);
+  }
+}
+
 .config-card {
   border-radius: 18px;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -83,6 +192,27 @@ mat-form-field {
   width: 100%;
 }
 
+.form-block-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ojas-text);
+  margin-bottom: 8px;
+
+  .optional {
+    font-weight: 400;
+    font-size: 0.78rem;
+    color: var(--ojas-text-light);
+  }
+}
+
+.bg-image-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -6px;
+}
+
 .banner-preview {
   border-radius: 14px;
   padding: 4px;
@@ -101,22 +231,80 @@ mat-form-field {
 }
 
 .preview-banner {
+  position: relative;
   background: linear-gradient(120deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
   color: #fff;
   border-radius: 16px;
   padding: 20px 24px;
   text-align: center;
+  overflow: hidden;
+
+  // Matches the home page: the image sizes itself (full width, natural aspect
+  // ratio) so a normal banner-shaped photo shows completely with no cropping
+  // and no letterboxing - this preview is exactly what customers will see.
+  &.has-bg {
+    padding: 0;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        transparent 45%,
+        rgba(0, 0, 0, 0.5) 80%,
+        rgba(0, 0, 0, 0.78) 100%
+      );
+    }
+
+    .preview-banner-content {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      padding: 16px 20px;
+    }
+  }
+
+  .preview-banner-media {
+    width: 100%;
+    min-height: 140px;
+    max-height: 320px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    background: linear-gradient(120deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
+  }
+
+  .preview-banner-img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .preview-banner-content {
+    position: relative;
+    z-index: 1;
+  }
 
   h3 {
     margin: 0 0 6px;
     font-family: 'Poppins', sans-serif;
     font-size: 1.3rem;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   }
 
   p {
     margin: 0 0 10px;
-    opacity: 0.92;
+    opacity: 0.95;
     font-size: 0.92rem;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
   }
 
   .preview-cta {
@@ -222,5 +410,17 @@ mat-form-field {
 @media (max-width: 640px) {
   .form-row.two-col {
     flex-direction: column;
+  }
+
+  .campaign-list-row {
+    flex-wrap: wrap;
+  }
+
+  .campaign-list-info {
+    min-width: 140px;
+  }
+
+  .campaign-list-actions {
+    margin-left: auto;
   }
 }

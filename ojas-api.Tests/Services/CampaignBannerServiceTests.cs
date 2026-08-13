@@ -27,60 +27,100 @@ public class CampaignBannerServiceTests
     };
 
     [Fact]
-    public async Task GetAsync_ReturnsNull_WhenNoBannerExists()
+    public async Task GetAllAsync_ReturnsEmptyList_WhenNoBannersExist()
     {
         _bannersMock.SetupFind(new List<CampaignBanner>());
 
-        var result = await _sut.GetAsync();
+        var result = await _sut.GetAllAsync();
+
+        result.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ReturnsAllBanners()
+    {
+        var banners = new List<CampaignBanner> { MakeBanner("First"), MakeBanner("Second") };
+        _bannersMock.SetupFind(banners);
+
+        var result = await _sut.GetAllAsync();
+
+        result.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ReturnsNull_WhenNotFound()
+    {
+        _bannersMock.SetupFind(new List<CampaignBanner>());
+
+        var result = await _sut.GetByIdAsync("507f1f77bcf86cd799439011");
 
         result.ShouldBeNull();
     }
 
     [Fact]
-    public async Task GetAsync_ReturnsBanner_WhenOneExists()
+    public async Task CreateAsync_InsertsNewBanner_WithFreshTimestamps()
     {
-        var banner = MakeBanner();
-        _bannersMock.SetupFind(new List<CampaignBanner> { banner });
+        _bannersMock.SetupFind(new List<CampaignBanner>());
+        var incoming = new CampaignBanner { Title = "New Sale" };
 
-        var result = await _sut.GetAsync();
+        var result = await _sut.CreateAsync(incoming);
 
-        result.ShouldBe(banner);
+        result.Title.ShouldBe("New Sale");
+        _bannersMock.Verify(c => c.InsertOneAsync(incoming, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task UpsertAsync_Inserts_WhenNoBannerExists()
+    public async Task UpdateAsync_ReturnsNull_WhenBannerDoesNotExist()
     {
         _bannersMock.SetupFind(new List<CampaignBanner>());
-        var incoming = MakeBanner();
-        incoming.Id = null;
 
-        var result = await _sut.UpsertAsync(incoming);
+        var result = await _sut.UpdateAsync("507f1f77bcf86cd799439011", MakeBanner("Updated"));
 
-        _bannersMock.Verify(c => c.InsertOneAsync(incoming, null, It.IsAny<CancellationToken>()), Times.Once);
+        result.ShouldBeNull();
         _bannersMock.Verify(
             c => c.ReplaceOneAsync(It.IsAny<FilterDefinition<CampaignBanner>>(), It.IsAny<CampaignBanner>(), It.IsAny<ReplaceOptions>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        result.ShouldBe(incoming);
     }
 
     [Fact]
-    public async Task UpsertAsync_Replaces_AndPreservesOriginalIdAndCreatedAt_WhenBannerExists()
+    public async Task UpdateAsync_Replaces_AndPreservesOriginalIdAndCreatedAt_WhenBannerExists()
     {
         var existing = MakeBanner();
         _bannersMock.SetupFind(new List<CampaignBanner> { existing });
 
-        var incoming = MakeBanner(title: "Winter Sale");
-        incoming.Id = null;
-        incoming.CreatedAt = default;
+        var incoming = new CampaignBanner { Title = "Winter Sale" };
 
-        var result = await _sut.UpsertAsync(incoming);
+        var result = await _sut.UpdateAsync(existing.Id!, incoming);
 
-        result.Id.ShouldBe(existing.Id);
+        result!.Id.ShouldBe(existing.Id);
         result.CreatedAt.ShouldBe(existing.CreatedAt);
         result.Title.ShouldBe("Winter Sale");
         _bannersMock.Verify(
             c => c.ReplaceOneAsync(It.IsAny<FilterDefinition<CampaignBanner>>(), incoming, It.IsAny<ReplaceOptions>(), It.IsAny<CancellationToken>()),
             Times.Once);
-        _bannersMock.Verify(c => c.InsertOneAsync(It.IsAny<CampaignBanner>(), null, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ReturnsTrue_WhenDeleted()
+    {
+        _bannersMock
+            .Setup(c => c.DeleteOneAsync(It.IsAny<FilterDefinition<CampaignBanner>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeleteResult.Acknowledged(1));
+
+        var result = await _sut.DeleteAsync("507f1f77bcf86cd799439011");
+
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ReturnsFalse_WhenNothingDeleted()
+    {
+        _bannersMock
+            .Setup(c => c.DeleteOneAsync(It.IsAny<FilterDefinition<CampaignBanner>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeleteResult.Acknowledged(0));
+
+        var result = await _sut.DeleteAsync("507f1f77bcf86cd799439011");
+
+        result.ShouldBeFalse();
     }
 }

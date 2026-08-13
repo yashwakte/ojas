@@ -17,26 +17,53 @@ public class CampaignBannerController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<CampaignBanner>> GetBanner()
+    public async Task<ActionResult<List<CampaignBanner>>> GetBanners()
     {
-        var banner = await _campaignBannerService.GetAsync();
-        if (banner == null)
-        {
-            return NotFound();
-        }
-        return Ok(banner);
+        var banners = await _campaignBannerService.GetAllAsync();
+        return Ok(banners);
     }
 
-    [HttpPatch]
+    [HttpPost]
     [Authorize(Roles = "admin")]
-    public async Task<ActionResult<CampaignBanner>> UpdateBanner([FromBody] CampaignBanner request)
+    public async Task<ActionResult<CampaignBanner>> CreateBanner([FromBody] CampaignBanner request)
     {
         if (request == null)
         {
             return BadRequest();
         }
 
-        var banner = await _campaignBannerService.UpsertAsync(request);
+        var banner = await _campaignBannerService.CreateAsync(request);
         return Ok(banner);
+    }
+
+    [HttpPatch("{id}")]
+    [Authorize(Roles = "admin")]
+    public async Task<ActionResult<CampaignBanner>> UpdateBanner(string id, [FromBody] CampaignBanner request)
+    {
+        if (request == null)
+        {
+            return BadRequest();
+        }
+
+        var banner = await _campaignBannerService.UpdateAsync(id, request);
+        if (banner == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(banner);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> DeleteBanner(string id)
+    {
+        var deleted = await _campaignBannerService.DeleteAsync(id);
+        if (!deleted)
+        {
+            return NotFound();
+        }
+
+        return NoContent();
     }
 }

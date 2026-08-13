@@ -68,7 +68,9 @@ export interface CampaignBannerConfig {
   subtitle: string;
   ctaText: string;
   ctaLink: string;
+  backgroundImageUrl: string;
   isActive: boolean;
+  featuredSectionTitle: string;
   featuredProductIds: string[];
   fallbackBestsellerProductIds: string[];
   createdAt: string;
@@ -80,7 +82,9 @@ export interface UpdateCampaignBannerRequest {
   subtitle?: string;
   ctaText?: string;
   ctaLink?: string;
+  backgroundImageUrl?: string;
   isActive?: boolean;
+  featuredSectionTitle?: string;
   featuredProductIds?: string[];
   fallbackBestsellerProductIds?: string[];
 }

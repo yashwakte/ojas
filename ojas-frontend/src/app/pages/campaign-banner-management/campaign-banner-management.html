@@ -2,28 +2,90 @@
   <header class="page-header">
     <div>
       <p class="eyebrow">Home Page</p>
-      <h1>Campaign Banner</h1>
-      <p class="subtitle">Show a seasonal or festive banner at the top of the home page</p>
+      <h1>Campaign Banners</h1>
+      <p class="subtitle">
+        Run one or more seasonal/festive banners on the home page. New campaigns you add appear
+        below the existing ones.
+      </p>
     </div>
-    @if (config()?.isActive) {
-      <mat-chip color="primary" selected>Live on Home Page</mat-chip>
-    } @else {
-      <mat-chip color="warn" selected>Hidden</mat-chip>
+    @if (editingId() === null) {
+      <button mat-flat-button color="primary" (click)="startCreate()">
+        <mat-icon>add</mat-icon>
+        New Campaign
+      </button>
     }
   </header>
 
-  @if (loading() && !config()) {
+  @if (loading() && campaigns().length === 0) {
     <div class="loading-state">
       <mat-spinner diameter="40"></mat-spinner>
-      <p>Loading configuration...</p>
+      <p>Loading campaigns...</p>
     </div>
+  } @else if (editingId() === null) {
+    @if (campaigns().length === 0) {
+      <div class="empty-state">
+        <mat-icon>campaign</mat-icon>
+        <p>No campaigns yet. Create one to show a banner on the home page.</p>
+      </div>
+    } @else {
+      <div class="campaign-list">
+        @for (c of campaigns(); track c.id) {
+          <mat-card class="campaign-list-card">
+            <div class="campaign-list-row">
+              <div
+                class="campaign-list-thumb"
+                [style.background-image]="c.backgroundImageUrl ? 'url(' + c.backgroundImageUrl + ')' : null"
+              >
+                @if (!c.backgroundImageUrl) {
+                  <mat-icon>campaign</mat-icon>
+                }
+              </div>
+              <div class="campaign-list-info">
+                <h3>{{ c.title }}</h3>
+                <p>{{ c.subtitle || 'No subtitle' }}</p>
+                <p class="campaign-list-featured-hint">
+                  "Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}" &middot;
+                  {{ c.featuredProductIds.length }} featured product(s)
+                </p>
+              </div>
+              @if (c.isActive) {
+                <mat-chip color="primary" selected>Live</mat-chip>
+              } @else {
+                <mat-chip color="warn" selected>Hidden</mat-chip>
+              }
+              <div class="campaign-list-actions">
+                <button mat-icon-button (click)="startEdit(c)" aria-label="Edit campaign">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  color="warn"
+                  (click)="deleteCampaign(c)"
+                  aria-label="Delete campaign"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+          </mat-card>
+        }
+      </div>
+    }
   } @else {
     <mat-card class="config-card">
       <mat-card-content>
+        <div class="form-heading">
+          <h2>{{ editingId() === 'new' ? 'New Campaign' : 'Edit Campaign' }}</h2>
+          <button type="button" mat-button (click)="cancelForm()">
+            <mat-icon>close</mat-icon>
+            Cancel
+          </button>
+        </div>
+
         <form #bannerForm="ngForm" (ngSubmit)="saveConfig()" class="banner-form">
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Banner Title *</mat-label>
+              <mat-label>Banner Title</mat-label>
               <input matInput
                 name="title"
                 [ngModel]="formData().title"
@@ -77,6 +139,31 @@
             </mat-form-field>
           </div>
 
+          <div class="form-row">
+            <span class="form-block-label">Background Image <span class="optional">(optional — e.g. a Ganpati festival scene)</span></span>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Background Image URL</mat-label>
+              <input matInput
+                name="backgroundImageUrl"
+                [ngModel]="formData().backgroundImageUrl"
+                (ngModelChange)="formData.update(d => ({...d, backgroundImageUrl: $event}))"
+                placeholder="https://example.com/festival.jpg or upload below">
+            </mat-form-field>
+            <div class="bg-image-actions">
+              <input type="file" accept="image/*" (change)="onBackgroundImageSelected($event)" hidden #bgFileInput>
+              <button type="button" mat-stroked-button (click)="bgFileInput.click()">
+                <mat-icon>upload</mat-icon>
+                Upload Image (Max 5MB)
+              </button>
+              @if (formData().backgroundImageUrl) {
+                <button type="button" mat-button color="warn" (click)="clearBackgroundImage()">
+                  <mat-icon>close</mat-icon>
+                  Remove
+                </button>
+              }
+            </div>
+          </div>
+
           <div class="form-row checkbox-row">
             <mat-slide-toggle
               name="isActive"
@@ -89,15 +176,22 @@
 
           @if (formData().title) {
             <div class="banner-preview" [class.inactive]="!formData().isActive">
-              <p class="preview-label">Preview</p>
-              <div class="preview-banner">
-                <h3>{{ formData().title }}</h3>
-                @if (formData().subtitle) {
-                  <p>{{ formData().subtitle }}</p>
+              <p class="preview-label">Live Preview — exactly how it'll look on the home page</p>
+              <div class="preview-banner" [class.has-bg]="formData().backgroundImageUrl">
+                @if (formData().backgroundImageUrl) {
+                  <div class="preview-banner-media">
+                    <img class="preview-banner-img" [src]="formData().backgroundImageUrl" alt="" />
+                  </div>
                 }
-                @if (formData().ctaText) {
-                  <span class="preview-cta">{{ formData().ctaText }}</span>
-                }
+                <div class="preview-banner-content">
+                  <h3>{{ formData().title }}</h3>
+                  @if (formData().subtitle) {
+                    <p>{{ formData().subtitle }}</p>
+                  }
+                  @if (formData().ctaText) {
+                    <span class="preview-cta">{{ formData().ctaText }}</span>
+                  }
+                </div>
               </div>
             </div>
           }
@@ -105,9 +199,24 @@
           <div class="product-picker-section">
             <h3>Featured Products for This Campaign</h3>
             <p class="section-hint">
-              Shown in a row under the banner on the home page.
+              Shown in a row under the banner on the home page, under the heading
+              "Handpicked for <strong>{{ formData().featuredSectionTitle || 'This Campaign' }}</strong>".
               {{ (formData().featuredProductIds ?? []).length }} selected.
             </p>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Featured Section Heading</mat-label>
+              <input matInput
+                name="featuredSectionTitle"
+                [ngModel]="formData().featuredSectionTitle"
+                (ngModelChange)="formData.update(d => ({...d, featuredSectionTitle: $event}))"
+                maxlength="60"
+                placeholder="e.g., This Festive Season, Ganpati Celebrations"
+                [class.error]="hasError('featuredSectionTitle')">
+              @if (hasError('featuredSectionTitle')) {
+                <mat-error>{{ getError('featuredSectionTitle') }}</mat-error>
+              }
+            </mat-form-field>
 
             <mat-form-field appearance="outline" class="full-width search-field">
               <mat-label>Search products</mat-label>
@@ -154,9 +263,12 @@
           </div>
 
           <div class="form-actions">
+            <button type="button" mat-button (click)="cancelForm()" [disabled]="submitting()">
+              Cancel
+            </button>
             <button type="submit" mat-flat-button color="primary" [disabled]="submitting()">
               <mat-icon>{{ submitting() ? 'hourglass_empty' : 'save' }}</mat-icon>
-              {{ submitting() ? 'Saving...' : 'Save Banner' }}
+              {{ submitting() ? 'Saving...' : (editingId() === 'new' ? 'Create Campaign' : 'Save Changes') }}
             </button>
           </div>
         </form>

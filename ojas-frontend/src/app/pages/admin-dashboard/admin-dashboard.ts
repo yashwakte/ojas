@@ -171,7 +171,7 @@ export class AdminDashboard implements OnInit {
     } else if (tab === 'delivery-charges') {
       this.deliveryChargesService.loadConfig();
     } else if (tab === 'campaign-banner') {
-      this.campaignBannerService.loadConfig();
+      this.campaignBannerService.loadCampaigns();
     }
   }
 
@@ -372,11 +372,11 @@ export class AdminDashboard implements OnInit {
   }
 
   private showSuccess(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'snack-success' });
   }
 
   private showError(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'error-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'snack-error' });
   }
 
   logout(): void {

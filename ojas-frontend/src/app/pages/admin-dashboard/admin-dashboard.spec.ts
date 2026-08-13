@@ -71,8 +71,8 @@ describe('AdminDashboard', () => {
       error: signal<string | null>(null),
     });
     deliveryChargesServiceSpy.calculateDeliveryCharge.and.returnValue({ charge: 0, isFree: true, breakdown: '' });
-    campaignBannerServiceSpy = jasmine.createSpyObj('CampaignBannerService', ['loadConfig'], {
-      config: signal<CampaignBannerConfig | null>(null),
+    campaignBannerServiceSpy = jasmine.createSpyObj('CampaignBannerService', ['loadCampaigns'], {
+      campaigns: signal<CampaignBannerConfig[]>([]),
       loading: signal(false),
     });
 
@@ -149,7 +149,7 @@ describe('AdminDashboard', () => {
 
     fixture.componentInstance.activeTab.set('campaign-banner');
     fixture.componentInstance.refreshCurrentTab();
-    expect(campaignBannerServiceSpy.loadConfig).toHaveBeenCalled();
+    expect(campaignBannerServiceSpy.loadCampaigns).toHaveBeenCalled();
   });
 
   it('filteredOrders defaults to the "pending" filter and sorts pending first, then by date desc', () => {

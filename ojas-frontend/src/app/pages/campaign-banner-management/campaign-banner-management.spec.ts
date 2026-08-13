@@ -14,7 +14,9 @@ describe('CampaignBannerManagement', () => {
     subtitle: 'Save big',
     ctaText: 'Shop Now',
     ctaLink: '/products',
+    backgroundImageUrl: '',
     isActive: true,
+    featuredSectionTitle: 'This Campaign',
     featuredProductIds: ['p1'],
     fallbackBestsellerProductIds: [],
     createdAt: '2024-01-01',
@@ -39,16 +41,20 @@ describe('CampaignBannerManagement', () => {
   };
   const product2: Product = { ...product, id: 'p2', name: 'Ragi Flour' };
 
-  let configSignal: ReturnType<typeof signal<CampaignBannerConfig | null>>;
+  let campaignsSignal: ReturnType<typeof signal<CampaignBannerConfig[]>>;
   let campaignBannerServiceSpy: any;
   let productServiceSpy: any;
 
   beforeEach(() => {
-    configSignal = signal<CampaignBannerConfig | null>(null);
-    campaignBannerServiceSpy = jasmine.createSpyObj('CampaignBannerService', ['loadConfig', 'updateConfig'], {
-      config: configSignal,
-      loading: signal(false),
-    });
+    campaignsSignal = signal<CampaignBannerConfig[]>([]);
+    campaignBannerServiceSpy = jasmine.createSpyObj(
+      'CampaignBannerService',
+      ['loadCampaigns', 'createCampaign', 'updateCampaign', 'deleteCampaign'],
+      {
+        campaigns: campaignsSignal,
+        loading: signal(false),
+      },
+    );
     productServiceSpy = { products: signal<Product[]>([product, product2]) };
 
     TestBed.configureTestingModule({
@@ -70,26 +76,46 @@ describe('CampaignBannerManagement', () => {
     return { fixture, snackBar };
   }
 
-  it('calls loadConfig on init', () => {
+  it('calls loadCampaigns on init and starts in list view', () => {
     const { fixture } = create();
-    expect(campaignBannerServiceSpy.loadConfig).toHaveBeenCalled();
+    expect(campaignBannerServiceSpy.loadCampaigns).toHaveBeenCalled();
     expect(fixture.componentInstance).toBeTruthy();
+    expect(fixture.componentInstance.editingId()).toBeNull();
   });
 
-  it('syncs formData from the service config whenever it changes', () => {
+  it('startCreate resets the form and enters create mode', () => {
     const { fixture } = create();
-    configSignal.set(config);
-    TestBed.flushEffects();
+    fixture.componentInstance.startCreate();
 
+    expect(fixture.componentInstance.editingId()).toBe('new');
+    expect(fixture.componentInstance.formData().title).toBe('');
+    expect(fixture.componentInstance.formData().featuredSectionTitle).toBe('This Campaign');
+  });
+
+  it('startEdit loads the given campaign into the form and enters edit mode', () => {
+    const { fixture } = create();
+    fixture.componentInstance.startEdit(config);
+
+    expect(fixture.componentInstance.editingId()).toBe('b1');
     expect(fixture.componentInstance.formData()).toEqual({
       title: 'Festive Sale',
       subtitle: 'Save big',
       ctaText: 'Shop Now',
       ctaLink: '/products',
+      backgroundImageUrl: '',
       isActive: true,
+      featuredSectionTitle: 'This Campaign',
       featuredProductIds: ['p1'],
       fallbackBestsellerProductIds: [],
     });
+  });
+
+  it('cancelForm returns to the list view', () => {
+    const { fixture } = create();
+    fixture.componentInstance.startCreate();
+    fixture.componentInstance.cancelForm();
+
+    expect(fixture.componentInstance.editingId()).toBeNull();
   });
 
   it('filteredProducts filters by search term (case-insensitive)', () => {
@@ -100,6 +126,7 @@ describe('CampaignBannerManagement', () => {
 
   it('isFeatured / toggleFeatured toggle a product id in featuredProductIds', () => {
     const { fixture } = create();
+    fixture.componentInstance.startCreate();
     expect(fixture.componentInstance.isFeatured('p1')).toBeFalse();
     fixture.componentInstance.toggleFeatured('p1');
     expect(fixture.componentInstance.isFeatured('p1')).toBeTrue();
@@ -109,6 +136,7 @@ describe('CampaignBannerManagement', () => {
 
   it('isFallbackBestseller / toggleFallbackBestseller toggle a product id', () => {
     const { fixture } = create();
+    fixture.componentInstance.startCreate();
     expect(fixture.componentInstance.isFallbackBestseller('p2')).toBeFalse();
     fixture.componentInstance.toggleFallbackBestseller('p2');
     expect(fixture.componentInstance.isFallbackBestseller('p2')).toBeTrue();
@@ -133,17 +161,19 @@ describe('CampaignBannerManagement', () => {
 
   it('saveConfig shows an error and skips the service call when the form is invalid', () => {
     const { fixture, snackBar } = create();
+    fixture.componentInstance.startCreate();
     fixture.componentInstance.formData.set({ title: '' });
 
     fixture.componentInstance.saveConfig();
 
     expect(snackBar.open).toHaveBeenCalledWith('Please fix the validation errors', 'Close', jasmine.any(Object));
-    expect(campaignBannerServiceSpy.updateConfig).not.toHaveBeenCalled();
+    expect(campaignBannerServiceSpy.createCampaign).not.toHaveBeenCalled();
   });
 
-  it('saveConfig updates the config and shows a success message', () => {
-    campaignBannerServiceSpy.updateConfig.and.returnValue(of(config));
+  it('saveConfig calls createCampaign and shows a success message when creating', () => {
+    campaignBannerServiceSpy.createCampaign.and.returnValue(of(config));
     const { fixture, snackBar } = create();
+    fixture.componentInstance.startCreate();
     fixture.componentInstance.formData.set({
       title: 'Sale',
       subtitle: 'sub',
@@ -156,20 +186,32 @@ describe('CampaignBannerManagement', () => {
 
     fixture.componentInstance.saveConfig();
 
-    expect(campaignBannerServiceSpy.updateConfig).toHaveBeenCalled();
+    expect(campaignBannerServiceSpy.createCampaign).toHaveBeenCalled();
     expect(snackBar.open).toHaveBeenCalledWith(
-      'Campaign banner updated successfully',
+      'Campaign created successfully',
       'Close',
       jasmine.any(Object),
     );
     expect(fixture.componentInstance.submitting()).toBeFalse();
+    expect(fixture.componentInstance.editingId()).toBeNull();
   });
 
-  it('saveConfig shows an error message when the update fails', () => {
-    campaignBannerServiceSpy.updateConfig.and.returnValue(
+  it('saveConfig calls updateCampaign with the campaign id when editing', () => {
+    campaignBannerServiceSpy.updateCampaign.and.returnValue(of(config));
+    const { fixture } = create();
+    fixture.componentInstance.startEdit(config);
+
+    fixture.componentInstance.saveConfig();
+
+    expect(campaignBannerServiceSpy.updateCampaign).toHaveBeenCalledWith('b1', jasmine.any(Object));
+  });
+
+  it('saveConfig shows an error message when the save fails', () => {
+    campaignBannerServiceSpy.createCampaign.and.returnValue(
       throwError(() => ({ error: { message: 'Server error' } })),
     );
     const { fixture, snackBar } = create();
+    fixture.componentInstance.startCreate();
     fixture.componentInstance.formData.set({
       title: 'Sale',
       subtitle: '',
@@ -186,22 +228,35 @@ describe('CampaignBannerManagement', () => {
     expect(fixture.componentInstance.submitting()).toBeFalse();
   });
 
-  it('toggleActive updates isActive in the form and triggers a save', () => {
-    campaignBannerServiceSpy.updateConfig.and.returnValue(of(config));
+  it('deleteCampaign does nothing when the confirmation is declined', () => {
+    spyOn(window, 'confirm').and.returnValue(false);
     const { fixture } = create();
-    fixture.componentInstance.formData.set({
-      title: 'Sale',
-      subtitle: '',
-      ctaText: '',
-      ctaLink: '',
-      isActive: false,
-      featuredProductIds: [],
-      fallbackBestsellerProductIds: [],
-    });
 
-    fixture.componentInstance.toggleActive({ checked: true });
+    fixture.componentInstance.deleteCampaign(config);
 
-    expect(fixture.componentInstance.formData().isActive).toBeTrue();
-    expect(campaignBannerServiceSpy.updateConfig).toHaveBeenCalled();
+    expect(campaignBannerServiceSpy.deleteCampaign).not.toHaveBeenCalled();
+  });
+
+  it('deleteCampaign calls the service and shows a success message when confirmed', () => {
+    spyOn(window, 'confirm').and.returnValue(true);
+    campaignBannerServiceSpy.deleteCampaign.and.returnValue(of(undefined));
+    const { fixture, snackBar } = create();
+
+    fixture.componentInstance.deleteCampaign(config);
+
+    expect(campaignBannerServiceSpy.deleteCampaign).toHaveBeenCalledWith('b1');
+    expect(snackBar.open).toHaveBeenCalledWith('Campaign deleted', 'Close', jasmine.any(Object));
+  });
+
+  it('deleteCampaign shows an error message when the delete fails', () => {
+    spyOn(window, 'confirm').and.returnValue(true);
+    campaignBannerServiceSpy.deleteCampaign.and.returnValue(
+      throwError(() => ({ error: { message: 'Cannot delete' } })),
+    );
+    const { fixture, snackBar } = create();
+
+    fixture.componentInstance.deleteCampaign(config);
+
+    expect(snackBar.open).toHaveBeenCalledWith('Cannot delete', 'Close', jasmine.any(Object));
   });
 });

@@ -85,7 +85,7 @@ public class DeliveryChargesAndCampaignBannerTests : IDisposable
     }
 
     [Fact]
-    public async Task CampaignBanner_AdminUpsert_ThenPublicGet()
+    public async Task CampaignBanner_AdminCreate_ThenPublicGetIncludesIt()
     {
         using var admin = _factory.CreateClient();
         var (_, csrf) = await _factory.SeedAndLoginAsStaffAsync(admin, UserRoles.Admin);
@@ -97,27 +97,55 @@ public class DeliveryChargesAndCampaignBannerTests : IDisposable
             IsActive = true,
         };
 
-        var upsertResponse = await admin.SendAsync(Json(HttpMethod.Patch, "/api/campaign-banner", banner, csrf));
-        upsertResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var upserted = await upsertResponse.Content.ReadFromJsonAsync<CampaignBanner>();
-        upserted!.Title.ShouldBe("Integration Sale");
+        var createResponse = await admin.SendAsync(Json(HttpMethod.Post, "/api/campaign-banner", banner, csrf));
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var created = await createResponse.Content.ReadFromJsonAsync<CampaignBanner>();
+        created!.Title.ShouldBe("Integration Sale");
+        created.Id.ShouldNotBeNullOrEmpty();
 
         using var publicClient = _factory.CreateClient();
         var getResponse = await publicClient.GetAsync("/api/campaign-banner");
         getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var fetched = await getResponse.Content.ReadFromJsonAsync<CampaignBanner>();
-        fetched!.Title.ShouldBe("Integration Sale");
+        var fetched = await getResponse.Content.ReadFromJsonAsync<List<CampaignBanner>>();
+        fetched!.ShouldContain(b => b.Id == created.Id && b.Title == "Integration Sale");
     }
 
     [Fact]
-    public async Task CampaignBanner_Customer_ForbiddenFromPatch()
+    public async Task CampaignBanner_AdminUpdate_ThenAdminDelete_RemovesIt()
+    {
+        using var admin = _factory.CreateClient();
+        var (_, csrf) = await _factory.SeedAndLoginAsStaffAsync(admin, UserRoles.Admin);
+
+        var created = await admin.SendAsync(Json(HttpMethod.Post, "/api/campaign-banner", new CampaignBanner { Title = "Original" }, csrf));
+        var banner = await created.Content.ReadFromJsonAsync<CampaignBanner>();
+
+        var updateResponse = await admin.SendAsync(
+            Json(HttpMethod.Patch, $"/api/campaign-banner/{banner!.Id}", new CampaignBanner { Title = "Updated" }, csrf));
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<CampaignBanner>();
+        updated!.Id.ShouldBe(banner.Id);
+        updated.Title.ShouldBe("Updated");
+
+        var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"/api/campaign-banner/{banner.Id}");
+        deleteRequest.AttachCsrf(csrf);
+        var deleteResponse = await admin.SendAsync(deleteRequest);
+        deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        using var publicClient = _factory.CreateClient();
+        var getResponse = await publicClient.GetAsync("/api/campaign-banner");
+        var fetched = await getResponse.Content.ReadFromJsonAsync<List<CampaignBanner>>();
+        fetched!.ShouldNotContain(b => b.Id == banner.Id);
+    }
+
+    [Fact]
+    public async Task CampaignBanner_Customer_ForbiddenFromCreate()
     {
         using var customerClient = _factory.CreateClient();
         var (_, csrf) = await customerClient.RegisterAsync();
 
         var banner = new CampaignBanner { Title = "Hacked Sale" };
 
-        var response = await customerClient.SendAsync(Json(HttpMethod.Patch, "/api/campaign-banner", banner, csrf));
+        var response = await customerClient.SendAsync(Json(HttpMethod.Post, "/api/campaign-banner", banner, csrf));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }

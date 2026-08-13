@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, effect, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -13,6 +13,20 @@ import { MatChipsModule } from '@angular/material/chips';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { ProductService } from '../../services/product.service';
 import { CampaignBannerConfig, UpdateCampaignBannerRequest } from '../../models/interfaces';
+
+function emptyFormData(): UpdateCampaignBannerRequest {
+  return {
+    title: '',
+    subtitle: '',
+    ctaText: 'Shop Now',
+    ctaLink: '/products',
+    backgroundImageUrl: '',
+    isActive: false,
+    featuredSectionTitle: 'This Campaign',
+    featuredProductIds: [],
+    fallbackBestsellerProductIds: [],
+  };
+}
 
 @Component({
   selector: 'app-campaign-banner-management',
@@ -38,12 +52,15 @@ export class CampaignBannerManagement implements OnInit {
   private productService = inject(ProductService);
   private snackBar = inject(MatSnackBar);
 
-  readonly config = computed(() => this.campaignBannerService.config());
+  readonly campaigns = computed(() => this.campaignBannerService.campaigns());
   readonly loading = computed(() => this.campaignBannerService.loading());
   readonly products = computed(() => this.productService.products());
 
   readonly submitting = signal(false);
   readonly productSearch = signal('');
+
+  // null = list view; 'new' = create form; an id = editing that campaign.
+  readonly editingId = signal<string | 'new' | null>(null);
 
   readonly filteredProducts = computed(() => {
     const term = this.productSearch().trim().toLowerCase();
@@ -51,29 +68,11 @@ export class CampaignBannerManagement implements OnInit {
     return term ? all.filter((p) => p.name.toLowerCase().includes(term)) : all;
   });
 
-  readonly formData = signal<UpdateCampaignBannerRequest>({
-    title: '',
-    subtitle: '',
-    ctaText: 'Shop Now',
-    ctaLink: '/products',
-    isActive: false,
-    featuredProductIds: [],
-    fallbackBestsellerProductIds: [],
-  });
-
+  readonly formData = signal<UpdateCampaignBannerRequest>(emptyFormData());
   readonly formErrors = signal<Partial<Record<keyof UpdateCampaignBannerRequest, string>>>({});
 
-  constructor() {
-    effect(() => {
-      const cfg = this.config();
-      if (cfg) {
-        this.formData.set(this.toFormData(cfg));
-      }
-    });
-  }
-
   ngOnInit(): void {
-    this.campaignBannerService.loadConfig();
+    this.campaignBannerService.loadCampaigns();
   }
 
   private toFormData(cfg: CampaignBannerConfig): UpdateCampaignBannerRequest {
@@ -82,10 +81,65 @@ export class CampaignBannerManagement implements OnInit {
       subtitle: cfg.subtitle,
       ctaText: cfg.ctaText,
       ctaLink: cfg.ctaLink,
+      backgroundImageUrl: cfg.backgroundImageUrl,
       isActive: cfg.isActive,
+      featuredSectionTitle: cfg.featuredSectionTitle || 'This Campaign',
       featuredProductIds: [...(cfg.featuredProductIds ?? [])],
       fallbackBestsellerProductIds: [...(cfg.fallbackBestsellerProductIds ?? [])],
     };
+  }
+
+  startCreate(): void {
+    this.formData.set(emptyFormData());
+    this.formErrors.set({});
+    this.productSearch.set('');
+    this.editingId.set('new');
+  }
+
+  startEdit(campaign: CampaignBannerConfig): void {
+    this.formData.set(this.toFormData(campaign));
+    this.formErrors.set({});
+    this.productSearch.set('');
+    this.editingId.set(campaign.id);
+  }
+
+  cancelForm(): void {
+    this.editingId.set(null);
+  }
+
+  deleteCampaign(campaign: CampaignBannerConfig): void {
+    if (!confirm(`Delete "${campaign.title}"? This can't be undone.`)) {
+      return;
+    }
+    this.campaignBannerService.deleteCampaign(campaign.id).subscribe({
+      next: () => this.showSuccess('Campaign deleted'),
+      error: (err) => this.showError(err?.error?.message ?? 'Failed to delete campaign'),
+    });
+  }
+
+  onBackgroundImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+      this.showError('Please select a valid image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.showError('Image size must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      this.formData.update((d) => ({ ...d, backgroundImageUrl: base64 }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearBackgroundImage(): void {
+    this.formData.update((d) => ({ ...d, backgroundImageUrl: '' }));
   }
 
   isFeatured(productId: string): boolean {
@@ -130,6 +184,10 @@ export class CampaignBannerManagement implements OnInit {
       errors.subtitle = 'Subtitle must not exceed 200 characters';
     }
 
+    if ((data.featuredSectionTitle?.length ?? 0) > 60) {
+      errors.featuredSectionTitle = 'Keep this under 60 characters';
+    }
+
     this.formErrors.set(errors);
     return Object.keys(errors).length === 0;
   }
@@ -147,34 +205,38 @@ export class CampaignBannerManagement implements OnInit {
       subtitle: data.subtitle?.trim() ?? '',
       ctaText: data.ctaText?.trim() ?? '',
       ctaLink: data.ctaLink?.trim() ?? '',
+      backgroundImageUrl: data.backgroundImageUrl?.trim() ?? '',
       isActive: data.isActive ?? false,
+      featuredSectionTitle: data.featuredSectionTitle?.trim() || 'This Campaign',
       featuredProductIds: data.featuredProductIds ?? [],
       fallbackBestsellerProductIds: data.fallbackBestsellerProductIds ?? [],
     };
 
-    this.campaignBannerService.updateConfig(request).subscribe({
+    const id = this.editingId();
+    const request$ =
+      id && id !== 'new'
+        ? this.campaignBannerService.updateCampaign(id, request)
+        : this.campaignBannerService.createCampaign(request);
+
+    request$.subscribe({
       next: () => {
-        this.showSuccess('Campaign banner updated successfully');
+        this.showSuccess(id && id !== 'new' ? 'Campaign updated successfully' : 'Campaign created successfully');
         this.submitting.set(false);
+        this.editingId.set(null);
       },
       error: (err) => {
-        this.showError(err?.error?.message ?? 'Failed to update campaign banner');
+        this.showError(err?.error?.message ?? 'Failed to save campaign');
         this.submitting.set(false);
       },
     });
   }
 
-  toggleActive(event: { checked: boolean }): void {
-    this.formData.update((d) => ({ ...d, isActive: event.checked }));
-    this.saveConfig();
-  }
-
   private showSuccess(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'snack-success' });
   }
 
   private showError(message: string): void {
-    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'error-snackbar' });
+    this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'snack-error' });
   }
 
   getError(field: keyof UpdateCampaignBannerRequest): string | undefined {

@@ -21,8 +21,16 @@ public class CampaignBanner
     [BsonElement("ctaLink")]
     public string CtaLink { get; set; } = string.Empty;
 
+    [BsonElement("backgroundImageUrl")]
+    public string BackgroundImageUrl { get; set; } = string.Empty;
+
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = false;
+
+    // Shown as "Handpicked for {FeaturedSectionTitle}" above this campaign's featured
+    // products row on the home page, e.g. "This Festive Season", "Ganpati Celebrations".
+    [BsonElement("featuredSectionTitle")]
+    public string FeaturedSectionTitle { get; set; } = "This Campaign";
 
     [BsonElement("featuredProductIds")]
     public List<string> FeaturedProductIds { get; set; } = [];

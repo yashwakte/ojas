@@ -82,8 +82,9 @@ public class ProductService
         // No real sales data yet: prefer the admin-curated fallback list over an arbitrary "newest products" guess.
         if (products.Count == 0)
         {
-            var banner = await _db.CampaignBanners.Find(_ => true).FirstOrDefaultAsync();
-            foreach (var productId in banner?.FallbackBestsellerProductIds ?? [])
+            var banners = await _db.CampaignBanners.Find(b => b.IsActive).SortBy(b => b.CreatedAt).ToListAsync();
+            var fallbackIds = banners.SelectMany(b => b.FallbackBestsellerProductIds ?? []);
+            foreach (var productId in fallbackIds)
             {
                 if (products.Count >= limit) break;
                 if (!ObjectId.TryParse(productId, out _)) continue;
