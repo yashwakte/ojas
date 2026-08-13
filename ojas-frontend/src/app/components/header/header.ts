@@ -33,7 +33,6 @@ export class Header {
   menuOpen = false;
   isScrolled = false;
   cartBounce = signal(false);
-  categoryMenuOpen = signal(false);
   desktopCategoryOpen = signal(false);
 
   readonly categories = PRODUCT_CATEGORIES;
@@ -63,13 +62,6 @@ export class Header {
 
   toggleMenu() {
     this.menuOpen = !this.menuOpen;
-    if (!this.menuOpen) {
-      this.categoryMenuOpen.set(false);
-    }
-  }
-
-  toggleCategoryMenu(): void {
-    this.categoryMenuOpen.update((open) => !open);
   }
 
   openDesktopCategoryMenu(): void {

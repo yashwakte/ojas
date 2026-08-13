@@ -17,72 +17,61 @@
   </div>
 </section>
 
-<!-- CAMPAIGN BANNER -->
-@if (banner(); as b) {
-  @if (b.isActive) {
-    <section class="campaign-banner">
-      <div class="campaign-banner-inner">
-        <h2>{{ b.title }}</h2>
-        @if (b.subtitle) {
-          <p>{{ b.subtitle }}</p>
-        }
-        @if (b.ctaText) {
-          <a [routerLink]="b.ctaLink || '/products'" class="btn-white">{{ b.ctaText }} <mat-icon>arrow_forward</mat-icon></a>
-        }
+<!-- QUICK CATEGORY NAV (mobile only — desktop already has the header dropdown) -->
+<nav class="quick-cats" aria-label="Shop by category">
+  @for (c of categoryTiles; track c.name) {
+    <a class="quick-cat-chip" [routerLink]="['/products']" [queryParams]="{ category: c.name }">
+      <span class="quick-cat-chip-ico"><mat-icon>{{ c.icon }}</mat-icon></span>
+      <span class="quick-cat-chip-label">{{ c.name }}</span>
+    </a>
+  }
+</nav>
+
+<!-- CAMPAIGNS (each active campaign renders its own banner + featured row) -->
+@for (c of activeCampaigns(); track c.id) {
+  <section class="campaign-banner" [class.has-bg-image]="c.backgroundImageUrl">
+    @if (c.backgroundImageUrl) {
+      <div class="campaign-banner-media">
+        <img class="campaign-banner-img" [src]="c.backgroundImageUrl" alt="" />
       </div>
-    </section>
+    }
+    <div class="campaign-banner-inner">
+      <h2>{{ c.title }}</h2>
+      @if (c.subtitle) {
+        <p>{{ c.subtitle }}</p>
+      }
+      @if (c.ctaText) {
+        <a [routerLink]="c.ctaLink || '/products'" class="btn-white">{{ c.ctaText }} <mat-icon>arrow_forward</mat-icon></a>
+      }
+    </div>
+  </section>
 
-    <!-- CAMPAIGN FEATURED PRODUCTS -->
-    @if (campaignFeaturedProducts().length > 0) {
-      <section class="section products-section campaign-featured-section">
-        <div class="tag"><span>FEATURED</span></div>
-        <h2 class="stitle">Handpicked for This Campaign</h2>
+  <!-- CAMPAIGN FEATURED PRODUCTS -->
+  @if (featuredProductsFor(c).length > 0) {
+    <section class="section products-section campaign-featured-section">
+      <div class="tag"><span>FEATURED</span></div>
+      <h2 class="stitle">Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}</h2>
 
-        <div class="pscroll">
-          @for (p of campaignFeaturedProducts(); track p.id) {
-            <div class="pcard">
-              <a class="pcard-link" [routerLink]="['/products', p.id]">
-                <div class="pimg">
-                  <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
-                </div>
-                <div class="pbody-top">
-                  <h3>{{ p.name }}</h3>
-                  <div class="pmeta">
-                    <span>{{ p.weight }}</span>
-                    <span class="pprice">
-                      @if (p.discount && p.discount > 0) {
-                        <span class="original-price">₹{{ p.price }}</span>
-                        <span class="sale-price"
-                          >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
-                        >
-                        <span class="discount-badge">{{ p.discount }}% OFF</span>
-                      } @else {
-                        <strong>₹{{ p.price }}</strong>
-                      }
-                    </span>
-                  </div>
-                </div>
-              </a>
-              <div class="pbody">
-                <div class="pactions">
-                  <button
-                    class="home-add-cart-btn"
-                    [class.added]="justAdded() === p.id"
-                    (click)="addToCart(p)"
-                  >
-                    <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-                    {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
-                  </button>
-                  <button class="home-buy-now-btn" (click)="buyNow(p)">
-                    <mat-icon>bolt</mat-icon> Buy Now
-                  </button>
-                </div>
-              </div>
-            </div>
+      <div class="pscroll-wrap">
+        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFeatured.scrollBy({ left: -320, behavior: 'smooth' })">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <div class="pscroll" #pscrollFeatured>
+          @for (p of featuredProductsFor(c); track p.id) {
+            <app-product-card
+              [product]="p"
+              badge="Featured"
+              [justAdded]="justAdded() === p.id"
+              (addToCart)="addToCart($event)"
+              (buyNow)="buyNow($event)"
+            />
           }
         </div>
-      </section>
-    }
+        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFeatured.scrollBy({ left: 320, behavior: 'smooth' })">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </section>
   }
 }
 
@@ -92,48 +81,24 @@
   <h2 class="stitle">Most Loved by Our Customers</h2>
 
   @if (!bestsellersLoading() && bestsellers().length > 0) {
-    <div class="pscroll">
-      @for (p of bestsellers(); track p.id) {
-        <div class="pcard">
-          <a class="pcard-link" [routerLink]="['/products', p.id]">
-            <div class="pimg">
-              <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
-            </div>
-            <div class="pbody-top">
-              <h3>{{ p.name }}</h3>
-              <div class="pmeta">
-                <span>{{ p.weight }}</span>
-                <span class="pprice">
-                  @if (p.discount && p.discount > 0) {
-                    <span class="original-price">₹{{ p.price }}</span>
-                    <span class="sale-price"
-                      >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
-                    >
-                    <span class="discount-badge">{{ p.discount }}% OFF</span>
-                  } @else {
-                    <strong>₹{{ p.price }}</strong>
-                  }
-                </span>
-              </div>
-            </div>
-          </a>
-          <div class="pbody">
-            <div class="pactions">
-              <button
-                class="home-add-cart-btn"
-                [class.added]="justAdded() === p.id"
-                (click)="addToCart(p)"
-              >
-                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-                {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
-              </button>
-              <button class="home-buy-now-btn" (click)="buyNow(p)">
-                <mat-icon>bolt</mat-icon> Buy Now
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+    <div class="pscroll-wrap">
+      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollBestsellers.scrollBy({ left: -320, behavior: 'smooth' })">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <div class="pscroll" #pscrollBestsellers>
+        @for (p of bestsellers(); track p.id) {
+          <app-product-card
+            [product]="p"
+            badge="Bestseller"
+            [justAdded]="justAdded() === p.id"
+            (addToCart)="addToCart($event)"
+            (buyNow)="buyNow($event)"
+          />
+        }
+      </div>
+      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollBestsellers.scrollBy({ left: 320, behavior: 'smooth' })">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
     </div>
   }
   <div class="ctr">
@@ -165,44 +130,24 @@
     <div class="tag"><span>LIMITED TIME</span></div>
     <h2 class="stitle">Festive Savings</h2>
 
-    <div class="pscroll">
-      @for (p of festiveSavings(); track p.id) {
-        <div class="pcard">
-          <a class="pcard-link" [routerLink]="['/products', p.id]">
-            <div class="pimg">
-              <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
-            </div>
-            <div class="pbody-top">
-              <h3>{{ p.name }}</h3>
-              <div class="pmeta">
-                <span>{{ p.weight }}</span>
-                <span class="pprice">
-                  <span class="original-price">₹{{ p.price }}</span>
-                  <span class="sale-price"
-                    >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
-                  >
-                  <span class="discount-badge">{{ p.discount }}% OFF</span>
-                </span>
-              </div>
-            </div>
-          </a>
-          <div class="pbody">
-            <div class="pactions">
-              <button
-                class="home-add-cart-btn"
-                [class.added]="justAdded() === p.id"
-                (click)="addToCart(p)"
-              >
-                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-                {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
-              </button>
-              <button class="home-buy-now-btn" (click)="buyNow(p)">
-                <mat-icon>bolt</mat-icon> Buy Now
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+    <div class="pscroll-wrap">
+      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFestive.scrollBy({ left: -320, behavior: 'smooth' })">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <div class="pscroll" #pscrollFestive>
+        @for (p of festiveSavings(); track p.id) {
+          <app-product-card
+            [product]="p"
+            badge="Sale"
+            [justAdded]="justAdded() === p.id"
+            (addToCart)="addToCart($event)"
+            (buyNow)="buyNow($event)"
+          />
+        }
+      </div>
+      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFestive.scrollBy({ left: 320, behavior: 'smooth' })">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
     </div>
   </section>
 }
@@ -219,7 +164,6 @@
           <mat-icon>{{ c.icon }}</mat-icon>
         </div>
         <h3>{{ c.name }}</h3>
-        <p>{{ c.desc }}</p>
       </a>
     }
   </div>
@@ -232,48 +176,23 @@
     <h2 class="stitle">Upwas Specials</h2>
     <p class="section-subtitle">Pure, grain-free flours crafted for your fasting days</p>
 
-    <div class="pscroll">
-      @for (p of upwasSpecials(); track p.id) {
-        <div class="pcard">
-          <a class="pcard-link" [routerLink]="['/products', p.id]">
-            <div class="pimg">
-              <img [src]="p.imageUrl" [alt]="p.name" loading="lazy" (error)="onImgError($event)" /><span class="pcat">{{ p.category }}</span>
-            </div>
-            <div class="pbody-top">
-              <h3>{{ p.name }}</h3>
-              <div class="pmeta">
-                <span>{{ p.weight }}</span>
-                <span class="pprice">
-                  @if (p.discount && p.discount > 0) {
-                    <span class="original-price">₹{{ p.price }}</span>
-                    <span class="sale-price"
-                      >₹{{ p.price - (p.price * p.discount / 100) | number: '1.0-0' }}</span
-                    >
-                    <span class="discount-badge">{{ p.discount }}% OFF</span>
-                  } @else {
-                    <strong>₹{{ p.price }}</strong>
-                  }
-                </span>
-              </div>
-            </div>
-          </a>
-          <div class="pbody">
-            <div class="pactions">
-              <button
-                class="home-add-cart-btn"
-                [class.added]="justAdded() === p.id"
-                (click)="addToCart(p)"
-              >
-                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-                {{ justAdded() === p.id ? 'Added!' : 'Add to cart' }}
-              </button>
-              <button class="home-buy-now-btn" (click)="buyNow(p)">
-                <mat-icon>bolt</mat-icon> Buy Now
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+    <div class="pscroll-wrap">
+      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollUpwas.scrollBy({ left: -320, behavior: 'smooth' })">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <div class="pscroll" #pscrollUpwas>
+        @for (p of upwasSpecials(); track p.id) {
+          <app-product-card
+            [product]="p"
+            [justAdded]="justAdded() === p.id"
+            (addToCart)="addToCart($event)"
+            (buyNow)="buyNow($event)"
+          />
+        }
+      </div>
+      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollUpwas.scrollBy({ left: 320, behavior: 'smooth' })">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
     </div>
   </section>
 }

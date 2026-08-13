@@ -7,10 +7,12 @@
     <!-- Desktop nav links only -->
     @if (isCustomerArea()) {
       <nav class="nav-desktop">
-        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
-          >Home</a
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <mat-icon>storefront</mat-icon>Home</a
         >
-        <a routerLink="/products" routerLinkActive="active">Products</a>
+        <a routerLink="/products" routerLinkActive="active">
+          <mat-icon>grid_view</mat-icon>Products</a
+        >
         <div
           class="nav-dropdown"
           [class.open]="desktopCategoryOpen()"
@@ -25,7 +27,7 @@
             [attr.aria-expanded]="desktopCategoryOpen()"
             (click)="closeDesktopCategoryMenu()"
           >
-            Shop by Category <mat-icon class="dropdown-caret">expand_more</mat-icon>
+            <mat-icon>category</mat-icon>Shop by Category <mat-icon class="dropdown-caret">expand_more</mat-icon>
           </a>
           <div class="nav-dropdown-panel">
             <span class="nav-dropdown-heading">Categories</span>
@@ -39,6 +41,9 @@
             }
           </div>
         </div>
+        <a routerLink="/offers" routerLinkActive="active" class="nav-accent-pill">
+          <mat-icon>local_offer</mat-icon>Offers & Deals</a
+        >
       </nav>
     }
 
@@ -93,7 +98,7 @@
             </a>
           }
           @if (auth.isAdmin()) {
-            <a mat-menu-item routerLink="/admin/orders">
+            <a mat-menu-item routerLink="/admin">
               <mat-icon>dashboard</mat-icon>
               <span>Admin Panel</span>
             </a>
@@ -155,25 +160,6 @@
       @if (isCustomerArea()) {
         <a routerLink="/" (click)="toggleMenu()">Home</a>
         <a routerLink="/products" (click)="toggleMenu()">Products</a>
-        <button
-          type="button"
-          class="mobile-category-toggle"
-          [class.open]="categoryMenuOpen()"
-          (click)="toggleCategoryMenu()"
-          [attr.aria-expanded]="categoryMenuOpen()"
-        >
-          Shop by Category
-          <mat-icon>{{ categoryMenuOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
-        </button>
-        @if (categoryMenuOpen()) {
-          <div class="mobile-category-list">
-            @for (cat of categories; track cat) {
-              <a [routerLink]="['/products']" [queryParams]="{ category: cat }" (click)="toggleMenu()">{{
-                cat
-              }}</a>
-            }
-          </div>
-        }
       }
       @if (auth.isLoggedIn()) {
         @if (auth.role() === 'customer') {
@@ -206,7 +192,7 @@
           </a>
         }
         @if (auth.isAdmin()) {
-          <a routerLink="/admin/orders" (click)="toggleMenu()">
+          <a routerLink="/admin" (click)="toggleMenu()">
             <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
               >dashboard</mat-icon
             >

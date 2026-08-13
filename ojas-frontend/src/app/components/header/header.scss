@@ -76,6 +76,8 @@
   gap: 8px;
 
   a {
+    display: inline-flex;
+    align-items: center;
     font-family: 'Poppins', sans-serif;
     font-weight: 500;
     color: var(--ojas-text);
@@ -85,20 +87,66 @@
     transition: all 0.2s ease;
     font-size: 0.92rem;
 
-    &:hover {
+    mat-icon:first-child {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+      margin-right: 6px;
+      color: var(--ojas-text-light);
+      transition: color 0.2s ease;
+    }
+
+    &:hover,
+    &.active {
       color: var(--ojas-orange);
       background: rgba(242, 90, 26, 0.05);
+
+      mat-icon:first-child {
+        color: var(--ojas-orange);
+      }
     }
 
     &.active {
-      color: var(--ojas-orange);
       background: rgba(242, 90, 26, 0.08);
+    }
+  }
+}
+
+.nav-accent-pill {
+  background: linear-gradient(120deg, rgba(242, 90, 26, 0.1) 0%, rgba(255, 181, 153, 0.22) 100%) !important;
+  border: 1px solid rgba(242, 90, 26, 0.18);
+  color: var(--ojas-orange) !important;
+  font-weight: 700 !important;
+
+  mat-icon:first-child {
+    color: var(--ojas-orange) !important;
+  }
+
+  &:hover {
+    background: var(--ojas-orange) !important;
+    color: #fff !important;
+
+    mat-icon:first-child {
+      color: #fff !important;
     }
   }
 }
 
 .nav-dropdown {
   position: relative;
+
+  .nav-dropdown-trigger mat-icon:first-child {
+    font-size: 17px;
+    width: 17px;
+    height: 17px;
+    margin-right: 6px;
+    color: var(--ojas-text-light);
+  }
+
+  &:hover .nav-dropdown-trigger mat-icon:first-child,
+  .nav-dropdown-trigger.active mat-icon:first-child {
+    color: var(--ojas-orange);
+  }
 
   .dropdown-caret {
     font-size: 18px;
@@ -513,50 +561,6 @@
       color: var(--ojas-orange);
       padding-left: 8px;
     }
-
-    &:last-child {
-      border-bottom: none;
-    }
-  }
-}
-
-.mobile-category-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 14px 0;
-  background: none;
-  border: none;
-  border-bottom: 1px solid #f5f5f5;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 500;
-  font-size: 1rem;
-  color: var(--ojas-text);
-  cursor: pointer;
-  text-align: left;
-
-  mat-icon {
-    color: var(--ojas-text-light);
-  }
-
-  &.open {
-    color: var(--ojas-orange);
-  }
-}
-
-.mobile-category-list {
-  display: flex;
-  flex-direction: column;
-  padding-left: 12px;
-  background: #fffaf7;
-  border-radius: 10px;
-  margin: 6px 0;
-
-  a {
-    padding: 11px 12px;
-    font-size: 0.9rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 
     &:last-child {
       border-bottom: none;

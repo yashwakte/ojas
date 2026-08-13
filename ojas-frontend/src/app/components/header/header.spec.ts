@@ -53,27 +53,15 @@ describe('Header', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('toggleMenu flips menuOpen and closes the category menu when closing', () => {
+  it('toggleMenu flips menuOpen', () => {
     const fixture = create();
     const header = fixture.componentInstance;
-    header.categoryMenuOpen.set(true);
 
     header.toggleMenu();
     expect(header.menuOpen).toBeTrue();
 
     header.toggleMenu();
     expect(header.menuOpen).toBeFalse();
-    expect(header.categoryMenuOpen()).toBeFalse();
-  });
-
-  it('toggleCategoryMenu toggles the signal', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
-    expect(header.categoryMenuOpen()).toBeFalse();
-    header.toggleCategoryMenu();
-    expect(header.categoryMenuOpen()).toBeTrue();
-    header.toggleCategoryMenu();
-    expect(header.categoryMenuOpen()).toBeFalse();
   });
 
   it('openDesktopCategoryMenu / closeDesktopCategoryMenu set the signal', () => {

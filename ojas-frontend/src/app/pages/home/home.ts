@@ -1,18 +1,18 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { DecimalPipe } from '@angular/common';
 import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
-import { Product } from '../../models/interfaces';
+import { CampaignBannerConfig, Product } from '../../models/interfaces';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
+import { ProductCard } from '../../components/product-card/product-card';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, MatIconModule, DecimalPipe],
+  imports: [RouterLink, MatIconModule, ProductCard],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
@@ -26,16 +26,20 @@ export class Home implements OnInit {
 
   justAdded = signal<string | null>(null);
 
-  readonly banner = computed(() => this.campaignBannerService.config());
+  // Every active campaign renders as its own banner + featured-products row,
+  // stacked in the order they were created (oldest first).
+  readonly activeCampaigns = computed(() =>
+    this.campaignBannerService.campaigns().filter((c) => c.isActive),
+  );
 
-  readonly campaignFeaturedProducts = computed(() => {
-    const ids = this.banner()?.featuredProductIds ?? [];
+  featuredProductsFor(campaign: CampaignBannerConfig): Product[] {
+    const ids = campaign.featuredProductIds ?? [];
     if (ids.length === 0) return [];
     const products = this.productService.products();
     return ids
       .map((id) => products.find((p) => p.id === id))
       .filter((p): p is Product => !!p && p.isAvailable);
-  });
+  }
 
   readonly bestsellers = signal<Product[]>([]);
   readonly bestsellersLoading = signal(true);
@@ -90,11 +94,6 @@ export class Home implements OnInit {
     }
     this.checkoutService.addItem(product);
     this.router.navigate(['/checkout']);
-  }
-
-  onImgError(event: Event) {
-    const img = event.target as HTMLImageElement;
-    img.src = '/images/placeholder.svg';
   }
 
   features = [

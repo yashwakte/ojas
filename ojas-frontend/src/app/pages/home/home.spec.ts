@@ -31,7 +31,7 @@ describe('Home', () => {
   const upwasProduct: Product = { ...product, id: 'p2', category: 'Upwas', discount: 0 };
 
   let productsSignal: ReturnType<typeof signal<Product[]>>;
-  let bannerConfigSignal: ReturnType<typeof signal<CampaignBannerConfig | null>>;
+  let campaignsSignal: ReturnType<typeof signal<CampaignBannerConfig[]>>;
   let productServiceSpy: jasmine.SpyObj<ProductService>;
   let cartServiceSpy: jasmine.SpyObj<CartService>;
   let checkoutServiceSpy: jasmine.SpyObj<CheckoutService>;
@@ -41,7 +41,7 @@ describe('Home', () => {
 
   beforeEach(() => {
     productsSignal = signal<Product[]>([product, upwasProduct]);
-    bannerConfigSignal = signal<CampaignBannerConfig | null>(null);
+    campaignsSignal = signal<CampaignBannerConfig[]>([]);
 
     productServiceSpy = jasmine.createSpyObj('ProductService', ['getBestsellers'], {
       products: productsSignal,
@@ -52,7 +52,7 @@ describe('Home', () => {
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
     authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn']);
     authServiceSpy.isLoggedIn.and.returnValue(true);
-    campaignBannerServiceSpy = { config: bannerConfigSignal };
+    campaignBannerServiceSpy = { campaigns: campaignsSignal };
 
     TestBed.configureTestingModule({
       imports: [Home],
@@ -98,21 +98,32 @@ describe('Home', () => {
     expect(fixture.componentInstance.upwasSpecials()).toEqual([upwasProduct]);
   });
 
-  it('campaignFeaturedProducts resolves ids from the banner config against available products', () => {
-    bannerConfigSignal.set({
-      id: 'b1',
-      title: 'Sale',
-      subtitle: '',
-      ctaText: 'Shop',
-      ctaLink: '/products',
-      isActive: true,
-      featuredProductIds: ['p1', 'missing'],
-      fallbackBestsellerProductIds: [],
-      createdAt: '',
-      updatedAt: '',
-    });
+  const makeCampaign = (overrides: Partial<CampaignBannerConfig> = {}): CampaignBannerConfig => ({
+    id: 'b1',
+    title: 'Sale',
+    subtitle: '',
+    ctaText: 'Shop',
+    ctaLink: '/products',
+    backgroundImageUrl: '',
+    isActive: true,
+    featuredSectionTitle: 'This Campaign',
+    featuredProductIds: [],
+    fallbackBestsellerProductIds: [],
+    createdAt: '',
+    updatedAt: '',
+    ...overrides,
+  });
+
+  it('activeCampaigns only includes campaigns with isActive true', () => {
+    campaignsSignal.set([makeCampaign({ id: 'b1', isActive: true }), makeCampaign({ id: 'b2', isActive: false })]);
     const fixture = create();
-    expect(fixture.componentInstance.campaignFeaturedProducts()).toEqual([product]);
+    expect(fixture.componentInstance.activeCampaigns().map((c) => c.id)).toEqual(['b1']);
+  });
+
+  it('featuredProductsFor resolves a campaign\'s ids against available products', () => {
+    const campaign = makeCampaign({ featuredProductIds: ['p1', 'missing'] });
+    const fixture = create();
+    expect(fixture.componentInstance.featuredProductsFor(campaign)).toEqual([product]);
   });
 
   it('addToCart redirects to /login when logged out', () => {
@@ -154,11 +165,4 @@ describe('Home', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
   });
 
-  it('onImgError swaps the image src to the placeholder', () => {
-    const fixture = create();
-    const img = document.createElement('img');
-    img.src = 'http://localhost/broken.jpg';
-    fixture.componentInstance.onImgError({ target: img } as unknown as Event);
-    expect(img.src).toContain('/images/placeholder.svg');
-  });
 });

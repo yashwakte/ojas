@@ -1,0 +1,46 @@
+<a class="pcard-link" [routerLink]="['/products', product().id]">
+  <div class="pimg">
+    <img
+      [src]="product().imageUrl"
+      [alt]="product().name"
+      loading="lazy"
+      (error)="onImgError($event)"
+    />
+    @if (badge()) {
+      <span class="pbadge">{{ badge() }}</span>
+    }
+    <span class="pcat">{{ product().category }}</span>
+  </div>
+  <div class="pbody-top">
+    <h3>{{ product().name }}</h3>
+    <div class="pmeta">
+      <span>{{ product().weight }}</span>
+      <span class="pprice">
+        @if (product().discount && product().discount > 0) {
+          <span class="original-price">₹{{ product().price }}</span>
+          <span class="sale-price"
+            >₹{{ product().price - (product().price * product().discount) / 100 | number: '1.0-0' }}</span
+          >
+          <span class="discount-badge">{{ product().discount }}% OFF</span>
+        } @else {
+          <strong>₹{{ product().price }}</strong>
+        }
+      </span>
+    </div>
+  </div>
+</a>
+<div class="pbody">
+  <div class="pactions">
+    <button
+      class="home-add-cart-btn"
+      [class.added]="justAdded()"
+      (click)="addToCart.emit(product())"
+    >
+      <mat-icon>{{ justAdded() ? 'check' : 'add_shopping_cart' }}</mat-icon>
+      {{ justAdded() ? 'Added' : 'Add' }}
+    </button>
+    <button class="home-buy-now-btn" (click)="buyNow.emit(product())">
+      <mat-icon>bolt</mat-icon> Buy
+    </button>
+  </div>
+</div>
