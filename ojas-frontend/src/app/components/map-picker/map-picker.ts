@@ -25,6 +25,8 @@ const DEFAULT_LNG = 73.8567;
 export class MapPicker implements AfterViewInit, OnDestroy {
   @Input() initialLat: number | null = null;
   @Input() initialLng: number | null = null;
+  @Input() instructionText = 'Drag the map so the pin points to your exact delivery location.';
+  @Input() confirmLabel = 'Confirm Pinned Location';
   @Output() locationConfirmed = new EventEmitter<{ lat: number; lng: number }>();
   @Output() cancelled = new EventEmitter<void>();
 

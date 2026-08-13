@@ -14,6 +14,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { DeliveryChargesConfig, UpdateDeliveryChargesRequest } from '../../models/interfaces';
+import { MapPicker } from '../../components/map-picker/map-picker';
 
 @Component({
   selector: 'app-delivery-charges-management',
@@ -33,6 +34,7 @@ import { DeliveryChargesConfig, UpdateDeliveryChargesRequest } from '../../model
     MatDividerModule,
     MatChipsModule,
     CurrencyPipe,
+    MapPicker,
   ],
   templateUrl: './delivery-charges-management.html',
   styleUrl: './delivery-charges-management.scss',
@@ -47,6 +49,7 @@ export class DeliveryChargesManagement implements OnInit {
 
   readonly editing = signal(false);
   readonly submitting = signal(false);
+  readonly showMapPicker = signal(false);
   readonly testDistance = signal<number | null>(null);
   readonly testResult = signal<{ charge: number; isFree: boolean; breakdown: string } | null>(null);
   readonly testDistanceInput = signal<number | null>(null);
@@ -91,6 +94,7 @@ export class DeliveryChargesManagement implements OnInit {
 
   cancelEditing(): void {
     this.editing.set(false);
+    this.showMapPicker.set(false);
     const cfg = this.config();
     if (cfg) {
       this.formData.set({
@@ -103,6 +107,15 @@ export class DeliveryChargesManagement implements OnInit {
       });
     }
     this.formErrors.set({});
+  }
+
+  onWarehouseLocationConfirmed(location: { lat: number; lng: number }): void {
+    this.formData.update((d) => ({
+      ...d,
+      warehouseLatitude: Math.round(location.lat * 1e6) / 1e6,
+      warehouseLongitude: Math.round(location.lng * 1e6) / 1e6,
+    }));
+    this.showMapPicker.set(false);
   }
 
   validateForm(): boolean {

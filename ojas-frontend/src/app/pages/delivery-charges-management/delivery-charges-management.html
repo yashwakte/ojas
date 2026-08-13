@@ -135,7 +135,33 @@
                 </mat-form-field>
               </div>
 
-              <div class="form-row two-col">
+              <div class="form-row pin-location-block">
+                <p class="pin-location-label">Pin the Warehouse on a Map</p>
+                <p class="section-hint">
+                  This drives the distance calculation customers see at checkout, so pin it precisely.
+                </p>
+                @if (showMapPicker()) {
+                  <app-map-picker
+                    [initialLat]="formData().warehouseLatitude ?? null"
+                    [initialLng]="formData().warehouseLongitude ?? null"
+                    instructionText="Drag the map so the pin points to your warehouse's exact location."
+                    confirmLabel="Confirm Warehouse Location"
+                    (locationConfirmed)="onWarehouseLocationConfirmed($event)"
+                    (cancelled)="showMapPicker.set(false)"
+                  />
+                } @else {
+                  <div class="pin-confirmed">
+                    <mat-icon>location_on</mat-icon>
+                    <span>{{ formatCoordinate(formData().warehouseLatitude ?? 0) }}, {{ formatCoordinate(formData().warehouseLongitude ?? 0) }}</span>
+                    <button type="button" class="change-pin-btn" (click)="showMapPicker.set(true)">
+                      <mat-icon>edit_location_alt</mat-icon>
+                      Change on Map
+                    </button>
+                  </div>
+                }
+              </div>
+
+              <div class="form-row two-col coords-row">
                 <mat-form-field appearance="outline">
                   <mat-label>Latitude</mat-label>
                   <input matInput type="number"
@@ -151,6 +177,7 @@
                   @if (hasError('warehouseLatitude')) {
                     <mat-error>{{ getError('warehouseLatitude') }}</mat-error>
                   }
+                  <mat-hint>Or fine-tune the exact coordinate here</mat-hint>
                 </mat-form-field>
 
                 <mat-form-field appearance="outline">

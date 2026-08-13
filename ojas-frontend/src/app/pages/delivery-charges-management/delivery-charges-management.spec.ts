@@ -104,6 +104,28 @@ describe('DeliveryChargesManagement', () => {
     expect(fixture.componentInstance.formData().freeDeliveryUpToKm).toBe(7);
   });
 
+  it('cancelEditing also closes the map picker', () => {
+    const { fixture } = create();
+    fixture.componentInstance.startEditing();
+    fixture.componentInstance.showMapPicker.set(true);
+
+    fixture.componentInstance.cancelEditing();
+
+    expect(fixture.componentInstance.showMapPicker()).toBeFalse();
+  });
+
+  it('onWarehouseLocationConfirmed updates the form coordinates and closes the picker', () => {
+    const { fixture } = create();
+    fixture.componentInstance.startEditing();
+    fixture.componentInstance.showMapPicker.set(true);
+
+    fixture.componentInstance.onWarehouseLocationConfirmed({ lat: 18.123456789, lng: 73.987654321 });
+
+    expect(fixture.componentInstance.formData().warehouseLatitude).toBe(18.123457);
+    expect(fixture.componentInstance.formData().warehouseLongitude).toBe(73.987654);
+    expect(fixture.componentInstance.showMapPicker()).toBeFalse();
+  });
+
   it('validateForm flags out-of-range latitude/longitude/km/charge values', () => {
     const { fixture } = create();
     fixture.componentInstance.formData.set({

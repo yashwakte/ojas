@@ -313,6 +313,68 @@
   &.full-width {
     width: 100%;
   }
+
+  &.coords-row {
+    margin-top: -4px;
+  }
+}
+
+.pin-location-block {
+  gap: 8px;
+
+  .section-hint {
+    margin: -4px 0 2px;
+  }
+}
+
+.pin-location-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ojas-text);
+}
+
+.pin-confirmed {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-self: flex-start;
+  background: rgba(22, 163, 74, 0.08);
+  color: #16a34a;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: monospace;
+
+  mat-icon {
+    font-size: 1.1rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+  }
+}
+
+.change-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  color: var(--ojas-orange);
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
 }
 
 mat-form-field {
