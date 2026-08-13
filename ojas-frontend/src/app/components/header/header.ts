@@ -9,7 +9,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
-import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
 
 @Component({
   selector: 'app-header',
@@ -27,6 +27,7 @@ import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
   styleUrl: './header.scss',
   host: {
     '[class.scrolled]': 'isScrolled',
+    '[class.customer-area]': 'isCustomerArea()',
   },
 })
 export class Header {
@@ -34,8 +35,10 @@ export class Header {
   isScrolled = false;
   cartBounce = signal(false);
   desktopCategoryOpen = signal(false);
+  categoriesSheetOpen = signal(false);
 
   readonly categories = PRODUCT_CATEGORIES;
+  readonly categoryDetails = PRODUCT_CATEGORY_DETAILS;
 
   private _prevCount = 0;
 
@@ -62,6 +65,16 @@ export class Header {
 
   toggleMenu() {
     this.menuOpen = !this.menuOpen;
+    if (this.menuOpen) {
+      this.categoriesSheetOpen.set(false);
+    }
+  }
+
+  toggleCategoriesSheet(): void {
+    this.categoriesSheetOpen.update((open) => !open);
+    if (this.categoriesSheetOpen()) {
+      this.menuOpen = false;
+    }
   }
 
   openDesktopCategoryMenu(): void {

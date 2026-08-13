@@ -64,6 +64,30 @@ describe('Header', () => {
     expect(header.menuOpen).toBeFalse();
   });
 
+  it('toggleMenu closes the categories sheet when opening', () => {
+    const fixture = create();
+    const header = fixture.componentInstance;
+    header.categoriesSheetOpen.set(true);
+
+    header.toggleMenu();
+
+    expect(header.menuOpen).toBeTrue();
+    expect(header.categoriesSheetOpen()).toBeFalse();
+  });
+
+  it('toggleCategoriesSheet flips the signal and closes the hamburger menu when opening', () => {
+    const fixture = create();
+    const header = fixture.componentInstance;
+    header.menuOpen = true;
+
+    header.toggleCategoriesSheet();
+    expect(header.categoriesSheetOpen()).toBeTrue();
+    expect(header.menuOpen).toBeFalse();
+
+    header.toggleCategoriesSheet();
+    expect(header.categoriesSheetOpen()).toBeFalse();
+  });
+
   it('openDesktopCategoryMenu / closeDesktopCategoryMenu set the signal', () => {
     const fixture = create();
     const header = fixture.componentInstance;

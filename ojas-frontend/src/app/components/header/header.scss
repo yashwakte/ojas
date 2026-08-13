@@ -579,6 +579,7 @@
 
   .header-mobile-right {
     display: flex;
+    margin-left: auto;
   }
 
   .hamburger {
@@ -590,11 +591,229 @@
   }
 
   .header-container {
+    position: relative;
     padding: 0 16px;
     height: 64px;
+    justify-content: flex-end;
+  }
+
+  // Cart/checkout now live in the bottom nav, so the mobile header only has the
+  // hamburger on the right - center the logo in the freed-up space instead of
+  // leaving it pinned to the left.
+  .logo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+
+    // The base :hover rule sets transform: scale(1.02), which - since transform
+    // isn't additive - would replace the centering translate entirely. Touch
+    // browsers apply :hover on tap (and it can stick after navigating), so
+    // tapping the logo would otherwise leave it shifted off-center. Keep the
+    // centering transform on mobile and skip the hover scale, which is a
+    // desktop-only affordance anyway.
+    &:hover {
+      transform: translate(-50%, -50%);
+    }
   }
 
   .logo-img {
-    height: 52px;
+    height: 44px;
+  }
+}
+
+// ===== MOBILE BOTTOM NAV (customer area only) =====
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.08);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 2px;
+  background: none;
+  border: none;
+  border-radius: 12px;
+  color: var(--ojas-text-light);
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  span:last-child {
+    font-size: 0.62rem;
+    font-weight: 600;
+  }
+
+  &.active {
+    color: var(--ojas-orange);
+    background: rgba(242, 90, 26, 0.08);
+  }
+
+  &.cart-bounce {
+    animation: cartPop 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+}
+
+.bottom-nav-icon {
+  position: relative;
+}
+
+.bottom-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 50px;
+  background: #e53935;
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  border: 1.5px solid #fff;
+
+  &.checkout {
+    background: #2e7d32;
+  }
+}
+
+// ===== CATEGORIES SHEET (mobile) =====
+.categories-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.4);
+  animation: fadeIn 0.2s ease both;
+}
+
+.categories-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1002;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+  padding: 4px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.categories-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 10px;
+
+  h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+  }
+}
+
+.categories-sheet-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ojas-text-light);
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.categories-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 8px;
+  padding-bottom: 8px;
+}
+
+.categories-sheet-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--ojas-text);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.categories-sheet-chip-ico {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(150deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
+  box-shadow: 0 6px 16px rgba(242, 90, 26, 0.28);
+
+  mat-icon {
+    font-size: 26px;
+    width: 26px;
+    height: 26px;
+    color: #fff;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }

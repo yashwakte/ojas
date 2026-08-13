@@ -7,7 +7,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { CampaignBannerConfig, Product } from '../../models/interfaces';
-import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
+import { PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
 import { ProductCard } from '../../components/product-card/product-card';
 
 @Component({
@@ -58,14 +58,7 @@ export class Home implements OnInit {
       .slice(0, 8),
   );
 
-  readonly categoryTiles = [
-    { name: 'Flour', icon: 'grain', desc: 'Stone-ground daily' },
-    { name: 'Grains', icon: 'rice_bowl', desc: 'Whole grain goodness' },
-    { name: 'Health Mix', icon: 'favorite', desc: 'Nutrient-rich blends' },
-    { name: 'Upwas', icon: 'self_improvement', desc: 'Fasting friendly' },
-    { name: 'Premium Atta', icon: 'bakery_dining', desc: 'Everyday rotis & bhakris' },
-    { name: 'Powder Box', icon: 'science', desc: 'Kitchen essentials' },
-  ] satisfies { name: (typeof PRODUCT_CATEGORIES)[number]; icon: string; desc: string }[];
+  readonly categoryTiles = PRODUCT_CATEGORY_DETAILS;
 
   ngOnInit(): void {
     this.productService.getBestsellers(6).subscribe({

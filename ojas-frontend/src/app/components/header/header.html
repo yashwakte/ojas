@@ -121,27 +121,8 @@
       }
     </div>
 
-    <!-- Mobile: cart icon(s) + hamburger (hidden on desktop) -->
+    <!-- Mobile: hamburger only (cart/checkout/profile now live in the bottom nav) -->
     <div class="header-mobile-right">
-      @if (auth.isLoggedIn() && auth.role() === 'customer') {
-        <a
-          routerLink="/cart"
-          class="icon-btn cart-btn"
-          [class.cart-bounce]="cartBounce()"
-          aria-label="Cart"
-        >
-          <mat-icon>shopping_cart</mat-icon>
-          @if (cart.items().length > 0) {
-            <span class="icon-badge">{{ cart.items().length }}</span>
-          }
-        </a>
-        @if (activeCheckoutCount() > 0) {
-          <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
-            <mat-icon>shopping_bag</mat-icon>
-            <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
-          </button>
-        }
-      }
       <button
         class="hamburger"
         [class.open]="menuOpen"
@@ -220,3 +201,69 @@
     </nav>
   }
 </header>
+
+<!-- Mobile-only fast-track bottom nav: one tap to every core destination, no hamburger needed -->
+@if (isCustomerArea()) {
+  <nav class="mobile-bottom-nav" aria-label="Shop navigation">
+    <a routerLink="/products" routerLinkActive="active" class="bottom-nav-btn">
+      <mat-icon>grid_view</mat-icon>
+      <span>Products</span>
+    </a>
+    <button
+      type="button"
+      class="bottom-nav-btn"
+      [class.active]="categoriesSheetOpen()"
+      (click)="toggleCategoriesSheet()"
+    >
+      <mat-icon>category</mat-icon>
+      <span>Categories</span>
+    </button>
+    <a routerLink="/cart" routerLinkActive="active" class="bottom-nav-btn" [class.cart-bounce]="cartBounce()">
+      <span class="bottom-nav-icon">
+        <mat-icon>shopping_cart</mat-icon>
+        @if (cart.items().length > 0) {
+          <span class="bottom-nav-badge">{{ cart.items().length }}</span>
+        }
+      </span>
+      <span>Cart</span>
+    </a>
+    <a routerLink="/checkout" routerLinkActive="active" class="bottom-nav-btn">
+      <span class="bottom-nav-icon">
+        <mat-icon>shopping_bag</mat-icon>
+        @if (activeCheckoutCount() > 0) {
+          <span class="bottom-nav-badge checkout">{{ activeCheckoutCount() }}</span>
+        }
+      </span>
+      <span>Checkout</span>
+    </a>
+    <a routerLink="/profile" routerLinkActive="active" class="bottom-nav-btn">
+      <mat-icon>account_circle</mat-icon>
+      <span>Profile</span>
+    </a>
+  </nav>
+
+  @if (categoriesSheetOpen()) {
+    <div class="categories-backdrop" (click)="toggleCategoriesSheet()"></div>
+    <div class="categories-sheet">
+      <div class="categories-sheet-header">
+        <h3>Shop by Category</h3>
+        <button type="button" class="categories-sheet-close" (click)="toggleCategoriesSheet()" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="categories-sheet-grid">
+        @for (c of categoryDetails; track c.name) {
+          <a
+            class="categories-sheet-chip"
+            [routerLink]="['/products']"
+            [queryParams]="{ category: c.name }"
+            (click)="toggleCategoriesSheet()"
+          >
+            <span class="categories-sheet-chip-ico"><mat-icon>{{ c.icon }}</mat-icon></span>
+            <span>{{ c.name }}</span>
+          </a>
+        }
+      </div>
+    </div>
+  }
+}

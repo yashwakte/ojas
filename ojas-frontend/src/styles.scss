@@ -51,6 +51,17 @@ body {
   box-sizing: border-box;
 }
 
+// The customer-area header renders a fixed bottom nav on mobile (see header.scss);
+// keep it from covering the last bit of page content or the footer. app-header
+// and .main-content/app-footer are siblings in app.html, so a sibling selector
+// reaches across the header component's own view-encapsulation boundary.
+@media (max-width: 900px) {
+  app-header.customer-area ~ .main-content,
+  app-header.customer-area ~ app-footer {
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 a {
   text-decoration: none;
   color: inherit;
