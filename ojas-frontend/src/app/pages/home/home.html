@@ -48,7 +48,7 @@
 
   <!-- CAMPAIGN FEATURED PRODUCTS -->
   @if (featuredProductsFor(c).length > 0) {
-    <section class="section products-section campaign-featured-section">
+    <section class="section products-section campaign-featured-section" [appScrollReveal]="0">
       <div class="tag"><span>FEATURED</span></div>
       <h2 class="stitle">Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}</h2>
 
@@ -76,7 +76,7 @@
 }
 
 <!-- MOST LOVED -->
-<section class="section products-section">
+<section class="section products-section" [appScrollReveal]="0">
   <div class="tag"><span>BESTSELLERS</span></div>
   <h2 class="stitle">Most Loved by Our Customers</h2>
 
@@ -109,7 +109,7 @@
 </section>
 
 <!-- WHY OJAS -->
-<section class="section why-section">
+<section class="section why-section" [appScrollReveal]="0">
   <div class="tag"><span>WHY OJAS</span></div>
   <div class="why-scroll">
     @for (f of features; track f.title) {
@@ -126,7 +126,7 @@
 
 <!-- FESTIVE SAVINGS -->
 @if (festiveSavings().length > 0) {
-  <section class="section products-section festive-section">
+  <section class="section products-section festive-section" [appScrollReveal]="0">
     <div class="tag"><span>LIMITED TIME</span></div>
     <h2 class="stitle">Festive Savings</h2>
 
@@ -153,13 +153,18 @@
 }
 
 <!-- SHOP BY CATEGORY -->
-<section class="section category-section">
+<section class="section category-section" [appScrollReveal]="0">
   <div class="tag"><span>CATEGORIES</span></div>
   <h2 class="stitle">Shop by Category</h2>
 
   <div class="category-tiles">
-    @for (c of categoryTiles; track c.name) {
-      <a class="category-tile" [routerLink]="['/products']" [queryParams]="{ category: c.name }">
+    @for (c of categoryTiles; track c.name; let i = $index) {
+      <a
+        class="category-tile"
+        [routerLink]="['/products']"
+        [queryParams]="{ category: c.name }"
+        [appScrollReveal]="i * 70"
+      >
         <div class="category-tile-ico">
           <mat-icon>{{ c.icon }}</mat-icon>
         </div>
@@ -171,7 +176,7 @@
 
 <!-- UPWAS SPECIALS -->
 @if (upwasSpecials().length > 0) {
-  <section class="section products-section upwas-section">
+  <section class="section products-section upwas-section" [appScrollReveal]="0">
     <div class="tag"><span>FASTING SPECIALS</span></div>
     <h2 class="stitle">Upwas Specials</h2>
     <p class="section-subtitle">Pure, grain-free flours crafted for your fasting days</p>
@@ -198,12 +203,12 @@
 }
 
 <!-- PROCESS -->
-<section class="section process-section">
+<section class="section process-section" [appScrollReveal]="0">
   <div class="tag"><span>OUR PROCESS</span></div>
   <h2 class="stitle">From Farm to Your Table</h2>
   <div class="steps">
     @for (s of processSteps; track s.title; let i = $index) {
-      <div class="step">
+      <div class="step" [appScrollReveal]="i * 80">
         <div class="snum">{{ i + 1 }}</div>
         <div class="sico">
           <mat-icon>{{ s.icon }}</mat-icon>
@@ -216,7 +221,7 @@
 </section>
 
 <!-- REVIEWS -->
-<section class="section reviews-section">
+<section class="section reviews-section" [appScrollReveal]="0">
   <div class="tag"><span>REVIEWS</span></div>
   <h2 class="stitle">Loved by Families</h2>
   <div class="rscroll">
@@ -238,7 +243,7 @@
 </section>
 
 <!-- CTA -->
-<section class="cta-section">
+<section class="cta-section" [appScrollReveal]="0">
   <h2>Ready to taste the <span>purity</span>?</h2>
   <p>Join families who trust Ojas for daily nutrition.</p>
   <a routerLink="/register" class="btn-white">Create Account <mat-icon>arrow_forward</mat-icon></a>

@@ -11,7 +11,7 @@
   align-items: center;
   justify-content: center;
   padding: 40px;
-  background: linear-gradient(160deg, var(--ojas-orange), #e04500, var(--ojas-orange-dark));
+  background: linear-gradient(160deg, #f7ece6 0%, #f1e3da 45%, #e7ddd0 100%);
   background-size: 200% 200%;
   animation: gradientFlow 8s ease infinite;
   overflow: hidden;
@@ -30,7 +30,7 @@
   &.orb-1 {
     width: 400px;
     height: 400px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--ojas-blob-rose-1);
     top: -100px;
     right: -50px;
     animation: float 6s ease-in-out infinite;
@@ -39,7 +39,7 @@
   &.orb-2 {
     width: 250px;
     height: 250px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--ojas-blob-sage-1);
     bottom: -80px;
     left: -40px;
     animation: float 8s ease-in-out infinite 1s;
@@ -50,7 +50,7 @@
   position: relative;
   z-index: 2;
   text-align: center;
-  color: #fff;
+  color: var(--ojas-ink);
   max-width: 360px;
   animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -61,7 +61,6 @@
   font-family: 'Poppins', sans-serif;
   display: block;
   margin-bottom: 16px;
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .decor-content h2 {
@@ -88,7 +87,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(10px);
   padding: 12px 20px;
   border-radius: 14px;
@@ -144,7 +144,7 @@
     display: none;
     font-size: 2.5rem;
     font-weight: 700;
-    color: var(--ojas-orange);
+    color: var(--ojas-ink);
     font-family: 'Poppins', sans-serif;
   }
 
@@ -180,7 +180,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--ojas-orange);
+  background: var(--ojas-ink-soft);
   animation: pulse 1s ease-in-out infinite;
 }
 
@@ -264,12 +264,12 @@
   font-size: 0.92rem;
 
   a {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink);
     font-weight: 600;
     transition: color 0.2s;
 
     &:hover {
-      color: var(--ojas-orange-dark);
+      color: var(--ojas-ink-soft);
       text-decoration: underline;
     }
   }

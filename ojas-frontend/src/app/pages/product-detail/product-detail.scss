@@ -22,7 +22,7 @@
     transition: color 0.2s ease;
 
     &:hover {
-      color: var(--ojas-orange);
+      color: var(--ojas-ink);
     }
   }
 
@@ -136,11 +136,11 @@
   }
 
   &:hover {
-    border-color: var(--ojas-orange-light);
+    border-color: var(--ojas-ink-border);
   }
 
   &.active {
-    border-color: var(--ojas-orange);
+    border-color: var(--ojas-ink);
   }
 }
 
@@ -151,8 +151,8 @@
 
 .category-badge {
   display: inline-block;
-  background: rgba(242, 90, 26, 0.08);
-  color: var(--ojas-orange);
+  background: var(--ojas-ink-bg);
+  color: var(--ojas-ink);
   font-size: 0.72rem;
   font-weight: 700;
   padding: 5px 16px;
@@ -212,7 +212,7 @@
   font-family: 'Poppins', sans-serif;
   font-size: 2rem;
   font-weight: 700;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
 
   &.discounted {
     display: flex;
@@ -229,7 +229,7 @@
     .sale-price {
       font-size: 2rem;
       font-weight: 700;
-      color: var(--ojas-orange);
+      color: var(--ojas-ink);
     }
   }
 }
@@ -259,11 +259,11 @@
   color: var(--ojas-text-light);
   margin-bottom: 24px;
   padding: 12px 16px;
-  background: var(--ojas-orange-bg);
+  background: #f7f5f3;
   border-radius: 12px;
 
   mat-icon {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
     font-size: 20px;
     width: 20px;
     height: 20px;
@@ -310,7 +310,7 @@
   gap: 4px;
   background: none;
   border: none;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -324,7 +324,7 @@
   }
 
   &:hover {
-    color: var(--ojas-orange-dark);
+    color: var(--ojas-ink-soft);
   }
 }
 
@@ -370,8 +370,8 @@
   }
 
   &:hover:not(:disabled) {
-    background: var(--ojas-orange-bg);
-    color: var(--ojas-orange);
+    background: var(--ojas-ink-bg);
+    color: var(--ojas-ink);
   }
 
   &:disabled {
@@ -477,14 +477,14 @@
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: var(--ojas-orange-bg);
+  background: #f7f5f3;
   border-radius: 12px;
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--ojas-text);
 
   mat-icon {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
     font-size: 20px;
     width: 20px;
     height: 20px;
@@ -508,7 +508,7 @@
   gap: 14px;
 
   mat-icon {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
     font-size: 24px;
     width: 24px;
     height: 24px;
@@ -564,11 +564,11 @@
   transition: background 0.2s ease;
 
   &:hover {
-    background: #fffaf7;
+    background: #f7f5f3;
   }
 
   > mat-icon:first-child {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
     font-size: 20px;
     width: 20px;
     height: 20px;
@@ -608,7 +608,7 @@
   padding: 14px 16px;
   margin-bottom: 24px;
   border-radius: 12px;
-  background: #fffaf7;
+  background: #f7f5f3;
 
   span {
     display: flex;
@@ -620,7 +620,7 @@
   }
 
   mat-icon {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
     font-size: 17px;
     width: 17px;
     height: 17px;
@@ -643,7 +643,7 @@
     .label-line {
       width: 40px;
       height: 2px;
-      background: var(--ojas-orange);
+      background: var(--ojas-ink);
       border-radius: 2px;
     }
 
@@ -651,7 +651,7 @@
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 3px;
-      color: var(--ojas-orange);
+      color: var(--ojas-ink);
       text-transform: uppercase;
     }
   }
@@ -760,7 +760,7 @@
 .similar-price {
   font-family: 'Poppins', sans-serif;
   font-size: 0.95rem;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
 
   .original {
     font-size: 0.8rem;
@@ -773,7 +773,7 @@
   .sale {
     font-size: 0.95rem;
     font-weight: 700;
-    color: var(--ojas-orange);
+    color: var(--ojas-ink);
   }
 }
 
@@ -818,7 +818,7 @@
     align-items: center;
     gap: 8px;
     padding: 12px 32px;
-    background: var(--ojas-orange);
+    background: var(--ojas-ink);
     color: #fff;
     border: none;
     border-radius: 14px;
@@ -829,8 +829,8 @@
     transition: all 0.3s ease;
 
     &:hover {
-      background: var(--ojas-orange-dark);
-      box-shadow: 0 6px 24px rgba(242, 90, 26, 0.3);
+      background: var(--ojas-ink-soft);
+      box-shadow: 0 6px 24px rgba(45, 45, 45, 0.25);
       transform: translateY(-2px);
     }
   }

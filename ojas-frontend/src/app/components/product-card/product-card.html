@@ -7,7 +7,7 @@
       (error)="onImgError($event)"
     />
     @if (badge()) {
-      <span class="pbadge">{{ badge() }}</span>
+      <span class="pbadge" [class.pbadge--sale]="badge() === 'Sale'">{{ badge() }}</span>
     }
     <span class="pcat">{{ product().category }}</span>
   </div>

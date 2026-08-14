@@ -98,32 +98,32 @@
 
     &:hover,
     &.active {
-      color: var(--ojas-orange);
-      background: rgba(242, 90, 26, 0.05);
+      color: var(--ojas-ink);
+      background: var(--ojas-ink-bg);
 
       mat-icon:first-child {
-        color: var(--ojas-orange);
+        color: var(--ojas-ink);
       }
     }
 
     &.active {
-      background: rgba(242, 90, 26, 0.08);
+      background: var(--ojas-ink-bg);
     }
   }
 }
 
 .nav-accent-pill {
-  background: linear-gradient(120deg, rgba(242, 90, 26, 0.1) 0%, rgba(255, 181, 153, 0.22) 100%) !important;
-  border: 1px solid rgba(242, 90, 26, 0.18);
-  color: var(--ojas-orange) !important;
+  background: var(--ojas-ink-bg) !important;
+  border: 1px solid var(--ojas-ink-border);
+  color: var(--ojas-ink) !important;
   font-weight: 700 !important;
 
   mat-icon:first-child {
-    color: var(--ojas-orange) !important;
+    color: var(--ojas-ink) !important;
   }
 
   &:hover {
-    background: var(--ojas-orange) !important;
+    background: var(--ojas-ink) !important;
     color: #fff !important;
 
     mat-icon:first-child {
@@ -145,7 +145,7 @@
 
   &:hover .nav-dropdown-trigger mat-icon:first-child,
   .nav-dropdown-trigger.active mat-icon:first-child {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink);
   }
 
   .dropdown-caret {
@@ -216,8 +216,8 @@
     transition: all 0.15s ease;
 
     &:hover {
-      color: var(--ojas-orange);
-      background: rgba(242, 90, 26, 0.08);
+      color: var(--ojas-ink);
+      background: var(--ojas-ink-bg);
       padding-left: 18px;
     }
   }
@@ -231,23 +231,23 @@
 }
 
 .login-link {
-  color: var(--ojas-orange) !important;
+  color: var(--ojas-ink) !important;
   font-weight: 600 !important;
 }
 
 .register-btn {
-  background: var(--ojas-orange) !important;
+  background: var(--ojas-ink) !important;
   color: #fff !important;
   padding: 10px 24px !important;
   border-radius: 50px !important;
   font-weight: 600 !important;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  box-shadow: 0 2px 12px rgba(242, 90, 26, 0.2);
+  box-shadow: 0 2px 12px rgba(45, 45, 45, 0.18);
 
   &:hover {
-    background: var(--ojas-orange-dark) !important;
+    background: var(--ojas-ink-soft) !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(242, 90, 26, 0.3) !important;
+    box-shadow: 0 4px 16px rgba(45, 45, 45, 0.26) !important;
   }
 }
 
@@ -283,8 +283,8 @@
   }
 
   &:hover {
-    color: var(--ojas-orange);
-    background: rgba(242, 90, 26, 0.08);
+    color: var(--ojas-ink);
+    background: var(--ojas-ink-bg);
   }
 }
 
@@ -376,10 +376,10 @@
   transition: background 0.2s ease;
 
   &:hover {
-    background: rgba(242, 90, 26, 0.08);
+    background: var(--ojas-ink-bg);
 
     .chevron-icon {
-      color: var(--ojas-orange) !important;
+      color: var(--ojas-ink) !important;
       transform: rotate(180deg);
     }
   }
@@ -389,7 +389,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--ojas-orange);
+  background: var(--ojas-ink);
   color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
@@ -399,7 +399,7 @@
   letter-spacing: 1px;
   font-family: 'Poppins', sans-serif;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(242, 90, 26, 0.35);
+  box-shadow: 0 2px 6px rgba(45, 45, 45, 0.3);
 }
 
 .user-name {
@@ -436,7 +436,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--ojas-orange), var(--ojas-orange-dark));
+  background: linear-gradient(135deg, var(--ojas-ink-soft), var(--ojas-ink));
   color: #fff;
   font-size: 0.85rem;
   font-weight: 700;
@@ -446,7 +446,7 @@
   letter-spacing: 1px;
   font-family: 'Poppins', sans-serif;
   flex-shrink: 0;
-  box-shadow: 0 3px 10px rgba(242, 90, 26, 0.35);
+  box-shadow: 0 3px 10px rgba(45, 45, 45, 0.3);
 }
 
 .menu-user-info {
@@ -501,7 +501,7 @@
   height: 44px;
 
   &:hover {
-    background: rgba(242, 90, 26, 0.08);
+    background: var(--ojas-ink-bg);
   }
 
   .bar {
@@ -527,7 +527,7 @@
     .bar:nth-child(1) {
       transform: translateY(7px) rotate(45deg);
       width: 22px;
-      background: var(--ojas-orange);
+      background: var(--ojas-ink);
     }
     .bar:nth-child(2) {
       opacity: 0;
@@ -536,7 +536,7 @@
     .bar:nth-child(3) {
       transform: translateY(-7px) rotate(-45deg);
       width: 22px;
-      background: var(--ojas-orange);
+      background: var(--ojas-ink);
     }
   }
 }
@@ -558,7 +558,7 @@
     transition: all 0.2s ease;
 
     &:hover {
-      color: var(--ojas-orange);
+      color: var(--ojas-ink);
       padding-left: 8px;
     }
 
@@ -672,8 +672,8 @@
   }
 
   &.active {
-    color: var(--ojas-orange);
-    background: rgba(242, 90, 26, 0.08);
+    color: var(--ojas-ink);
+    background: var(--ojas-ink-bg);
   }
 
   &.cart-bounce {
@@ -780,6 +780,11 @@
   color: var(--ojas-text);
   font-size: 0.74rem;
   font-weight: 600;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:active {
+    transform: scale(0.94);
+  }
 }
 
 .categories-sheet-chip-ico {
@@ -789,8 +794,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(150deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
-  box-shadow: 0 6px 16px rgba(242, 90, 26, 0.28);
+  background: linear-gradient(135deg, #ff9a5c 0%, var(--ojas-orange) 55%, var(--ojas-orange-dark) 100%);
+  box-shadow: 0 6px 16px rgba(242, 90, 26, 0.3);
 
   mat-icon {
     font-size: 26px;

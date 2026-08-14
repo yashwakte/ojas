@@ -29,7 +29,7 @@ import { MatIconModule } from '@angular/material/icon';
           font-size: 4rem;
           width: 4rem;
           height: 4rem;
-          color: var(--ojas-orange);
+          color: var(--ojas-ink-soft);
           display: block;
           margin: 0 auto 16px;
         }

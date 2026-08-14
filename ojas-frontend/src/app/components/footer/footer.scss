@@ -27,7 +27,7 @@
 .footer-logo {
   font-size: 2.2rem;
   font-weight: 700;
-  color: var(--ojas-orange);
+  color: #e8e4df;
   font-family: 'Poppins', sans-serif;
   line-height: 1;
 }
@@ -41,7 +41,7 @@
 }
 
 .footer-tagline {
-  color: var(--ojas-orange-light);
+  color: #a8a29a;
   font-size: 0.82rem;
   margin-bottom: 16px;
   font-weight: 500;
@@ -76,7 +76,7 @@
       font-size: 16px;
       width: 16px;
       height: 16px;
-      color: var(--ojas-orange);
+      color: #e8e4df;
       opacity: 0;
       transition:
         opacity 0.2s ease,
@@ -85,7 +85,7 @@
     }
 
     &:hover {
-      color: var(--ojas-orange);
+      color: #e8e4df;
       padding-left: 4px;
 
       mat-icon {
@@ -118,7 +118,7 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(242, 90, 26, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -128,7 +128,7 @@
     font-size: 18px;
     width: 18px;
     height: 18px;
-    color: var(--ojas-orange);
+    color: #e8e4df;
   }
 }
 
@@ -137,7 +137,7 @@
   transition: color 0.2s;
 
   &:hover {
-    color: var(--ojas-orange);
+    color: #e8e4df;
   }
 }
 
@@ -148,7 +148,7 @@
   color: #666;
 
   .heart {
-    color: var(--ojas-orange);
+    color: #999;
   }
 }
 

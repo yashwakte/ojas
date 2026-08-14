@@ -13,11 +13,11 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  background: linear-gradient(135deg, var(--ojas-orange) 0%, #ff8c42 100%);
+  background: linear-gradient(135deg, #3a3530 0%, #57504a 100%);
   border-radius: 24px;
   padding: 28px 28px;
   color: #fff;
-  box-shadow: 0 8px 32px rgba(242, 90, 26, 0.25);
+  box-shadow: 0 8px 32px rgba(45, 40, 35, 0.25);
 }
 
 .avatar-circle {
@@ -168,7 +168,7 @@
 }
 
 .edit-btn {
-  color: var(--ojas-orange) !important;
+  color: var(--ojas-ink) !important;
 }
 
 // ── Info Rows ────────────────────────────────────────────────────────
@@ -184,7 +184,7 @@
   gap: 14px;
 
   mat-icon {
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
     flex-shrink: 0;
     margin-top: 2px;
   }
@@ -266,8 +266,8 @@
     text-align: left;
 
     &:hover {
-      background: rgba(242, 90, 26, 0.06);
-      color: var(--ojas-orange);
+      background: var(--ojas-ink-bg);
+      color: var(--ojas-ink);
     }
   }
 }
@@ -294,7 +294,7 @@
 }
 
 .save-btn {
-  background: var(--ojas-orange) !important;
+  background: var(--ojas-ink) !important;
   color: #fff !important;
   border-radius: 50px !important;
 }
@@ -325,8 +325,8 @@
   transition: border-color 0.2s;
 
   &.default {
-    border-color: var(--ojas-orange);
-    background: rgba(242, 90, 26, 0.03);
+    border-color: var(--ojas-ink);
+    background: var(--ojas-ink-bg);
   }
 }
 
@@ -343,7 +343,7 @@
 }
 
 .edit-address-btn {
-  color: var(--ojas-orange) !important;
+  color: var(--ojas-ink) !important;
 }
 
 .address-body {
@@ -360,7 +360,7 @@
     font-size: 1rem;
     width: 1rem;
     height: 1rem;
-    color: var(--ojas-orange);
+    color: var(--ojas-ink-soft);
   }
 }
 
@@ -371,7 +371,7 @@
 }
 
 .default-badge {
-  background: var(--ojas-orange);
+  background: var(--ojas-ink);
   color: #fff;
   font-size: 0.68rem;
   font-weight: 700;
@@ -395,7 +395,7 @@
   gap: 6px;
   margin-top: 8px;
   margin-left: 24px;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
   font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
@@ -436,9 +436,9 @@
   align-items: center;
   gap: 8px;
   align-self: flex-start;
-  border: 1.5px dashed var(--ojas-orange);
-  background: rgba(242, 90, 26, 0.05);
-  color: var(--ojas-orange);
+  border: 1.5px dashed var(--ojas-ink-soft);
+  background: var(--ojas-ink-bg);
+  color: var(--ojas-ink);
   border-radius: 12px;
   padding: 10px 16px;
   font-size: 0.85rem;
@@ -469,7 +469,7 @@
 .change-pin-btn {
   border: none;
   background: none;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
   font-weight: 700;
   font-size: 0.8rem;
   text-decoration: underline;
@@ -503,7 +503,7 @@
 
 .spin {
   animation: spin 1s linear infinite;
-  color: var(--ojas-orange) !important;
+  color: var(--ojas-ink-soft) !important;
 }
 @keyframes spin {
   from {

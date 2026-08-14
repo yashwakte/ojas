@@ -83,7 +83,7 @@ mat-icon.mat-badge {
   background: #f1f1f1;
 }
 ::-webkit-scrollbar-thumb {
-  background: #f25a1a;
+  background: #b0b0b0;
   border-radius: 3px;
 }
 
@@ -103,6 +103,23 @@ mat-icon.mat-badge {
   --ojas-shadow-orange: 0 8px 30px rgba(242, 90, 26, 0.2);
   --ojas-radius: 20px;
   --ojas-radius-lg: 28px;
+
+  // Neutral ink tones — used for nav, icons, badges, and other UI that
+  // shouldn't compete with the brand orange reserved for cart/CTA actions.
+  --ojas-ink: #2d2d2d;
+  --ojas-ink-soft: #514c48;
+  --ojas-ink-bg: rgba(45, 45, 45, 0.06);
+  --ojas-ink-border: rgba(45, 45, 45, 0.14);
+
+  // Decorative gradient palette — soft blob backgrounds behind section
+  // headers/heroes, kept separate from the brand orange so it reads as
+  // ambience rather than more brand color.
+  --ojas-blob-rose-1: rgba(244, 199, 196, 0.55);
+  --ojas-blob-rose-2: rgba(250, 224, 205, 0.42);
+  --ojas-blob-sage-1: rgba(174, 196, 152, 0.42);
+  --ojas-blob-sage-2: rgba(203, 217, 181, 0.35);
+  --ojas-blob-cream-1: rgba(255, 224, 189, 0.4);
+  --ojas-blob-cream-2: rgba(255, 240, 222, 0.5);
 }
 
 // ===== GLOBAL ANIMATIONS =====
@@ -235,6 +252,30 @@ mat-icon.mat-badge {
   animation-delay: 0.6s;
 }
 
+// ===== SCROLL REVEAL =====
+// Paired with the ScrollRevealDirective ([appScrollReveal]) — an element
+// starts faded/offset and settles into place the first time it scrolls
+// into view.
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-visible {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 // ===== GLASSMORPHISM =====
 .glass {
   background: rgba(255, 255, 255, 0.7);
@@ -245,7 +286,7 @@ mat-icon.mat-badge {
 
 // ===== SELECTION =====
 ::selection {
-  background: rgba(242, 90, 26, 0.2);
+  background: rgba(45, 45, 45, 0.15);
   color: var(--ojas-text);
 }
 
@@ -289,8 +330,8 @@ mat-icon.mat-badge {
   }
 
   .menu-user-header {
-    background: linear-gradient(135deg, #fff8f4 0%, #ffe8d8 100%);
-    border-bottom: 1px solid rgba(242, 90, 26, 0.1);
+    background: linear-gradient(135deg, #f7f5f3 0%, #ece7e2 100%);
+    border-bottom: 1px solid rgba(45, 45, 45, 0.08);
   }
 
   .mat-mdc-menu-item {
@@ -313,19 +354,19 @@ mat-icon.mat-badge {
     }
 
     &:hover:not([disabled]) {
-      background-color: rgba(242, 90, 26, 0.08) !important;
+      background-color: var(--ojas-ink-bg) !important;
 
       .mdc-list-item__primary-text {
-        color: var(--ojas-orange) !important;
+        color: var(--ojas-ink) !important;
       }
 
       .mat-icon {
-        color: var(--ojas-orange) !important;
+        color: var(--ojas-ink) !important;
       }
     }
 
     .mat-ripple-element {
-      background-color: rgba(242, 90, 26, 0.12) !important;
+      background-color: rgba(45, 45, 45, 0.1) !important;
     }
   }
 

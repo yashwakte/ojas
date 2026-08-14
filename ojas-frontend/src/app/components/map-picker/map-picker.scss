@@ -2,10 +2,10 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1.5px solid rgba(242, 90, 26, 0.25);
+  border: 1.5px solid var(--ojas-ink-border);
   border-radius: 16px;
   padding: 14px;
-  background: #fffaf7;
+  background: #f7f5f3;
 }
 
 .map-picker-header {
@@ -28,9 +28,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1.5px solid var(--ojas-orange);
+  border: 1.5px solid var(--ojas-ink-soft);
   background: #fff;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
   border-radius: 50px;
   padding: 6px 14px;
   font-size: 0.8rem;
@@ -79,7 +79,7 @@
   transform: translate(-50%, -100%);
   pointer-events: none;
   z-index: 500;
-  color: var(--ojas-orange);
+  color: var(--ojas-ink);
 
   mat-icon {
     font-size: 2.6rem;
@@ -112,7 +112,7 @@
   align-items: center;
   gap: 6px;
   border: none;
-  background: var(--ojas-orange);
+  background: var(--ojas-ink);
   color: #fff;
   border-radius: 50px;
   padding: 8px 18px;
