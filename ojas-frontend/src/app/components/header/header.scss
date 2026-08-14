@@ -784,6 +784,10 @@
 
   &:active {
     transform: scale(0.94);
+
+    .categories-sheet-chip-ico {
+      box-shadow: 0 0 0 3px #000;
+    }
   }
 }
 
@@ -794,14 +798,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #ff9a5c 0%, var(--ojas-orange) 55%, var(--ojas-orange-dark) 100%);
-  box-shadow: 0 6px 16px rgba(242, 90, 26, 0.3);
+  background: var(--ojas-orange-light);
+  box-shadow: 0 6px 16px rgba(242, 90, 26, 0.18);
+  transition: box-shadow 0.2s ease;
 
   mat-icon {
     font-size: 26px;
     width: 26px;
     height: 26px;
-    color: #fff;
+    color: var(--ojas-orange-dark);
   }
 }
 

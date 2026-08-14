@@ -44,6 +44,9 @@
         <a routerLink="/offers" routerLinkActive="active" class="nav-accent-pill">
           <mat-icon>local_offer</mat-icon>Offers & Deals</a
         >
+        <a routerLink="/about" routerLinkActive="active">
+          <mat-icon>info</mat-icon>About Us</a
+        >
       </nav>
     }
 
@@ -141,6 +144,7 @@
       @if (isCustomerArea()) {
         <a routerLink="/" (click)="toggleMenu()">Home</a>
         <a routerLink="/products" (click)="toggleMenu()">Products</a>
+        <a routerLink="/about" (click)="toggleMenu()">About Us</a>
       }
       @if (auth.isLoggedIn()) {
         @if (auth.role() === 'customer') {
