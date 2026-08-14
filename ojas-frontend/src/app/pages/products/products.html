@@ -20,7 +20,7 @@
     <div class="category-filter">
       @for (cat of categories; track cat) {
         <button
-          [class.active]="selectedCategory === cat"
+          [class.active]="selectedCategory() === cat"
           (click)="selectCategory(cat)"
           class="filter-chip"
         >
@@ -31,7 +31,7 @@
 
     <!-- Products Grid -->
     <div class="products-grid">
-      @for (product of filteredProducts; track product.id; let i = $index) {
+      @for (product of filteredProducts(); track product.id; let i = $index) {
         <div class="product-card" [style.animation-delay]="i * 0.06 + 's'">
           <a class="product-link" [routerLink]="['/products', product.id]">
             <div class="product-image">
@@ -85,7 +85,7 @@
       }
     </div>
 
-    @if (filteredProducts.length === 0) {
+    @if (filteredProducts().length === 0) {
       <div class="no-products">
         <mat-icon>inventory_2</mat-icon>
         <p>No products found in this category.</p>

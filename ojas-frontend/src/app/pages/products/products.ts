@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -17,10 +18,10 @@ import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
   templateUrl: './products.html',
   styleUrl: './products.scss',
 })
-export class Products implements OnInit {
-  selectedCategory = 'All';
+export class Products {
   categories = ['All', ...PRODUCT_CATEGORIES];
   justAdded = signal<string | null>(null);
+  selectedCategory = signal('All');
 
   constructor(
     private productService: ProductService,
@@ -29,20 +30,26 @@ export class Products implements OnInit {
     private auth: AuthService,
     private route: ActivatedRoute,
     private router: Router,
-  ) {}
-
-  ngOnInit(): void {
-    const category = this.route.snapshot.queryParamMap.get('category');
-    if (category && (this.categories as string[]).includes(category)) {
-      this.selectedCategory = category;
-    }
+  ) {
+    // The router reuses this component instance across /products?category=…
+    // navigations (same route, different query params), so the category
+    // must be read from the live query-param stream rather than a one-time
+    // snapshot in ngOnInit — otherwise clicking a different category in the
+    // navbar while already on this page silently does nothing.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const category = params.get('category');
+      this.selectedCategory.set(
+        category && (this.categories as string[]).includes(category) ? category : 'All',
+      );
+    });
   }
 
-  get filteredProducts(): Product[] {
+  readonly filteredProducts = computed(() => {
     const all = this.productService.products();
-    if (this.selectedCategory === 'All') return all;
-    return all.filter((p) => p.category === this.selectedCategory);
-  }
+    const category = this.selectedCategory();
+    if (category === 'All') return all;
+    return all.filter((p) => p.category === category);
+  });
 
   addToCart(product: Product): void {
     if (!this.auth.isLoggedIn()) {
@@ -69,6 +76,12 @@ export class Products implements OnInit {
   }
 
   selectCategory(cat: string) {
-    this.selectedCategory = cat;
+    // Navigate rather than setting the signal directly, so the URL and the
+    // query-param subscription above stay the single source of truth.
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { category: cat === 'All' ? null : cat },
+      queryParamsHandling: 'merge',
+    });
   }
 }
