@@ -10,6 +10,7 @@ import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
+import { HeaderAddressPicker } from '../header-address-picker/header-address-picker';
 
 @Component({
   selector: 'app-header',
@@ -22,6 +23,7 @@ import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_DETAILS } from '../../constants/pr
     MatMenuModule,
     MatBadgeModule,
     MatDividerModule,
+    HeaderAddressPicker,
   ],
   templateUrl: './header.html',
   styleUrl: './header.scss',

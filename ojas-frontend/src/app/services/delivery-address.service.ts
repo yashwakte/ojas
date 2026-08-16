@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { DeliveryChargeCalculation, SavedAddress } from '../models/interfaces';
 import { AuthService } from './auth.service';
 import { DeliveryChargesService } from './delivery-charges.service';
+import { UserService } from './user.service';
 
 const GUEST_KEY = 'ojas_delivery_address_guest';
 
@@ -14,6 +15,7 @@ const GUEST_KEY = 'ojas_delivery_address_guest';
 export class DeliveryAddressService {
   private readonly auth = inject(AuthService);
   private readonly deliveryCharges = inject(DeliveryChargesService);
+  private readonly users = inject(UserService);
 
   private readonly _selected = signal<SavedAddress | null>(null);
   private readonly _quote = signal<DeliveryChargeCalculation | null>(null);
@@ -36,12 +38,47 @@ export class DeliveryAddressService {
     // estimate survives until they log in at checkout.
     effect(() => {
       const userId = this.auth.user()?.id ?? null;
-      const stored = this.read(this.keyFor(userId));
-      this._selected.set(stored);
-      this._prompted.set(this.readPrompted(userId));
-      if (stored) {
-        this.refreshQuote(stored);
+
+      if (!userId) {
+        const stored = this.read(GUEST_KEY);
+        this._selected.set(stored);
+        this._prompted.set(this.readPrompted(null));
+        if (stored) this.refreshQuote(stored);
+        else this._quote.set(null);
+        return;
+      }
+
+      const ownAddress = this.read(this.keyFor(userId));
+      if (ownAddress) {
+        this._selected.set(ownAddress);
+        this._prompted.set(this.readPrompted(userId));
+        this.refreshQuote(ownAddress);
+        return;
+      }
+
+      // No address of their own yet — a guest who just created an account at
+      // checkout must not lose the address they were already shopping against.
+      const guestAddress = this.read(GUEST_KEY);
+      if (guestAddress) {
+        this._selected.set(guestAddress);
+        this._prompted.set(true);
+        localStorage.setItem(this.keyFor(userId), JSON.stringify(guestAddress));
+        localStorage.removeItem(GUEST_KEY);
+        this.refreshQuote(guestAddress);
+        // Best-effort: carry it into their saved addresses too, so it's there
+        // on the profile page and future orders, not just this session.
+        this.users
+          .saveAddress({
+            label: guestAddress.label,
+            fullAddress: guestAddress.fullAddress,
+            latitude: guestAddress.latitude,
+            longitude: guestAddress.longitude,
+            isDefault: true,
+          })
+          .subscribe({ error: () => {} });
       } else {
+        this._selected.set(null);
+        this._prompted.set(this.readPrompted(userId));
         this._quote.set(null);
       }
     });

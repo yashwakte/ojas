@@ -27,9 +27,17 @@
   padding: 0 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 20px;
   height: 56px;
   transition: height 0.3s ease;
+}
+
+// Logo and the address picker form one cluster on the far left; nav-desktop
+// flows after them, and the actions on the right push themselves to the end
+// with their own margin-left: auto below — so the header reads as two zones
+// (left cluster + nav, then actions) rather than evenly spread stops.
+.header-address {
+  flex-shrink: 0;
 }
 
 :host.scrolled .header-container {
@@ -108,26 +116,6 @@
 
     &.active {
       background: var(--ojas-ink-bg);
-    }
-  }
-}
-
-.nav-accent-pill {
-  background: var(--ojas-ink-bg) !important;
-  border: 1px solid var(--ojas-ink-border);
-  color: var(--ojas-ink) !important;
-  font-weight: 700 !important;
-
-  mat-icon:first-child {
-    color: var(--ojas-ink) !important;
-  }
-
-  &:hover {
-    background: var(--ojas-ink) !important;
-    color: #fff !important;
-
-    mat-icon:first-child {
-      color: #fff !important;
     }
   }
 }
@@ -267,6 +255,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
 }
 
 .header-mobile-right {
@@ -610,8 +599,8 @@
   }
 
   // Cart/checkout now live in the bottom nav, so the mobile header only has the
-  // hamburger on the right - center the logo in the freed-up space instead of
-  // leaving it pinned to the left.
+  // address picker (left) and hamburger (right) in normal flow - center the
+  // logo in the freed-up middle space instead of leaving it pinned to the left.
   .logo {
     position: absolute;
     left: 50%;
@@ -631,6 +620,15 @@
 
   .logo-img {
     height: 44px;
+  }
+
+  // Taken out of flex flow so it anchors to the true left edge rather than
+  // being squeezed against the hamburger by justify-content: flex-end.
+  .header-address {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
   }
 }
 

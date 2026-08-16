@@ -12,6 +12,7 @@ import {
   DEFAULT_STATE,
   SERVICEABLE_STATES,
   citiesForState,
+  isValidPunePincode,
 } from '../../constants/serviceable-locations';
 
 /**
@@ -55,7 +56,7 @@ export class AddressPicker {
       !!this.pinned() &&
       this.houseNo.trim().length > 0 &&
       this.area.trim().length > 0 &&
-      this.pincode.trim().length === 6,
+      isValidPunePincode(this.pincode.trim()),
   );
 
   constructor() {

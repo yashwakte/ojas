@@ -4,6 +4,10 @@
       <img src="/images/logo.png" alt="Ojas - शुद्ध आहार...शुद्ध विचार" class="logo-img" />
     </a>
 
+    @if (isCustomerArea()) {
+      <app-header-address-picker class="header-address" />
+    }
+
     <!-- Desktop nav links only -->
     @if (isCustomerArea()) {
       <nav class="nav-desktop">
@@ -41,9 +45,6 @@
             }
           </div>
         </div>
-        <a routerLink="/offers" routerLinkActive="active" class="nav-accent-pill">
-          <mat-icon>local_offer</mat-icon>Offers & Deals</a
-        >
         <a routerLink="/about" routerLinkActive="active">
           <mat-icon>info</mat-icon>About Us</a
         >
@@ -52,26 +53,26 @@
 
     <!-- Desktop right: icons + user menu (hidden on mobile) -->
     <div class="header-right">
-      @if (auth.isLoggedIn()) {
-        @if (auth.role() === 'customer') {
-          <a
-            routerLink="/cart"
-            class="icon-btn cart-btn"
-            [class.cart-bounce]="cartBounce()"
-            aria-label="Cart"
-          >
-            <mat-icon>shopping_cart</mat-icon>
-            @if (cart.items().length > 0) {
-              <span class="icon-badge">{{ cart.items().length }}</span>
-            }
-          </a>
-          @if (activeCheckoutCount() > 0) {
-            <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
-              <mat-icon>shopping_bag</mat-icon>
-              <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
-            </button>
+      @if (isCustomerArea()) {
+        <a
+          routerLink="/cart"
+          class="icon-btn cart-btn"
+          [class.cart-bounce]="cartBounce()"
+          aria-label="Cart"
+        >
+          <mat-icon>shopping_cart</mat-icon>
+          @if (cart.items().length > 0) {
+            <span class="icon-badge">{{ cart.items().length }}</span>
           }
+        </a>
+        @if (activeCheckoutCount() > 0) {
+          <button class="icon-btn checkout-bag-btn" (click)="goToCheckout()" aria-label="Checkout">
+            <mat-icon>shopping_bag</mat-icon>
+            <span class="icon-badge checkout-badge">{{ activeCheckoutCount() }}</span>
+          </button>
         }
+      }
+      @if (auth.isLoggedIn()) {
         <button [matMenuTriggerFor]="userMenu" class="user-btn">
           <div class="user-avatar">{{ getInitials() }}</div>
           <span class="user-name">{{ (auth.user()?.fullName ?? '').split(' ')[0] }}</span>
@@ -94,10 +95,6 @@
             <a mat-menu-item routerLink="/my-orders">
               <mat-icon>receipt_long</mat-icon>
               <span>Your Orders</span>
-            </a>
-            <a mat-menu-item routerLink="/offers">
-              <mat-icon>local_offer</mat-icon>
-              <span>Offers &amp; Deals</span>
             </a>
           }
           @if (auth.isAdmin()) {
@@ -168,12 +165,6 @@
               >receipt_long</mat-icon
             >
             Your Orders
-          </a>
-          <a routerLink="/offers" (click)="toggleMenu()">
-            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
-              >local_offer</mat-icon
-            >
-            Offers &amp; Deals
           </a>
         }
         @if (auth.isAdmin()) {

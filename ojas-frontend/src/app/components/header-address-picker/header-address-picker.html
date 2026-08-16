@@ -1,0 +1,45 @@
+<div class="hap">
+  <button type="button" class="hap-trigger" [class.open]="open()" (click)="toggle()">
+    <mat-icon class="hap-pin">location_on</mat-icon>
+    <span class="hap-text">
+      @if (deliveryAddress.selected(); as addr) {
+        <span class="hap-label">Deliver to</span>
+        <span class="hap-value">{{ addr.label }}</span>
+      } @else {
+        <span class="hap-value hap-placeholder">Select address</span>
+      }
+    </span>
+    <mat-icon class="hap-chevron">expand_more</mat-icon>
+  </button>
+
+  @if (open()) {
+    <div class="hap-panel" role="menu">
+      @if (loadingSaved()) {
+        <p class="hap-muted">Loading your addresses…</p>
+      } @else if (savedAddresses().length > 0) {
+        @for (addr of savedAddresses(); track addr.label) {
+          <button
+            type="button"
+            class="hap-option"
+            [class.active]="deliveryAddress.selected()?.label === addr.label"
+            (click)="choose(addr)"
+          >
+            <mat-icon>{{ addr.isDefault ? 'home' : 'location_on' }}</mat-icon>
+            <span class="hap-option-text">
+              <strong>{{ addr.label }}</strong>
+              <small>{{ addr.fullAddress }}</small>
+            </span>
+            @if (deliveryAddress.selected()?.label === addr.label) {
+              <mat-icon class="hap-check">check</mat-icon>
+            }
+          </button>
+        }
+      } @else {
+        <p class="hap-muted">No saved addresses yet.</p>
+      }
+      <button type="button" class="hap-add" (click)="addNew()">
+        <mat-icon>add_location_alt</mat-icon> Add new address
+      </button>
+    </div>
+  }
+</div>
