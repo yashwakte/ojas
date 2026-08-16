@@ -20,3 +20,17 @@ export const DEFAULT_CITY = 'Pune';
 export function citiesForState(state: string): readonly string[] {
   return CITIES_BY_STATE[state] ?? [];
 }
+
+/**
+ * Pune's postal codes run 411001–411062. The geofence is still the real
+ * enforcement (see the module comment above) — this just stops an
+ * out-of-town pincode from being saved in the first place.
+ */
+const PUNE_PINCODE_MIN = 411001;
+const PUNE_PINCODE_MAX = 411062;
+
+export function isValidPunePincode(pincode: string): boolean {
+  if (!/^\d{6}$/.test(pincode)) return false;
+  const value = Number(pincode);
+  return value >= PUNE_PINCODE_MIN && value <= PUNE_PINCODE_MAX;
+}

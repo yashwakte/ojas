@@ -35,14 +35,16 @@
               />
               <span class="check-custom"></span>
             </label>
-            <div class="item-img">
-              <img [src]="item.product.imageUrl" [alt]="item.product.name" />
-            </div>
-            <div class="item-details">
-              <h4>{{ item.product.name }}</h4>
-              <span class="item-weight">{{ item.product.weight }}</span>
-              <span class="item-price">₹{{ item.product.price }} each</span>
-            </div>
+            <a class="item-link" [routerLink]="['/products', item.product.id]">
+              <div class="item-img">
+                <img [src]="item.product.imageUrl" [alt]="item.product.name" />
+              </div>
+              <div class="item-details">
+                <h4>{{ item.product.name }}</h4>
+                <span class="item-weight">{{ item.product.weight }}</span>
+                <span class="item-price">₹{{ item.product.price }} each</span>
+              </div>
+            </a>
             <div class="qty-controls">
               <button class="qty-btn" (click)="decreaseQty(item.product.id, item.quantity)">
                 <mat-icon>remove</mat-icon>

@@ -18,6 +18,7 @@ import {
   DEFAULT_STATE,
   SERVICEABLE_STATES,
   citiesForState,
+  isValidPunePincode,
 } from '../../constants/serviceable-locations';
 
 @Component({
@@ -137,7 +138,7 @@ export class Checkout implements OnInit {
       this.area.trim() &&
       this.city.trim() &&
       this.state &&
-      this.pincode.trim().length === 6 &&
+      isValidPunePincode(this.pincode.trim()) &&
       this.manualLat !== null &&
       this.manualLng !== null
     );

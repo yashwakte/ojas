@@ -13,7 +13,13 @@ import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
-import { INDIAN_STATES } from '../../constants/indian-states';
+import {
+  DEFAULT_CITY,
+  DEFAULT_STATE,
+  SERVICEABLE_STATES,
+  citiesForState,
+  isValidPunePincode,
+} from '../../constants/serviceable-locations';
 
 @Component({
   selector: 'app-profile',
@@ -51,8 +57,8 @@ export class Profile implements OnInit {
   newStreet = '';
   newArea = '';
   newLandmark = '';
-  newCity = '';
-  newState = '';
+  newCity = DEFAULT_CITY;
+  newState = DEFAULT_STATE;
   newPincode = '';
   newLat: number | null = null;
   newLng: number | null = null;
@@ -67,8 +73,8 @@ export class Profile implements OnInit {
   editStreet = '';
   editArea = '';
   editLandmark = '';
-  editCity = '';
-  editState = '';
+  editCity = DEFAULT_CITY;
+  editState = DEFAULT_STATE;
   editPincode = '';
   editLat: number | null = null;
   editLng: number | null = null;
@@ -76,23 +82,12 @@ export class Profile implements OnInit {
   editIsDefault = false;
   savingEditAddress = signal(false);
 
-  readonly indianStates = INDIAN_STATES;
+  readonly serviceableStates = SERVICEABLE_STATES;
 
   private snackBar = inject(MatSnackBar);
 
-  // State filtering using signals for performance
-  newStateQuery = signal('');
-  editStateQuery = signal('');
-
-  readonly filteredNewStates = computed(() => {
-    const q = this.newStateQuery().toLowerCase();
-    return INDIAN_STATES.filter((s) => s.toLowerCase().includes(q));
-  });
-
-  readonly filteredEditStates = computed(() => {
-    const q = this.editStateQuery().toLowerCase();
-    return INDIAN_STATES.filter((s) => s.toLowerCase().includes(q));
-  });
+  readonly newCities = computed(() => citiesForState(this.newState));
+  readonly editCities = computed(() => citiesForState(this.editState));
 
   constructor(
     public auth: AuthService,
@@ -156,29 +151,17 @@ export class Profile implements OnInit {
       });
   }
 
-  filterNewStates(value: string): void {
-    this.newStateQuery.set(value);
-  }
-
-  filterEditStates(value: string): void {
-    this.editStateQuery.set(value);
-  }
-
-  onStateFocus(type: 'new' | 'edit'): void {
-    if (type === 'new') {
-      this.newStateQuery.set('');
-    } else {
-      this.editStateQuery.set('');
+  onNewStateChange(): void {
+    const cities = citiesForState(this.newState);
+    if (!cities.includes(this.newCity)) {
+      this.newCity = cities[0] ?? '';
     }
   }
 
-  selectState(type: 'new' | 'edit', state: string): void {
-    if (type === 'new') {
-      this.newState = state;
-      this.newStateQuery.set('');
-    } else {
-      this.editState = state;
-      this.editStateQuery.set('');
+  onEditStateChange(): void {
+    const cities = citiesForState(this.editState);
+    if (!cities.includes(this.editCity)) {
+      this.editCity = cities[0] ?? '';
     }
   }
 
@@ -189,8 +172,8 @@ export class Profile implements OnInit {
       this.newStreet.trim() &&
       this.newArea.trim() &&
       this.newCity.trim() &&
-      INDIAN_STATES.includes(this.newState as any) &&
-      this.newPincode.trim().length === 6 &&
+      (SERVICEABLE_STATES as readonly string[]).includes(this.newState) &&
+      isValidPunePincode(this.newPincode.trim()) &&
       this.newLat !== null &&
       this.newLng !== null
     );
@@ -234,14 +217,13 @@ export class Profile implements OnInit {
     this.newStreet = '';
     this.newArea = '';
     this.newLandmark = '';
-    this.newCity = '';
-    this.newState = '';
+    this.newCity = DEFAULT_CITY;
+    this.newState = DEFAULT_STATE;
     this.newPincode = '';
     this.newLat = null;
     this.newLng = null;
     this.showNewMapPicker.set(false);
     this.newIsDefault = false;
-    this.newStateQuery.set('');
   }
 
   deleteAddress(index: number): void {
@@ -257,8 +239,8 @@ export class Profile implements OnInit {
       this.editStreet.trim() &&
       this.editArea.trim() &&
       this.editCity.trim() &&
-      INDIAN_STATES.includes(this.editState as any) &&
-      this.editPincode.trim().length === 6 &&
+      (SERVICEABLE_STATES as readonly string[]).includes(this.editState) &&
+      isValidPunePincode(this.editPincode.trim()) &&
       this.editLat !== null &&
       this.editLng !== null
     );
@@ -282,8 +264,8 @@ export class Profile implements OnInit {
     this.editStreet = '';
     this.editArea = '';
     this.editLandmark = '';
-    this.editCity = '';
-    this.editState = '';
+    this.editCity = DEFAULT_CITY;
+    this.editState = DEFAULT_STATE;
     this.editPincode = '';
 
     const parts = fullAddress.split(', ');
@@ -323,14 +305,13 @@ export class Profile implements OnInit {
     this.editStreet = '';
     this.editArea = '';
     this.editLandmark = '';
-    this.editCity = '';
-    this.editState = '';
+    this.editCity = DEFAULT_CITY;
+    this.editState = DEFAULT_STATE;
     this.editPincode = '';
     this.editLat = null;
     this.editLng = null;
     this.showEditMapPicker.set(false);
     this.editIsDefault = false;
-    this.editStateQuery.set('');
   }
 
   saveEditAddress(): void {

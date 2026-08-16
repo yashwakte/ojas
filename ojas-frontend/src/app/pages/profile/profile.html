@@ -151,36 +151,31 @@
                     <input matInput [(ngModel)]="editLandmark" placeholder="e.g. Near D-Mart Sanghvi" />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
-                    <mat-label>City *</mat-label>
-                    <input matInput [(ngModel)]="editCity" placeholder="e.g. Pune" />
+                    <mat-label>State *</mat-label>
+                    <mat-select [(ngModel)]="editState" (selectionChange)="onEditStateChange()">
+                      @for (s of serviceableStates; track s) {
+                        <mat-option [value]="s">{{ s }}</mat-option>
+                      }
+                    </mat-select>
                   </mat-form-field>
-                  <div class="state-picker">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>State *</mat-label>
-                      <input
-                        matInput
-                        [(ngModel)]="editState"
-                        (ngModelChange)="filterEditStates($event)"
-                        placeholder="Search state..."
-                        autocomplete="off"
-                      />
-                    </mat-form-field>
-                    @if (editStateQuery() && filteredEditStates().length > 0) {
-                      <div class="state-list">
-                        @for (s of filteredEditStates(); track s) {
-                          <button type="button" class="state-option" (mousedown)="selectState('edit', s)">{{ s }}</button>
-                        }
-                      </div>
-                    }
-                  </div>
+                  <mat-form-field appearance="outline">
+                    <mat-label>City *</mat-label>
+                    <mat-select [(ngModel)]="editCity">
+                      @for (c of editCities(); track c) {
+                        <mat-option [value]="c">{{ c }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
                 <mat-form-field appearance="outline" class="pincode-field">
                   <mat-label>Pincode *</mat-label>
                   <input
                     matInput
                     [(ngModel)]="editPincode"
-                    placeholder="6-digit pincode"
+                    placeholder="6-digit Pune pincode"
+                    inputmode="numeric"
                     maxlength="6"
                   />
+                  <mat-hint>Pune pincodes only (411001–411062)</mat-hint>
                 </mat-form-field>
                 </div>
                 <div class="pin-location-block">
@@ -293,36 +288,31 @@
               <input matInput [(ngModel)]="newLandmark" placeholder="e.g. Near D-Mart Sanghvi" />
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>City *</mat-label>
-              <input matInput [(ngModel)]="newCity" placeholder="e.g. Pune" />
+              <mat-label>State *</mat-label>
+              <mat-select [(ngModel)]="newState" (selectionChange)="onNewStateChange()">
+                @for (s of serviceableStates; track s) {
+                  <mat-option [value]="s">{{ s }}</mat-option>
+                }
+              </mat-select>
             </mat-form-field>
-            <div class="state-picker">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>State *</mat-label>
-                <input
-                  matInput
-                  [(ngModel)]="newState"
-                  (ngModelChange)="filterNewStates($event)"
-                  placeholder="Search state..."
-                  autocomplete="off"
-                />
-              </mat-form-field>
-              @if (newStateQuery() && filteredNewStates().length > 0) {
-                <div class="state-list">
-                  @for (s of filteredNewStates(); track s) {
-                    <button type="button" class="state-option" (mousedown)="selectState('new', s)">{{ s }}</button>
-                  }
-                </div>
-              }
-            </div>
+            <mat-form-field appearance="outline">
+              <mat-label>City *</mat-label>
+              <mat-select [(ngModel)]="newCity">
+                @for (c of newCities(); track c) {
+                  <mat-option [value]="c">{{ c }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
             <mat-form-field appearance="outline" class="pincode-field">
               <mat-label>Pincode *</mat-label>
               <input
                 matInput
                 [(ngModel)]="newPincode"
-                placeholder="6-digit pincode"
+                placeholder="6-digit Pune pincode"
+                inputmode="numeric"
                 maxlength="6"
               />
+              <mat-hint>Pune pincodes only (411001–411062)</mat-hint>
             </mat-form-field>
           </div>
 
