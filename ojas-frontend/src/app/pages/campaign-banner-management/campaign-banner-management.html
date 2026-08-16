@@ -177,22 +177,14 @@
           @if (formData().title) {
             <div class="banner-preview" [class.inactive]="!formData().isActive">
               <p class="preview-label">Live Preview — exactly how it'll look on the home page</p>
-              <div class="preview-banner" [class.has-bg]="formData().backgroundImageUrl">
-                @if (formData().backgroundImageUrl) {
-                  <div class="preview-banner-media">
-                    <img class="preview-banner-img" [src]="formData().backgroundImageUrl" alt="" />
-                  </div>
-                }
-                <div class="preview-banner-content">
-                  <h3>{{ formData().title }}</h3>
-                  @if (formData().subtitle) {
-                    <p>{{ formData().subtitle }}</p>
-                  }
-                  @if (formData().ctaText) {
-                    <span class="preview-cta">{{ formData().ctaText }}</span>
-                  }
-                </div>
-              </div>
+              <app-campaign-banner
+                [title]="formData().title ?? ''"
+                [subtitle]="formData().subtitle ?? ''"
+                [ctaText]="formData().ctaText ?? ''"
+                [ctaLink]="formData().ctaLink ?? ''"
+                [backgroundImageUrl]="formData().backgroundImageUrl ?? ''"
+                [preview]="true"
+              />
             </div>
           }
 

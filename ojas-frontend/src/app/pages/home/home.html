@@ -29,22 +29,13 @@
 
 <!-- CAMPAIGNS (each active campaign renders its own banner + featured row) -->
 @for (c of activeCampaigns(); track c.id) {
-  <section class="campaign-banner" [class.has-bg-image]="c.backgroundImageUrl">
-    @if (c.backgroundImageUrl) {
-      <div class="campaign-banner-media">
-        <img class="campaign-banner-img" [src]="c.backgroundImageUrl" alt="" />
-      </div>
-    }
-    <div class="campaign-banner-inner">
-      <h2>{{ c.title }}</h2>
-      @if (c.subtitle) {
-        <p>{{ c.subtitle }}</p>
-      }
-      @if (c.ctaText) {
-        <a [routerLink]="c.ctaLink || '/products'" class="btn-white">{{ c.ctaText }} <mat-icon>arrow_forward</mat-icon></a>
-      }
-    </div>
-  </section>
+  <app-campaign-banner
+    [title]="c.title"
+    [subtitle]="c.subtitle"
+    [ctaText]="c.ctaText"
+    [ctaLink]="c.ctaLink"
+    [backgroundImageUrl]="c.backgroundImageUrl"
+  />
 
   <!-- CAMPAIGN FEATURED PRODUCTS -->
   @if (featuredProductsFor(c).length > 0) {

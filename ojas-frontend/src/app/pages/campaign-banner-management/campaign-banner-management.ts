@@ -13,6 +13,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { ProductService } from '../../services/product.service';
 import { CampaignBannerConfig, UpdateCampaignBannerRequest } from '../../models/interfaces';
+import { CampaignBanner } from '../../components/campaign-banner/campaign-banner';
 
 function emptyFormData(): UpdateCampaignBannerRequest {
   return {
@@ -43,6 +44,7 @@ function emptyFormData(): UpdateCampaignBannerRequest {
     MatSnackBarModule,
     MatSlideToggleModule,
     MatChipsModule,
+    CampaignBanner,
   ],
   templateUrl: './campaign-banner-management.html',
   styleUrl: './campaign-banner-management.scss',

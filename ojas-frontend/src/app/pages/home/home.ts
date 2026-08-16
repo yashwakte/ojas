@@ -10,10 +10,11 @@ import { CampaignBannerConfig, Product } from '../../models/interfaces';
 import { PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
 import { ProductCard } from '../../components/product-card/product-card';
 import { ScrollRevealDirective } from '../../directives/scroll-reveal.directive';
+import { CampaignBanner } from '../../components/campaign-banner/campaign-banner';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, MatIconModule, ProductCard, ScrollRevealDirective],
+  imports: [RouterLink, MatIconModule, ProductCard, ScrollRevealDirective, CampaignBanner],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
