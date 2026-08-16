@@ -189,6 +189,7 @@
                     <app-map-picker
                       [initialLat]="editLat"
                       [initialLng]="editLng"
+                      [enforceServiceArea]="true"
                       (locationConfirmed)="onEditLocationConfirmed($event)"
                       (cancelled)="showEditMapPicker.set(false)"
                     />
@@ -331,6 +332,7 @@
               <app-map-picker
                 [initialLat]="newLat"
                 [initialLng]="newLng"
+                [enforceServiceArea]="true"
                 (locationConfirmed)="onNewLocationConfirmed($event)"
                 (cancelled)="showNewMapPicker.set(false)"
               />

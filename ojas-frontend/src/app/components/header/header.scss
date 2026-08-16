@@ -194,6 +194,18 @@
     border-radius: 2px 0 0 0;
   }
 
+  // Invisible bridge across the 10px gap above this panel. Without it the
+  // pointer leaves .nav-dropdown on its way down from the trigger, mouseleave
+  // fires, and the menu closes before it can be reached.
+  &::after {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 12px;
+  }
+
   .nav-dropdown-heading {
     display: block;
     padding: 6px 14px 8px;
