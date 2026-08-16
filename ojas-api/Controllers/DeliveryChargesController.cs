@@ -43,7 +43,12 @@ public class DeliveryChargesController : ControllerBase
     [HttpGet("calculate")]
     public async Task<ActionResult<DeliveryChargeCalculationResponse>> Calculate([FromQuery] double latitude, [FromQuery] double longitude)
     {
-        var (distanceKm, charge, isFree) = await _deliveryChargesService.CalculateDeliveryChargeAsync(latitude, longitude);
-        return Ok(new DeliveryChargeCalculationResponse(distanceKm, charge, isFree));
+        var quote = await _deliveryChargesService.CalculateDeliveryChargeAsync(latitude, longitude);
+        return Ok(new DeliveryChargeCalculationResponse(
+            quote.DistanceKm,
+            quote.Charge,
+            quote.IsFree,
+            quote.IsServiceable,
+            quote.MaxRadiusKm));
     }
 }

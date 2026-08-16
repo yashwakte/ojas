@@ -24,6 +24,12 @@ public class DeliveryCharges
     [BsonElement("perKmChargeAfterFree")]
     public decimal PerKmChargeAfterFree { get; set; }
 
+    // Serviceable radius from the warehouse. Orders pinned beyond this are
+    // refused outright, which is how the Pune-only restriction is enforced.
+    // 0 or less means "no limit", so existing configs keep working unchanged.
+    [BsonElement("maxDeliveryRadiusKm")]
+    public double MaxDeliveryRadiusKm { get; set; }
+
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 

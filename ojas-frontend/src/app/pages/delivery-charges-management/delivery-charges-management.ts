@@ -51,7 +51,12 @@ export class DeliveryChargesManagement implements OnInit {
   readonly submitting = signal(false);
   readonly showMapPicker = signal(false);
   readonly testDistance = signal<number | null>(null);
-  readonly testResult = signal<{ charge: number; isFree: boolean; breakdown: string } | null>(null);
+  readonly testResult = signal<{
+    charge: number;
+    isFree: boolean;
+    breakdown: string;
+    isServiceable: boolean;
+  } | null>(null);
   readonly testDistanceInput = signal<number | null>(null);
 
   readonly formData = signal<UpdateDeliveryChargesRequest>({
@@ -60,6 +65,7 @@ export class DeliveryChargesManagement implements OnInit {
     warehouseLongitude: 73.7793,
     freeDeliveryUpToKm: 7,
     perKmChargeAfterFree: 10,
+    maxDeliveryRadiusKm: 25,
     isActive: true,
   });
 
@@ -77,6 +83,7 @@ export class DeliveryChargesManagement implements OnInit {
           warehouseLongitude: cfg.warehouseLongitude,
           freeDeliveryUpToKm: cfg.freeDeliveryUpToKm,
           perKmChargeAfterFree: cfg.perKmChargeAfterFree,
+          maxDeliveryRadiusKm: cfg.maxDeliveryRadiusKm,
           isActive: cfg.isActive,
         });
       }
@@ -103,6 +110,7 @@ export class DeliveryChargesManagement implements OnInit {
         warehouseLongitude: cfg.warehouseLongitude,
         freeDeliveryUpToKm: cfg.freeDeliveryUpToKm,
         perKmChargeAfterFree: cfg.perKmChargeAfterFree,
+        maxDeliveryRadiusKm: cfg.maxDeliveryRadiusKm,
         isActive: cfg.isActive,
       });
     }
@@ -157,6 +165,21 @@ export class DeliveryChargesManagement implements OnInit {
         errors.perKmChargeAfterFree = 'Per km charge must be 0 or greater';
       } else if (data.perKmChargeAfterFree > 1000) {
         errors.perKmChargeAfterFree = 'Per km charge seems too high (max ₹1000/km)';
+      }
+    }
+
+    if (data.maxDeliveryRadiusKm !== undefined) {
+      if (isNaN(data.maxDeliveryRadiusKm) || data.maxDeliveryRadiusKm < 0) {
+        errors.maxDeliveryRadiusKm = 'Delivery radius must be 0 or greater (0 = no limit)';
+      } else if (data.maxDeliveryRadiusKm > 500) {
+        errors.maxDeliveryRadiusKm = 'Delivery radius seems too high (max 500 km)';
+      } else if (
+        data.maxDeliveryRadiusKm > 0 &&
+        data.freeDeliveryUpToKm !== undefined &&
+        data.maxDeliveryRadiusKm < data.freeDeliveryUpToKm
+      ) {
+        errors.maxDeliveryRadiusKm =
+          'Delivery radius cannot be smaller than the free-delivery distance';
       }
     }
 
@@ -216,6 +239,7 @@ export class DeliveryChargesManagement implements OnInit {
     const result = this.deliveryChargesService.calculateDeliveryCharge(distance, {
       freeDeliveryUpToKm: data.freeDeliveryUpToKm ?? 0,
       perKmChargeAfterFree: data.perKmChargeAfterFree ?? 0,
+      maxDeliveryRadiusKm: data.maxDeliveryRadiusKm ?? 0,
       isActive: data.isActive ?? true,
     });
     this.testResult.set(result);
@@ -244,6 +268,9 @@ export class DeliveryChargesManagement implements OnInit {
     }
     if (data.perKmChargeAfterFree !== undefined) {
       sanitized.perKmChargeAfterFree = Math.round(data.perKmChargeAfterFree * 100) / 100;
+    }
+    if (data.maxDeliveryRadiusKm !== undefined) {
+      sanitized.maxDeliveryRadiusKm = Math.round(data.maxDeliveryRadiusKm * 10) / 10;
     }
     if (data.isActive !== undefined) {
       sanitized.isActive = data.isActive;

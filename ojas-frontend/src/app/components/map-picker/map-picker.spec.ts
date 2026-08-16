@@ -66,14 +66,46 @@ describe('MapPicker', () => {
   it('useCurrentLocation() failure sets locateError and locating false', () => {
     spyOn(navigator.geolocation, 'getCurrentPosition').and.callFake(
       (_success: PositionCallback, error?: PositionErrorCallback) => {
-        error?.({ code: 1, message: 'denied' } as GeolocationPositionError);
+        // A real GeolocationPositionError carries these constants; the component
+        // distinguishes a denied permission from a failed fix by them.
+        error?.({
+          code: 1,
+          message: 'denied',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
       },
     );
     const fixture = create();
     fixture.detectChanges();
 
     expect(fixture.componentInstance.locating()).toBeFalse();
-    expect(fixture.componentInstance.locateError()).toBe('Could not access your location. Please pin it manually.');
+    expect(fixture.componentInstance.locateError()).toBe(
+      'Location permission denied. Search for your area or pin it manually.',
+    );
+
+    fixture.destroy();
+  });
+
+  it('useCurrentLocation() reports a vague fix differently from a denied one', () => {
+    spyOn(navigator.geolocation, 'getCurrentPosition').and.callFake(
+      (_success: PositionCallback, error?: PositionErrorCallback) => {
+        error?.({
+          code: 3,
+          message: 'timeout',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
+      },
+    );
+    const fixture = create();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.locateError()).toBe(
+      'Could not get an accurate fix. Search for your area or pin it manually.',
+    );
 
     fixture.destroy();
   });
@@ -102,12 +134,13 @@ describe('MapPicker', () => {
     fixture.componentInstance.initialLng = 75;
     fixture.detectChanges();
 
-    let emitted: { lat: number; lng: number } | undefined;
+    let emitted: { lat: number; lng: number; address?: string } | undefined;
     fixture.componentInstance.locationConfirmed.subscribe((v) => (emitted = v));
 
     fixture.componentInstance.confirm();
 
-    expect(emitted).toEqual({ lat: 21, lng: 75 });
+    // address is omitted until reverse geocoding resolves a label for the pin.
+    expect(emitted).toEqual({ lat: 21, lng: 75, address: undefined });
     fixture.destroy();
   });
 

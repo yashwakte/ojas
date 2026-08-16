@@ -9,11 +9,31 @@ export interface Product {
   galleryImageUrls: string[];
   weight: string;
   isAvailable: boolean;
+  /** Units on hand. null means stock isn't tracked for this product yet. */
+  stockQuantity: number | null;
+  lowStockThreshold: number;
   ingredients: string;
   benefits: string;
   storageInfo: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Purchasable = admin has it enabled AND it isn't a tracked product at zero. */
+export function isPurchasable(product: Product): boolean {
+  return product.isAvailable && (product.stockQuantity === null || product.stockQuantity > 0);
+}
+
+export function isOutOfStock(product: Product): boolean {
+  return product.stockQuantity !== null && product.stockQuantity <= 0;
+}
+
+export function isLowStock(product: Product): boolean {
+  return (
+    product.stockQuantity !== null &&
+    product.stockQuantity > 0 &&
+    product.stockQuantity <= product.lowStockThreshold
+  );
 }
 
 export interface CreateProductRequest {
@@ -26,6 +46,8 @@ export interface CreateProductRequest {
   galleryImageUrls: string[];
   weight: string;
   isAvailable: boolean;
+  stockQuantity?: number | null;
+  lowStockThreshold?: number;
   ingredients: string;
   benefits: string;
   storageInfo: string;
@@ -42,6 +64,8 @@ export interface DeliveryChargesConfig {
   warehouseLongitude: number;
   freeDeliveryUpToKm: number;
   perKmChargeAfterFree: number;
+  /** Serviceable radius from the warehouse; 0 means no limit. */
+  maxDeliveryRadiusKm: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -53,6 +77,7 @@ export interface UpdateDeliveryChargesRequest {
   warehouseLongitude?: number;
   freeDeliveryUpToKm?: number;
   perKmChargeAfterFree?: number;
+  maxDeliveryRadiusKm?: number;
   isActive?: boolean;
 }
 
@@ -60,6 +85,9 @@ export interface DeliveryChargeCalculation {
   distanceKm: number;
   charge: number;
   isFree: boolean;
+  /** False when the location sits outside the serviceable radius. */
+  isServiceable: boolean;
+  maxRadiusKm: number;
 }
 
 export interface CampaignBannerConfig {
@@ -133,6 +161,16 @@ export interface PlaceOrderRequest {
   longitude: number;
   notes: string;
   items: OrderItem[];
+}
+
+/** Same shape as placing an order — the server recomputes totals either way. */
+export type UpdateMyOrderRequest = PlaceOrderRequest;
+
+/** Statuses at which a customer may still edit or cancel; mirrors the API. */
+export const CUSTOMER_EDITABLE_STATUSES = ['Pending', 'Confirmed'];
+
+export function isOrderEditable(status: string): boolean {
+  return CUSTOMER_EDITABLE_STATUSES.some((s) => s.toLowerCase() === status.toLowerCase());
 }
 
 export interface OrderResponse {

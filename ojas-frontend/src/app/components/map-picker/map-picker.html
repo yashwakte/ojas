@@ -7,20 +7,73 @@
     </button>
   </div>
 
+  <div class="map-search">
+    <mat-icon class="map-search-icon">search</mat-icon>
+    <input
+      type="text"
+      class="map-search-input"
+      placeholder="Search your area, building or landmark"
+      [(ngModel)]="searchQuery"
+      (ngModelChange)="onSearchInput()"
+      aria-label="Search for an address"
+    />
+    @if (searchQuery) {
+      <button type="button" class="map-search-clear" (click)="clearSearch()" aria-label="Clear search">
+        <mat-icon>close</mat-icon>
+      </button>
+    }
+
+    @if (searchResults().length) {
+      <ul class="map-search-results">
+        @for (result of searchResults(); track result.label) {
+          <li>
+            <button type="button" (click)="chooseResult(result)">
+              <mat-icon>place</mat-icon>{{ result.label }}
+            </button>
+          </li>
+        }
+      </ul>
+    } @else if (searching()) {
+      <p class="map-search-hint">Searching…</p>
+    }
+  </div>
+
   @if (locateError()) {
     <p class="locate-error">{{ locateError() }}</p>
   }
 
+  @if (accuracyWarning()) {
+    <p class="accuracy-warning"><mat-icon>gps_not_fixed</mat-icon>{{ accuracyWarning() }}</p>
+  }
+
   <div class="map-shell">
     <div #mapContainer class="map-container"></div>
-    <div class="center-pin">
+    <div class="center-pin" [class.out-of-area]="outsideServiceArea()">
       <mat-icon>location_on</mat-icon>
     </div>
   </div>
 
+  @if (resolvedAddress()) {
+    <p class="resolved-address"><mat-icon>place</mat-icon>{{ resolvedAddress() }}</p>
+  }
+
+  @if (outsideServiceArea()) {
+    <p class="out-of-area-warning" role="status">
+      <mat-icon>wrong_location</mat-icon>
+      Outside our delivery area — this spot is
+      {{ distanceFromStoreKm()?.toFixed(1) }} km away and we deliver within
+      {{ serviceRadiusKm() }} km.
+    </p>
+  }
+
   <div class="map-picker-actions">
     <button type="button" class="cancel-btn" (click)="cancel()">Cancel</button>
-    <button type="button" class="confirm-btn" (click)="confirm()">
+    <button
+      type="button"
+      class="confirm-btn"
+      [disabled]="outsideServiceArea()"
+      (click)="confirm()"
+    >
       <mat-icon>check_circle</mat-icon>
       {{ confirmLabel }}
     </button>

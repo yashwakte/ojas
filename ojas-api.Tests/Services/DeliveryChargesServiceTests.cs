@@ -24,7 +24,8 @@ public class DeliveryChargesServiceTests
         double warehouseLon = 73.0,
         double freeUpToKm = 5,
         decimal perKmAfterFree = 10,
-        bool isActive = true) => new()
+        bool isActive = true,
+        double maxRadiusKm = 0) => new()
     {
         Id = "507f1f77bcf86cd799439011",
         WarehouseAddress = "Test Warehouse",
@@ -32,6 +33,7 @@ public class DeliveryChargesServiceTests
         WarehouseLongitude = warehouseLon,
         FreeDeliveryUpToKm = freeUpToKm,
         PerKmChargeAfterFree = perKmAfterFree,
+        MaxDeliveryRadiusKm = maxRadiusKm,
         IsActive = isActive,
         CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
     };
@@ -99,7 +101,7 @@ public class DeliveryChargesServiceTests
     {
         _chargesMock.SetupFind(new List<DeliveryCharges>());
 
-        var (distanceKm, charge, isFree) = await _sut.CalculateDeliveryChargeAsync(18.0, 73.0);
+        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(18.0, 73.0);
 
         distanceKm.ShouldBe(0);
         charge.ShouldBe(0);
@@ -112,7 +114,7 @@ public class DeliveryChargesServiceTests
         var config = MakeConfig(isActive: false);
         _chargesMock.SetupFind(new List<DeliveryCharges> { config });
 
-        var (distanceKm, charge, isFree) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
+        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
 
         distanceKm.ShouldBe(0);
         charge.ShouldBe(0);
@@ -126,7 +128,7 @@ public class DeliveryChargesServiceTests
         var config = MakeConfig(warehouseLat: 18.0, warehouseLon: 73.0, freeUpToKm: 5, perKmAfterFree: 10);
         _chargesMock.SetupFind(new List<DeliveryCharges> { config });
 
-        var (distanceKm, charge, isFree) = await _sut.CalculateDeliveryChargeAsync(18.01, 73.0);
+        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(18.01, 73.0);
 
         distanceKm.ShouldBeLessThan(5);
         charge.ShouldBe(0);
@@ -141,11 +143,52 @@ public class DeliveryChargesServiceTests
         var config = MakeConfig(warehouseLat: 18.0, warehouseLon: 73.0, freeUpToKm: 5, perKmAfterFree: 10);
         _chargesMock.SetupFind(new List<DeliveryCharges> { config });
 
-        var (distanceKm, charge, isFree) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
+        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
 
         distanceKm.ShouldBe(111.1949, 0.001);
         // chargeableKm = 111.1949 - 5 = 106.1949; charge = round(106.1949 * 10, 2, AwayFromZero) = 1061.95
         charge.ShouldBe(1061.95m);
         isFree.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task CalculateDeliveryChargeAsync_IsServiceable_WhenNoRadiusConfigured()
+    {
+        // A zero radius means the restriction is switched off entirely.
+        var config = MakeConfig(maxRadiusKm: 0);
+        _chargesMock.SetupFind(new List<DeliveryCharges> { config });
+
+        var quote = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
+
+        quote.IsServiceable.ShouldBeTrue();
+        quote.Charge.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task CalculateDeliveryChargeAsync_IsNotServiceable_BeyondMaxRadius()
+    {
+        // ~111.19 km away, well beyond the 25 km serviceable radius.
+        var config = MakeConfig(maxRadiusKm: 25);
+        _chargesMock.SetupFind(new List<DeliveryCharges> { config });
+
+        var quote = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
+
+        quote.IsServiceable.ShouldBeFalse();
+        quote.MaxRadiusKm.ShouldBe(25);
+        // No charge is quoted for somewhere we refuse to deliver.
+        quote.Charge.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CalculateDeliveryChargeAsync_IsServiceable_WithinMaxRadius()
+    {
+        // ~1.11 km away, inside both the free radius and the 25 km limit.
+        var config = MakeConfig(maxRadiusKm: 25);
+        _chargesMock.SetupFind(new List<DeliveryCharges> { config });
+
+        var quote = await _sut.CalculateDeliveryChargeAsync(18.01, 73.0);
+
+        quote.IsServiceable.ShouldBeTrue();
+        quote.IsFree.ShouldBeTrue();
     }
 }

@@ -14,6 +14,7 @@ describe('DeliveryChargesManagement', () => {
     warehouseLongitude: 73.7793,
     freeDeliveryUpToKm: 7,
     perKmChargeAfterFree: 10,
+    maxDeliveryRadiusKm: 25,
     isActive: true,
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -68,6 +69,7 @@ describe('DeliveryChargesManagement', () => {
       warehouseLongitude: config.warehouseLongitude,
       freeDeliveryUpToKm: config.freeDeliveryUpToKm,
       perKmChargeAfterFree: config.perKmChargeAfterFree,
+      maxDeliveryRadiusKm: config.maxDeliveryRadiusKm,
       isActive: config.isActive,
     });
   });
@@ -272,13 +274,19 @@ describe('DeliveryChargesManagement', () => {
       charge: 15,
       isFree: false,
       breakdown: 'x',
+      isServiceable: true,
     });
     const { fixture } = create();
 
     fixture.componentInstance.testDistanceCalculation(12);
 
     expect(fixture.componentInstance.testDistance()).toBe(12);
-    expect(fixture.componentInstance.testResult()).toEqual({ charge: 15, isFree: false, breakdown: 'x' });
+    expect(fixture.componentInstance.testResult()).toEqual({
+      charge: 15,
+      isFree: false,
+      breakdown: 'x',
+      isServiceable: true,
+    });
 
     fixture.componentInstance.clearTest();
     expect(fixture.componentInstance.testDistance()).toBeNull();
@@ -303,6 +311,7 @@ describe('DeliveryChargesManagement', () => {
     expect(deliveryChargesServiceSpy.calculateDeliveryCharge).toHaveBeenCalledWith(12, {
       freeDeliveryUpToKm: 2,
       perKmChargeAfterFree: 25,
+      maxDeliveryRadiusKm: config.maxDeliveryRadiusKm,
       isActive: true,
     });
   });

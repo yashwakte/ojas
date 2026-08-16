@@ -32,6 +32,14 @@ public record UserProfileResponse(string Id, string FullName, string Email, stri
 public record OrderItemDto(string ProductId, string ProductName, decimal Price, string Weight, int Quantity);
 public record PlaceOrderRequest(string FullName, string Phone, string Address, [Required] double? Latitude, [Required] double? Longitude, string Notes, List<OrderItemDto> Items);
 public record UpdateOrderStatusRequest([Required] string Status);
+public record UpdateMyOrderRequest(
+	string FullName,
+	string Phone,
+	string Address,
+	[Required] double? Latitude,
+	[Required] double? Longitude,
+	string Notes,
+	List<OrderItemDto> Items);
 public record AssignDeliveryPartnerRequest([Required] string DeliveryPartnerId);
 public record OrderResponse(
 	string Id,
@@ -52,4 +60,9 @@ public record OrderResponse(
 	string? DeliveryPartnerName,
 	DateTime? UpdatedAt);
 
-public record DeliveryChargeCalculationResponse(double DistanceKm, decimal Charge, bool IsFree);
+public record DeliveryChargeCalculationResponse(
+	double DistanceKm,
+	decimal Charge,
+	bool IsFree,
+	bool IsServiceable,
+	double MaxRadiusKm);

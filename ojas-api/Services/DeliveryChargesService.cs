@@ -3,6 +3,15 @@ using OjasApi.Models;
 
 namespace OjasApi.Services;
 
+/// <param name="IsServiceable">False when the pin sits outside the configured delivery radius.</param>
+/// <param name="MaxRadiusKm">0 means no radius limit is configured.</param>
+public record DeliveryQuote(
+    double DistanceKm,
+    decimal Charge,
+    bool IsFree,
+    bool IsServiceable,
+    double MaxRadiusKm);
+
 public class DeliveryChargesService
 {
     private readonly IMongoDbService _db;
@@ -36,24 +45,31 @@ public class DeliveryChargesService
         return config;
     }
 
-    public async Task<(double DistanceKm, decimal Charge, bool IsFree)> CalculateDeliveryChargeAsync(double latitude, double longitude)
+    public async Task<DeliveryQuote> CalculateDeliveryChargeAsync(double latitude, double longitude)
     {
         var config = await GetAsync();
         if (config == null || !config.IsActive)
         {
-            return (0, 0, true);
+            return new DeliveryQuote(0, 0, true, true, 0);
         }
 
         var distanceKm = CalculateDistanceKm(config.WarehouseLatitude, config.WarehouseLongitude, latitude, longitude);
+        var maxRadiusKm = config.MaxDeliveryRadiusKm;
+        var isServiceable = maxRadiusKm <= 0 || distanceKm <= maxRadiusKm;
+
+        if (!isServiceable)
+        {
+            return new DeliveryQuote(distanceKm, 0, false, false, maxRadiusKm);
+        }
 
         if (distanceKm <= config.FreeDeliveryUpToKm)
         {
-            return (distanceKm, 0, true);
+            return new DeliveryQuote(distanceKm, 0, true, true, maxRadiusKm);
         }
 
         var chargeableKm = distanceKm - config.FreeDeliveryUpToKm;
         var charge = Math.Round((decimal)chargeableKm * config.PerKmChargeAfterFree, 2, MidpointRounding.AwayFromZero);
-        return (distanceKm, charge, false);
+        return new DeliveryQuote(distanceKm, charge, false, true, maxRadiusKm);
     }
 
     // Haversine formula: great-circle distance between two lat/lng points, in kilometers.

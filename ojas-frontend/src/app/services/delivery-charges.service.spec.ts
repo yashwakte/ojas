@@ -16,6 +16,7 @@ describe('DeliveryChargesService', () => {
     warehouseLongitude: 73.7793,
     freeDeliveryUpToKm: 7,
     perKmChargeAfterFree: 10,
+    maxDeliveryRadiusKm: 0,
     isActive: true,
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -77,15 +78,26 @@ describe('DeliveryChargesService', () => {
         r.params.get('latitude') === '18.5' &&
         r.params.get('longitude') === '73.8',
     );
-    req.flush({ distanceKm: 3, charge: 0, isFree: true });
-    expect(result).toEqual({ distanceKm: 3, charge: 0, isFree: true });
+    req.flush({ distanceKm: 3, charge: 0, isFree: true, isServiceable: true, maxRadiusKm: 25 });
+    expect(result).toEqual({
+      distanceKm: 3,
+      charge: 0,
+      isFree: true,
+      isServiceable: true,
+      maxRadiusKm: 25,
+    });
   });
 
   describe('calculateDeliveryCharge (client-side estimate)', () => {
     it('returns free when config is not loaded', () => {
       flushInitialLoad(null);
       const result = service.calculateDeliveryCharge(20);
-      expect(result).toEqual({ charge: 0, isFree: true, breakdown: 'Delivery charges not configured' });
+      expect(result).toEqual({
+        charge: 0,
+        isFree: true,
+        isServiceable: true,
+        breakdown: 'Delivery charges not configured',
+      });
     });
 
     it('returns free when config is inactive', () => {
@@ -132,6 +144,35 @@ describe('DeliveryChargesService', () => {
       });
       expect(result.isFree).toBeTrue();
       expect(result.charge).toBe(0);
+    });
+  });
+
+  describe('service area radius', () => {
+    it('marks a distance beyond the configured radius as unserviceable', () => {
+      flushInitialLoad({ ...config, maxDeliveryRadiusKm: 25 });
+      const result = service.calculateDeliveryCharge(40);
+      expect(result.isServiceable).toBeFalse();
+      expect(result.charge).toBe(0);
+      expect(result.breakdown).toContain('Outside the 25 km delivery area');
+    });
+
+    it('keeps a distance inside the configured radius serviceable', () => {
+      flushInitialLoad({ ...config, maxDeliveryRadiusKm: 25 });
+      const result = service.calculateDeliveryCharge(10);
+      expect(result.isServiceable).toBeTrue();
+      expect(result.charge).toBe(30);
+    });
+
+    it('treats a zero radius as no limit', () => {
+      flushInitialLoad({ ...config, maxDeliveryRadiusKm: 0 });
+      expect(service.calculateDeliveryCharge(500).isServiceable).toBeTrue();
+      expect(service.isWithinServiceArea(500)).toBeTrue();
+    });
+
+    it('isWithinServiceArea agrees with the configured radius', () => {
+      flushInitialLoad({ ...config, maxDeliveryRadiusKm: 25 });
+      expect(service.isWithinServiceArea(24.9)).toBeTrue();
+      expect(service.isWithinServiceArea(25.1)).toBeFalse();
     });
   });
 });

@@ -55,21 +55,48 @@ export class DeliveryChargesService {
     });
   }
 
+  /** Whether a location is inside the serviceable radius, per the saved config. */
+  isWithinServiceArea(distanceKm: number): boolean {
+    const max = this._config()?.maxDeliveryRadiusKm ?? 0;
+    return max <= 0 || distanceKm <= max;
+  }
+
   calculateDeliveryCharge(
     distanceKm: number,
     // Defaults to the saved config, but callers previewing unsaved edits (e.g. the
     // admin's "Test Distance Calculation" tool) can pass the in-progress form values
     // instead so the preview reflects what they just typed, not the last saved rules.
-    config: Pick<DeliveryChargesConfig, 'freeDeliveryUpToKm' | 'perKmChargeAfterFree' | 'isActive'> | null = this._config(),
-  ): { charge: number; isFree: boolean; breakdown: string } {
+    // The radius is optional here: callers that only care about the charge math
+    // can omit it, and an absent radius means "no limit", same as 0.
+    config:
+      | (Pick<DeliveryChargesConfig, 'freeDeliveryUpToKm' | 'perKmChargeAfterFree' | 'isActive'> &
+          Partial<Pick<DeliveryChargesConfig, 'maxDeliveryRadiusKm'>>)
+      | null = this._config(),
+  ): { charge: number; isFree: boolean; breakdown: string; isServiceable: boolean } {
     if (!config || !config.isActive) {
-      return { charge: 0, isFree: true, breakdown: 'Delivery charges not configured' };
+      return {
+        charge: 0,
+        isFree: true,
+        isServiceable: true,
+        breakdown: 'Delivery charges not configured',
+      };
+    }
+
+    const maxRadius = config.maxDeliveryRadiusKm ?? 0;
+    if (maxRadius > 0 && distanceKm > maxRadius) {
+      return {
+        charge: 0,
+        isFree: false,
+        isServiceable: false,
+        breakdown: `Outside the ${maxRadius} km delivery area (${distanceKm.toFixed(1)} km away)`,
+      };
     }
 
     if (distanceKm <= config.freeDeliveryUpToKm) {
       return {
         charge: 0,
         isFree: true,
+        isServiceable: true,
         breakdown: `Free delivery (within ${config.freeDeliveryUpToKm} km)`,
       };
     }
@@ -79,6 +106,7 @@ export class DeliveryChargesService {
     return {
       charge,
       isFree: false,
+      isServiceable: true,
       breakdown: `${config.freeDeliveryUpToKm} km free + ${chargeableKm.toFixed(1)} km × ₹${config.perKmChargeAfterFree}/km = ₹${charge}`,
     };
   }

@@ -64,6 +64,19 @@
                 <div class="config-description">Charged for each km beyond free radius</div>
               </div>
 
+              <div class="config-item highlight">
+                <div class="config-label">Delivery Area Limit</div>
+                <div class="config-value">
+                  @if (config()?.maxDeliveryRadiusKm) {
+                    <span class="distance-value">{{ config()?.maxDeliveryRadiusKm }}</span>
+                    <span class="distance-unit">km</span>
+                  } @else {
+                    <span class="distance-unit">No limit</span>
+                  }
+                </div>
+                <div class="config-description">Orders pinned beyond this radius are refused</div>
+              </div>
+
               <div class="config-item">
                 <div class="config-label">Warehouse Location</div>
                 <div class="config-value address">{{ config()?.warehouseAddress }}</div>
@@ -239,6 +252,25 @@
                     <mat-error>{{ getError('perKmChargeAfterFree') }}</mat-error>
                   }
                   <mat-hint>Charge per km beyond free radius</mat-hint>
+                </mat-form-field>
+              </div>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Maximum Delivery Radius (km)</mat-label>
+                  <input matInput type="number"
+                    name="maxDeliveryRadiusKm"
+                    [(ngModel)]="formData().maxDeliveryRadiusKm"
+                    (ngModelChange)="formData.update(d => ({...d, maxDeliveryRadiusKm: $event}))"
+                    step="0.5"
+                    min="0"
+                    max="500"
+                    placeholder="e.g., 25"
+                    [class.error]="hasError('maxDeliveryRadiusKm')">
+                  @if (hasError('maxDeliveryRadiusKm')) {
+                    <mat-error>{{ getError('maxDeliveryRadiusKm') }}</mat-error>
+                  }
+                  <mat-hint>Orders beyond this distance are refused. Set 0 for no limit.</mat-hint>
                 </mat-form-field>
               </div>
 

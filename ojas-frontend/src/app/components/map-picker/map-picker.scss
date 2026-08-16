@@ -58,6 +58,145 @@
   font-weight: 500;
 }
 
+.map-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--ojas-border);
+  border-radius: 12px;
+  background: #fff;
+
+  &:focus-within {
+    border-color: var(--ojas-orange);
+  }
+}
+
+.map-search-icon {
+  flex-shrink: 0;
+  color: var(--ojas-text-light);
+  font-size: 1.15rem;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.map-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  border: none;
+  outline: none;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--ojas-text);
+  background: transparent;
+}
+
+.map-search-clear {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ojas-ink-bg);
+  color: var(--ojas-ink-soft);
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 0.95rem;
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+}
+
+.map-search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 600;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--ojas-border);
+  border-radius: 12px;
+  box-shadow: var(--ojas-shadow-md);
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 10px;
+    text-align: left;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 0.83rem;
+    font-family: inherit;
+    color: var(--ojas-text);
+    cursor: pointer;
+    line-height: 1.35;
+
+    &:hover {
+      background: var(--ojas-ink-bg);
+    }
+
+    mat-icon {
+      flex-shrink: 0;
+      color: var(--ojas-text-light);
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+}
+
+.map-search-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--ojas-text-light);
+}
+
+.accuracy-warning,
+.resolved-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.accuracy-warning {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.07);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.resolved-address {
+  color: var(--ojas-text-light);
+}
+
 .map-shell {
   position: relative;
   width: 100%;
@@ -86,6 +225,33 @@
     width: 2.6rem;
     height: 2.6rem;
     filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+  }
+
+  // Turns red the moment the pin crosses outside the deliverable radius.
+  &.out-of-area {
+    color: #dc2626;
+  }
+}
+
+.out-of-area-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1.05rem;
+    width: 1.05rem;
+    height: 1.05rem;
   }
 }
 
@@ -125,5 +291,10 @@
     font-size: 1.1rem;
     width: 1.1rem;
     height: 1.1rem;
+  }
+
+  &:disabled {
+    background: rgba(45, 45, 45, 0.28);
+    cursor: not-allowed;
   }
 }
