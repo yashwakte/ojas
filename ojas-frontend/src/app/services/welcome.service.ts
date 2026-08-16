@@ -17,6 +17,7 @@ export interface Celebration {
 export class WelcomeService {
   private readonly VISITED_KEY = 'ojas_visited';
   private readonly INTRO_KEY = 'ojas_intro_shown';
+  private readonly LOGIN_CELEBRATED_KEY = 'ojas_login_celebrated';
 
   /** Decided once at startup so the storage write doesn't change the answer mid-session. */
   readonly playIntro = this.decideIntro();
@@ -40,6 +41,13 @@ export class WelcomeService {
   }
 
   celebrate(kind: CelebrationKind, fullName: string): void {
+    // The full moment is meant for "welcome back", not every login — once
+    // it's played this session (tab lifetime, roughly the auth cookie's
+    // 2-hour window), logging in again quickly should just go straight in.
+    if (kind === 'login') {
+      if (sessionStorage.getItem(this.LOGIN_CELEBRATED_KEY)) return;
+      sessionStorage.setItem(this.LOGIN_CELEBRATED_KEY, '1');
+    }
     const first = fullName?.trim().split(/\s+/)[0] ?? '';
     this._celebration.set({ kind, name: first });
   }

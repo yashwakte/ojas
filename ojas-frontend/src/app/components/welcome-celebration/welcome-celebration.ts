@@ -13,12 +13,12 @@ import { CelebrationKind, WelcomeService } from '../../services/welcome.service'
 
 /**
  * How long the moment holds before it starts leaving. Registration says more
- * and only ever happens once, so it earns the longer beat; returning users get
- * a briefer greeting that still leaves time to read it.
+ * and only ever happens once, so it earns the longer beat; a returning user
+ * gets a quick, quiet acknowledgement, not a delay.
  */
 const HOLD_MS: Record<CelebrationKind, number> = {
   register: 5500,
-  login: 3500,
+  login: 2600,
 };
 const EXIT_MS = 550;
 
@@ -95,8 +95,10 @@ export class WelcomeCelebration {
     effect(() => {
       const canvas = this.canvasRef();
       const c = this.celebration();
-      if (canvas && c && !this.reducedMotion) {
-        this.startMotes(canvas.nativeElement, c.kind);
+      // The mote field only ever renders for 'register' (see the template) —
+      // login keeps its own quieter orbit-ring treatment instead.
+      if (canvas && c?.kind === 'register' && !this.reducedMotion) {
+        this.startMotes(canvas.nativeElement);
       }
     });
 
@@ -150,12 +152,11 @@ export class WelcomeCelebration {
     });
   }
 
-  private startMotes(canvas: HTMLCanvasElement, kind: CelebrationKind): void {
+  private startMotes(canvas: HTMLCanvasElement): void {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const generous = kind === 'register';
-    const holdMs = HOLD_MS[kind];
+    const holdMs = HOLD_MS.register;
 
     this.buildSprites();
 
@@ -171,7 +172,7 @@ export class WelcomeCelebration {
     const motes: Mote[] = [];
 
     // Ambient drift — a slow, sparse field of light rising through the frame.
-    const ambient = generous ? 46 : 30;
+    const ambient = 46;
     for (let i = 0; i < ambient; i++) {
       motes.push({
         x: Math.random() * width,
@@ -189,10 +190,10 @@ export class WelcomeCelebration {
 
     // A single soft bloom outward from the emblem, easing to a stop — the
     // celebratory beat, without anything resembling a party popper.
-    const burst = generous ? 40 : 22;
+    const burst = 40;
     for (let i = 0; i < burst; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = (0.7 + Math.random() * 2.4) * (generous ? 1 : 0.75);
+      const speed = 0.7 + Math.random() * 2.4;
       motes.push({
         x: cx + Math.cos(angle) * 18,
         y: cy + Math.sin(angle) * 18,
