@@ -40,32 +40,217 @@
             </span>
           </div>
 
-          <div class="order-items">
-            @for (item of order.items; track item.productId) {
-              <div class="order-item">
-                <div class="item-info">
-                  <span class="item-name">{{ item.productName }}</span>
-                  <span class="item-weight">{{ item.weight }}</span>
-                </div>
-                <div class="item-qty-price">
-                  <span class="item-qty">× {{ item.quantity }}</span>
-                  <span class="item-price">{{
-                    item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
-                  }}</span>
-                </div>
-              </div>
-            }
-          </div>
+          @if (editingId() === order.id) {
+            <!-- Edit mode: items, quantities and delivery details -->
+            <div class="order-edit">
+              <p class="edit-hint">
+                <mat-icon>edit</mat-icon>
+                Change what you ordered or where it goes. Delivery and totals are
+                recalculated when you save.
+              </p>
 
-          <div class="order-footer">
-            <div class="delivery-info">
-              <mat-icon>location_on</mat-icon>
-              <span>{{ order.address }}</span>
+              <div class="order-items">
+                @for (item of editItems(); track item.productId; let i = $index) {
+                  <div class="order-item editable">
+                    <div class="item-info">
+                      <span class="item-name">{{ item.productName }}</span>
+                      <span class="item-weight">{{ item.weight }}</span>
+                    </div>
+                    <div class="edit-qty">
+                      <button type="button" (click)="changeQty(i, -1)" [disabled]="item.quantity <= 1"
+                        aria-label="Decrease quantity">−</button>
+                      <span>{{ item.quantity }}</span>
+                      <button type="button" (click)="changeQty(i, 1)" aria-label="Increase quantity">+</button>
+                      <button type="button" class="edit-remove" (click)="removeItem(i)"
+                        aria-label="Remove item">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </div>
+                    <span class="item-price">{{
+                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                    }}</span>
+                  </div>
+                }
+              </div>
+
+              @if (showProductPicker()) {
+                <div class="product-picker">
+                  <input
+                    type="text"
+                    class="product-search"
+                    placeholder="Search products to add…"
+                    [(ngModel)]="productQuery"
+                  />
+                  @if (addableProducts().length) {
+                    <ul class="product-results">
+                      @for (p of addableProducts(); track p.id) {
+                        <li>
+                          <button type="button" (click)="addProduct(p)">
+                            <span class="product-result-name">{{ p.name }}</span>
+                            <span class="product-result-weight">{{ p.weight }}</span>
+                            <span class="product-result-price">
+                              {{ p.price | currency: 'INR' : 'symbol' : '1.0-0' }}
+                            </span>
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  } @else {
+                    <p class="product-empty">No matching products available to add.</p>
+                  }
+                  <button type="button" class="picker-close" (click)="showProductPicker.set(false)">
+                    Done
+                  </button>
+                </div>
+              } @else {
+                <button type="button" class="add-product-btn" (click)="showProductPicker.set(true)">
+                  <mat-icon>add_shopping_cart</mat-icon> Add more products
+                </button>
+              }
+
+              <div class="edit-field">
+                <label [attr.for]="'phone-' + order.id">Phone</label>
+                <input [id]="'phone-' + order.id" type="tel" [(ngModel)]="editPhone" />
+              </div>
+
+              <div class="edit-field">
+                <label [attr.for]="'addr-' + order.id">Delivery address</label>
+                <textarea [id]="'addr-' + order.id" rows="2" [(ngModel)]="editAddress"></textarea>
+              </div>
+
+              <div class="edit-field">
+                <label [attr.for]="'notes-' + order.id">Notes</label>
+                <input [id]="'notes-' + order.id" type="text" [(ngModel)]="editNotes" />
+              </div>
+
+              @if (showEditMap()) {
+                <app-map-picker
+                  [initialLat]="editLat"
+                  [initialLng]="editLng"
+                  [enforceServiceArea]="true"
+                  (locationConfirmed)="onEditLocationConfirmed($event)"
+                  (cancelled)="showEditMap.set(false)"
+                />
+              } @else {
+                <button type="button" class="edit-map-btn" (click)="showEditMap.set(true)">
+                  <mat-icon>edit_location_alt</mat-icon> Change pinned location
+                </button>
+              }
+
+              @if (editError()) {
+                <p class="edit-error"><mat-icon>error_outline</mat-icon>{{ editError() }}</p>
+              }
+
+              <!-- Priced against the existing order so the payment difference is
+                   explicit before they commit. -->
+              <div class="edit-summary">
+                <div class="summary-line">
+                  <span>Items</span>
+                  <span>{{ editItemsTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+                </div>
+                <div class="summary-line">
+                  <span>Delivery</span>
+                  <span>
+                    @if (quotingDelivery()) {
+                      Checking…
+                    } @else if (editDeliveryCharge() === 0) {
+                      Free
+                    } @else {
+                      {{ editDeliveryCharge() | currency: 'INR' : 'symbol' : '1.0-0' }}
+                    }
+                  </span>
+                </div>
+                <div class="summary-line summary-new-total">
+                  <span>New total</span>
+                  <span>{{ newTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+                </div>
+                <div class="summary-line summary-was">
+                  <span>Originally paid</span>
+                  <span>{{ originalTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+                </div>
+
+                @if (amountDifference() > 0) {
+                  <div class="summary-diff owe">
+                    <mat-icon>arrow_upward</mat-icon>
+                    You'll pay
+                    <strong>{{ amountDifference() | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+                    more
+                  </div>
+                } @else if (amountDifference() < 0) {
+                  <div class="summary-diff refund">
+                    <mat-icon>arrow_downward</mat-icon>
+                    <strong>{{ -amountDifference() | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+                    will be refunded
+                  </div>
+                } @else {
+                  <div class="summary-diff same">No change to the amount</div>
+                }
+              </div>
+
+              <div class="edit-actions">
+                <button type="button" class="edit-cancel" (click)="cancelEdit()">Discard changes</button>
+                <button type="button" class="edit-save" [disabled]="saving()" (click)="saveEdit(order)">
+                  {{ saving() ? 'Saving…' : 'Save changes' }}
+                </button>
+              </div>
             </div>
-            <div class="order-total">
-              Total: <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+          } @else {
+            <div class="order-items">
+              @for (item of order.items; track item.productId) {
+                <div class="order-item">
+                  <div class="item-info">
+                    <span class="item-name">{{ item.productName }}</span>
+                    <span class="item-weight">{{ item.weight }}</span>
+                  </div>
+                  <div class="item-qty-price">
+                    <span class="item-qty">× {{ item.quantity }}</span>
+                    <span class="item-price">{{
+                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                    }}</span>
+                  </div>
+                </div>
+              }
             </div>
-          </div>
+
+            <div class="order-footer">
+              <div class="delivery-info">
+                <mat-icon>location_on</mat-icon>
+                <span>{{ order.address }}</span>
+              </div>
+              <div class="order-total">
+                Total: <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+              </div>
+            </div>
+
+            @if (canModify(order)) {
+              @if (confirmingCancelId() === order.id) {
+                <div class="cancel-confirm">
+                  <p>Cancel this order? This can't be undone.</p>
+                  <div class="cancel-confirm-actions">
+                    <button type="button" class="keep-btn" (click)="dismissCancel()">Keep order</button>
+                    <button type="button" class="cancel-yes" [disabled]="cancelling()"
+                      (click)="confirmCancel(order)">
+                      {{ cancelling() ? 'Cancelling…' : 'Yes, cancel it' }}
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <div class="order-actions">
+                  <button type="button" class="order-edit-btn" (click)="startEdit(order)">
+                    <mat-icon>edit</mat-icon> Edit order
+                  </button>
+                  <button type="button" class="order-cancel-btn" (click)="askCancel(order.id)">
+                    Cancel order
+                  </button>
+                </div>
+              }
+            } @else {
+              <p class="locked-note">
+                <mat-icon>lock_outline</mat-icon>
+                This order is {{ order.status.toLowerCase() }} and can no longer be changed.
+              </p>
+            }
+          }
         </div>
       }
     </div>

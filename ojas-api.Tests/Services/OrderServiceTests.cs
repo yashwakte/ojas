@@ -179,4 +179,32 @@ public class OrderServiceTests
 
         result.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData("Pending")]
+    [InlineData("pending")]
+    [InlineData("Confirmed")]
+    public void IsCustomerEditable_IsTrue_BeforeThePackingStage(string status)
+    {
+        OrderService.IsCustomerEditable(status).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("Packed")]
+    [InlineData("Shipped")]
+    [InlineData("Delivered")]
+    [InlineData("Cancelled")]
+    public void IsCustomerEditable_IsFalse_OncePackedOrLater(string status)
+    {
+        // Past packing the goods are physically committed, so the edit window shuts.
+        OrderService.IsCustomerEditable(status).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("NotAStatus")]
+    public void IsCustomerEditable_IsFalse_ForUnrecognisedStatuses(string status)
+    {
+        OrderService.IsCustomerEditable(status).ShouldBeFalse();
+    }
 }

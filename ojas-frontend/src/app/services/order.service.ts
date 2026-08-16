@@ -7,6 +7,7 @@ import {
   OrderResponse,
   PlaceOrderRequest,
   StaffUserResponse,
+  UpdateMyOrderRequest,
   UpdateOrderStatusRequest,
 } from '../models/interfaces';
 
@@ -46,6 +47,15 @@ export class OrderService {
 
   placeOrder(request: PlaceOrderRequest): Observable<OrderResponse> {
     return this.http.post<OrderResponse>(this.apiUrl, request);
+  }
+
+  /** Customer edits their own order; allowed until it is Packed. */
+  updateMyOrder(orderId: string, request: UpdateMyOrderRequest): Observable<OrderResponse> {
+    return this.http.put<OrderResponse>(`${this.apiUrl}/my/${orderId}`, request);
+  }
+
+  cancelMyOrder(orderId: string): Observable<void> {
+    return this.http.patch<void>(`${this.apiUrl}/my/${orderId}/cancel`, {});
   }
 
   getAdminOrders(): Observable<OrderResponse[]> {

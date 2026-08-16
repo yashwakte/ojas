@@ -17,6 +17,7 @@ public class OrdersControllerTests
     private readonly Mock<IMongoCollection<Order>> _ordersMock = new();
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
     private readonly Mock<IMongoCollection<DeliveryCharges>> _chargesMock = new();
+    private readonly Mock<IMongoCollection<Product>> _productsMock = new();
     private readonly OrdersController _sut;
 
     public OrdersControllerTests()
@@ -24,6 +25,17 @@ public class OrdersControllerTests
         _dbMock.Setup(d => d.Orders).Returns(_ordersMock.Object);
         _dbMock.Setup(d => d.Users).Returns(_usersMock.Object);
         _dbMock.Setup(d => d.DeliveryCharges).Returns(_chargesMock.Object);
+        _dbMock.Setup(d => d.Products).Returns(_productsMock.Object);
+
+        // Default: stock updates succeed, so existing order tests are unaffected
+        // by the stock check that now runs before an order is created.
+        _productsMock
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<Product>>(),
+                It.IsAny<UpdateDefinition<Product>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
 
         _ordersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<Order>(), null, It.IsAny<CancellationToken>()))
@@ -32,7 +44,8 @@ public class OrdersControllerTests
 
         var orderService = new OrderService(_dbMock.Object);
         var deliveryChargesService = new DeliveryChargesService(_dbMock.Object);
-        _sut = new OrdersController(orderService, _dbMock.Object, deliveryChargesService);
+        var productService = new ProductService(_dbMock.Object);
+        _sut = new OrdersController(orderService, _dbMock.Object, deliveryChargesService, productService);
 
         SetUser("user-1");
     }
@@ -59,6 +72,16 @@ public class OrdersControllerTests
         Longitude = 73.8,
         DeliveryPartnerId = deliveryPartnerId,
         Status = status,
+    };
+
+    /// <summary>A real ObjectId, so stock filters serialize as they do in production.</summary>
+    private static OrderItem MakeOrderItem(string productId = "507f1f77bcf86cd799439055") => new()
+    {
+        ProductId = productId,
+        ProductName = "Bajra Flour",
+        Price = 100,
+        Weight = "500g",
+        Quantity = 2,
     };
 
     private static User MakeDeliveryUser(string id = "507f1f77bcf86cd799439022", string name = "Delivery Guy") => new()
@@ -189,9 +212,8 @@ public class OrdersControllerTests
     [Fact]
     public async Task UpdateOrderStatusAsAdmin_ReturnsNotFound_WhenOrderMissing()
     {
-        _ordersMock
-            .Setup(c => c.UpdateOneAsync(It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UpdateResult.Acknowledged(0, 0, null));
+        // The controller now loads the order first, so it can restore stock on cancel.
+        _ordersMock.SetupFind(new List<Order>());
 
         var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Confirmed"));
 
@@ -201,6 +223,7 @@ public class OrdersControllerTests
     [Fact]
     public async Task UpdateOrderStatusAsAdmin_ReturnsNoContent_OnSuccess()
     {
+        _ordersMock.SetupFind(new List<Order> { MakeOrder() });
         _ordersMock
             .Setup(c => c.UpdateOneAsync(It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
@@ -208,6 +231,47 @@ public class OrdersControllerTests
         var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Confirmed"));
 
         result.ShouldBeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatusAsAdmin_RestoresStock_WhenCancelling()
+    {
+        var order = MakeOrder();
+        order.Items = [MakeOrderItem()];
+        _ordersMock.SetupFind(new List<Order> { order });
+        _ordersMock
+            .Setup(c => c.UpdateOneAsync(It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
+
+        var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Cancelled"));
+
+        result.ShouldBeOfType<NoContentResult>();
+        // Cancelled goods go back on the shelf — one update per order line.
+        _productsMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatusAsAdmin_DoesNotRestoreStockTwice_WhenAlreadyCancelled()
+    {
+        var order = MakeOrder();
+        order.Status = "Cancelled";
+        order.Items = [MakeOrderItem()];
+        _ordersMock.SetupFind(new List<Order> { order });
+        _ordersMock
+            .Setup(c => c.UpdateOneAsync(It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
+
+        await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Cancelled"));
+
+        _productsMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ---------- AssignDeliveryPartner ----------

@@ -17,10 +17,60 @@ public class OrderService(IMongoDbService db)
         "Cancelled"
     ];
 
+    /// <summary>
+    /// Statuses at which a customer may still change or cancel their own order.
+    /// Once it is Packed the goods are physically committed, so the window shuts.
+    /// </summary>
+    private static readonly HashSet<string> CustomerEditableStatuses =
+    [
+        "Pending",
+        "Confirmed"
+    ];
+
+    public static bool IsCustomerEditable(string status) =>
+        CustomerEditableStatuses.Contains(NormalizeStatus(status) ?? string.Empty);
+
     public async Task<Order> CreateOrderAsync(Order order)
     {
         await _orders.InsertOneAsync(order);
         return order;
+    }
+
+    /// <summary>
+    /// Replaces the mutable parts of an order (items, delivery details) and the
+    /// recomputed money. Guarded by status so a packed order can't shift underneath
+    /// the person picking it.
+    /// </summary>
+    public async Task<bool> UpdateOrderContentsAsync(
+        string orderId,
+        List<OrderItem> items,
+        string fullName,
+        string phone,
+        string address,
+        double latitude,
+        double longitude,
+        string? addressMapLink,
+        string notes,
+        decimal deliveryCharge,
+        double deliveryDistanceKm,
+        decimal totalAmount)
+    {
+        var update = Builders<Order>.Update
+            .Set(o => o.Items, items)
+            .Set(o => o.FullName, fullName)
+            .Set(o => o.Phone, phone)
+            .Set(o => o.Address, address)
+            .Set(o => o.Latitude, latitude)
+            .Set(o => o.Longitude, longitude)
+            .Set(o => o.AddressMapLink, addressMapLink)
+            .Set(o => o.Notes, notes)
+            .Set(o => o.DeliveryCharge, deliveryCharge)
+            .Set(o => o.DeliveryDistanceKm, deliveryDistanceKm)
+            .Set(o => o.TotalAmount, totalAmount)
+            .Set(o => o.UpdatedAt, DateTime.UtcNow);
+
+        var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+        return result.MatchedCount > 0;
     }
 
     public async Task<List<Order>> GetOrdersByUserAsync(string userId)
