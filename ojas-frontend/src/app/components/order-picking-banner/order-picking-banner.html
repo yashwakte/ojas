@@ -1,0 +1,17 @@
+@if (draft.picking()) {
+  <div class="picking-banner" role="status">
+    <div class="picking-banner-text">
+      <mat-icon>playlist_add</mat-icon>
+      <span>
+        Adding products to your order
+        @if (draft.pickedCount() > 0) {
+          <strong>· {{ draft.pickedCount() }} added</strong>
+        }
+      </span>
+    </div>
+    <button type="button" class="picking-banner-done" (click)="done()">
+      Done, back to order
+      <mat-icon>arrow_forward</mat-icon>
+    </button>
+  </div>
+}

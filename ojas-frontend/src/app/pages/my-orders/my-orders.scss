@@ -266,11 +266,6 @@
   .orders-page {
     padding: 90px 16px 32px;
   }
-  .order-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
 }
 
 // ===== Customer edit / cancel (allowed until the order is Packed) =====
@@ -460,6 +455,28 @@
   }
 }
 
+// Below this width the name, qty stepper and price can't all share one line
+// — how much they overlap the edge depends on the product name's length, so
+// letting them wrap naturally landed differently row to row (stepper stuck
+// mid-line for short names, price orphaned onto its own line for long ones).
+// Forcing the name onto its own row makes every item resolve to the same
+// predictable two-row shape: name above, stepper and price sharing the row
+// below. This block must stay below the .edit-qty rule above — same
+// specificity, so source order is what lets it win at narrow widths.
+@media (max-width: 600px) {
+  .order-item.editable {
+    justify-content: space-between;
+  }
+
+  .item-info {
+    flex: 1 1 100%;
+  }
+
+  .edit-qty {
+    margin-left: 0;
+  }
+}
+
 .edit-remove {
   color: #b91c1c;
   border-color: rgba(220, 38, 38, 0.3) !important;
@@ -613,91 +630,6 @@
     width: 1rem;
     height: 1rem;
   }
-}
-
-.product-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--ojas-border);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.015);
-}
-
-.product-search {
-  padding: 10px 12px;
-  border: 1px solid var(--ojas-border);
-  border-radius: 10px;
-  font-size: 0.87rem;
-  font-family: inherit;
-
-  &:focus {
-    outline: none;
-    border-color: var(--ojas-orange);
-  }
-}
-
-.product-results {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 200px;
-  overflow-y: auto;
-
-  button {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 9px 10px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    font-family: inherit;
-    text-align: left;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--ojas-ink-bg);
-    }
-  }
-}
-
-.product-result-name {
-  flex: 1;
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--ojas-text);
-}
-
-.product-result-weight {
-  font-size: 0.76rem;
-  color: var(--ojas-text-light);
-}
-
-.product-result-price {
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: var(--ojas-text);
-}
-
-.product-empty {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--ojas-text-light);
-}
-
-.picker-close {
-  align-self: flex-end;
-  padding: 7px 16px;
-  border: 1px solid var(--ojas-border);
-  border-radius: 999px;
-  background: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  font-family: 'Poppins', sans-serif;
-  cursor: pointer;
 }
 
 // ===== Change summary (drives the payment difference later) =====

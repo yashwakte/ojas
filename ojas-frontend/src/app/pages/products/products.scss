@@ -197,6 +197,44 @@
   padding: 12px;
 }
 
+// A veil over the image rather than hiding the card: the product stays
+// discoverable and simply reads as unavailable right now.
+.stock-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(0.35);
+  -webkit-backdrop-filter: saturate(0.35);
+
+  span {
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(45, 45, 45, 0.85);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+.low-stock-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(242, 90, 26, 0.94);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .product-badge {
   background: rgba(255, 255, 255, 0.95);
   color: var(--ojas-ink);
@@ -340,6 +378,18 @@
 
   &:active {
     transform: translateY(0);
+  }
+}
+
+.add-to-cart-btn:disabled,
+.buy-now-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+
+  &:hover {
+    transform: none;
+    box-shadow: none;
   }
 }
 

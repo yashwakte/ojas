@@ -1,5 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,8 +8,9 @@ import { UserService } from '../../services/user.service';
 import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
+import { OrderEditDraftService } from '../../services/order-edit-draft.service';
 import { MapPicker } from '../../components/map-picker/map-picker';
-import { OrderItem, OrderResponse, Product, isOrderEditable } from '../../models/interfaces';
+import { OrderItem, OrderResponse, isOrderEditable } from '../../models/interfaces';
 
 @Component({
   selector: 'app-my-orders',
@@ -22,6 +23,8 @@ export class MyOrders implements OnInit {
   private readonly orderService = inject(OrderService);
   private readonly productService = inject(ProductService);
   private readonly deliveryCharges = inject(DeliveryChargesService);
+  private readonly orderEditDraft = inject(OrderEditDraftService);
+  private readonly router = inject(Router);
 
   orders = signal<OrderResponse[]>([]);
   loading = signal(true);
@@ -44,20 +47,6 @@ export class MyOrders implements OnInit {
   /** Delivery charge for the currently pinned location, re-quoted as it changes. */
   editDeliveryCharge = signal(0);
   quotingDelivery = signal(false);
-
-  showProductPicker = signal(false);
-  productQuery = '';
-
-  /** Products not already on the order, matching the search box. */
-  addableProducts = computed(() => {
-    const existing = new Set(this.editItems().map((i) => i.productId));
-    const query = this.productQuery.trim().toLowerCase();
-    return this.productService
-      .products()
-      .filter((p) => p.isAvailable && !existing.has(p.id))
-      .filter((p) => !query || p.name.toLowerCase().includes(query))
-      .slice(0, 8);
-  });
 
   /** What the order will total once saved, at the currently quoted delivery. */
   newTotal = computed(() => this.editItemsTotal() + this.editDeliveryCharge());
@@ -92,8 +81,6 @@ export class MyOrders implements OnInit {
     this.originalTotal.set(order.totalAmount);
     this.editDeliveryCharge.set(order.deliveryCharge);
     this.showEditMap.set(false);
-    this.showProductPicker.set(false);
-    this.productQuery = '';
     this.editError.set('');
     this.productService.loadProducts();
   }
@@ -102,8 +89,28 @@ export class MyOrders implements OnInit {
     this.editingId.set(null);
     this.editItems.set([]);
     this.showEditMap.set(false);
-    this.showProductPicker.set(false);
     this.editError.set('');
+    this.orderEditDraft.clear();
+  }
+
+  /** Sends the customer to Products to pick more items, then back here to resume. */
+  addMoreProducts(order: OrderResponse): void {
+    this.orderEditDraft.begin(order.id, this.editItems());
+    this.router.navigate(['/products']);
+  }
+
+  /** Restores an in-progress edit after a trip to Products/product-detail to add items. */
+  private resumeDraftIfAny(): void {
+    const draft = this.orderEditDraft.draft();
+    if (!draft) return;
+    const order = this.orders().find((o) => o.id === draft.orderId);
+    if (!order || !this.canModify(order)) {
+      this.orderEditDraft.clear();
+      return;
+    }
+    this.startEdit(order);
+    this.editItems.set(draft.items);
+    this.orderEditDraft.clear();
   }
 
   changeQty(index: number, delta: number): void {
@@ -116,22 +123,6 @@ export class MyOrders implements OnInit {
 
   removeItem(index: number): void {
     this.editItems.update((items) => items.filter((_, i) => i !== index));
-  }
-
-  addProduct(product: Product): void {
-    this.editItems.update((items) => [
-      ...items,
-      {
-        productId: product.id,
-        productName: product.name,
-        // Honour any active discount, the same way the cart prices it.
-        price: product.discount > 0 ? product.price - (product.price * product.discount) / 100 : product.price,
-        weight: product.weight,
-        quantity: 1,
-      },
-    ]);
-    this.productQuery = '';
-    this.showProductPicker.set(false);
   }
 
   onEditLocationConfirmed(location: { lat: number; lng: number; address?: string }): void {
@@ -251,6 +242,7 @@ export class MyOrders implements OnInit {
       next: (orders) => {
         this.orders.set(orders);
         this.loading.set(false);
+        this.resumeDraftIfAny();
       },
       error: () => {
         this.error.set('Failed to load orders.');

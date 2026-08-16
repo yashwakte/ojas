@@ -8,11 +8,13 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { DeliveryAddressService } from '../../services/delivery-address.service';
+import { OrderEditDraftService } from '../../services/order-edit-draft.service';
 import { Product, isLowStock, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
 
 @Component({
   selector: 'app-product-detail',
-  imports: [RouterLink, MatIconModule, DecimalPipe],
+  imports: [RouterLink, MatIconModule, DecimalPipe, OrderPickingBanner],
   templateUrl: './product-detail.html',
   styleUrl: './product-detail.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,8 +28,10 @@ export class ProductDetail {
   private auth = inject(AuthService);
   private router = inject(Router);
   private deliveryChargesService = inject(DeliveryChargesService);
+  private orderEditDraft = inject(OrderEditDraftService);
   // Public so the template can show the "Deliver to" bar and open the picker.
   readonly deliveryAddress = inject(DeliveryAddressService);
+  readonly picking = this.orderEditDraft.picking;
 
   freeDeliveryUpToKm = computed(() => this.deliveryChargesService.config()?.freeDeliveryUpToKm ?? null);
 
@@ -38,6 +42,12 @@ export class ProductDetail {
   readonly purchasable = computed(() => {
     const p = this.product();
     return !!p && isPurchasable(p);
+  });
+
+  readonly addButtonLabel = computed(() => {
+    const justAdded = this.justAdded() === this.product()?.id;
+    if (this.picking()) return justAdded ? 'Added!' : 'Add to Order';
+    return justAdded ? 'Added to Cart!' : 'Add to Cart';
   });
 
   readonly outOfStock = computed(() => {
@@ -134,8 +144,12 @@ export class ProductDetail {
   addToCart(): void {
     const p = this.product();
     if (!p) return;
-    for (let i = 0; i < this.quantity(); i++) {
-      this.cartService.addToCart(p);
+    if (this.picking()) {
+      this.orderEditDraft.addProduct(p, this.quantity());
+    } else {
+      for (let i = 0; i < this.quantity(); i++) {
+        this.cartService.addToCart(p);
+      }
     }
     this.justAdded.set(p.id);
     setTimeout(() => this.justAdded.set(null), 2000);

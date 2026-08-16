@@ -12,6 +12,8 @@
     </nav>
 
     <div class="detail-container">
+      <app-order-picking-banner />
+
       <!-- Main Layout: Image + Info -->
       <div class="detail-layout">
         <!-- Image Section -->
@@ -240,12 +242,14 @@
               [disabled]="!purchasable()"
             >
               <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-              {{ justAdded() === p.id ? 'Added to Cart!' : 'Add to Cart' }}
+              {{ addButtonLabel() }}
             </button>
-            <button class="detail-buy-now-btn" (click)="buyNow()" [disabled]="!purchasable()">
-              <mat-icon>bolt</mat-icon>
-              Buy Now
-            </button>
+            @if (!picking()) {
+              <button class="detail-buy-now-btn" (click)="buyNow()" [disabled]="!purchasable()">
+                <mat-icon>bolt</mat-icon>
+                Buy Now
+              </button>
+            }
           </div>
 
           <!-- Product Highlights -->

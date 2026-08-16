@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
@@ -8,17 +8,26 @@ import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
-import { Product } from '../../models/interfaces';
+import { OrderEditDraftService } from '../../services/order-edit-draft.service';
+import { Product, isLowStock, isOutOfStock, isPurchasable } from '../../models/interfaces';
 import { DecimalPipe } from '@angular/common';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
+import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
 
 @Component({
   selector: 'app-products',
-  imports: [RouterLink, MatButtonModule, MatIconModule, DecimalPipe],
+  imports: [RouterLink, MatButtonModule, MatIconModule, DecimalPipe, OrderPickingBanner],
   templateUrl: './products.html',
   styleUrl: './products.scss',
 })
 export class Products {
+  readonly isOutOfStock = isOutOfStock;
+  readonly isLowStock = isLowStock;
+  readonly isPurchasable = isPurchasable;
+
+  private readonly orderEditDraft = inject(OrderEditDraftService);
+  readonly picking = this.orderEditDraft.picking;
+
   categories = ['All', ...PRODUCT_CATEGORIES];
   justAdded = signal<string | null>(null);
   selectedCategory = signal('All');
@@ -52,7 +61,11 @@ export class Products {
   });
 
   addToCart(product: Product): void {
-    this.cartService.addToCart(product);
+    if (this.picking()) {
+      this.orderEditDraft.addProduct(product);
+    } else {
+      this.cartService.addToCart(product);
+    }
     this.justAdded.set(product.id);
     setTimeout(() => this.justAdded.set(null), 2000);
   }

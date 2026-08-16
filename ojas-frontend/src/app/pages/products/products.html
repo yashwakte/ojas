@@ -16,6 +16,8 @@
   </div>
 
   <div class="products-container">
+    <app-order-picking-banner />
+
     <!-- Category Filter -->
     <div class="category-filter">
       @for (cat of categories; track cat) {
@@ -44,6 +46,11 @@
               <div class="product-overlay">
                 <span class="product-badge">{{ product.category }}</span>
               </div>
+              @if (isOutOfStock(product)) {
+                <span class="stock-veil"><span>Out of Stock</span></span>
+              } @else if (isLowStock(product)) {
+                <span class="low-stock-tag">Only {{ product.stockQuantity }} left</span>
+              }
             </div>
 <div class="product-info-top">
             <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
@@ -69,16 +76,21 @@
               <button
                 class="add-to-cart-btn"
                 [class.added]="justAdded() === product.id"
+                [disabled]="!isPurchasable(product)"
                 (click)="addToCart(product)"
               >
                 <mat-icon>{{
                   justAdded() === product.id ? 'check' : 'add_shopping_cart'
                 }}</mat-icon>
-                {{ justAdded() === product.id ? 'Added!' : 'Add to Cart' }}
+                {{
+                  justAdded() === product.id ? 'Added!' : picking() ? 'Add' : 'Add to Cart'
+                }}
               </button>
-              <button class="buy-now-btn" (click)="buyNow(product)">
-                <mat-icon>bolt</mat-icon> Buy Now
-              </button>
+              @if (!picking()) {
+                <button class="buy-now-btn" [disabled]="!isPurchasable(product)" (click)="buyNow(product)">
+                  <mat-icon>bolt</mat-icon> Buy Now
+                </button>
+              }
             </div>
           </div>
         </div>

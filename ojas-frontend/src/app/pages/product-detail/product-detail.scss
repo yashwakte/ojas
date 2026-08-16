@@ -54,6 +54,15 @@
   align-items: flex-start;
 }
 
+// Grid items default to min-width: auto, so an un-shrinkable descendant (e.g.
+// the nowrap address text in .deliver-to) can force the column past its
+// track and overflow the page horizontally. min-width: 0 lets the track's
+// own width win, same as the min-width: 0 already used on .deliver-to-text.
+.image-section,
+.info-section {
+  min-width: 0;
+}
+
 // ─── Image Section ───
 .image-section {
   position: sticky;

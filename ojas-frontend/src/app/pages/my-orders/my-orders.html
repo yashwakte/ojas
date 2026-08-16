@@ -73,40 +73,9 @@
                 }
               </div>
 
-              @if (showProductPicker()) {
-                <div class="product-picker">
-                  <input
-                    type="text"
-                    class="product-search"
-                    placeholder="Search products to add…"
-                    [(ngModel)]="productQuery"
-                  />
-                  @if (addableProducts().length) {
-                    <ul class="product-results">
-                      @for (p of addableProducts(); track p.id) {
-                        <li>
-                          <button type="button" (click)="addProduct(p)">
-                            <span class="product-result-name">{{ p.name }}</span>
-                            <span class="product-result-weight">{{ p.weight }}</span>
-                            <span class="product-result-price">
-                              {{ p.price | currency: 'INR' : 'symbol' : '1.0-0' }}
-                            </span>
-                          </button>
-                        </li>
-                      }
-                    </ul>
-                  } @else {
-                    <p class="product-empty">No matching products available to add.</p>
-                  }
-                  <button type="button" class="picker-close" (click)="showProductPicker.set(false)">
-                    Done
-                  </button>
-                </div>
-              } @else {
-                <button type="button" class="add-product-btn" (click)="showProductPicker.set(true)">
-                  <mat-icon>add_shopping_cart</mat-icon> Add more products
-                </button>
-              }
+              <button type="button" class="add-product-btn" (click)="addMoreProducts(order)">
+                <mat-icon>add_shopping_cart</mat-icon> Add more products
+              </button>
 
               <div class="edit-field">
                 <label [attr.for]="'phone-' + order.id">Phone</label>
