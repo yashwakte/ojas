@@ -242,3 +242,54 @@
     font-size: 1.1rem;
   }
 }
+
+// ===== Stock state =====
+// A veil over the image rather than hiding the card: the product stays
+// discoverable and simply reads as unavailable right now.
+.pstock-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(0.35);
+  -webkit-backdrop-filter: saturate(0.35);
+
+  span {
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(45, 45, 45, 0.85);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+.plow-stock {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(242, 90, 26, 0.94);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.home-add-cart-btn:disabled,
+.home-buy-now-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+
+  &:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}

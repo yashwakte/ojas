@@ -24,6 +24,7 @@ import { CampaignBannerManagement } from '../campaign-banner-management/campaign
 import {
   CreateStaffRequest,
   OrderResponse,
+  Product,
   StaffUserResponse,
   UpdateOrderStatusRequest,
   UserRole,
@@ -147,9 +148,27 @@ export class AdminDashboard implements OnInit {
     });
   });
 
+  readonly lowStockProducts = signal<Product[]>([]);
+  readonly loadingLowStock = signal(true);
+
   ngOnInit(): void {
     this.loadOrders();
     this.loadDeliveryPartners();
+    this.loadLowStock();
+  }
+
+  loadLowStock(): void {
+    this.loadingLowStock.set(true);
+    this.productService.getLowStock().subscribe({
+      next: (products) => {
+        this.lowStockProducts.set(products);
+        this.loadingLowStock.set(false);
+      },
+      error: () => {
+        this.lowStockProducts.set([]);
+        this.loadingLowStock.set(false);
+      },
+    });
   }
 
   getTabIndex(): number {
@@ -229,6 +248,12 @@ export class AdminDashboard implements OnInit {
         );
         this.busyOrderAction.set(null);
         this.showSuccess('Order status updated');
+        // Cancelling restores stock server-side; refresh so the products
+        // list and low-stock widget don't show stale availability.
+        if (nextStatus === 'Cancelled') {
+          this.productService.loadProducts();
+          this.loadLowStock();
+        }
       },
       error: () => {
         this.ordersError.set('Could not update order status');

@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { Products } from './products';
 import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
@@ -20,6 +21,8 @@ describe('Products', () => {
     galleryImageUrls: [],
     weight: '500g',
     isAvailable: true,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: '',
     benefits: '',
     storageInfo: '',
@@ -53,6 +56,9 @@ describe('Products', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: { queryParamMap: convertToParamMap(queryParam ? { category: queryParam } : {}) },
+            // The component subscribes to the live stream (not the snapshot) so
+            // that re-navigating to /products?category=… updates the list.
+            queryParamMap: of(convertToParamMap(queryParam ? { category: queryParam } : {})),
           },
         },
       ],
@@ -69,32 +75,58 @@ describe('Products', () => {
   it('should create with "All" selected by default', () => {
     configure(null);
     const fixture = create();
-    expect(fixture.componentInstance.selectedCategory).toBe('All');
-    expect(fixture.componentInstance.filteredProducts.length).toBe(2);
+    expect(fixture.componentInstance.selectedCategory()).toBe('All');
+    expect(fixture.componentInstance.filteredProducts().length).toBe(2);
   });
 
   it('pre-selects the category from the query param when valid', () => {
     configure('Flour');
     const fixture = create();
-    expect(fixture.componentInstance.selectedCategory).toBe('Flour');
-    expect(fixture.componentInstance.filteredProducts).toEqual([flourProduct]);
+    expect(fixture.componentInstance.selectedCategory()).toBe('Flour');
+    expect(fixture.componentInstance.filteredProducts()).toEqual([flourProduct]);
   });
 
   it('ignores an invalid category query param', () => {
     configure('NotACategory');
     const fixture = create();
-    expect(fixture.componentInstance.selectedCategory).toBe('All');
+    expect(fixture.componentInstance.selectedCategory()).toBe('All');
   });
 
-  it('selectCategory updates the filtered list', () => {
+  // selectCategory deliberately does not set the signal itself: it navigates, and
+  // the query-param subscription is the single source of truth for the selection.
+  it('selectCategory navigates with the category query param', () => {
     configure(null);
+    spyOn(router, 'navigate');
     const fixture = create();
+
     fixture.componentInstance.selectCategory('Grains');
-    expect(fixture.componentInstance.selectedCategory).toBe('Grains');
-    expect(fixture.componentInstance.filteredProducts).toEqual([grainProduct]);
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      [],
+      jasmine.objectContaining({ queryParams: { category: 'Grains' } }),
+    );
   });
 
-  it('addToCart redirects to login when logged out', () => {
+  it('selectCategory clears the query param when selecting All', () => {
+    configure('Grains');
+    spyOn(router, 'navigate');
+    const fixture = create();
+
+    fixture.componentInstance.selectCategory('All');
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      [],
+      jasmine.objectContaining({ queryParams: { category: null } }),
+    );
+  });
+
+  it('filters the list to the category carried by the query param', () => {
+    configure('Grains');
+    const fixture = create();
+    expect(fixture.componentInstance.filteredProducts()).toEqual([grainProduct]);
+  });
+
+  it('addToCart works when logged out so guests can build a cart', () => {
     configure(null);
     authServiceSpy.isLoggedIn.and.returnValue(false);
     spyOn(router, 'navigate');
@@ -102,8 +134,8 @@ describe('Products', () => {
 
     fixture.componentInstance.addToCart(flourProduct);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(cartServiceSpy.addToCart).not.toHaveBeenCalled();
+    expect(cartServiceSpy.addToCart).toHaveBeenCalledWith(flourProduct);
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('addToCart adds the product and sets justAdded when logged in', () => {
@@ -114,7 +146,7 @@ describe('Products', () => {
     expect(fixture.componentInstance.justAdded()).toBe(flourProduct.id);
   });
 
-  it('buyNow redirects to login when logged out', () => {
+  it('buyNow sends a logged-out guest to checkout, where the auth guard takes over', () => {
     configure(null);
     authServiceSpy.isLoggedIn.and.returnValue(false);
     spyOn(router, 'navigate');
@@ -122,8 +154,8 @@ describe('Products', () => {
 
     fixture.componentInstance.buyNow(flourProduct);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(checkoutServiceSpy.addItem).not.toHaveBeenCalled();
+    expect(checkoutServiceSpy.addItem).toHaveBeenCalledWith(flourProduct);
+    expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
   });
 
   it('buyNow adds to checkout and navigates when logged in', () => {

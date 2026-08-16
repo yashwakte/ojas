@@ -261,6 +261,30 @@
             </label>
           </div>
 
+          <div class="form-row two-col">
+            <label class="form-field">
+              <span class="form-label">Stock quantity</span>
+              <input class="form-control" type="number" min="0" step="1"
+                name="stockQuantity"
+                placeholder="Leave blank to not track stock"
+                [ngModel]="formData().stockQuantity"
+                (ngModelChange)="formData.update(d => ({...d, stockQuantity: $event === null || $event === '' ? null : +$event}))">
+              <span class="field-hint">
+                Blank means stock isn't tracked — the product stays buyable and is never
+                counted down. Enter a number to start tracking it.
+              </span>
+            </label>
+
+            <label class="form-field">
+              <span class="form-label">Low stock alert at</span>
+              <input class="form-control" type="number" min="0" step="1"
+                name="lowStockThreshold"
+                [ngModel]="formData().lowStockThreshold"
+                (ngModelChange)="formData.update(d => ({...d, lowStockThreshold: +$event}))">
+              <span class="field-hint">Warn on the dashboard at or below this count.</span>
+            </label>
+          </div>
+
           <div class="form-row checkbox-row">
             <label class="checkbox-control">
               <input type="checkbox"
@@ -354,6 +378,21 @@
                     <mat-icon>{{ product.isAvailable ? 'check_circle' : 'cancel' }}</mat-icon>
                     {{ product.isAvailable ? 'Available' : 'Unavailable' }}
                   </span>
+                  @if (product.stockQuantity === null) {
+                    <span class="stock-chip untracked">
+                      <mat-icon>help_outline</mat-icon> Stock not tracked
+                    </span>
+                  } @else if (product.stockQuantity <= 0) {
+                    <span class="stock-chip out"><mat-icon>error_outline</mat-icon> Out of stock</span>
+                  } @else if (product.stockQuantity <= product.lowStockThreshold) {
+                    <span class="stock-chip low">
+                      <mat-icon>warning_amber</mat-icon> {{ product.stockQuantity }} left
+                    </span>
+                  } @else {
+                    <span class="stock-chip ok">
+                      <mat-icon>inventory_2</mat-icon> {{ product.stockQuantity }} in stock
+                    </span>
+                  }
                 </div>
 
                 <div class="product-price">

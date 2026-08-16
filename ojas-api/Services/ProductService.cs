@@ -4,6 +4,14 @@ using OjasApi.Models;
 
 namespace OjasApi.Services;
 
+/// <param name="ProductName">Which product ran short, for the customer-facing message.</param>
+/// <param name="Available">How many were actually left.</param>
+public record StockResult(bool Success, string? ProductName = null, int Available = 0)
+{
+    public static StockResult Ok() => new(true);
+    public static StockResult Failed(string productName, int available) => new(false, productName, available);
+}
+
 public class ProductService
 {
     private readonly IMongoDbService _db;
@@ -43,6 +51,8 @@ public class ProductService
         if (request.GalleryImageUrls != null) product.GalleryImageUrls = request.GalleryImageUrls;
         if (request.Weight != null) product.Weight = request.Weight;
         if (request.IsAvailable.HasValue) product.IsAvailable = request.IsAvailable.Value;
+        if (request.StockQuantity.HasValue) product.StockQuantity = request.StockQuantity.Value;
+        if (request.LowStockThreshold.HasValue) product.LowStockThreshold = request.LowStockThreshold.Value;
         if (request.Ingredients != null) product.Ingredients = request.Ingredients;
         if (request.Benefits != null) product.Benefits = request.Benefits;
         if (request.StorageInfo != null) product.StorageInfo = request.StorageInfo;
@@ -108,6 +118,82 @@ public class ProductService
         return products;
     }
 
+    /// <summary>
+    /// Atomically takes stock for an order. Each decrement is a single conditional
+    /// update (`stockQuantity >= qty`), so two customers racing for the last packet
+    /// cannot both win — the loser's update matches nothing. If any line fails,
+    /// every line already taken in this call is put back before returning.
+    /// Products with null stockQuantity are untracked and simply skipped.
+    /// </summary>
+    public async Task<StockResult> TryConsumeStockAsync(IEnumerable<(string ProductId, int Quantity, string ProductName)> items)
+    {
+        var taken = new List<(string ProductId, int Quantity)>();
+
+        foreach (var (productId, quantity, productName) in items)
+        {
+            if (quantity <= 0) continue;
+            // Product.Id is stored as an ObjectId, so a malformed id would throw while
+            // the filter is serialized. Treat it as untracked rather than 500-ing.
+            if (!ObjectId.TryParse(productId, out _)) continue;
+
+            var filter = Builders<Product>.Filter.Eq(p => p.Id, productId)
+                & Builders<Product>.Filter.Ne(p => p.StockQuantity, null)
+                & Builders<Product>.Filter.Gte(p => p.StockQuantity, quantity);
+
+            var result = await _db.Products.UpdateOneAsync(
+                filter,
+                Builders<Product>.Update.Inc(p => p.StockQuantity, -quantity));
+
+            if (result.MatchedCount > 0)
+            {
+                taken.Add((productId, quantity));
+                continue;
+            }
+
+            // Either the product is untracked (fine) or there isn't enough (not fine).
+            var product = await GetByIdAsync(productId);
+            if (product is null)
+            {
+                await RestoreStockAsync(taken);
+                return StockResult.Failed(productName, 0);
+            }
+
+            if (product.StockQuantity is null) continue; // untracked
+
+            await RestoreStockAsync(taken);
+            return StockResult.Failed(product.Name, product.StockQuantity.Value);
+        }
+
+        return StockResult.Ok();
+    }
+
+    /// <summary>Puts stock back — used on cancellation and when an edit reduces quantities.</summary>
+    public async Task RestoreStockAsync(IEnumerable<(string ProductId, int Quantity)> items)
+    {
+        foreach (var (productId, quantity) in items)
+        {
+            if (quantity <= 0) continue;
+            if (!ObjectId.TryParse(productId, out _)) continue;
+            await _db.Products.UpdateOneAsync(
+                Builders<Product>.Filter.Eq(p => p.Id, productId)
+                    & Builders<Product>.Filter.Ne(p => p.StockQuantity, null),
+                Builders<Product>.Update.Inc(p => p.StockQuantity, quantity));
+        }
+    }
+
+    /// <summary>Tracked products at or below their low-stock threshold, neediest first.</summary>
+    public async Task<List<Product>> GetLowStockAsync()
+    {
+        var tracked = await _db.Products
+            .Find(Builders<Product>.Filter.Ne(p => p.StockQuantity, null))
+            .ToListAsync();
+
+        return tracked
+            .Where(p => p.StockQuantity!.Value <= p.LowStockThreshold)
+            .OrderBy(p => p.StockQuantity!.Value)
+            .ToList();
+    }
+
     public async Task<bool> DeleteAsync(string id)
     {
         var result = await _db.Products.DeleteOneAsync(p => p.Id == id);
@@ -146,6 +232,13 @@ public class ProductService
         await _db.Products.UpdateManyAsync(
             filter.Exists("galleryImageUrls", false),
             update.Set(p => p.GalleryImageUrls, new List<string>()));
+
+        // Give existing products a threshold but deliberately NOT a stockQuantity:
+        // leaving it absent (null) keeps them untracked and purchasable until an
+        // admin enters a real count, rather than silently marking the shop empty.
+        await _db.Products.UpdateManyAsync(
+            filter.Exists("lowStockThreshold", false),
+            update.Set(p => p.LowStockThreshold, 5));
 
         var fastingProductNames = new[]
         {

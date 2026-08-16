@@ -15,6 +15,8 @@ describe('ProductCard', () => {
     galleryImageUrls: [],
     weight: '500g',
     isAvailable: true,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: '',
     benefits: '',
     storageInfo: '',
@@ -84,5 +86,48 @@ describe('ProductCard', () => {
     const fixture = create();
     const badge = fixture.nativeElement.querySelector('.pbadge');
     expect(badge).toBeNull();
+  });
+
+  // ===== Stock =====
+
+  it('stays purchasable when stock is not tracked (stockQuantity null)', () => {
+    const fixture = create();
+    fixture.componentRef.setInput('product', { ...product, stockQuantity: null });
+    fixture.detectChanges();
+
+    const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.home-add-cart-btn');
+    expect(addBtn.disabled).toBeFalse();
+    expect(fixture.nativeElement.querySelector('.pstock-veil')).toBeNull();
+  });
+
+  it('disables both actions and veils the image when out of stock', () => {
+    const fixture = create();
+    fixture.componentRef.setInput('product', { ...product, stockQuantity: 0 });
+    fixture.detectChanges();
+
+    const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.home-add-cart-btn');
+    const buyBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.home-buy-now-btn');
+    expect(addBtn.disabled).toBeTrue();
+    expect(buyBtn.disabled).toBeTrue();
+    expect(fixture.nativeElement.querySelector('.pstock-veil').textContent).toContain('Out of stock');
+  });
+
+  it('warns how many are left when stock is low but not gone', () => {
+    const fixture = create();
+    fixture.componentRef.setInput('product', { ...product, stockQuantity: 2, lowStockThreshold: 5 });
+    fixture.detectChanges();
+
+    const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.home-add-cart-btn');
+    expect(addBtn.disabled).toBeFalse();
+    expect(fixture.nativeElement.querySelector('.plow-stock').textContent).toContain('Only 2 left');
+  });
+
+  it('is not purchasable when the admin has disabled it, whatever the stock', () => {
+    const fixture = create();
+    fixture.componentRef.setInput('product', { ...product, isAvailable: false, stockQuantity: 99 });
+    fixture.detectChanges();
+
+    const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.home-add-cart-btn');
+    expect(addBtn.disabled).toBeTrue();
   });
 });

@@ -253,6 +253,40 @@ public class ProductsControllerTests
     }
 
     [Fact]
+    public async Task Update_PersistsStockQuantity()
+    {
+        // Regression: the controller used to rebuild a sanitized request that
+        // dropped StockQuantity/LowStockThreshold entirely, so neither field was
+        // ever persisted no matter what the admin entered.
+        var existing = MakeProduct("507f1f77bcf86cd799439011");
+        existing.StockQuantity = null;
+        _productsMock.SetupFind(new List<Product> { existing });
+
+        var result = await _sut.Update(existing.Id!, new UpdateProductRequest { StockQuantity = 42, LowStockThreshold = 8 });
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var product = okResult.Value.ShouldBeOfType<Product>();
+        product.StockQuantity.ShouldBe(42);
+        product.LowStockThreshold.ShouldBe(8);
+    }
+
+    [Fact]
+    public async Task Update_LeavesStockQuantityUnchanged_WhenNotProvided()
+    {
+        // A partial update (e.g. toggling availability alone) must not wipe out
+        // an already-tracked stock count.
+        var existing = MakeProduct("507f1f77bcf86cd799439011");
+        existing.StockQuantity = 15;
+        _productsMock.SetupFind(new List<Product> { existing });
+
+        var result = await _sut.Update(existing.Id!, new UpdateProductRequest { IsAvailable = false });
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var product = okResult.Value.ShouldBeOfType<Product>();
+        product.StockQuantity.ShouldBe(15);
+    }
+
+    [Fact]
     public async Task Update_ReturnsBadRequest_WhenPriceOutOfRangeAfterMerge()
     {
         var existing = MakeProduct("507f1f77bcf86cd799439011");

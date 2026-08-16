@@ -60,11 +60,13 @@ describe('AdminDashboard', () => {
     orderServiceSpy.getAdminOrders.and.returnValue(of([order, order2, order3]));
     orderServiceSpy.getDeliveryPartners.and.returnValue(of([partner]));
 
-    productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts'], {
+    productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts', 'getLowStock'], {
       products: signal<Product[]>([]),
       loading: signal(false),
       error: signal<string | null>(null),
     });
+    // The dashboard loads the low-stock panel on init.
+    productServiceSpy.getLowStock.and.returnValue(of([]));
     deliveryChargesServiceSpy = jasmine.createSpyObj('DeliveryChargesService', ['loadConfig', 'calculateDeliveryCharge'], {
       config: signal<DeliveryChargesConfig | null>(null),
       loading: signal(false),
@@ -189,6 +191,30 @@ describe('AdminDashboard', () => {
     expect(orderServiceSpy.updateOrderStatusAsAdmin).toHaveBeenCalledWith('o1', { status: 'Packed' });
     expect(fixture.componentInstance.orders().find((o) => o.id === 'o1')?.status).toBe('Packed');
     expect(snackBar.open).toHaveBeenCalledWith('Order status updated', 'Close', jasmine.any(Object));
+  });
+
+  it('updateOrderStatus refreshes products and low-stock when cancelling, since stock is restored server-side', () => {
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(undefined));
+    const { fixture } = create();
+    productServiceSpy.loadProducts.calls.reset();
+    productServiceSpy.getLowStock.calls.reset();
+    fixture.componentInstance.setStatusDraft('o1', 'Cancelled');
+
+    fixture.componentInstance.updateOrderStatus(order);
+
+    expect(productServiceSpy.loadProducts).toHaveBeenCalled();
+    expect(productServiceSpy.getLowStock).toHaveBeenCalled();
+  });
+
+  it('updateOrderStatus does not refresh products for non-cancelling transitions', () => {
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(undefined));
+    const { fixture } = create();
+    productServiceSpy.loadProducts.calls.reset();
+    fixture.componentInstance.setStatusDraft('o1', 'Packed');
+
+    fixture.componentInstance.updateOrderStatus(order);
+
+    expect(productServiceSpy.loadProducts).not.toHaveBeenCalled();
   });
 
   it('updateOrderStatus is a no-op when the draft equals the current status', () => {

@@ -37,6 +37,19 @@ public class Product
     [BsonElement("isAvailable")]
     public bool IsAvailable { get; set; } = true;
 
+    /// <summary>
+    /// Units on hand. Null means stock is not tracked for this product yet — it
+    /// stays purchasable and is never decremented. That keeps every pre-existing
+    /// product buyable after this feature ships, so the shop doesn't go dark;
+    /// admins opt each product in by setting a number.
+    /// </summary>
+    [BsonElement("stockQuantity")]
+    public int? StockQuantity { get; set; }
+
+    /// <summary>At or below this (and above zero), admin sees a low-stock warning.</summary>
+    [BsonElement("lowStockThreshold")]
+    public int LowStockThreshold { get; set; } = 5;
+
     [BsonElement("ingredients")]
     public string Ingredients { get; set; } = string.Empty;
 
@@ -80,6 +93,12 @@ public sealed class CreateProductRequest
 
     public bool IsAvailable { get; init; } = true;
 
+    [Range(0, 1_000_000)]
+    public int? StockQuantity { get; init; }
+
+    [Range(0, 10_000)]
+    public int? LowStockThreshold { get; init; }
+
     [Required, StringLength(3000, MinimumLength = 5)]
     public string Ingredients { get; init; } = string.Empty;
 
@@ -116,6 +135,12 @@ public sealed class UpdateProductRequest
     public string? Weight { get; init; }
 
     public bool? IsAvailable { get; init; }
+
+    [Range(0, 1_000_000)]
+    public int? StockQuantity { get; init; }
+
+    [Range(0, 10_000)]
+    public int? LowStockThreshold { get; init; }
 
     [StringLength(3000, MinimumLength = 5)]
     public string? Ingredients { get; init; }

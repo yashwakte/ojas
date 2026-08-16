@@ -10,6 +10,11 @@
       <span class="pbadge" [class.pbadge--sale]="badge() === 'Sale'">{{ badge() }}</span>
     }
     <span class="pcat">{{ product().category }}</span>
+    @if (outOfStock()) {
+      <span class="pstock-veil"><span>Out of stock</span></span>
+    } @else if (lowStock()) {
+      <span class="plow-stock">Only {{ product().stockQuantity }} left</span>
+    }
   </div>
   <div class="pbody-top">
     <h3>{{ product().name }}</h3>
@@ -34,12 +39,13 @@
     <button
       class="home-add-cart-btn"
       [class.added]="justAdded()"
+      [disabled]="!purchasable()"
       (click)="addToCart.emit(product())"
     >
       <mat-icon>{{ justAdded() ? 'check' : 'add_shopping_cart' }}</mat-icon>
       {{ justAdded() ? 'Added' : 'Add' }}
     </button>
-    <button class="home-buy-now-btn" (click)="buyNow.emit(product())">
+    <button class="home-buy-now-btn" [disabled]="!purchasable()" (click)="buyNow.emit(product())">
       <mat-icon>bolt</mat-icon> Buy
     </button>
   </div>

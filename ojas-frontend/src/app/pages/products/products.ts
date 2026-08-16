@@ -52,20 +52,14 @@ export class Products {
   });
 
   addToCart(product: Product): void {
-    if (!this.auth.isLoggedIn()) {
-      this.router.navigate(['/login']);
-      return;
-    }
     this.cartService.addToCart(product);
     this.justAdded.set(product.id);
     setTimeout(() => this.justAdded.set(null), 2000);
   }
 
+  // Guests are allowed through — /checkout's auth guard collects the login and
+  // sends them straight back, with the item still in their basket.
   buyNow(product: Product): void {
-    if (!this.auth.isLoggedIn()) {
-      this.router.navigate(['/login']);
-      return;
-    }
     this.checkoutService.addItem(product);
     this.router.navigate(['/checkout']);
   }

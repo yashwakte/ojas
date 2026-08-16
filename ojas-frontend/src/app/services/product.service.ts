@@ -52,6 +52,13 @@ export class ProductService {
       .pipe(map((products) => products.map((product) => this.normalizeProduct(product))));
   }
 
+  /** Admin-only: tracked products at or below their low-stock threshold. */
+  getLowStock(): Observable<Product[]> {
+    return this.http
+      .get<Product[]>(`${this.apiUrl}/low-stock`)
+      .pipe(map((products) => products.map((product) => this.normalizeProduct(product))));
+  }
+
   createProduct(request: CreateProductRequest): Observable<Product> {
     return this.http.post<Product>(this.apiUrl, request).pipe(
       map((product) => this.normalizeProduct(product)),
@@ -87,6 +94,10 @@ export class ProductService {
       imageUrl: product.imageUrl ?? '',
       galleryImageUrls: product.galleryImageUrls ?? [],
       isAvailable: product.isAvailable ?? true,
+      // undefined (field absent on older documents) must normalise to null —
+      // "not tracked" — and never to 0, which would read as out of stock.
+      stockQuantity: product.stockQuantity ?? null,
+      lowStockThreshold: product.lowStockThreshold ?? 5,
       ingredients: product.ingredients || 'See the product description for ingredient details.',
       benefits: product.benefits || 'See the product description for nutritional and usage benefits.',
       storageInfo: product.storageInfo || 'Store in a cool, dry place in an airtight container.',

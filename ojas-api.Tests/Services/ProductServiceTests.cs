@@ -143,4 +143,130 @@ public class ProductServiceTests
 
         _productsMock.Verify(c => c.InsertManyAsync(It.IsAny<IEnumerable<Product>>(), It.IsAny<InsertManyOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    // ===== Stock =====
+
+    private void SetupUpdateResults(params long[] matchedCounts)
+    {
+        var sequence = _productsMock.SetupSequence(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()));
+
+        foreach (var matched in matchedCounts)
+        {
+            sequence = sequence.ReturnsAsync(new UpdateResult.Acknowledged(matched, matched, null));
+        }
+    }
+
+    [Fact]
+    public async Task TryConsumeStockAsync_Succeeds_WhenStockIsSufficient()
+    {
+        SetupUpdateResults(1, 1);
+
+        var result = await _sut.TryConsumeStockAsync(
+        [
+            ("507f1f77bcf86cd799439011", 2, "Bajra Flour"),
+            ("507f1f77bcf86cd799439012", 1, "Rice Flour"),
+        ]);
+
+        result.Success.ShouldBeTrue();
+        _productsMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task TryConsumeStockAsync_SkipsUntrackedProducts_WithoutFailing()
+    {
+        // The conditional update matches nothing because stockQuantity is null;
+        // an untracked product is simply not counted down.
+        var untracked = MakeProduct("507f1f77bcf86cd799439011");
+        untracked.StockQuantity = null;
+        _productsMock.SetupFind([untracked]);
+        SetupUpdateResults(0);
+
+        var result = await _sut.TryConsumeStockAsync([("507f1f77bcf86cd799439011", 3, "Bajra Flour")]);
+
+        result.Success.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task TryConsumeStockAsync_Fails_AndReportsWhatIsLeft_WhenShort()
+    {
+        var short_ = MakeProduct("507f1f77bcf86cd799439011", "Bajra Flour");
+        short_.StockQuantity = 2;
+        _productsMock.SetupFind([short_]);
+        SetupUpdateResults(0);
+
+        var result = await _sut.TryConsumeStockAsync([("507f1f77bcf86cd799439011", 5, "Bajra Flour")]);
+
+        result.Success.ShouldBeFalse();
+        result.ProductName.ShouldBe("Bajra Flour");
+        result.Available.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task TryConsumeStockAsync_RollsBackEarlierLines_WhenALaterLineIsShort()
+    {
+        var short_ = MakeProduct("507f1f77bcf86cd799439012", "Rice Flour");
+        short_.StockQuantity = 0;
+        _productsMock.SetupFind([short_]);
+
+        // take first line, second line short, then the restore of the first line
+        SetupUpdateResults(1, 0, 1);
+
+        var result = await _sut.TryConsumeStockAsync(
+        [
+            ("507f1f77bcf86cd799439011", 2, "Bajra Flour"),
+            ("507f1f77bcf86cd799439012", 1, "Rice Flour"),
+        ]);
+
+        result.Success.ShouldBeFalse();
+        // Three updates: the take, the failed attempt, and the compensating restore —
+        // so a partial failure never leaves stock silently consumed.
+        _productsMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task TryConsumeStockAsync_IgnoresNonPositiveQuantities()
+    {
+        var result = await _sut.TryConsumeStockAsync([("507f1f77bcf86cd799439011", 0, "Bajra Flour")]);
+
+        result.Success.ShouldBeTrue();
+        _productsMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetLowStockAsync_ReturnsTrackedProductsAtOrBelowThreshold_NeediestFirst()
+    {
+        var plenty = MakeProduct("507f1f77bcf86cd799439011", "Plenty");
+        plenty.StockQuantity = 50;
+        plenty.LowStockThreshold = 5;
+
+        var low = MakeProduct("507f1f77bcf86cd799439012", "Low");
+        low.StockQuantity = 3;
+        low.LowStockThreshold = 5;
+
+        var out_ = MakeProduct("507f1f77bcf86cd799439013", "Empty");
+        out_.StockQuantity = 0;
+        out_.LowStockThreshold = 5;
+
+        _productsMock.SetupFind([plenty, low, out_]);
+
+        var result = await _sut.GetLowStockAsync();
+
+        result.Select(p => p.Name).ShouldBe(["Empty", "Low"]);
+    }
 }

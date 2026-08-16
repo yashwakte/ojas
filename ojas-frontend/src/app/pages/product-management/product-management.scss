@@ -645,3 +645,40 @@ select.form-control {
     padding: 10px 12px;
   }
 }
+
+// ===== Stock state chips in the product list =====
+.stock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 0.9rem;
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  &.ok {
+    background: rgba(21, 128, 61, 0.09);
+    color: #15803d;
+  }
+
+  &.low {
+    background: rgba(242, 90, 26, 0.11);
+    color: #c2410c;
+  }
+
+  &.out {
+    background: rgba(220, 38, 38, 0.09);
+    color: #b91c1c;
+  }
+
+  &.untracked {
+    background: rgba(45, 45, 45, 0.06);
+    color: #6b6b6b;
+  }
+}

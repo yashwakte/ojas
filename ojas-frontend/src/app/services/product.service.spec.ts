@@ -31,6 +31,8 @@ describe('ProductService', () => {
     galleryImageUrls: ['/images/g1.jpg'],
     weight: '1kg',
     isAvailable: false,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: 'Ragi',
     benefits: 'Iron rich',
     storageInfo: 'Cool place',

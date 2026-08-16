@@ -46,6 +46,14 @@ public class ProductsController : ControllerBase
         return Ok(products);
     }
 
+    /// <summary>Tracked products at or below their low-stock threshold.</summary>
+    [HttpGet("low-stock")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<ActionResult<List<Product>>> GetLowStock()
+    {
+        return Ok(await _productService.GetLowStockAsync());
+    }
+
     [HttpPost]
     [Authorize(Roles = UserRoles.Admin)]
     public async Task<ActionResult<Product>> Create([FromBody] CreateProductRequest request)
@@ -61,6 +69,8 @@ public class ProductsController : ControllerBase
             GalleryImageUrls = CleanGallery(request.GalleryImageUrls),
             Weight = Clean(request.Weight),
             IsAvailable = request.IsAvailable,
+            StockQuantity = request.StockQuantity,
+            LowStockThreshold = request.LowStockThreshold ?? 5,
             Ingredients = Clean(request.Ingredients),
             Benefits = Clean(request.Benefits),
             StorageInfo = Clean(request.StorageInfo),
@@ -91,6 +101,8 @@ public class ProductsController : ControllerBase
             GalleryImageUrls = request.GalleryImageUrls is null ? null : CleanGallery(request.GalleryImageUrls),
             Weight = request.Weight is null ? null : Clean(request.Weight),
             IsAvailable = request.IsAvailable,
+            StockQuantity = request.StockQuantity,
+            LowStockThreshold = request.LowStockThreshold,
             Ingredients = request.Ingredients is null ? null : Clean(request.Ingredients),
             Benefits = request.Benefits is null ? null : Clean(request.Benefits),
             StorageInfo = request.StorageInfo is null ? null : Clean(request.StorageInfo),
@@ -124,6 +136,7 @@ public class ProductsController : ControllerBase
         request.Name != null || request.Description != null || request.Price.HasValue ||
         request.Discount.HasValue || request.Category != null || request.ImageUrl != null ||
         request.GalleryImageUrls != null || request.Weight != null || request.IsAvailable.HasValue ||
+        request.StockQuantity.HasValue || request.LowStockThreshold.HasValue ||
         request.Ingredients != null || request.Benefits != null || request.StorageInfo != null;
 
     private static string Clean(string value) => value.Trim().Replace("<", string.Empty).Replace(">", string.Empty);
@@ -142,6 +155,8 @@ public class ProductsController : ControllerBase
         if (request.GalleryImageUrls != null) product.GalleryImageUrls = request.GalleryImageUrls;
         if (request.Weight != null) product.Weight = request.Weight;
         if (request.IsAvailable.HasValue) product.IsAvailable = request.IsAvailable.Value;
+        if (request.StockQuantity.HasValue) product.StockQuantity = request.StockQuantity.Value;
+        if (request.LowStockThreshold.HasValue) product.LowStockThreshold = request.LowStockThreshold.Value;
         if (request.Ingredients != null) product.Ingredients = request.Ingredients;
         if (request.Benefits != null) product.Benefits = request.Benefits;
         if (request.StorageInfo != null) product.StorageInfo = request.StorageInfo;

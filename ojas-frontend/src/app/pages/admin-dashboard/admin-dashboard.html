@@ -64,6 +64,36 @@
     }
   </nav>
 
+  <!-- Restocking is time-sensitive, so it sits above the tabs rather than
+       inside one an admin might not open. -->
+  @if (!loadingLowStock() && lowStockProducts().length > 0) {
+    <section class="low-stock-alert">
+      <div class="low-stock-head">
+        <mat-icon>inventory_2</mat-icon>
+        <h3>Running low</h3>
+        <span class="low-stock-count">{{ lowStockProducts().length }}</span>
+      </div>
+      <ul class="low-stock-list">
+        @for (p of lowStockProducts(); track p.id) {
+          <li [class.is-out]="p.stockQuantity === 0">
+            <span class="low-stock-name">{{ p.name }}</span>
+            <span class="low-stock-weight">{{ p.weight }}</span>
+            <span class="low-stock-qty">
+              @if (p.stockQuantity === 0) {
+                Out of stock
+              } @else {
+                {{ p.stockQuantity }} left
+              }
+            </span>
+          </li>
+        }
+      </ul>
+      <button type="button" class="low-stock-manage" (click)="selectTab('products')">
+        Manage stock
+      </button>
+    </section>
+  }
+
   <mat-tab-group
     [selectedIndex]="getTabIndex()"
     (selectedTabChange)="onTabChange($event)"
