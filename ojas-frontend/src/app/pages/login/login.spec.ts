@@ -66,17 +66,17 @@ describe('Login', () => {
     expect(authServiceSpy.login).not.toHaveBeenCalled();
   });
 
-  it('onSubmit logs in, saves auth, shows a success snackbar, and navigates to the role home on success', () => {
+  it('onSubmit logs in, saves auth, celebrates, and navigates to the role home on success', () => {
     authServiceSpy.login.and.returnValue(of(authResponse));
-    spyOn(router, 'navigate');
-    const { fixture, snackBar } = create();
+    spyOn(router, 'navigateByUrl');
+    const { fixture } = create();
     fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
     expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
-    expect(snackBar.open).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/']);
+    // The success snackbar was replaced by the welcome celebration overlay.
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/');
     expect(fixture.componentInstance.loading).toBeFalse();
   });
 

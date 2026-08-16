@@ -1,0 +1,207 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.intro {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+// The curtain itself — warm ivory so the lift resolves seamlessly into the
+// light site behind it rather than flashing from dark to light.
+.intro-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 30%, #fffaf6 0%, #fdf3ec 45%, #f7e9df 100%);
+  transform: translateY(0);
+  will-change: transform;
+}
+
+// Soft brand-orange bloom breathing behind the wordmark.
+.intro-bloom {
+  position: absolute;
+  width: min(90vmin, 720px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(242, 90, 26, 0.16),
+    rgba(242, 90, 26, 0.05) 55%,
+    transparent 72%
+  );
+  filter: blur(6px);
+  animation: introBloom 2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.intro-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  will-change: transform, opacity, filter;
+}
+
+// ===== Wordmark =====
+.intro-mark {
+  position: relative;
+  display: flex;
+  font-family: 'Poppins', sans-serif;
+  font-size: clamp(3rem, 11vw, 5.6rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ojas-ink, #2d2d2d);
+  line-height: 1;
+}
+
+// Each letter rises out of an overflow mask — reads far more deliberate
+// than a plain fade.
+.glyph {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.06em 0 0.12em;
+
+  > i {
+    display: inline-block;
+    font-style: normal;
+    transform: translateY(115%);
+    animation: glyphRise 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+// A single light sweep across the wordmark once it has settled.
+.sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 62%
+  );
+  mix-blend-mode: overlay;
+  transform: translateX(-120%);
+  animation: sheenSweep 1.05s cubic-bezier(0.5, 0, 0.2, 1) 0.62s both;
+}
+
+.intro-hair {
+  display: block;
+  height: 1px;
+  width: min(260px, 52vw);
+  background: linear-gradient(90deg, transparent, rgba(242, 90, 26, 0.55), transparent);
+  transform: scaleX(0);
+  animation: hairExpand 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.72s both;
+}
+
+.intro-tag {
+  margin: 0;
+  font-size: clamp(0.78rem, 2.4vw, 0.95rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ojas-text-light, #6b6b6b);
+  animation: tagIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.86s both;
+}
+
+// ===== Exit: content recedes, then the curtain lifts away =====
+.intro.lifting {
+  .intro-stage {
+    animation: stageOut 0.5s cubic-bezier(0.5, 0, 0.75, 0) both;
+  }
+
+  .intro-bloom {
+    animation: bloomOut 0.5s ease both;
+  }
+
+  .intro-veil {
+    animation: curtainLift 0.9s cubic-bezier(0.76, 0, 0.24, 1) 0.16s both;
+  }
+}
+
+@keyframes introBloom {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes glyphRise {
+  from {
+    transform: translateY(115%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheenSweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes hairExpand {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes tagIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes stageOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.98);
+    filter: blur(6px);
+  }
+}
+
+@keyframes bloomOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes curtainLift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-101%);
+  }
+}

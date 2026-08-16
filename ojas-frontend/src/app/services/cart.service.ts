@@ -2,6 +2,8 @@ import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import { CartItem, Product } from '../models/interfaces';
 import { AuthService } from './auth.service';
 
+const GUEST_KEY = 'ojas_cart_guest';
+
 @Injectable({ providedIn: 'root' })
 export class CartService {
   private readonly auth = inject(AuthService);
@@ -16,10 +18,27 @@ export class CartService {
   );
 
   constructor() {
-    // Reload cart whenever the logged-in user changes (login / logout / account switch)
+    // Swap buckets whenever the signed-in user changes (login / logout / account switch).
     effect(() => {
-      const user = this.auth.user();
-      this._items.set(user ? this.load(user.id) : []);
+      const userId = this.auth.user()?.id ?? null;
+
+      if (!userId) {
+        this._items.set(this.read(GUEST_KEY));
+        return;
+      }
+
+      // Anything added while browsing signed-out follows the customer into their
+      // account, so a guest never loses a cart by logging in at checkout.
+      const guestItems = this.read(GUEST_KEY);
+      const ownItems = this.read(this.userKey(userId));
+
+      if (guestItems.length) {
+        this._items.set(mergeCarts(ownItems, guestItems));
+        localStorage.removeItem(GUEST_KEY);
+        localStorage.setItem(this.userKey(userId), JSON.stringify(this._items()));
+      } else {
+        this._items.set(ownItems);
+      }
     });
   }
 
@@ -54,25 +73,43 @@ export class CartService {
 
   clearCart(): void {
     this._items.set([]);
-    const userId = this.auth.user()?.id;
-    if (userId) localStorage.removeItem(this.key(userId));
+    localStorage.removeItem(this.storageKey());
   }
 
-  private key(userId: string): string {
+  private userKey(userId: string): string {
     return `ojas_cart_${userId}`;
   }
 
-  private save(): void {
+  /** Guests persist to their own bucket so the cart survives a page reload. */
+  private storageKey(): string {
     const userId = this.auth.user()?.id;
-    if (userId) localStorage.setItem(this.key(userId), JSON.stringify(this._items()));
+    return userId ? this.userKey(userId) : GUEST_KEY;
   }
 
-  private load(userId: string): CartItem[] {
+  private save(): void {
+    localStorage.setItem(this.storageKey(), JSON.stringify(this._items()));
+  }
+
+  private read(key: string): CartItem[] {
     try {
-      const raw = localStorage.getItem(this.key(userId));
+      const raw = localStorage.getItem(key);
       return raw ? (JSON.parse(raw) as CartItem[]) : [];
     } catch {
       return [];
     }
   }
+}
+
+/** Quantities add up when a guest cart is absorbed into an account cart. */
+function mergeCarts(base: CartItem[], incoming: CartItem[]): CartItem[] {
+  const merged = [...base];
+  for (const item of incoming) {
+    const idx = merged.findIndex((i) => i.product.id === item.product.id);
+    if (idx >= 0) {
+      merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + item.quantity };
+    } else {
+      merged.push({ ...item });
+    }
+  }
+  return merged;
 }

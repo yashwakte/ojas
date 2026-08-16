@@ -1,5 +1,5 @@
-import { Component, ChangeDetectorRef, OnDestroy } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, ChangeDetectorRef, OnDestroy, inject } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { WelcomeService } from '../../services/welcome.service';
 import { timeout } from 'rxjs';
 
 @Component({
@@ -26,6 +27,9 @@ import { timeout } from 'rxjs';
   styleUrl: './login.scss',
 })
 export class Login implements OnDestroy {
+  private readonly welcome = inject(WelcomeService);
+  private readonly route = inject(ActivatedRoute);
+
   loginForm: FormGroup;
   loading = false;
   slowConnection = false;
@@ -67,11 +71,16 @@ export class Login implements OnDestroy {
           this.slowConnection = false;
           this.cdr.detectChanges();
           this.auth.saveAuth(res);
-          this.snackBar.open('Welcome back! 🎉', 'Close', {
-            duration: 3000,
-            panelClass: 'snack-success',
-          });
-          this.router.navigate([this.auth.getDefaultRouteForRole(res.role)]);
+          this.welcome.celebrate('login', res.fullName);
+
+          // Guards park the intended destination here (e.g. a guest sent to log
+          // in from checkout), so return them to it rather than the role home.
+          const redirect = this.route.snapshot.queryParamMap.get('redirect');
+          const target =
+            redirect && res.role === 'customer'
+              ? redirect
+              : this.auth.getDefaultRouteForRole(res.role);
+          this.router.navigateByUrl(target);
         },
         error: (err) => {
           this.clearSlowTimer();

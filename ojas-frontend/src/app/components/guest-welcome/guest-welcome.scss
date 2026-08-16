@@ -1,0 +1,329 @@
+.gw {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  padding: 40px 38px 34px;
+  width: min(92vw, 440px);
+  max-width: none;
+  border-radius: 30px;
+  text-align: center;
+  color: var(--ojas-text, #2d2d2d);
+
+  // Layered glass: a warm ivory pane with a fine luminous edge.
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.96), rgba(255, 248, 243, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 30px 90px rgba(58, 30, 14, 0.22),
+    0 4px 18px rgba(58, 30, 14, 0.08);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+
+  animation: gwIn 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  &::backdrop {
+    background: rgba(28, 18, 12, 0.5);
+    backdrop-filter: blur(6px) saturate(1.1);
+    -webkit-backdrop-filter: blur(6px) saturate(1.1);
+    animation: gwBackdropIn 0.6s ease both;
+  }
+
+  &.closing {
+    animation: gwOut 0.42s cubic-bezier(0.5, 0, 0.75, 0) both;
+
+    &::backdrop {
+      animation: gwBackdropOut 0.42s ease both;
+    }
+  }
+}
+
+// Warm brand light pooling at the top of the panel.
+.gw-glow {
+  position: absolute;
+  top: -140px;
+  left: 50%;
+  translate: -50% 0;
+  width: 380px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(242, 90, 26, 0.24),
+    rgba(242, 90, 26, 0.07) 55%,
+    transparent 75%
+  );
+  pointer-events: none;
+  animation: gwGlow 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.gw-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ojas-text-light, #6b6b6b);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  &:hover {
+    background: rgba(45, 45, 45, 0.05);
+    border-color: rgba(45, 45, 45, 0.1);
+    color: var(--ojas-text, #2d2d2d);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange, #f25a1a);
+    outline-offset: 2px;
+  }
+}
+
+// ===== Content, staged =====
+.gw-eyebrow {
+  position: relative;
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ojas-orange, #f25a1a);
+  animation: gwSoftIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.gw-title {
+  position: relative;
+  margin: 12px 0 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: clamp(1.7rem, 6vw, 2.15rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.w {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
+
+  > i {
+    display: inline-block;
+    font-style: normal;
+    transform: translateY(115%);
+    animation: gwWordRise 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  + .w {
+    margin-left: 0.26em;
+  }
+}
+
+.gw-hair {
+  position: relative;
+  display: block;
+  height: 1px;
+  width: 190px;
+  margin: 20px auto 18px;
+  background: linear-gradient(90deg, transparent, rgba(242, 90, 26, 0.5), transparent);
+  transform: scaleX(0);
+  animation: gwHair 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.46s both;
+}
+
+.gw-copy {
+  position: relative;
+  margin: 0 0 26px;
+  font-size: 0.95rem;
+  line-height: 1.62;
+  color: var(--ojas-text-light, #6b6b6b);
+  text-wrap: pretty;
+  animation: gwSoftIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.56s both;
+}
+
+.gw-actions {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: gwSoftIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.68s both;
+}
+
+.gw-btn {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  padding: 14px 22px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease;
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange, #f25a1a);
+    outline-offset: 3px;
+  }
+}
+
+.gw-btn--primary {
+  background: linear-gradient(135deg, var(--ojas-orange, #f25a1a), var(--ojas-orange-dark, #d14500));
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(242, 90, 26, 0.34);
+
+  // Light sheen sweeping across on hover.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.42) 50%,
+      transparent 65%
+    );
+    transform: translateX(-130%);
+    transition: transform 0.7s cubic-bezier(0.5, 0, 0.2, 1);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 44px rgba(242, 90, 26, 0.42);
+
+    &::after {
+      transform: translateX(130%);
+    }
+  }
+}
+
+.gw-btn--ghost {
+  background: transparent;
+  color: var(--ojas-text, #2d2d2d);
+  border: 1px solid var(--ojas-border, #e0e0e0);
+
+  &:hover {
+    background: rgba(45, 45, 45, 0.04);
+    border-color: rgba(45, 45, 45, 0.2);
+    transform: translateY(-1px);
+  }
+}
+
+// ===== Keyframes =====
+@keyframes gwIn {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.94);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes gwOut {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+    filter: blur(8px);
+  }
+}
+
+@keyframes gwBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gwBackdropOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes gwGlow {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes gwWordRise {
+  from {
+    transform: translateY(115%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes gwHair {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes gwSoftIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gw,
+  .gw::backdrop,
+  .gw *,
+  .gw.closing {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .gw .w > i {
+    transform: none;
+  }
+}

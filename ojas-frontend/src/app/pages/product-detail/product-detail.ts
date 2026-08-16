@@ -7,7 +7,8 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
-import { Product } from '../../models/interfaces';
+import { DeliveryAddressService } from '../../services/delivery-address.service';
+import { Product, isLowStock, isOutOfStock, isPurchasable } from '../../models/interfaces';
 
 @Component({
   selector: 'app-product-detail',
@@ -25,8 +26,32 @@ export class ProductDetail {
   private auth = inject(AuthService);
   private router = inject(Router);
   private deliveryChargesService = inject(DeliveryChargesService);
+  // Public so the template can show the "Deliver to" bar and open the picker.
+  readonly deliveryAddress = inject(DeliveryAddressService);
 
   freeDeliveryUpToKm = computed(() => this.deliveryChargesService.config()?.freeDeliveryUpToKm ?? null);
+
+  changeDeliveryAddress(): void {
+    this.deliveryAddress.openPicker();
+  }
+
+  readonly purchasable = computed(() => {
+    const p = this.product();
+    return !!p && isPurchasable(p);
+  });
+
+  readonly outOfStock = computed(() => {
+    const p = this.product();
+    return !!p && isOutOfStock(p);
+  });
+
+  readonly lowStock = computed(() => {
+    const p = this.product();
+    return !!p && isLowStock(p);
+  });
+
+  /** Never let the quantity stepper exceed what's actually on the shelf. */
+  readonly maxQuantity = computed(() => this.product()?.stockQuantity ?? Infinity);
 
   product = computed(() => this.productService.getProduct(this.id()));
 
@@ -99,7 +124,7 @@ export class ProductDetail {
   }
 
   increaseQty(): void {
-    this.quantity.update((q) => q + 1);
+    this.quantity.update((q) => Math.min(this.maxQuantity(), q + 1));
   }
 
   decreaseQty(): void {
@@ -109,10 +134,6 @@ export class ProductDetail {
   addToCart(): void {
     const p = this.product();
     if (!p) return;
-    if (!this.auth.isLoggedIn()) {
-      this.router.navigate(['/login']);
-      return;
-    }
     for (let i = 0; i < this.quantity(); i++) {
       this.cartService.addToCart(p);
     }
@@ -120,13 +141,11 @@ export class ProductDetail {
     setTimeout(() => this.justAdded.set(null), 2000);
   }
 
+  // Guests are allowed through — /checkout's auth guard collects the login and
+  // sends them straight back, with the item still in their basket.
   buyNow(): void {
     const p = this.product();
     if (!p) return;
-    if (!this.auth.isLoggedIn()) {
-      this.router.navigate(['/login']);
-      return;
-    }
     this.checkoutService.addItem(p, this.quantity());
     this.router.navigate(['/checkout']);
   }

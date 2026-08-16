@@ -122,6 +122,12 @@ mat-icon.mat-badge {
   --ojas-blob-cream-2: rgba(255, 240, 222, 0.5);
 }
 
+// Set while the branded intro curtain is on screen, so the page behind it
+// can't be scrolled before it has been revealed.
+body.intro-locked {
+  overflow: hidden;
+}
+
 // ===== GLOBAL ANIMATIONS =====
 @keyframes fadeInUp {
   from {

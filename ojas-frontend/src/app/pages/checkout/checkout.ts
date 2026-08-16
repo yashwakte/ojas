@@ -6,12 +6,19 @@ import { MatIconModule } from '@angular/material/icon';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { OrderService } from '../../services/order.service';
+import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
+import { DeliveryAddressService } from '../../services/delivery-address.service';
 import { PlaceOrderRequest, SaveAddressRequest, SavedAddress } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
-import { INDIAN_STATES } from '../../constants/indian-states';
+import {
+  DEFAULT_CITY,
+  DEFAULT_STATE,
+  SERVICEABLE_STATES,
+  citiesForState,
+} from '../../constants/serviceable-locations';
 
 @Component({
   selector: 'app-checkout',
@@ -30,8 +37,9 @@ export class Checkout implements OnInit {
   street = '';
   area = '';
   landmark = '';
-  city = '';
-  state = '';
+  // We only deliver around Pune, so these start pre-filled rather than blank.
+  city = DEFAULT_CITY;
+  state = DEFAULT_STATE;
   pincode = '';
   manualLat: number | null = null;
   manualLng: number | null = null;
@@ -41,7 +49,19 @@ export class Checkout implements OnInit {
   saveNewAddress = false;
   saveNewAddressLabel = '';
 
-  readonly indianStates = INDIAN_STATES;
+  readonly serviceableStates = SERVICEABLE_STATES;
+
+  get citiesForSelectedState(): readonly string[] {
+    return citiesForState(this.state);
+  }
+
+  /** Keeps city consistent when the state changes; there is only one today. */
+  onStateChange(): void {
+    const cities = this.citiesForSelectedState;
+    if (!cities.includes(this.city)) {
+      this.city = cities[0] ?? '';
+    }
+  }
 
   loading = signal(false);
   orderPlaced = signal(false);
@@ -53,6 +73,9 @@ export class Checkout implements OnInit {
   deliveryCharge = signal(0);
   deliveryDistanceKm = signal<number | null>(null);
   deliveryLoading = signal(false);
+  /** Set when the pinned address falls outside the serviceable radius. */
+  outOfServiceArea = signal(false);
+  maxRadiusKm = signal(0);
 
   readonly totalAmount = computed(() =>
     this.checkoutService.items().reduce((sum, i) => sum + i.product.price * i.quantity, 0),
@@ -64,9 +87,11 @@ export class Checkout implements OnInit {
     private cartService: CartService,
     public checkoutService: CheckoutService,
     private orderService: OrderService,
+    private productService: ProductService,
     public auth: AuthService,
     private userService: UserService,
     private deliveryChargesService: DeliveryChargesService,
+    private deliveryAddress: DeliveryAddressService,
     private router: Router,
   ) {}
 
@@ -76,13 +101,19 @@ export class Checkout implements OnInit {
     // Pre-fill from logged-in user
     this.fullName = user?.fullName ?? '';
 
-    // Load saved addresses and pre-select default
+    // Load saved addresses, preferring whatever they were already shopping
+    // against so the charge quoted on the product page is the one they pay.
     this.userService.getProfile().subscribe({
       next: (profile) => {
         this.savedAddresses.set(profile.savedAddresses ?? []);
-        const def = profile.savedAddresses?.find((a) => a.isDefault);
-        if (def) {
-          this.selectedSavedAddress.set(def);
+
+        const browsing = this.deliveryAddress.selected();
+        const match = browsing
+          ? (profile.savedAddresses?.find((a) => a.label === browsing.label) ?? browsing)
+          : profile.savedAddresses?.find((a) => a.isDefault);
+
+        if (match) {
+          this.selectedSavedAddress.set(match);
           this.updateDeliveryEstimate();
         }
       },
@@ -127,6 +158,14 @@ export class Checkout implements OnInit {
 
   placeOrder(): void {
     this.errorMsg.set('');
+
+    if (this.outOfServiceArea()) {
+      this.errorMsg.set(
+        `We currently deliver only within ${this.maxRadiusKm()} km of our store. Please pick a delivery address inside that area.`,
+      );
+      return;
+    }
+
     const selectedAddress = this.selectedSavedAddress();
     const deliveryAddress = selectedAddress?.fullAddress ?? this.composedAddress;
     const latitude = selectedAddress?.latitude ?? this.manualLat!;
@@ -156,6 +195,9 @@ export class Checkout implements OnInit {
         this.checkoutService
           .items()
           .forEach((item) => this.cartService.removeFromCart(item.product.id));
+        // Stock was just decremented server-side; refresh the shared product
+        // cache so the products page reflects it without a manual reload.
+        this.productService.loadProducts();
         // Save new address if user opted in
         if (
           this.saveNewAddress &&
@@ -177,6 +219,14 @@ export class Checkout implements OnInit {
         this.loading.set(false);
         if (err.status === 401) {
           this.errorMsg.set('Session expired. Please login again.');
+        } else if (err.error?.outOfStock) {
+          // Someone bought the last one while this order was being filled in.
+          this.errorMsg.set(err.error.message ?? 'An item just went out of stock.');
+        } else if (err.error?.outOfRange) {
+          // The server is the authority on the delivery area — mirror its verdict.
+          this.outOfServiceArea.set(true);
+          this.maxRadiusKm.set(err.error.maxRadiusKm ?? this.maxRadiusKm());
+          this.errorMsg.set(err.error.message ?? 'This address is outside our delivery area.');
         } else {
           this.errorMsg.set('Failed to place order. Please try again.');
         }
@@ -213,6 +263,7 @@ export class Checkout implements OnInit {
     if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
       this.deliveryCharge.set(0);
       this.deliveryDistanceKm.set(null);
+      this.outOfServiceArea.set(false);
       return;
     }
 
@@ -221,11 +272,14 @@ export class Checkout implements OnInit {
       next: (result) => {
         this.deliveryCharge.set(result.charge);
         this.deliveryDistanceKm.set(result.distanceKm);
+        this.outOfServiceArea.set(!result.isServiceable);
+        this.maxRadiusKm.set(result.maxRadiusKm);
         this.deliveryLoading.set(false);
       },
       error: () => {
         this.deliveryCharge.set(0);
         this.deliveryDistanceKm.set(null);
+        this.outOfServiceArea.set(false);
         this.deliveryLoading.set(false);
       },
     });

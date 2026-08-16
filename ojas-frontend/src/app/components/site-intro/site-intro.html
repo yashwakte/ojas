@@ -1,0 +1,18 @@
+@if (active()) {
+  <div class="intro" [class.lifting]="lifting()" aria-hidden="true">
+    <div class="intro-veil"></div>
+    <div class="intro-bloom"></div>
+
+    <div class="intro-stage">
+      <div class="intro-mark">
+        @for (letter of letters; track $index) {
+          <span class="glyph"><i [style.animation-delay.ms]="140 + $index * 80">{{ letter }}</i></span>
+        }
+        <span class="sheen"></span>
+      </div>
+
+      <span class="intro-hair"></span>
+      <p class="intro-tag">Fresh picks, delivered with care</p>
+    </div>
+  </div>
+}

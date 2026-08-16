@@ -73,7 +73,7 @@ export class AuthService {
     this.http.post(`${this.apiUrl}/logout`, {}, { responseType: 'text' }).subscribe({ error: () => {} });
     localStorage.removeItem(this.USER_KEY);
     this._user.set(null);
-    this.router.navigate(['/']);
+    this.router.navigate(['/login']);
   }
 
   getDefaultRouteForRole(role: UserRole = this.role()): string {

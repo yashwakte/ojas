@@ -6,6 +6,7 @@ import { Checkout } from './checkout';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService, CheckoutItem } from '../../services/checkout.service';
 import { OrderService } from '../../services/order.service';
+import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
@@ -29,6 +30,8 @@ describe('Checkout', () => {
     galleryImageUrls: [],
     weight: '500g',
     isAvailable: true,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: '',
     benefits: '',
     storageInfo: '',
@@ -81,6 +84,7 @@ describe('Checkout', () => {
   let cartServiceSpy: jasmine.SpyObj<CartService>;
   let checkoutServiceSpy: any;
   let orderServiceSpy: jasmine.SpyObj<OrderService>;
+  let productServiceSpy: jasmine.SpyObj<ProductService>;
   let authServiceSpy: any;
   let userServiceSpy: jasmine.SpyObj<UserService>;
   let deliveryChargesServiceSpy: jasmine.SpyObj<DeliveryChargesService>;
@@ -93,11 +97,14 @@ describe('Checkout', () => {
       items,
     });
     orderServiceSpy = jasmine.createSpyObj('OrderService', ['placeOrder']);
+    productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts']);
     authServiceSpy = { user: signal<AuthResponse | null>(authUser) };
     userServiceSpy = jasmine.createSpyObj('UserService', ['getProfile', 'saveAddress']);
     userServiceSpy.getProfile.and.returnValue(of(profile));
     deliveryChargesServiceSpy = jasmine.createSpyObj('DeliveryChargesService', ['previewCharge']);
-    deliveryChargesServiceSpy.previewCharge.and.returnValue(of({ distanceKm: 3, charge: 20, isFree: false }));
+    deliveryChargesServiceSpy.previewCharge.and.returnValue(
+      of({ distanceKm: 3, charge: 20, isFree: false, isServiceable: true, maxRadiusKm: 25 }),
+    );
 
     TestBed.configureTestingModule({
       imports: [Checkout],
@@ -106,6 +113,7 @@ describe('Checkout', () => {
         { provide: CartService, useValue: cartServiceSpy },
         { provide: CheckoutService, useValue: checkoutServiceSpy },
         { provide: OrderService, useValue: orderServiceSpy },
+        { provide: ProductService, useValue: productServiceSpy },
         { provide: AuthService, useValue: authServiceSpy },
         { provide: UserService, useValue: userServiceSpy },
         { provide: DeliveryChargesService, useValue: deliveryChargesServiceSpy },
@@ -215,6 +223,8 @@ describe('Checkout', () => {
     expect(fixture.componentInstance.orderId()).toBe('o1');
     expect(cartServiceSpy.removeFromCart).toHaveBeenCalledWith('p1');
     expect(checkoutServiceSpy.clear).toHaveBeenCalled();
+    // Stock changed server-side; the cached product list must be refreshed.
+    expect(productServiceSpy.loadProducts).toHaveBeenCalled();
   });
 
   it('placeOrder saves a new address when opted in and none is currently selected', () => {

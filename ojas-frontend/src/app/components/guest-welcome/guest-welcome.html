@@ -1,0 +1,40 @@
+@if (open()) {
+  <dialog
+    #welcomeDialog
+    class="gw"
+    [class.closing]="closing()"
+    aria-labelledby="gwTitle"
+    (click)="onBackdropClick($event)"
+    (cancel)="onCancel($event)"
+  >
+    <div class="gw-glow" aria-hidden="true"></div>
+
+    <button type="button" class="gw-close" (click)="close()" aria-label="Close welcome message">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      </svg>
+    </button>
+
+    <span class="gw-eyebrow">Welcome</span>
+
+    <h2 id="gwTitle" class="gw-title">
+      <span class="w"><i style="animation-delay: 160ms">You</i></span>
+      <span class="w"><i style="animation-delay: 235ms">found</i></span>
+      <span class="w"><i style="animation-delay: 310ms">us.</i></span>
+    </h2>
+
+    <span class="gw-hair" aria-hidden="true"></span>
+
+    <p class="gw-copy">
+      Ojas is a small store built on care — fresh picks, honest prices, and delivery that turns up
+      when we say it will. Have a look around.
+    </p>
+
+    <div class="gw-actions">
+      <a routerLink="/products" class="gw-btn gw-btn--primary" (click)="close()">
+        <span>Start exploring</span>
+      </a>
+      <a routerLink="/register" class="gw-btn gw-btn--ghost" (click)="close()">Create an account</a>
+    </div>
+  </dialog>
+}

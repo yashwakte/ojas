@@ -158,20 +158,24 @@
                 </div>
                 <div class="form-group">
                   <label for="city">City *</label>
-                  <input
-                    id="city"
-                    type="text"
-                    [(ngModel)]="city"
-                    name="city"
-                    required
-                    placeholder="e.g. Bengaluru"
-                  />
+                  <select id="city" [(ngModel)]="city" name="city" required>
+                    <option value="" disabled>Select city</option>
+                    @for (c of citiesForSelectedState; track c) {
+                      <option [value]="c">{{ c }}</option>
+                    }
+                  </select>
                 </div>
                 <div class="form-group">
                   <label for="state">State *</label>
-                  <select id="state" [(ngModel)]="state" name="state" required>
+                  <select
+                    id="state"
+                    [(ngModel)]="state"
+                    name="state"
+                    required
+                    (ngModelChange)="onStateChange()"
+                  >
                     <option value="" disabled>Select state</option>
-                    @for (s of indianStates; track s) {
+                    @for (s of serviceableStates; track s) {
                       <option [value]="s">{{ s }}</option>
                     }
                   </select>
@@ -197,6 +201,7 @@
                   <app-map-picker
                     [initialLat]="manualLat"
                     [initialLng]="manualLng"
+                    [enforceServiceArea]="true"
                     (locationConfirmed)="onManualLocationConfirmed($event)"
                     (cancelled)="showManualMapPicker.set(false)"
                   />
@@ -254,10 +259,18 @@
             </div>
           }
 
+          @if (outOfServiceArea()) {
+            <div class="error-banner">
+              <mat-icon>wrong_location</mat-icon>
+              We deliver only within {{ maxRadiusKm() }} km of our store. This address is
+              {{ deliveryDistanceKm()?.toFixed(1) }} km away — please pick a closer one.
+            </div>
+          }
+
           <button
             type="submit"
             class="place-order-btn"
-            [disabled]="loading() || !fullName || !phone || !isAddressValid"
+            [disabled]="loading() || !fullName || !phone || !isAddressValid || outOfServiceArea()"
           >
             @if (loading()) {
               <mat-icon class="spin">hourglass_empty</mat-icon> Placing Order...

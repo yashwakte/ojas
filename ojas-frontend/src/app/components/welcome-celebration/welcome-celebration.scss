@@ -1,0 +1,347 @@
+.cel {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  animation: celIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+// ===== Scrim: warm, deep, and blurred so the page reads as "held" =====
+.cel-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      110% 80% at 50% 42%,
+      rgba(72, 38, 20, 0.66) 0%,
+      rgba(30, 19, 13, 0.88) 58%,
+      rgba(20, 13, 9, 0.95) 100%
+    );
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+// ===== Brand bloom behind everything =====
+.cel-bloom {
+  position: absolute;
+  width: min(130vmin, 980px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(242, 90, 26, 0.42),
+    rgba(242, 90, 26, 0.12) 46%,
+    transparent 72%
+  );
+  filter: blur(14px);
+  animation: bloomBreathe 2.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cel-motes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+// ===== Hairline rings pulsing outward from the emblem =====
+.cel-rings {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+// Evenly spaced across the cycle so the pulse is continuous rather than a
+// burst followed by dead air while the message is still being read.
+.ring {
+  grid-area: 1 / 1;
+  width: 150px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 196, 156, 0.55);
+  animation: ringOut 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite both;
+}
+
+// ===== Stage =====
+.cel-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 640px;
+}
+
+// Luminous glass disc holding the check or the person's initial.
+.emblem {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 208, 176, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 18px 60px rgba(242, 90, 26, 0.5),
+    0 0 110px rgba(242, 90, 26, 0.28);
+  // Settles in, then breathes so it stays alive through the longer hold.
+  animation:
+    emblemIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both,
+    emblemBreathe 3.6s ease-in-out 1.3s infinite;
+}
+
+.check {
+  width: 42px;
+  height: 42px;
+
+  path {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: drawCheck 0.75s cubic-bezier(0.65, 0, 0.35, 1) 0.5s both;
+  }
+}
+
+.monogram {
+  font-family: 'Poppins', sans-serif;
+  font-size: 2.3rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  animation: monogramIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.42s both;
+}
+
+// ===== Headline: words rise out of their own masks =====
+.cel-title {
+  margin: 26px 0 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: clamp(1.6rem, 5.4vw, 2.6rem);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  color: #fff6ef;
+  text-wrap: balance;
+}
+
+.w {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
+
+  > i {
+    display: inline-block;
+    font-style: normal;
+    transform: translateY(115%);
+    animation: wordRise 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  + .w {
+    margin-left: 0.28em;
+  }
+}
+
+.cel-hair {
+  display: block;
+  height: 1px;
+  width: min(240px, 52vw);
+  margin: 20px 0 16px;
+  background: linear-gradient(90deg, transparent, rgba(255, 196, 156, 0.7), transparent);
+  transform: scaleX(0);
+  animation: hairExpand 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
+}
+
+.cel-sub {
+  margin: 0;
+  font-size: clamp(0.92rem, 2.6vw, 1.05rem);
+  line-height: 1.55;
+  color: rgba(255, 240, 230, 0.78);
+  animation: softIn 0.95s cubic-bezier(0.16, 1, 0.3, 1) 1.08s both;
+}
+
+.cel-hint {
+  position: absolute;
+  bottom: clamp(28px, 6vh, 56px);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 236, 224, 0.4);
+  animation: softIn 1s ease 1.7s both;
+}
+
+// ===== Exit: the whole moment dissolves into light =====
+.cel.leaving {
+  animation: celOut 0.55s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+@keyframes celIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes celOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(10px);
+  }
+}
+
+@keyframes bloomBreathe {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes ringOut {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  14% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(4.4);
+  }
+}
+
+@keyframes emblemIn {
+  from {
+    opacity: 0;
+    transform: scale(0.62) translateY(12px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes emblemBreathe {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 18px 60px rgba(242, 90, 26, 0.5),
+      0 0 110px rgba(242, 90, 26, 0.28);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 20px 70px rgba(242, 90, 26, 0.62),
+      0 0 140px rgba(242, 90, 26, 0.4);
+  }
+}
+
+@keyframes drawCheck {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes monogramIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes wordRise {
+  from {
+    transform: translateY(115%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes hairExpand {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes softIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+// ===== Reduced motion: same composition, no movement =====
+.cel.still {
+  .emblem,
+  .monogram,
+  .cel-title .w > i,
+  .cel-hair,
+  .cel-sub,
+  .cel-hint,
+  .check path {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+    stroke-dashoffset: 0;
+  }
+
+  &,
+  &.leaving {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cel,
+  .cel.leaving,
+  .cel * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

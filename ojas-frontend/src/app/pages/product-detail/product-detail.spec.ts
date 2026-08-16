@@ -21,6 +21,8 @@ describe('ProductDetail', () => {
     galleryImageUrls: ['/images/p1b.jpg'],
     weight: '500g',
     isAvailable: true,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: 'Bajra',
     benefits: 'Fiber',
     storageInfo: 'Cool place',
@@ -43,8 +45,10 @@ describe('ProductDetail', () => {
 
     cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn', 'user']);
     authServiceSpy.isLoggedIn.and.returnValue(true);
+    // DeliveryAddressService (injected for the "Deliver to" bar) reads user().
+    authServiceSpy.user.and.returnValue(null);
     deliveryChargesServiceSpy = { config: signal<DeliveryChargesConfig | null>(null) };
 
     TestBed.configureTestingModule({
@@ -132,15 +136,15 @@ describe('ProductDetail', () => {
     expect(fixture.componentInstance.descExpanded()).toBeTrue();
   });
 
-  it('addToCart redirects to login when logged out', () => {
+  it('addToCart works when logged out so guests can build a cart', () => {
     authServiceSpy.isLoggedIn.and.returnValue(false);
     spyOn(router, 'navigate');
     const fixture = create();
 
     fixture.componentInstance.addToCart();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(cartServiceSpy.addToCart).not.toHaveBeenCalled();
+    expect(cartServiceSpy.addToCart).toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('addToCart adds the product to the cart quantity() times', () => {
@@ -162,15 +166,15 @@ describe('ProductDetail', () => {
     expect(cartServiceSpy.addToCart).not.toHaveBeenCalled();
   });
 
-  it('buyNow redirects to login when logged out', () => {
+  it('buyNow sends a logged-out guest to checkout, where the auth guard takes over', () => {
     authServiceSpy.isLoggedIn.and.returnValue(false);
     spyOn(router, 'navigate');
     const fixture = create();
 
     fixture.componentInstance.buyNow();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(checkoutServiceSpy.addItem).not.toHaveBeenCalled();
+    expect(checkoutServiceSpy.addItem).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
   });
 
   it('buyNow adds to checkout with the selected quantity and navigates', () => {

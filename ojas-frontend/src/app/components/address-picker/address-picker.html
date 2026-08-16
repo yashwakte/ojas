@@ -1,0 +1,100 @@
+@if (open()) {
+  <div class="ap-backdrop" (click)="close()"></div>
+
+  <div class="ap-sheet" role="dialog" aria-modal="true" aria-labelledby="apTitle">
+    <div class="ap-head">
+      <div>
+        <h2 id="apTitle">Where should we deliver?</h2>
+        <p>We'll show delivery charges upfront as you shop.</p>
+      </div>
+      <button type="button" class="ap-close" (click)="close()" aria-label="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="ap-body">
+      @if (!addingNew()) {
+        @if (loadingSaved()) {
+          <p class="ap-muted">Loading your addresses…</p>
+        } @else {
+          @for (addr of saved(); track addr.label) {
+            <button type="button" class="ap-saved" (click)="choose(addr)">
+              <mat-icon>location_on</mat-icon>
+              <span class="ap-saved-text">
+                <strong>{{ addr.label }}</strong>
+                <small>{{ addr.fullAddress }}</small>
+              </span>
+              @if (addr.isDefault) {
+                <span class="ap-default">Default</span>
+              }
+            </button>
+          }
+        }
+
+        <button type="button" class="ap-add" (click)="startAddingNew()">
+          <mat-icon>add_location_alt</mat-icon> Add a new address
+        </button>
+      } @else {
+        <div class="ap-form">
+          <div class="ap-row">
+            <label for="apLabel">Label</label>
+            <input id="apLabel" type="text" [(ngModel)]="label" placeholder="Home, Office…" />
+          </div>
+
+          <div class="ap-row">
+            <label for="apHouse">Flat / House no. *</label>
+            <input id="apHouse" type="text" [(ngModel)]="houseNo" placeholder="e.g. B-402" />
+          </div>
+
+          <div class="ap-row">
+            <label for="apArea">Area / Locality *</label>
+            <input id="apArea" type="text" [(ngModel)]="area" placeholder="e.g. Sangvi" />
+          </div>
+
+          <div class="ap-grid">
+            <div class="ap-row">
+              <label for="apState">State *</label>
+              <select id="apState" [(ngModel)]="state" (ngModelChange)="onStateChange()">
+                @for (s of serviceableStates; track s) {
+                  <option [value]="s">{{ s }}</option>
+                }
+              </select>
+            </div>
+            <div class="ap-row">
+              <label for="apCity">City *</label>
+              <select id="apCity" [(ngModel)]="city">
+                @for (c of cities(); track c) {
+                  <option [value]="c">{{ c }}</option>
+                }
+              </select>
+            </div>
+            <div class="ap-row">
+              <label for="apPin">Pincode *</label>
+              <input id="apPin" type="text" inputmode="numeric" maxlength="6" [(ngModel)]="pincode" />
+            </div>
+          </div>
+
+          <p class="ap-pin-label">Pin your exact location *</p>
+          <app-map-picker
+            [enforceServiceArea]="true"
+            confirmLabel="Use this location"
+            (locationConfirmed)="onPinned($event)"
+            (cancelled)="addingNew.set(false)"
+          />
+
+          @if (pinned()) {
+            <p class="ap-pinned"><mat-icon>check_circle</mat-icon> Location pinned</p>
+          }
+
+          @if (saveError()) {
+            <p class="ap-error"><mat-icon>wrong_location</mat-icon> {{ saveError() }}</p>
+          }
+
+          <button type="button" class="ap-save" [disabled]="!canSaveNew()" (click)="saveNew()">
+            Save &amp; deliver here
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}

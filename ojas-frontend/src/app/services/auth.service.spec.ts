@@ -142,7 +142,7 @@ describe('AuthService', () => {
     expect(JSON.parse(localStorage.getItem('ojas_user')!)).toEqual(authResponse);
   });
 
-  it('logout() clears localStorage, resets the user signal, posts to /auth/logout, and navigates home', () => {
+  it('logout() clears localStorage, resets the user signal, posts to /auth/logout, and navigates to login', () => {
     setup();
     service.saveAuth(authResponse);
     spyOn(router, 'navigate');
@@ -151,7 +151,7 @@ describe('AuthService', () => {
 
     expect(localStorage.getItem('ojas_user')).toBeNull();
     expect(service.user()).toBeNull();
-    expect(router.navigate).toHaveBeenCalledWith(['/']);
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
 
     const call = httpMock.expectOne(`${environment.apiUrl}/auth/logout`);
     expect(call.request.method).toBe('POST');

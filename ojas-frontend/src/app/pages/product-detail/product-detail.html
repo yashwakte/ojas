@@ -180,10 +180,55 @@
                 <mat-icon>remove</mat-icon>
               </button>
               <span class="qty-value">{{ quantity() }}</span>
-              <button class="qty-btn" (click)="increaseQty()" aria-label="Increase quantity">
+              <button
+                class="qty-btn"
+                (click)="increaseQty()"
+                [disabled]="quantity() >= maxQuantity()"
+                aria-label="Increase quantity"
+              >
                 <mat-icon>add</mat-icon>
               </button>
             </div>
+            @if (outOfStock()) {
+              <span class="stock-note out">Out of stock</span>
+            } @else if (lowStock()) {
+              <span class="stock-note low">Only {{ p.stockQuantity }} left</span>
+            }
+          </div>
+
+          <!-- Deliver-to: the charge for THIS address, before they commit -->
+          <div class="deliver-to">
+            <mat-icon class="deliver-to-pin">location_on</mat-icon>
+            @if (deliveryAddress.selected(); as addr) {
+              <div class="deliver-to-text">
+                <span class="deliver-to-label">Deliver to {{ addr.label }}</span>
+                <span class="deliver-to-addr">{{ addr.fullAddress }}</span>
+                @if (deliveryAddress.quoteLoading()) {
+                  <span class="deliver-to-charge">Checking delivery…</span>
+                } @else if (deliveryAddress.quote(); as q) {
+                  @if (!q.isServiceable) {
+                    <span class="deliver-to-charge out">
+                      Outside our delivery area ({{ q.distanceKm.toFixed(1) }} km)
+                    </span>
+                  } @else if (q.isFree) {
+                    <span class="deliver-to-charge free">Free delivery</span>
+                  } @else {
+                    <span class="deliver-to-charge">Delivery ₹{{ q.charge }}</span>
+                  }
+                }
+              </div>
+              <button type="button" class="deliver-to-btn" (click)="changeDeliveryAddress()">
+                Change
+              </button>
+            } @else {
+              <div class="deliver-to-text">
+                <span class="deliver-to-label">Select a delivery address</span>
+                <span class="deliver-to-addr">See delivery charges before you order</span>
+              </div>
+              <button type="button" class="deliver-to-btn" (click)="changeDeliveryAddress()">
+                Select
+              </button>
+            }
           </div>
 
           <!-- Action Buttons -->
@@ -192,12 +237,12 @@
               class="detail-add-cart-btn"
               [class.added]="justAdded() === p.id"
               (click)="addToCart()"
-              [disabled]="!p.isAvailable"
+              [disabled]="!purchasable()"
             >
               <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
               {{ justAdded() === p.id ? 'Added to Cart!' : 'Add to Cart' }}
             </button>
-            <button class="detail-buy-now-btn" (click)="buyNow()" [disabled]="!p.isAvailable">
+            <button class="detail-buy-now-btn" (click)="buyNow()" [disabled]="!purchasable()">
               <mat-icon>bolt</mat-icon>
               Buy Now
             </button>

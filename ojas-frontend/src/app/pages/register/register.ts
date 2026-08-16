@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectorRef, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   FormBuilder,
@@ -12,9 +12,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { WelcomeService } from '../../services/welcome.service';
 import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
 
 @Component({
@@ -26,13 +26,14 @@ import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
-    MatSnackBarModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './register.html',
   styleUrl: './register.scss',
 })
 export class Register {
+  private readonly welcome = inject(WelcomeService);
+
   registerForm: FormGroup;
   loading = false;
   hidePassword = true;
@@ -42,7 +43,6 @@ export class Register {
     private fb: FormBuilder,
     private auth: AuthService,
     private router: Router,
-    private snackBar: MatSnackBar,
     private cdr: ChangeDetectorRef,
   ) {
     this.registerForm = this.fb.group({
@@ -116,10 +116,7 @@ export class Register {
         next: (res) => {
           this.loading = false;
           this.auth.saveAuth(res);
-          this.snackBar.open('Account created successfully!', 'Close', {
-            duration: 3000,
-            panelClass: 'snack-success',
-          });
+          this.welcome.celebrate('register', res.fullName);
           this.router.navigate(['/']);
         },
         error: (err) => {

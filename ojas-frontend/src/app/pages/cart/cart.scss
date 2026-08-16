@@ -279,6 +279,25 @@
   }
 }
 
+.guest-checkout-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ojas-text-light);
+  text-align: center;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
 .continue-link {
   display: flex;
   align-items: center;

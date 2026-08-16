@@ -391,6 +391,107 @@
   line-height: 40px;
 }
 
+// ─── Stock state ───
+.stock-note {
+  margin-left: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+
+  &.out {
+    background: rgba(220, 38, 38, 0.09);
+    color: #b91c1c;
+  }
+
+  &.low {
+    background: rgba(242, 90, 26, 0.1);
+    color: var(--ojas-orange-dark);
+  }
+}
+
+.detail-add-cart-btn:disabled,
+.detail-buy-now-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+// ─── Deliver-to ───
+.deliver-to {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid var(--ojas-border);
+  border-radius: 14px;
+  background: var(--ojas-orange-bg);
+}
+
+.deliver-to-pin {
+  flex-shrink: 0;
+  color: var(--ojas-orange);
+}
+
+.deliver-to-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.deliver-to-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ojas-text);
+}
+
+.deliver-to-addr {
+  font-size: 0.76rem;
+  color: var(--ojas-text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deliver-to-charge {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ojas-text);
+
+  &.free {
+    color: #15803d;
+  }
+
+  &.out {
+    color: #b91c1c;
+  }
+}
+
+.deliver-to-btn {
+  flex-shrink: 0;
+  padding: 7px 15px;
+  border: 1px solid var(--ojas-orange);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ojas-orange);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    background: var(--ojas-orange);
+    color: #fff;
+  }
+}
+
 // ─── Action Buttons ───
 .action-buttons {
   display: flex;

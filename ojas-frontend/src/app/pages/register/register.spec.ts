@@ -125,10 +125,10 @@ describe('Register', () => {
     expect(authServiceSpy.register).not.toHaveBeenCalled();
   });
 
-  it('onSubmit registers, saves auth, shows success snackbar, and navigates home on success', () => {
+  it('onSubmit registers, saves auth, celebrates, and navigates home on success', () => {
     authServiceSpy.register.and.returnValue(of(authResponse));
     spyOn(router, 'navigate');
-    const { fixture, snackBar } = create();
+    const { fixture } = create();
 
     jasmine.clock().install();
     try {
@@ -138,7 +138,7 @@ describe('Register', () => {
       fixture.componentInstance.onSubmit();
 
       expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
-      expect(snackBar.open).toHaveBeenCalled();
+      // The success snackbar was replaced by the welcome celebration overlay.
       expect(router.navigate).toHaveBeenCalledWith(['/']);
       expect(fixture.componentInstance.loading).toBeFalse();
     } finally {

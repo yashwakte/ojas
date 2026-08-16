@@ -37,8 +37,9 @@ export const routes: Routes = [
   },
   {
     path: 'cart',
+    // Guests may build a cart freely; the login gate is at checkout.
     loadComponent: () => import('./pages/cart/cart').then((m) => m.Cart),
-    canActivate: [authGuard, customerGuard],
+    canActivate: [storefrontGuard],
   },
   {
     path: 'checkout',

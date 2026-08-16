@@ -19,6 +19,8 @@ describe('Cart', () => {
     galleryImageUrls: [],
     weight: '500g',
     isAvailable: true,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: '',
     benefits: '',
     storageInfo: '',
@@ -50,7 +52,8 @@ describe('Cart', () => {
         provideRouter([]),
         { provide: CartService, useValue: cartServiceSpy },
         { provide: CheckoutService, useValue: checkoutServiceSpy },
-        { provide: AuthService, useValue: {} },
+        // The template shows a guest-checkout hint, so isLoggedIn must exist.
+        { provide: AuthService, useValue: { isLoggedIn: () => true } },
       ],
     });
     router = TestBed.inject(Router);

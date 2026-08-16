@@ -21,6 +21,8 @@ describe('CartService', () => {
     galleryImageUrls: [],
     weight: '500g',
     isAvailable: true,
+    stockQuantity: null,
+    lowStockThreshold: 5,
     ingredients: '',
     benefits: '',
     storageInfo: '',

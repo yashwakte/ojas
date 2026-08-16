@@ -7,6 +7,8 @@ export interface CheckoutItem {
   quantity: number;
 }
 
+const GUEST_KEY = 'ojas_checkout_guest';
+
 @Injectable({ providedIn: 'root' })
 export class CheckoutService {
   private readonly auth = inject(AuthService);
@@ -18,8 +20,25 @@ export class CheckoutService {
   constructor() {
     // Reload checkout whenever the logged-in user changes (login / logout / account switch)
     effect(() => {
-      const user = this.auth.user();
-      this._items.set(user ? this.load(user.id) : []);
+      const userId = this.auth.user()?.id ?? null;
+
+      if (!userId) {
+        this._items.set(this.read(GUEST_KEY));
+        return;
+      }
+
+      // A guest who hit "Buy Now" and then signed in at the gate finds their
+      // selection still waiting for them on the checkout page.
+      const guestItems = this.read(GUEST_KEY);
+      const ownItems = this.read(this.userKey(userId));
+
+      if (guestItems.length) {
+        this._items.set(mergeCheckout(ownItems, guestItems));
+        localStorage.removeItem(GUEST_KEY);
+        localStorage.setItem(this.userKey(userId), JSON.stringify(this._items()));
+      } else {
+        this._items.set(ownItems);
+      }
     });
   }
 
@@ -66,25 +85,42 @@ export class CheckoutService {
 
   clear(): void {
     this._items.set([]);
-    const userId = this.auth.user()?.id;
-    if (userId) localStorage.removeItem(this.key(userId));
+    localStorage.removeItem(this.storageKey());
   }
 
-  private key(userId: string): string {
+  private userKey(userId: string): string {
     return `ojas_checkout_${userId}`;
   }
 
-  private save(): void {
+  /** Guests persist to their own bucket so "Buy Now" survives the login redirect. */
+  private storageKey(): string {
     const userId = this.auth.user()?.id;
-    if (userId) localStorage.setItem(this.key(userId), JSON.stringify(this._items()));
+    return userId ? this.userKey(userId) : GUEST_KEY;
   }
 
-  private load(userId: string): CheckoutItem[] {
+  private save(): void {
+    localStorage.setItem(this.storageKey(), JSON.stringify(this._items()));
+  }
+
+  private read(key: string): CheckoutItem[] {
     try {
-      const raw = localStorage.getItem(this.key(userId));
+      const raw = localStorage.getItem(key);
       return raw ? (JSON.parse(raw) as CheckoutItem[]) : [];
     } catch {
       return [];
     }
   }
+}
+
+function mergeCheckout(base: CheckoutItem[], incoming: CheckoutItem[]): CheckoutItem[] {
+  const merged = [...base];
+  for (const item of incoming) {
+    const idx = merged.findIndex((i) => i.product.id === item.product.id);
+    if (idx >= 0) {
+      merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + item.quantity };
+    } else {
+      merged.push({ ...item });
+    }
+  }
+  return merged;
 }
