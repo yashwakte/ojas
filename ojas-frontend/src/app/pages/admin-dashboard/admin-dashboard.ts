@@ -335,8 +335,8 @@ export class AdminDashboard implements OnInit {
       return;
     }
 
-    if (payload.password.length < 8) {
-      this.staffError.set('Password must be at least 8 characters');
+    if (payload.password.length < 10) {
+      this.staffError.set('Password must be at least 10 characters');
       return;
     }
 

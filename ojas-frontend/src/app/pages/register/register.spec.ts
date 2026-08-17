@@ -43,7 +43,7 @@ describe('Register', () => {
   function fillValidForm(fixture: ReturnType<typeof create>['fixture']) {
     const form = fixture.componentInstance.registerForm;
     form.get('fullName')?.setValue('Jane Doe');
-    form.get('password')?.setValue('123456');
+    form.get('password')?.setValue('123456789A');
     form.get('email')?.setValue('jane@x.com');
     form.get('phone')?.setValue('9876543210');
   }

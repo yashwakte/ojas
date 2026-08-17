@@ -293,7 +293,7 @@ describe('AdminDashboard', () => {
     expect(authServiceSpy.createStaff).not.toHaveBeenCalled();
   });
 
-  it('createStaffAccount requires a password of at least 8 characters', () => {
+  it('createStaffAccount requires a password of at least 10 characters', () => {
     const { fixture } = create();
     fixture.componentInstance.updateStaffField('fullName', 'New Staff');
     fixture.componentInstance.updateStaffField('email', 'n@x.com');
@@ -302,7 +302,7 @@ describe('AdminDashboard', () => {
 
     fixture.componentInstance.createStaffAccount();
 
-    expect(fixture.componentInstance.staffError()).toBe('Password must be at least 8 characters');
+    expect(fixture.componentInstance.staffError()).toBe('Password must be at least 10 characters');
     expect(authServiceSpy.createStaff).not.toHaveBeenCalled();
   });
 

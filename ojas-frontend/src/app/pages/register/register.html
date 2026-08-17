@@ -92,7 +92,7 @@
             matInput
             formControlName="password"
             [type]="hidePassword ? 'password' : 'text'"
-            placeholder="Min 6 characters"
+            placeholder="Min 10 characters"
           />
           <mat-icon matPrefix>lock</mat-icon>
           <button mat-icon-button matSuffix (click)="hidePassword = !hidePassword" type="button">
@@ -101,7 +101,7 @@
           @if (registerForm.get('password')?.hasError('required') && registerForm.get('password')?.touched) {
             <mat-error>Password is required</mat-error>
           } @else if (registerForm.get('password')?.hasError('minlength')) {
-            <mat-error>Password must be at least 6 characters</mat-error>
+            <mat-error>Password must be at least 10 characters</mat-error>
           }
         </mat-form-field>
 

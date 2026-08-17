@@ -45,7 +45,7 @@ public class AuthFlowTests : IDisposable
         var (first, _) = await _client.RegisterAsync(email: "duplicate@example.com");
 
         using var client2 = _factory.CreateClient();
-        var request = new RegisterRequest("Someone Else", first.Email, "9123456780", "Passw0rd!");
+        var request = new RegisterRequest("Someone Else", first.Email, "9123456780", "Passw0rd123!");
         var response = await client2.PostAsJsonAsync("/api/auth/register", request);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);

@@ -63,7 +63,7 @@ export class Register {
           updateOn: 'blur',
         },
       ],
-      password: ['', [Validators.required, Validators.minLength(6)]],
+      password: ['', [Validators.required, Validators.minLength(10)]],
     });
   }
 

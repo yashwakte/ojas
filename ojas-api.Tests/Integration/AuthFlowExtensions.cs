@@ -15,7 +15,7 @@ namespace OjasApi.Tests.Integration;
 public static class AuthFlowExtensions
 {
     public static async Task<(AuthResponse Auth, string CsrfToken)> RegisterAsync(
-        this HttpClient client, string? fullName = null, string? email = null, string? phone = null, string password = "Passw0rd!")
+        this HttpClient client, string? fullName = null, string? email = null, string? phone = null, string password = "Passw0rd123!")
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var request = new RegisterRequest(
@@ -47,7 +47,7 @@ public static class AuthFlowExtensions
     /// <summary>Inserts a pre-hashed admin/delivery user straight into the test database and logs
     /// in as them, sidestepping the admin-only /api/auth/staff endpoint's bootstrap problem.</summary>
     public static async Task<(AuthResponse Auth, string CsrfToken)> SeedAndLoginAsStaffAsync(
-        this OjasApiFactory factory, HttpClient client, string role, string? email = null, string password = "Passw0rd!")
+        this OjasApiFactory factory, HttpClient client, string role, string? email = null, string password = "Passw0rd123!")
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         email ??= $"{role}.{suffix}@example.com";
