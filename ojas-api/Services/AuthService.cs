@@ -112,6 +112,42 @@ public class AuthService
         );
     }
 
+    // Lets the very first admin account be created through the API instead of a manual
+    // Atlas edit. Self-disables the moment any admin exists, so it can't be used as a
+    // standing backdoor once the team has a real admin account.
+    public async Task<(AuthResult? Result, string? ConflictField, string? Error)> BootstrapAdminAsync(RegisterRequest request)
+    {
+        var adminExists = await _db.Users.Find(u => u.Role == UserRoles.Admin).AnyAsync();
+        if (adminExists)
+            return (null, null, "An admin account already exists; this endpoint is now disabled.");
+
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var normalizedPhone = NormalizePhone(request.Phone);
+
+        var byEmail = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
+        if (byEmail != null)
+            return (null, "email", null);
+
+        var byPhone = await _db.Users.Find(u => u.Phone == normalizedPhone).FirstOrDefaultAsync();
+        if (byPhone != null)
+            return (null, "phone", null);
+
+        var user = new User
+        {
+            FullName = request.FullName.Trim(),
+            Email = normalizedEmail,
+            Phone = normalizedPhone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = UserRoles.Admin,
+            IsEmailVerified = true,
+            IsPhoneVerified = true
+        };
+
+        await _db.Users.InsertOneAsync(user);
+        var token = GenerateToken(user);
+        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role)), null, null);
+    }
+
     private string GenerateToken(User user)
     {
         var role = string.IsNullOrWhiteSpace(user.Role) ? UserRoles.Customer : user.Role;

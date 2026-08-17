@@ -119,6 +119,30 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    // One-time bootstrap for the first admin account. Works only while the Users
+    // collection has zero admins; every call after that returns 409, so this can be
+    // left in the deployed API without acting as a standing backdoor.
+    [HttpPost("bootstrap-admin")]
+    public async Task<ActionResult<AuthResponse>> BootstrapAdmin([FromBody] RegisterRequest request)
+    {
+        var (result, conflictField, error) = await _authService.BootstrapAdminAsync(request);
+        if (error != null)
+            return Conflict(new { message = error });
+
+        if (result == null)
+        {
+            var message = conflictField == "email"
+                ? "Email already registered"
+                : "Phone number already in use";
+            return Conflict(new { message, field = conflictField });
+        }
+
+        var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
+        Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
+        return Ok(result.User with { CsrfToken = csrfToken });
+    }
+
     [HttpPost("staff")]
     [Authorize(Roles = UserRoles.Admin)]
     public async Task<ActionResult<StaffUserResponse>> CreateStaff([FromBody] CreateStaffRequest request)
