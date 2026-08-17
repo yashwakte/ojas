@@ -129,13 +129,15 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
-    // General API limit: 30 requests per minute per IP
+    // General API limit: 60 requests per minute per IP. High enough that a legitimate
+    // admin session bulk-creating/editing products in one sitting doesn't get caught in
+    // the same net as scraping or enumeration abuse.
     options.AddPolicy("general", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 30,
+                PermitLimit = 60,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));

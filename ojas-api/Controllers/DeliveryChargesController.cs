@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using OjasApi.Models;
 using OjasApi.Services;
 
@@ -7,6 +8,7 @@ namespace OjasApi.Controllers;
 
 [ApiController]
 [Route("api/delivery-charges")]
+[EnableRateLimiting("general")]
 public class DeliveryChargesController : ControllerBase
 {
     private readonly DeliveryChargesService _deliveryChargesService;
