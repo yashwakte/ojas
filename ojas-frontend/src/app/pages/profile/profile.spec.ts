@@ -140,24 +140,21 @@ describe('Profile', () => {
     );
   });
 
-  it('filterNewStates/filterEditStates narrow the filtered state lists', () => {
+  it('exposes the fixed list of serviceable states for the dropdown', () => {
     const fixture = create();
-    fixture.componentInstance.filterNewStates('mahar');
-    expect(fixture.componentInstance.filteredNewStates()).toEqual(['Maharashtra']);
-
-    fixture.componentInstance.filterEditStates('kerala');
-    expect(fixture.componentInstance.filteredEditStates()).toEqual(['Kerala']);
+    expect(fixture.componentInstance.serviceableStates).toEqual(['Maharashtra']);
   });
 
-  it('selectState sets the chosen state and clears the query', () => {
+  it('onNewStateChange/onEditStateChange reset the city when it is not valid for the new state', () => {
     const fixture = create();
-    fixture.componentInstance.selectState('new', 'Goa');
-    expect(fixture.componentInstance.newState).toBe('Goa');
-    expect(fixture.componentInstance.newStateQuery()).toBe('');
 
-    fixture.componentInstance.selectState('edit', 'Kerala');
-    expect(fixture.componentInstance.editState).toBe('Kerala');
-    expect(fixture.componentInstance.editStateQuery()).toBe('');
+    fixture.componentInstance.newCity = 'Nowhere';
+    fixture.componentInstance.onNewStateChange();
+    expect(fixture.componentInstance.newCity).toBe('Pune');
+
+    fixture.componentInstance.editCity = 'Nowhere';
+    fixture.componentInstance.onEditStateChange();
+    expect(fixture.componentInstance.editCity).toBe('Pune');
   });
 
   it('isNewAddressValid requires all fields plus valid coordinates and a real state', () => {
