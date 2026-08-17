@@ -18,6 +18,7 @@ public class AuthControllerTests
     private readonly Mock<IMongoDbService> _dbMock = new();
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
     private readonly Mock<IMongoCollection<OtpCode>> _otpCodesMock = new();
+    private readonly Mock<IMongoCollection<RefreshToken>> _refreshTokensMock = new();
     private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly Mock<IPhoneOtpSender> _phoneOtpSenderMock = new();
     private readonly AuthController _sut;
@@ -26,6 +27,7 @@ public class AuthControllerTests
     {
         _dbMock.Setup(d => d.Users).Returns(_usersMock.Object);
         _dbMock.Setup(d => d.OtpCodes).Returns(_otpCodesMock.Object);
+        _dbMock.Setup(d => d.RefreshTokens).Returns(_refreshTokensMock.Object);
         _usersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
@@ -65,6 +67,15 @@ public class AuthControllerTests
 
     private static IEnumerable<string> SetCookieHeaders(ControllerContext context) =>
         context.HttpContext.Response.Headers["Set-Cookie"].ToArray()!;
+
+    /// <summary>Points _sut at a fresh context carrying the given cookie on the request, the way
+    /// a browser would send ojas_refresh back on a /refresh or /logout call.</summary>
+    private void SetRequestCookie(string name, string value)
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers["Cookie"] = $"{name}={value}";
+        _sut.ControllerContext = new ControllerContext { HttpContext = httpContext };
+    }
 
     [Fact]
     public void Ping_ReturnsPong()
@@ -157,6 +168,7 @@ public class AuthControllerTests
 
         var cookies = SetCookieHeaders(_sut.ControllerContext);
         cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
         cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
     }
 
@@ -193,6 +205,7 @@ public class AuthControllerTests
 
         var cookies = SetCookieHeaders(_sut.ControllerContext);
         cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
         cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
     }
 
@@ -222,14 +235,70 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public void Logout_DeletesBothCookies()
+    public async Task Logout_DeletesAllSessionCookies()
     {
-        var result = _sut.Logout();
+        var result = await _sut.Logout();
 
         result.ShouldBeOfType<NoContentResult>();
         var cookies = SetCookieHeaders(_sut.ControllerContext);
         cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
         cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
+    }
+
+    [Fact]
+    public async Task Logout_WithRefreshCookie_RevokesIt()
+    {
+        SetRequestCookie("ojas_refresh", "some-raw-token");
+
+        await _sut.Logout();
+
+        _refreshTokensMock.Verify(c => c.DeleteOneAsync(
+            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Refresh_ValidCookie_IssuesNewSessionAndCookies()
+    {
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(10) },
+        });
+        SetRequestCookie("ojas_refresh", "some-raw-token");
+
+        var result = await _sut.Refresh();
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var response = okResult.Value.ShouldBeOfType<AuthResponse>();
+        response.CsrfToken.ShouldNotBeNullOrWhiteSpace();
+
+        var cookies = SetCookieHeaders(_sut.ControllerContext);
+        cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
+        cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
+    }
+
+    [Fact]
+    public async Task Refresh_NoCookie_ReturnsUnauthorized()
+    {
+        var result = await _sut.Refresh();
+
+        result.Result.ShouldBeOfType<UnauthorizedResult>();
+    }
+
+    [Fact]
+    public async Task Refresh_UnknownToken_ReturnsUnauthorizedAndClearsCookie()
+    {
+        _refreshTokensMock.SetupFind(new List<RefreshToken>());
+        SetRequestCookie("ojas_refresh", "some-raw-token");
+
+        var result = await _sut.Refresh();
+
+        result.Result.ShouldBeOfType<UnauthorizedResult>();
+        var cookies = SetCookieHeaders(_sut.ControllerContext);
+        cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
     }
 
     [Fact]

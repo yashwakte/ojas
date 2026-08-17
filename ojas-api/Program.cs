@@ -241,12 +241,17 @@ app.UseAuthentication();
 
 app.Use(async (context, next) =>
 {
-    // Login/register/logout establish or clear the session cookie itself, so a stale
+    // Login/register/logout/refresh establish or clear the session cookie itself, so a stale
     // still-valid auth cookie from a prior session must not block them with a CSRF check.
+    // Refresh in particular: the frontend calls it reactively once the access token has
+    // already expired (IsAuthenticated is false by then, so this exemption wouldn't even be
+    // reached) - but nothing stops it from also being called while the old token is still
+    // valid, and it shouldn't depend on that timing to behave consistently.
     var path = context.Request.Path;
     var isAuthBootstrapEndpoint = path.StartsWithSegments("/api/auth/login") ||
         path.StartsWithSegments("/api/auth/register") ||
-        path.StartsWithSegments("/api/auth/logout");
+        path.StartsWithSegments("/api/auth/logout") ||
+        path.StartsWithSegments("/api/auth/refresh");
 
     if (!isAuthBootstrapEndpoint &&
         context.User.Identity?.IsAuthenticated == true &&

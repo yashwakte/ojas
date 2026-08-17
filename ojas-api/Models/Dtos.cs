@@ -20,7 +20,7 @@ public record CreateStaffRequest(
 	[Required] string Role);
 
 public record AuthResponse(string Id, string FullName, string Email, string Phone, string Role, string CsrfToken = "");
-public record AuthResult(string Token, AuthResponse User);
+public record AuthResult(string Token, AuthResponse User, string RefreshToken);
 
 /// <summary>Returned by /register while the account is awaiting OTP verification - deliberately
 /// not an AuthResponse, since no session exists until the code is verified.</summary>

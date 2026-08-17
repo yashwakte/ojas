@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
@@ -9,6 +10,13 @@ namespace OjasApi.Services;
 
 public class AuthService
 {
+    // Short-lived access token, meant to be silently renewed via the refresh token rather
+    // than re-authenticated - a leaked one is only useful for a few minutes. The refresh
+    // token is the one that's actually revocable (server-tracked, deleted on logout/rotation),
+    // which is the capability a bare long-lived JWT never had.
+    private const int AccessTokenMinutes = 15;
+    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
+
     private readonly IMongoDbService _db;
     private readonly IConfiguration _config;
 
@@ -78,7 +86,8 @@ public class AuthService
         }
 
         var token = GenerateToken(user);
-        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role));
+        var refreshToken = await IssueRefreshTokenAsync(user.Id!);
+        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), refreshToken);
     }
 
     public async Task<(AuthResult? Result, bool NeedsEmailVerification)> LoginAsync(LoginRequest request)
@@ -99,7 +108,8 @@ public class AuthService
             user.Role = UserRoles.Customer;
 
         var token = GenerateToken(user);
-        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role)), false);
+        var refreshToken = await IssueRefreshTokenAsync(user.Id!);
+        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), refreshToken), false);
     }
 
     // Email verification enforcement ships from here on. Accounts created before this date
@@ -193,7 +203,8 @@ public class AuthService
 
         await _db.Users.InsertOneAsync(user);
         var token = GenerateToken(user);
-        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role)), null, null);
+        var refreshToken = await IssueRefreshTokenAsync(user.Id!);
+        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), refreshToken), null, null);
     }
 
     private string GenerateToken(User user)
@@ -217,10 +228,59 @@ public class AuthService
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(2),
+            expires: DateTime.UtcNow.AddMinutes(AccessTokenMinutes),
             signingCredentials: credentials
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    private async Task<string> IssueRefreshTokenAsync(string userId)
+    {
+        var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var record = new RefreshToken
+        {
+            TokenHash = HashToken(rawToken),
+            UserId = userId,
+            ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime),
+        };
+        await _db.RefreshTokens.InsertOneAsync(record);
+        return rawToken;
+    }
+
+    /// <summary>Verifies the presented refresh token, then rotates it - the old one is deleted
+    /// and a new one issued alongside the new access token, so a stolen-but-unused refresh
+    /// token stops working the moment the legitimate owner's client refreshes again.</summary>
+    public async Task<AuthResult?> RefreshAsync(string rawRefreshToken)
+    {
+        var tokenHash = HashToken(rawRefreshToken);
+        var record = await _db.RefreshTokens.Find(r => r.TokenHash == tokenHash).FirstOrDefaultAsync();
+        if (record == null || record.ExpiresAt < DateTime.UtcNow)
+            return null;
+
+        var user = await _db.Users.Find(u => u.Id == record.UserId).FirstOrDefaultAsync();
+        if (user == null)
+            return null;
+
+        await _db.RefreshTokens.DeleteOneAsync(r => r.TokenHash == tokenHash);
+
+        var token = GenerateToken(user);
+        var newRefreshToken = await IssueRefreshTokenAsync(user.Id!);
+        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), newRefreshToken);
+    }
+
+    public async Task RevokeRefreshTokenAsync(string rawRefreshToken)
+    {
+        await _db.RefreshTokens.DeleteOneAsync(r => r.TokenHash == HashToken(rawRefreshToken));
+    }
+
+    /// <summary>Not called anywhere yet - available for a future "log out of all devices"
+    /// action or as a defensive measure on password change.</summary>
+    public async Task RevokeAllRefreshTokensForUserAsync(string userId)
+    {
+        await _db.RefreshTokens.DeleteManyAsync(r => r.UserId == userId);
+    }
+
+    private static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

@@ -12,11 +12,13 @@ public class AuthServiceTests
 {
     private readonly Mock<IMongoDbService> _dbMock = new();
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
+    private readonly Mock<IMongoCollection<RefreshToken>> _refreshTokensMock = new();
     private readonly AuthService _sut;
 
     public AuthServiceTests()
     {
         _dbMock.Setup(d => d.Users).Returns(_usersMock.Object);
+        _dbMock.Setup(d => d.RefreshTokens).Returns(_refreshTokensMock.Object);
 
         // Mimics the real MongoDB driver's server-assigned ObjectId behaviour on insert, since
         // AuthService reads user.Id right back off the object immediately after InsertOneAsync
@@ -24,6 +26,9 @@ public class AuthServiceTests
         _usersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
+            .Returns(Task.CompletedTask);
+        _refreshTokensMock
+            .Setup(c => c.InsertOneAsync(It.IsAny<RefreshToken>(), null, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var config = new ConfigurationBuilder()
@@ -287,5 +292,61 @@ public class AuthServiceTests
         var result = await _sut.CompleteEmailVerificationAsync("nobody@example.com");
 
         result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task RefreshAsync_ValidToken_RotatesAndReturnsNewSession()
+    {
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(10) },
+        });
+
+        var result = await _sut.RefreshAsync("some-raw-refresh-token");
+
+        result.ShouldNotBeNull();
+        result!.User.Email.ShouldBe(user.Email);
+        result.Token.ShouldNotBeNullOrWhiteSpace();
+        result.RefreshToken.ShouldNotBeNullOrWhiteSpace();
+        _refreshTokensMock.Verify(c => c.DeleteOneAsync(
+            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
+        _refreshTokensMock.Verify(c => c.InsertOneAsync(
+            It.IsAny<RefreshToken>(), null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_ReturnsNull_WhenNoMatchingTokenExists()
+    {
+        _refreshTokensMock.SetupFind(new List<RefreshToken>());
+
+        var result = await _sut.RefreshAsync("unknown-token");
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task RefreshAsync_ReturnsNull_WhenTokenIsExpired()
+    {
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(-1) },
+        });
+
+        var result = await _sut.RefreshAsync("expired-token");
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task RevokeRefreshTokenAsync_DeletesMatchingToken()
+    {
+        await _sut.RevokeRefreshTokenAsync("some-token");
+
+        _refreshTokensMock.Verify(c => c.DeleteOneAsync(
+            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

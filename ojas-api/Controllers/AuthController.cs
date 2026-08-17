@@ -14,6 +14,14 @@ public class AuthController : ControllerBase
 {
     private const string AuthCookieName = "ojas_auth";
     private const string CsrfCookieName = "ojas_csrf";
+    private const string RefreshCookieName = "ojas_refresh";
+
+    // Must match AuthService's AccessTokenMinutes/RefreshTokenLifetime - these govern how long
+    // the browser keeps offering each cookie, the token's own claims/hash-expiry are what the
+    // server actually enforces.
+    private const int AccessTokenMinutes = 15;
+    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
+
     private readonly AuthService _authService;
     private readonly OtpService _otpService;
     private readonly IWebHostEnvironment _env;
@@ -33,24 +41,39 @@ public class AuthController : ControllerBase
         Secure = true,
         SameSite = SameSiteMode.None,
         Path = "/",
-        Expires = DateTimeOffset.UtcNow.AddHours(2)
+        Expires = DateTimeOffset.UtcNow.AddMinutes(AccessTokenMinutes)
     };
 
+    // Lives as long as the refresh token, not the access token - it needs to still be valid
+    // whenever a silent /refresh call reissues a fresh access token partway through the session.
     private CookieOptions BuildCsrfCookieOptions() => new()
     {
         HttpOnly = false,
         Secure = true,
         SameSite = SameSiteMode.None,
         Path = "/",
-        Expires = DateTimeOffset.UtcNow.AddHours(2)
+        Expires = DateTimeOffset.UtcNow.Add(RefreshTokenLifetime)
     };
 
-    /// <summary>Sets the auth+CSRF cookies for a verified session and returns the response body
-    /// every login-equivalent endpoint (login, register-verify, bootstrap-admin) shares.</summary>
+    // Scoped to /api/auth only (not "/") - it's never needed outside login/refresh/logout, so
+    // there's no reason for it to ride along on every single API request.
+    private CookieOptions BuildRefreshCookieOptions() => new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.None,
+        Path = "/api/auth",
+        Expires = DateTimeOffset.UtcNow.Add(RefreshTokenLifetime)
+    };
+
+    /// <summary>Sets the auth+CSRF+refresh cookies for a verified session and returns the
+    /// response body every login-equivalent endpoint (login, register-verify, refresh,
+    /// bootstrap-admin) shares.</summary>
     private AuthResponse IssueSession(AuthResult result)
     {
         var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
+        Response.Cookies.Append(RefreshCookieName, result.RefreshToken, BuildRefreshCookieOptions());
         Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
         return result.User with { CsrfToken = csrfToken };
     }
@@ -153,10 +176,34 @@ public class AuthController : ControllerBase
         return Ok(IssueSession(result));
     }
 
+    // Called automatically by the frontend's HTTP interceptor whenever the access token has
+    // expired, so it needs more headroom than the 5/min "auth" policy - a user with several
+    // tabs open can otherwise trip that limit just from ordinary background use.
+    [HttpPost("refresh")]
+    [EnableRateLimiting("general")]
+    public async Task<ActionResult<AuthResponse>> Refresh()
+    {
+        if (!Request.Cookies.TryGetValue(RefreshCookieName, out var rawRefreshToken) || string.IsNullOrWhiteSpace(rawRefreshToken))
+            return Unauthorized();
+
+        var result = await _authService.RefreshAsync(rawRefreshToken);
+        if (result == null)
+        {
+            // Stale, expired, or already-rotated - clear it so the browser stops offering it.
+            Response.Cookies.Delete(RefreshCookieName, new CookieOptions { Path = "/api/auth", Secure = true, SameSite = SameSiteMode.None });
+            return Unauthorized();
+        }
+
+        return Ok(IssueSession(result));
+    }
+
     [HttpPost("logout")]
     [DisableRateLimiting]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout()
     {
+        if (Request.Cookies.TryGetValue(RefreshCookieName, out var rawRefreshToken) && !string.IsNullOrWhiteSpace(rawRefreshToken))
+            await _authService.RevokeRefreshTokenAsync(rawRefreshToken);
+
         Response.Cookies.Delete(AuthCookieName, new CookieOptions
         {
             Path = "/",
@@ -166,6 +213,12 @@ public class AuthController : ControllerBase
         Response.Cookies.Delete(CsrfCookieName, new CookieOptions
         {
             Path = "/",
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+        Response.Cookies.Delete(RefreshCookieName, new CookieOptions
+        {
+            Path = "/api/auth",
             Secure = true,
             SameSite = SameSiteMode.None
         });
