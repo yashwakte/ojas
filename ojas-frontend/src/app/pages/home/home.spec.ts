@@ -128,15 +128,15 @@ describe('Home', () => {
     expect(fixture.componentInstance.featuredProductsFor(campaign)).toEqual([product]);
   });
 
-  it('addToCart redirects to /login when logged out', () => {
+  it('addToCart lets a logged-out guest add to cart too', () => {
     authServiceSpy.isLoggedIn.and.returnValue(false);
     spyOn(router, 'navigate');
     const fixture = create();
 
     fixture.componentInstance.addToCart(product);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(cartServiceSpy.addToCart).not.toHaveBeenCalled();
+    expect(cartServiceSpy.addToCart).toHaveBeenCalledWith(product);
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('addToCart adds the product and flags justAdded when logged in', () => {
@@ -146,15 +146,15 @@ describe('Home', () => {
     expect(fixture.componentInstance.justAdded()).toBe(product.id);
   });
 
-  it('buyNow redirects to /login when logged out', () => {
+  it('buyNow lets a logged-out guest through to /checkout, where the route guard takes over', () => {
     authServiceSpy.isLoggedIn.and.returnValue(false);
     spyOn(router, 'navigate');
     const fixture = create();
 
     fixture.componentInstance.buyNow(product);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(checkoutServiceSpy.addItem).not.toHaveBeenCalled();
+    expect(checkoutServiceSpy.addItem).toHaveBeenCalledWith(product);
+    expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
   });
 
   it('buyNow adds to checkout and navigates to /checkout when logged in', () => {
