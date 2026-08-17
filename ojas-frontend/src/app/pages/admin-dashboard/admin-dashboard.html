@@ -135,15 +135,20 @@
           } @else {
             <div class="orders-grid">
               @for (order of filteredOrders(); track order.id) {
-                <article class="order-card">
+                <article class="order-card" [class.order-card--editing]="isDirty(order)">
                   <div class="order-card-head">
                     <div>
                       <span class="order-id">Order #{{ order.id.slice(-8).toUpperCase() }}</span>
                       <p>{{ order.createdAt | date: 'dd MMM, h:mm a' }}</p>
                     </div>
-                    <span class="status-pill" [class]="statusClass(order.status)">{{
-                      order.status
-                    }}</span>
+                    <div class="order-card-head-right">
+                      @if (isDirty(order)) {
+                        <span class="editing-badge"><mat-icon>edit</mat-icon> Editing</span>
+                      }
+                      <span class="status-pill" [class]="statusClass(order.status)">{{
+                        order.status
+                      }}</span>
+                    </div>
                   </div>
 
                   <div class="order-customer">
@@ -258,49 +263,50 @@
           } @else {
             <mat-card class="staff-card">
               <mat-card-header>
-                <mat-card-title>Create Staff Credential</mat-card-title>
+                <mat-card-title><mat-icon>badge</mat-icon> Create Staff Credential</mat-card-title>
                 <mat-card-subtitle
                   >Add delivery or admin accounts from one place.</mat-card-subtitle
                 >
               </mat-card-header>
               <mat-card-content>
                 <div class="staff-grid">
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" floatLabel="always">
                     <mat-label>Full Name</mat-label>
                     <input
                       matInput
+                      autocomplete="off"
                       [(ngModel)]="staffForm().fullName"
                       (ngModelChange)="updateStaffField('fullName', $event)"
-                      placeholder="Full name"
                     />
                   </mat-form-field>
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" floatLabel="always">
                     <mat-label>Email</mat-label>
                     <input
                       matInput
                       type="email"
+                      autocomplete="off"
                       [(ngModel)]="staffForm().email"
                       (ngModelChange)="updateStaffField('email', $event)"
-                      placeholder="Email"
                     />
                   </mat-form-field>
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" floatLabel="always">
                     <mat-label>Phone</mat-label>
                     <input
                       matInput
+                      type="tel"
+                      autocomplete="off"
                       [(ngModel)]="staffForm().phone"
                       (ngModelChange)="updateStaffField('phone', $event)"
-                      placeholder="Phone"
                     />
                   </mat-form-field>
-                  <mat-form-field appearance="outline" class="password-field">
+                  <mat-form-field appearance="outline" class="password-field" floatLabel="always">
                     <mat-label>Temporary Password</mat-label>
                     <input
                       [type]="showStaffPassword() ? 'text' : 'password'"
                       matInput
+                      autocomplete="new-password"
                       [(ngModel)]="staffForm().password"
                       (ngModelChange)="updateStaffField('password', $event)"
-                      placeholder="Temporary password"
                     />
                     <button
                       mat-icon-button
@@ -314,7 +320,7 @@
                       }}</mat-icon>
                     </button>
                   </mat-form-field>
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" floatLabel="always">
                     <mat-label>Role</mat-label>
                     <mat-select
                       [(ngModel)]="staffForm().role"
@@ -345,7 +351,10 @@
 
             <mat-card class="partners-list-card">
               <mat-card-header>
-                <mat-card-title>Existing Delivery Partners</mat-card-title>
+                <mat-card-title>
+                  <mat-icon>groups</mat-icon> Existing Delivery Partners
+                  <span class="partners-count">{{ deliveryPartners().length }}</span>
+                </mat-card-title>
               </mat-card-header>
               <mat-card-content>
                 @if (deliveryPartners().length === 0) {
@@ -354,22 +363,18 @@
                   <div class="partners-grid">
                     @for (partner of deliveryPartners(); track partner.id) {
                       <div class="partner-card">
-                        <div class="partner-avatar">
-                          <mat-icon>person</mat-icon>
+                        <div class="partner-avatar" [class.admin]="partner.role === 'admin'">
+                          {{ partner.fullName.charAt(0).toUpperCase() }}
                         </div>
                         <div class="partner-info">
                           <h4>{{ partner.fullName }}</h4>
                           <p><mat-icon>email</mat-icon> {{ partner.email }}</p>
                           <p><mat-icon>call</mat-icon> {{ partner.phone }}</p>
                         </div>
-                        <mat-chip-set>
-                          <mat-chip
-                            [color]="partner.role === 'admin' ? 'primary' : 'accent'"
-                            selected
-                          >
-                            {{ partner.role }}
-                          </mat-chip>
-                        </mat-chip-set>
+                        <span class="role-pill" [class.admin]="partner.role === 'admin'">
+                          <mat-icon>{{ partner.role === 'admin' ? 'shield' : 'moped' }}</mat-icon>
+                          {{ partner.role === 'admin' ? 'Admin' : 'Delivery' }}
+                        </span>
                       </div>
                     }
                   </div>

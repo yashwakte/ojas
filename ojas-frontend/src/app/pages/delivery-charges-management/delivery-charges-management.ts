@@ -97,6 +97,11 @@ export class DeliveryChargesManagement implements OnInit {
   startEditing(): void {
     this.editing.set(true);
     this.formErrors.set({});
+    // The outlined fields are created while this tab panel's layout is still settling,
+    // which can leave Material's notch (the gap it cuts in the border for the floating
+    // label) sized wrong so the border draws straight through the label text. A resize
+    // event is what Material listens for to recompute it.
+    setTimeout(() => window.dispatchEvent(new Event('resize')));
   }
 
   cancelEditing(): void {

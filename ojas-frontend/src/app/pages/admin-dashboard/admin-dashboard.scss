@@ -114,7 +114,7 @@
           color: var(--ojas-orange);
         }
 
-        .mat-mdc-tab-label {
+        .mdc-tab__text-label {
           display: flex;
           align-items: center;
           gap: 10px;
@@ -135,7 +135,7 @@
           color: #fff;
           box-shadow: 0 4px 16px rgba(242, 90, 26, 0.35);
 
-          .mat-mdc-tab-label {
+          .mdc-tab__text-label {
             color: #fff;
 
             mat-icon {
@@ -232,6 +232,42 @@
   border-radius: 16px;
   padding: 14px;
   background: linear-gradient(180deg, #ffffff 0%, #fffaf8 100%);
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
+
+  &--editing {
+    border-color: var(--ojas-orange);
+    box-shadow:
+      0 0 0 3px rgba(242, 90, 26, 0.15),
+      0 4px 30px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.order-card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.editing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ojas-orange-dark);
+  background: var(--ojas-orange-bg);
+  border: 1px solid rgba(242, 90, 26, 0.3);
+
+  mat-icon {
+    font-size: 0.85rem;
+    width: 0.85rem;
+    height: 0.85rem;
+  }
 }
 
 .order-card-head {
@@ -397,8 +433,9 @@
   }
 }
 
-/* Staff Card */
-.staff-card {
+/* Staff Card + Partners List Card share one visual language */
+.staff-card,
+.partners-list-card {
   background: #fff;
   border-radius: 18px;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -408,17 +445,29 @@
   ::ng-deep {
     .mat-mdc-card-header {
       padding: 18px 18px 8px;
+    }
 
-      .mat-mdc-card-title {
-        margin: 0;
-        font-size: 1.1rem;
-      }
+    .mat-mdc-card-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--ojas-text);
 
-      .mat-mdc-card-subtitle {
-        margin: 6px 0 0;
-        color: var(--ojas-text-light);
-        font-size: 0.88rem;
+      mat-icon {
+        color: var(--ojas-orange);
+        font-size: 1.2rem;
+        width: 1.2rem;
+        height: 1.2rem;
       }
+    }
+
+    .mat-mdc-card-subtitle {
+      margin: 6px 0 0;
+      color: var(--ojas-text-light);
+      font-size: 0.88rem;
     }
 
     .mat-mdc-card-content {
@@ -427,10 +476,31 @@
   }
 }
 
+.partners-count {
+  margin-left: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--ojas-orange-bg);
+  color: var(--ojas-orange-dark);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .staff-grid {
   display: grid;
   grid-template-columns: 1.3fr 1.2fr 1fr 1fr 0.9fr auto;
-  gap: 10px;
+  align-items: start;
+  gap: 6px 12px;
+  // Compact, standard-height outlined fields with a lighter border instead
+  // of Material's default (taller, darker-outlined) sizing.
+  --mat-form-field-outlined-outline-color: rgba(0, 0, 0, 0.16);
+  --mat-form-field-outlined-hover-outline-color: rgba(0, 0, 0, 0.3);
+  --mat-form-field-outlined-focus-outline-color: var(--ojas-orange);
+  // A resting (empty, unfocused) label should read as a placeholder hint —
+  // light gray — not near-black like a filled-in value.
+  --mat-form-field-outlined-label-text-color: var(--ojas-text-light);
+  --mat-form-field-outlined-hover-label-text-color: var(--ojas-text-light);
+  --mat-form-field-outlined-focus-label-text-color: var(--ojas-orange);
 
   mat-form-field {
     width: 100%;
@@ -444,17 +514,43 @@
         display: none;
       }
 
-      input.mat-mdc-input-element {
-        padding: 10px 12px !important;
-        font-size: 0.86rem;
+      .mat-mdc-form-field-infix {
+        min-height: 0;
+        padding-top: 11px !important;
+        padding-bottom: 11px !important;
+      }
+
+      input.mat-mdc-input-element,
+      .mat-mdc-select-value {
+        padding: 0;
+        font-size: 0.85rem;
       }
     }
   }
 
   .password-field {
     ::ng-deep {
-      .mat-mdc-form-field-suffix button {
+      .mat-mdc-form-field-suffix {
+        align-self: center;
+      }
+
+      .mat-mdc-icon-button {
+        --mdc-icon-button-state-layer-size: 32px;
+        width: 32px;
+        height: 32px;
+        padding: 4px;
         color: var(--ojas-text-light);
+
+        .mat-mdc-button-touch-target {
+          width: 32px;
+          height: 32px;
+        }
+
+        mat-icon {
+          font-size: 19px;
+          width: 19px;
+          height: 19px;
+        }
       }
     }
   }
@@ -463,7 +559,7 @@
     background: var(--ojas-orange) !important;
     color: #fff !important;
     border-radius: 10px !important;
-    height: 48px;
+    height: 42px;
     align-self: end;
   }
 }
@@ -482,19 +578,6 @@
   color: #c62828;
 }
 
-/* Partners List Card */
-.partners-list-card {
-  ::ng-deep {
-    .mat-mdc-card-header {
-      padding: 16px 18px 8px;
-    }
-
-    .mat-mdc-card-content {
-      padding: 0 18px 18px;
-    }
-  }
-}
-
 .partners-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -505,33 +588,37 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px;
-  background: #fafafa;
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  border-radius: 12px;
-  transition: all 0.2s ease;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
 
   &:hover {
-    background: #fff;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+    border-color: rgba(242, 90, 26, 0.2);
+    transform: translateY(-2px);
   }
 
   .partner-avatar {
-    width: 48px;
-    height: 48px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--ojas-orange) 0%, #e86c00 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
     flex-shrink: 0;
 
-    mat-icon {
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
+    &.admin {
+      background: linear-gradient(135deg, #3b3b3b 0%, #1a1a1a 100%);
     }
   }
 
@@ -565,8 +652,30 @@
     }
   }
 
-  mat-chip-set {
+  .role-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     flex-shrink: 0;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--ojas-orange-dark);
+    background: var(--ojas-orange-bg);
+    border: 1px solid rgba(242, 90, 26, 0.25);
+
+    mat-icon {
+      font-size: 0.9rem;
+      width: 0.9rem;
+      height: 0.9rem;
+    }
+
+    &.admin {
+      color: #2b2b2b;
+      background: #f2f2f2;
+      border-color: rgba(0, 0, 0, 0.12);
+    }
   }
 }
 
@@ -741,10 +850,6 @@
 
   .staff-grid {
     grid-template-columns: 1fr;
-
-    .create-btn {
-      grid-column: auto;
-    }
   }
 
   .partners-grid {

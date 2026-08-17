@@ -296,6 +296,26 @@ body.intro-locked {
   color: var(--ojas-text);
 }
 
+// mat-select's option panel renders in a CDK overlay attached to <body>,
+// outside every component's view encapsulation, so it can only reliably be
+// styled from here. Forced opaque so it never lets page content underneath
+// (buttons, cards) show through.
+.mat-mdc-select-panel {
+  background-color: #fff !important;
+}
+
+.mat-mdc-option {
+  background-color: #fff;
+
+  &.mdc-list-item--selected:not(.mat-mdc-option-multiple) {
+    background-color: var(--ojas-orange-bg) !important;
+  }
+
+  &:hover:not(.mdc-list-item--disabled) {
+    background-color: var(--ojas-ink-bg);
+  }
+}
+
 .snack-error {
   --mdc-snackbar-container-color: #d32f2f;
   --mdc-snackbar-supporting-text-color: #fff;

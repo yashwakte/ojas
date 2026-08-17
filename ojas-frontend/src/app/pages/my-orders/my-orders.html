@@ -28,16 +28,21 @@
     </div>
   } @else {
     <div class="orders-list">
-      @for (order of orders(); track order.id) {
-        <div class="order-card">
+      @for (order of sortedOrders(); track order.id) {
+        <div class="order-card" [class.order-card--editing]="editingId() === order.id">
           <div class="order-header">
             <div class="order-meta">
               <span class="order-id">Order #{{ order.id.slice(-8).toUpperCase() }}</span>
               <span class="order-date">{{ order.createdAt | date: 'dd MMM yyyy, h:mm a' }}</span>
             </div>
-            <span class="order-status" [class]="getStatusClass(order.status)">
-              {{ order.status }}
-            </span>
+            <div class="order-header-right">
+              @if (editingId() === order.id) {
+                <span class="editing-badge"><mat-icon>edit</mat-icon> Editing</span>
+              }
+              <span class="order-status" [class]="getStatusClass(order.status)">
+                {{ order.status }}
+              </span>
+            </div>
           </div>
 
           @if (editingId() === order.id) {

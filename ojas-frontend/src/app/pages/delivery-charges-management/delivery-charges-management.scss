@@ -1,6 +1,6 @@
 .delivery-charges-management {
-  min-height: 100vh;
-  padding: 88px 20px 40px;
+  min-height: 0;
+  padding: 24px 20px 40px;
   max-width: 900px;
   margin: 0 auto;
 }
@@ -498,7 +498,7 @@ mat-form-field {
 
 @media (max-width: 768px) {
   .delivery-charges-management {
-    padding: 86px 16px 32px;
+    padding: 20px 16px 32px;
   }
 
   .page-header {

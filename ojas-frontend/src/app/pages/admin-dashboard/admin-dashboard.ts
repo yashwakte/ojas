@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, effect, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, effect, inject, viewChild } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -11,7 +11,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../services/auth.service';
 import { OrderService } from '../../services/order.service';
@@ -48,7 +47,6 @@ type AdminTab = 'orders' | 'products' | 'delivery-partners' | 'delivery-charges'
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatTooltipModule,
-    MatChipsModule,
     MatDividerModule,
     CurrencyPipe,
     DatePipe,
@@ -66,6 +64,8 @@ export class AdminDashboard implements OnInit {
   private deliveryChargesService = inject(DeliveryChargesService);
   private campaignBannerService = inject(CampaignBannerService);
   private snackBar = inject(MatSnackBar);
+  /** Lets a header Refresh discard an in-progress add/edit form instead of leaving it open with stale data. */
+  private readonly productManagement = viewChild(ProductManagement);
 
   readonly tabs = [
     { id: 'orders', label: 'Orders', shortLabel: 'Orders', icon: 'receipt_long' },
@@ -129,21 +129,26 @@ export class AdminDashboard implements OnInit {
         .reduce((sum, o) => sum + o.totalAmount, 0),
   );
 
+  /**
+   * Orders with unsaved status/delivery-partner changes come first (so an
+   * in-progress edit never scrolls out of view), then delivered/cancelled
+   * orders sink to the bottom since they're done, and everything else is
+   * newest first.
+   */
   readonly filteredOrders = computed(() => {
     const filter = this.statusFilter().toLowerCase();
-    let filtered = this.orders();
-    
-    if (filter !== 'all') {
-      filtered = filtered.filter((order) => order.status.toLowerCase() === filter);
-    }
-    
-    // Sort: pending first, then by createdAt descending
+    const all = this.orders();
+    const filtered = filter === 'all' ? [...all] : all.filter((order) => order.status.toLowerCase() === filter);
+
     return filtered.sort((a, b) => {
-      const aPending = a.status.toLowerCase() === 'pending';
-      const bPending = b.status.toLowerCase() === 'pending';
-      if (aPending && !bPending) return -1;
-      if (!aPending && bPending) return 1;
-      // Both same pending status, sort by date descending
+      const aDirty = this.isDirty(a);
+      const bDirty = this.isDirty(b);
+      if (aDirty !== bDirty) return aDirty ? -1 : 1;
+
+      const aFinal = this.isFinalStatus(a.status);
+      const bFinal = this.isFinalStatus(b.status);
+      if (aFinal !== bFinal) return aFinal ? 1 : -1;
+
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   });
@@ -190,6 +195,9 @@ export class AdminDashboard implements OnInit {
     } else if (tab === 'delivery-partners') {
       this.loadDeliveryPartners();
     } else if (tab === 'products') {
+      // Refresh implies "start fresh" — an open add/edit form with unsaved
+      // changes would otherwise sit there showing data that's now stale.
+      this.productManagement()?.closeForm();
       this.productService.loadProducts();
     } else if (tab === 'delivery-charges') {
       this.deliveryChargesService.loadConfig();
@@ -248,6 +256,7 @@ export class AdminDashboard implements OnInit {
         );
         this.busyOrderAction.set(null);
         this.showSuccess('Order status updated');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         // Cancelling restores stock server-side; refresh so the products
         // list and low-stock widget don't show stale availability.
         if (nextStatus === 'Cancelled') {
@@ -286,6 +295,7 @@ export class AdminDashboard implements OnInit {
         );
         this.busyOrderAction.set(null);
         this.showSuccess('Delivery partner assigned');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       },
       error: () => {
         this.ordersError.set('Could not assign delivery partner');
@@ -383,6 +393,18 @@ export class AdminDashboard implements OnInit {
       acc[order.id] = order.deliveryPartnerId ?? '';
       return acc;
     }, {});
+  }
+
+  /** True when this order's status or delivery-partner draft hasn't been saved yet. */
+  isDirty(order: OrderResponse): boolean {
+    const statusChanged = (this.statusDraft()[order.id] ?? order.status) !== order.status;
+    const deliveryChanged = (this.deliveryDraft()[order.id] ?? '') !== (order.deliveryPartnerId ?? '');
+    return statusChanged || deliveryChanged;
+  }
+
+  private isFinalStatus(status: string): boolean {
+    const s = status.toLowerCase();
+    return s === 'delivered' || s === 'cancelled';
   }
 
   statusClass(status: string): string {

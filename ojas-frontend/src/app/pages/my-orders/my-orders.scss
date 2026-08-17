@@ -101,10 +101,19 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
 
   &:hover {
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+
+  &--editing {
+    border-color: var(--ojas-orange);
+    box-shadow:
+      0 0 0 3px rgba(242, 90, 26, 0.15),
+      0 4px 30px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -133,6 +142,31 @@
 .order-date {
   font-size: 0.78rem;
   color: var(--ojas-text-light);
+}
+
+.order-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 50px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ojas-orange-dark);
+  background: var(--ojas-orange-bg);
+  border: 1px solid rgba(242, 90, 26, 0.3);
+
+  mat-icon {
+    font-size: 0.85rem;
+    width: 0.85rem;
+    height: 0.85rem;
+  }
 }
 
 .order-status {

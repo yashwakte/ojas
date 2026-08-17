@@ -4,6 +4,7 @@ import { DatePipe, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { UserService } from '../../services/user.service';
 import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
@@ -25,6 +26,7 @@ export class MyOrders implements OnInit {
   private readonly deliveryCharges = inject(DeliveryChargesService);
   private readonly orderEditDraft = inject(OrderEditDraftService);
   private readonly router = inject(Router);
+  private readonly snackBar = inject(MatSnackBar);
 
   orders = signal<OrderResponse[]>([]);
   loading = signal(true);
@@ -62,6 +64,28 @@ export class MyOrders implements OnInit {
   confirmingCancelId = signal<string | null>(null);
   cancelling = signal(false);
 
+  /**
+   * Delivered/cancelled orders are done and sink to the bottom; everything
+   * else stays on top, newest first. Whatever order is currently being
+   * edited is pinned above all of that so the customer never loses track
+   * of it mid-edit.
+   */
+  readonly sortedOrders = computed(() => {
+    const editingId = this.editingId();
+    const sorted = [...this.orders()].sort((a, b) => {
+      const aFinal = this.isFinalStatus(a.status);
+      const bFinal = this.isFinalStatus(b.status);
+      if (aFinal !== bFinal) return aFinal ? 1 : -1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    if (!editingId) return sorted;
+    const editIndex = sorted.findIndex((o) => o.id === editingId);
+    if (editIndex <= 0) return sorted;
+    const [edited] = sorted.splice(editIndex, 1);
+    return [edited, ...sorted];
+  });
+
   ngOnInit(): void {
     this.load();
   }
@@ -83,6 +107,9 @@ export class MyOrders implements OnInit {
     this.showEditMap.set(false);
     this.editError.set('');
     this.productService.loadProducts();
+    // The order jumps to the top of the list as soon as editing starts;
+    // scroll there so the customer sees it move and land in edit mode.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   cancelEdit(): void {
@@ -177,6 +204,8 @@ export class MyOrders implements OnInit {
           this.cancelEdit();
           // Item quantities may have changed, shifting stock server-side.
           this.productService.loadProducts();
+          this.showSuccess('Order updated');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         error: (err) => {
           this.saving.set(false);
@@ -209,6 +238,8 @@ export class MyOrders implements OnInit {
         // Cancelling restores stock server-side; refresh so out-of-stock
         // products the customer bought the last of show as buyable again.
         this.productService.loadProducts();
+        this.showSuccess('Order cancelled');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       },
       error: (err) => {
         this.cancelling.set(false);
@@ -234,6 +265,15 @@ export class MyOrders implements OnInit {
       default:
         return 'status-pending';
     }
+  }
+
+  private isFinalStatus(status: string): boolean {
+    const s = status.toLowerCase();
+    return s === 'delivered' || s === 'cancelled';
+  }
+
+  private showSuccess(message: string): void {
+    this.snackBar.open(message, 'Close', { duration: 3000, panelClass: 'snack-success' });
   }
 
   private load(): void {
