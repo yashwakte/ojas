@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { Observable, catchError, finalize, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   AuthResponse,
@@ -70,6 +71,34 @@ export class AuthService {
 
   login(request: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request);
+  }
+
+  // Called by the auth interceptor when a request 401s because the short-lived access token
+  // expired - exchanges the (much longer-lived, HttpOnly) refresh cookie for a fresh one.
+  refresh() {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/refresh`, {});
+  }
+
+  private refreshInFlight$: Observable<AuthResponse> | null = null;
+
+  /** Single-flight wrapper around refresh() - if several requests 401 around the same moment
+   * (e.g. a page firing multiple authenticated calls right as the access token expires), they
+   * share one in-flight /refresh call instead of each firing their own. */
+  refreshOnce(): Observable<AuthResponse> {
+    if (!this.refreshInFlight$) {
+      this.refreshInFlight$ = this.refresh().pipe(
+        tap((res) => this.saveAuth(res)),
+        catchError((err) => {
+          this.logout();
+          return throwError(() => err);
+        }),
+        finalize(() => {
+          this.refreshInFlight$ = null;
+        }),
+        shareReplay(1),
+      );
+    }
+    return this.refreshInFlight$;
   }
 
   createStaff(request: CreateStaffRequest) {

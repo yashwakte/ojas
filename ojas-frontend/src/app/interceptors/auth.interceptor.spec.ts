@@ -81,13 +81,63 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
-  it('calls authService.logout() when an already-logged-in session receives a 401 (session expired)', () => {
-    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'tok-123' });
+  it('attempts a silent refresh on a 401 for a mutating request, then retries with the fresh CSRF token', () => {
+    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'old-csrf' });
+
+    let result: unknown;
+    http.put(`${environment.apiUrl}/user/profile`, {}).subscribe((res) => (result = res));
+
+    const firstAttempt = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
+    expect(firstAttempt.request.headers.get('X-CSRF-Token')).toBe('old-csrf');
+    firstAttempt.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+
+    const refreshReq = httpMock.expectOne(`${environment.apiUrl}/auth/refresh`);
+    refreshReq.flush({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'new-csrf' });
+
+    const retryReq = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
+    expect(retryReq.request.headers.get('X-CSRF-Token')).toBe('new-csrf');
+    retryReq.flush({ ok: true });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('logs out when the silent refresh itself fails', () => {
+    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'old-csrf' });
     spyOn(auth, 'logout');
-    http.get(`${environment.apiUrl}/user/profile`).subscribe({ error: () => {} });
-    const req = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
-    req.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+
+    let errorStatus: number | undefined;
+    http.get(`${environment.apiUrl}/user/profile`).subscribe({ error: (err) => (errorStatus = err.status) });
+
+    const firstAttempt = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
+    firstAttempt.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+
+    const refreshReq = httpMock.expectOne(`${environment.apiUrl}/auth/refresh`);
+    refreshReq.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+
     expect(auth.logout).toHaveBeenCalled();
+    expect(errorStatus).toBe(401);
+  });
+
+  it('shares a single refresh call across requests that 401 around the same time', () => {
+    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'old-csrf' });
+
+    const results: unknown[] = [];
+    http.get(`${environment.apiUrl}/user/profile`).subscribe((res) => results.push(res));
+    http.get(`${environment.apiUrl}/orders`).subscribe((res) => results.push(res));
+
+    const profileReq = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
+    const ordersReq = httpMock.expectOne(`${environment.apiUrl}/orders`);
+    profileReq.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+    ordersReq.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+
+    // Exactly one /refresh call handles both - a second expectOne would fail if a duplicate fired.
+    const refreshReq = httpMock.expectOne(`${environment.apiUrl}/auth/refresh`);
+    refreshReq.flush({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'new-csrf' });
+
+    httpMock.expectOne(`${environment.apiUrl}/user/profile`).flush({ from: 'profile' });
+    httpMock.expectOne(`${environment.apiUrl}/orders`).flush({ from: 'orders' });
+
+    expect(results).toEqual([{ from: 'profile' }, { from: 'orders' }]);
   });
 
   it('does not call authService.logout() on a 401 while logged out (e.g. wrong login credentials)', () => {
