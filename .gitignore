@@ -11,6 +11,11 @@ ojas-frontend/node_modules/
 ojas-frontend/dist/
 ojas-frontend/.angular/
 
+# E2E
+ojas-e2e/node_modules/
+ojas-e2e/test-results/
+ojas-e2e/playwright-report/
+
 # IDE
 .vs/
 .vscode/
