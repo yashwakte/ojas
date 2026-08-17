@@ -26,6 +26,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<Order> Orders => _database.GetCollection<Order>("orders");
     public IMongoCollection<DeliveryCharges> DeliveryCharges => _database.GetCollection<DeliveryCharges>("delivery_charges");
     public IMongoCollection<CampaignBanner> CampaignBanners => _database.GetCollection<CampaignBanner>("campaign_banner");
+    public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
 
     private void TryEnsureIndexes()
     {
@@ -40,6 +41,14 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Unique = true, Name = "unique_phone" }
             );
             Users.Indexes.CreateMany([emailIndex, phoneIndex]);
+
+            // TTL index - Mongo automatically deletes an OTP document once ExpiresAt is in the
+            // past, so the collection self-cleans instead of growing unbounded.
+            var otpTtlIndex = new CreateIndexModel<OtpCode>(
+                Builders<OtpCode>.IndexKeys.Ascending(o => o.ExpiresAt),
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "otp_ttl" }
+            );
+            OtpCodes.Indexes.CreateOne(otpTtlIndex);
         }
         catch (MongoCommandException ex)
         {
