@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { Register } from './register';
@@ -65,6 +65,45 @@ describe('Register', () => {
   it('should create with an invalid, empty form', () => {
     const { fixture } = create();
     expect(fixture.componentInstance.registerForm.invalid).toBeTrue();
+  });
+
+  it('arriving with a ?verify=email query param (redirected from login) shows the OTP step without crashing', () => {
+    // Regression test: this used to call sendResend() - which calls cdr.detectChanges() -
+    // from the constructor, before the component's view existed, which threw and crashed
+    // the whole component. The router-outlet rendered blank with no error surfaced anywhere,
+    // since the header/footer live outside the outlet and kept rendering fine.
+    TestBed.resetTestingModule();
+    authServiceSpy = jasmine.createSpyObj('AuthService', [
+      'register',
+      'verifyEmailOtp',
+      'resendEmailOtp',
+      'saveAuth',
+      'checkEmail',
+      'checkPhone',
+    ]);
+    authServiceSpy.checkEmail.and.returnValue(of({ exists: false }));
+    authServiceSpy.checkPhone.and.returnValue(of({ exists: false }));
+    authServiceSpy.resendEmailOtp.and.returnValue(of({ message: 'ok', devCode: '654321' }));
+
+    TestBed.configureTestingModule({
+      imports: [Register],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authServiceSpy },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: convertToParamMap({ verify: 'stuck@example.com' }) } },
+        },
+      ],
+    });
+
+    const fixture = TestBed.createComponent(Register);
+    expect(() => fixture.detectChanges()).not.toThrow();
+
+    const component = fixture.componentInstance;
+    expect(component.showOtpStep).toBeTrue();
+    expect(component.pendingEmail).toBe('stuck@example.com');
+    expect(authServiceSpy.resendEmailOtp).toHaveBeenCalledWith({ email: 'stuck@example.com' });
   });
 
   it('fullName requires at least 2 characters', () => {

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, OnDestroy, inject } from '@angular/core';
+import { Component, ChangeDetectorRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   FormBuilder,
@@ -35,7 +35,7 @@ const RESEND_COOLDOWN_SECONDS = 30;
   templateUrl: './register.html',
   styleUrl: './register.scss',
 })
-export class Register implements OnDestroy {
+export class Register implements OnInit, OnDestroy {
   private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
 
@@ -84,9 +84,14 @@ export class Register implements OnDestroy {
       ],
       password: ['', [Validators.required, Validators.minLength(10)]],
     });
+  }
 
+  ngOnInit() {
     // Login redirects here with ?verify=<email> when the account exists but never
     // completed OTP verification, so they can pick the flow back up without re-registering.
+    // Deferred to ngOnInit rather than done in the constructor because sendResend() calls
+    // cdr.detectChanges(), which throws if the component's view hasn't been created yet -
+    // the constructor runs before that, ngOnInit runs after.
     const verifyEmail = this.route.snapshot.queryParamMap.get('verify');
     if (verifyEmail) {
       this.pendingEmail = verifyEmail;
