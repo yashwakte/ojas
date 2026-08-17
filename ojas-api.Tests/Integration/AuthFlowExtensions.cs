@@ -14,6 +14,9 @@ namespace OjasApi.Tests.Integration;
 /// </summary>
 public static class AuthFlowExtensions
 {
+    /// <summary>Registration is now two steps - create the account, then verify the emailed
+    /// code before a session exists. The test host runs in Development, so the register
+    /// response includes the code directly (DevCode) instead of requiring a real inbox.</summary>
     public static async Task<(AuthResponse Auth, string CsrfToken)> RegisterAsync(
         this HttpClient client, string? fullName = null, string? email = null, string? phone = null, string password = "Passw0rd123!")
     {
@@ -26,7 +29,13 @@ public static class AuthFlowExtensions
 
         var response = await client.PostAsJsonAsync("/api/auth/register", request);
         response.EnsureSuccessStatusCode();
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var pending = await response.Content.ReadFromJsonAsync<RegisterPendingResponse>();
+
+        var verifyResponse = await client.PostAsJsonAsync(
+            "/api/auth/verify-email-otp",
+            new VerifyEmailOtpRequest(pending!.Email, pending.DevCode!));
+        verifyResponse.EnsureSuccessStatusCode();
+        var auth = await verifyResponse.Content.ReadFromJsonAsync<AuthResponse>();
         return (auth!, auth!.CsrfToken!);
     }
 

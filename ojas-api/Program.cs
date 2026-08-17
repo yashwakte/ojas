@@ -44,6 +44,9 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
+builder.Services.AddScoped<OtpService>();
+builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
+builder.Services.AddHttpClient<IPhoneOtpSender, Msg91PhoneOtpSender>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -186,6 +189,21 @@ _ = Task.Run(async () =>
     catch (Exception ex)
     {
         Console.WriteLine($"⚠️ Could not seed products: {ex.Message}");
+    }
+});
+
+// Grandfather accounts that predate email-verification enforcement (non-blocking)
+_ = Task.Run(async () =>
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var authService = scope.ServiceProvider.GetRequiredService<AuthService>();
+        await authService.GrandfatherPreExistingUsersAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Could not grandfather pre-existing users for email verification: {ex.Message}");
     }
 });
 

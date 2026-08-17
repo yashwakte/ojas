@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using MongoDB.Driver;
 using OjasApi.Controllers;
@@ -16,15 +17,20 @@ public class AuthControllerTests
 {
     private readonly Mock<IMongoDbService> _dbMock = new();
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
+    private readonly Mock<IMongoCollection<OtpCode>> _otpCodesMock = new();
+    private readonly Mock<IEmailSender> _emailSenderMock = new();
+    private readonly Mock<IPhoneOtpSender> _phoneOtpSenderMock = new();
     private readonly AuthController _sut;
 
     public AuthControllerTests()
     {
         _dbMock.Setup(d => d.Users).Returns(_usersMock.Object);
+        _dbMock.Setup(d => d.OtpCodes).Returns(_otpCodesMock.Object);
         _usersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
             .Returns(Task.CompletedTask);
+        _phoneOtpSenderMock.Setup(s => s.IsConfigured).Returns(false);
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -36,15 +42,17 @@ public class AuthControllerTests
             .Build();
 
         var authService = new AuthService(_dbMock.Object, config);
+        var otpService = new OtpService(_dbMock.Object, _emailSenderMock.Object, _phoneOtpSenderMock.Object, NullLogger<OtpService>.Instance);
         var envMock = new Mock<IWebHostEnvironment>();
+        envMock.Setup(e => e.EnvironmentName).Returns("Development");
 
-        _sut = new AuthController(authService, envMock.Object)
+        _sut = new AuthController(authService, otpService, envMock.Object, NullLogger<AuthController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
     }
 
-    private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!") => new()
+    private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!", bool isEmailVerified = true) => new()
     {
         Id = "507f1f77bcf86cd799439011",
         FullName = "Jane Doe",
@@ -52,6 +60,7 @@ public class AuthControllerTests
         Phone = phone,
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
         Role = UserRoles.Customer,
+        IsEmailVerified = isEmailVerified,
     };
 
     private static IEnumerable<string> SetCookieHeaders(ControllerContext context) =>
@@ -98,7 +107,7 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Register_Success_SetsAuthAndCsrfCookies_AndReturnsCsrfToken()
+    public async Task Register_Success_ReturnsPendingVerification_AndSetsNoCookiesYet()
     {
         _usersMock.SetupFind(new List<User>());
         var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!");
@@ -106,12 +115,12 @@ public class AuthControllerTests
         var result = await _sut.Register(request);
 
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
-        var response = okResult.Value.ShouldBeOfType<AuthResponse>();
-        response.CsrfToken.ShouldNotBeNullOrWhiteSpace();
+        var response = okResult.Value.ShouldBeOfType<RegisterPendingResponse>();
+        response.Email.ShouldBe("new@example.com");
+        response.DevCode.ShouldNotBeNullOrWhiteSpace();
 
         var cookies = SetCookieHeaders(_sut.ControllerContext);
-        cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
-        cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
+        cookies.ShouldBeEmpty();
     }
 
     [Fact]
@@ -124,6 +133,50 @@ public class AuthControllerTests
 
         var conflict = result.Result.ShouldBeOfType<ConflictObjectResult>();
         conflict.Value.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task VerifyEmailOtp_Success_SetsAuthAndCsrfCookies()
+    {
+        var user = MakeUser(isEmailVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+        var otp = new OtpCode
+        {
+            Target = user.Email,
+            Channel = OtpChannels.Email,
+            CodeHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+        };
+        _otpCodesMock.SetupFind(new List<OtpCode> { otp });
+
+        var result = await _sut.VerifyEmailOtp(new VerifyEmailOtpRequest(user.Email, "123456"));
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var response = okResult.Value.ShouldBeOfType<AuthResponse>();
+        response.CsrfToken.ShouldNotBeNullOrWhiteSpace();
+
+        var cookies = SetCookieHeaders(_sut.ControllerContext);
+        cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
+    }
+
+    [Fact]
+    public async Task VerifyEmailOtp_WrongCode_ReturnsBadRequest()
+    {
+        var user = MakeUser(isEmailVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+        var otp = new OtpCode
+        {
+            Target = user.Email,
+            Channel = OtpChannels.Email,
+            CodeHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+        };
+        _otpCodesMock.SetupFind(new List<OtpCode> { otp });
+
+        var result = await _sut.VerifyEmailOtp(new VerifyEmailOtpRequest(user.Email, "000000"));
+
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -151,6 +204,21 @@ public class AuthControllerTests
         var result = await _sut.Login(new LoginRequest("unknown@example.com", "Passw0rd!"));
 
         result.Result.ShouldBeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Login_UnverifiedEmail_Returns403AndNoCookies()
+    {
+        var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!"));
+
+        var objectResult = result.Result.ShouldBeOfType<ObjectResult>();
+        objectResult.StatusCode.ShouldBe(403);
+
+        var cookies = SetCookieHeaders(_sut.ControllerContext);
+        cookies.ShouldBeEmpty();
     }
 
     [Fact]

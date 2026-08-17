@@ -22,6 +22,22 @@ public record CreateStaffRequest(
 public record AuthResponse(string Id, string FullName, string Email, string Phone, string Role, string CsrfToken = "");
 public record AuthResult(string Token, AuthResponse User);
 
+/// <summary>Returned by /register while the account is awaiting OTP verification - deliberately
+/// not an AuthResponse, since no session exists until the code is verified.</summary>
+public record RegisterPendingResponse(string Email, string Message, string? DevCode = null);
+
+public record VerifyEmailOtpRequest(
+	[Required, EmailAddress] string Email,
+	[Required, RegularExpression(@"^\d{6}$")] string Code);
+
+public record ResendEmailOtpRequest([Required, EmailAddress] string Email);
+
+public record SendPhoneOtpRequest([Required] string Phone);
+
+public record VerifyPhoneOtpRequest(
+	[Required] string Phone,
+	[Required, RegularExpression(@"^\d{6}$")] string Code);
+
 public record StaffUserResponse(string Id, string FullName, string Email, string Phone, string Role);
 
 public record SavedAddressDto(string Label, string FullAddress, double Latitude, double Longitude, string? MapLink, bool IsDefault);

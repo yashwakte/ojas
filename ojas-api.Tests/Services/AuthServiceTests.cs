@@ -38,7 +38,7 @@ public class AuthServiceTests
         _sut = new AuthService(_dbMock.Object, config);
     }
 
-    private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!", string role = UserRoles.Customer) => new()
+    private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!", string role = UserRoles.Customer, bool isEmailVerified = true) => new()
     {
         Id = "507f1f77bcf86cd799439011",
         FullName = "Jane Doe",
@@ -46,6 +46,7 @@ public class AuthServiceTests
         Phone = phone,
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
         Role = role,
+        IsEmailVerified = isEmailVerified,
     };
 
     [Fact]
@@ -89,7 +90,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RegisterAsync_HappyPath_InsertsUserAndReturnsToken()
+    public async Task RegisterAsync_HappyPath_InsertsUnverifiedUser()
     {
         _usersMock.SetupFind(new List<User>());
         var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!");
@@ -98,9 +99,9 @@ public class AuthServiceTests
 
         conflictField.ShouldBeNull();
         result.ShouldNotBeNull();
-        result!.Token.ShouldNotBeNullOrWhiteSpace();
-        result.User.Email.ShouldBe("new@example.com");
-        result.User.Role.ShouldBe(UserRoles.Customer);
+        result!.Email.ShouldBe("new@example.com");
+        result.Role.ShouldBe(UserRoles.Customer);
+        result.IsEmailVerified.ShouldBeFalse();
         _usersMock.Verify(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -149,8 +150,9 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
 
+        needsEmailVerification.ShouldBeFalse();
         result.ShouldNotBeNull();
         result!.User.Email.ShouldBe(user.Email);
         result.Token.ShouldNotBeNullOrWhiteSpace();
@@ -162,9 +164,10 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "WrongPassword1!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "WrongPassword1!"));
 
         result.ShouldBeNull();
+        needsEmailVerification.ShouldBeFalse();
     }
 
     [Fact]
@@ -172,9 +175,10 @@ public class AuthServiceTests
     {
         _usersMock.SetupFind(new List<User>());
 
-        var result = await _sut.LoginAsync(new LoginRequest("unknown@example.com", "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest("unknown@example.com", "Passw0rd!"));
 
         result.ShouldBeNull();
+        needsEmailVerification.ShouldBeFalse();
     }
 
     [Fact]
@@ -183,10 +187,23 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!", role: "");
         _usersMock.SetupFind(new List<User> { user });
 
-        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
 
+        needsEmailVerification.ShouldBeFalse();
         result.ShouldNotBeNull();
         result!.User.Role.ShouldBe(UserRoles.Customer);
+    }
+
+    [Fact]
+    public async Task LoginAsync_ReturnsNeedsEmailVerification_WhenAccountIsUnverified()
+    {
+        var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
+
+        result.ShouldBeNull();
+        needsEmailVerification.ShouldBeTrue();
     }
 
     [Fact]
@@ -242,5 +259,33 @@ public class AuthServiceTests
         staff.ShouldBeNull();
         error.ShouldBeNull();
         conflictField.ShouldBe("email");
+    }
+
+    [Fact]
+    public async Task CompleteEmailVerificationAsync_MarksVerifiedAndReturnsToken()
+    {
+        var user = MakeUser(isEmailVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.CompleteEmailVerificationAsync(user.Email);
+
+        result.ShouldNotBeNull();
+        result!.User.Email.ShouldBe(user.Email);
+        result.Token.ShouldNotBeNullOrWhiteSpace();
+        _usersMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<User>>(),
+            It.IsAny<UpdateDefinition<User>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteEmailVerificationAsync_ReturnsNull_WhenUserDoesNotExist()
+    {
+        _usersMock.SetupFind(new List<User>());
+
+        var result = await _sut.CompleteEmailVerificationAsync("nobody@example.com");
+
+        result.ShouldBeNull();
     }
 }

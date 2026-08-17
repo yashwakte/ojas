@@ -27,7 +27,9 @@ public class AuthService
     public async Task<bool> PhoneExistsAsync(string phone) =>
         await _db.Users.Find(u => u.Phone == NormalizePhone(phone)).AnyAsync();
 
-    public async Task<(AuthResult? Result, string? ConflictField)> RegisterAsync(RegisterRequest request)
+    /// <summary>Creates the account but issues no session - the account isn't usable until
+    /// the caller drives it through email OTP verification (see CompleteEmailVerificationAsync).</summary>
+    public async Task<(User? User, string? ConflictField)> RegisterAsync(RegisterRequest request)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
         var normalizedPhone = NormalizePhone(request.Phone);
@@ -54,11 +56,32 @@ public class AuthService
         };
 
         await _db.Users.InsertOneAsync(user);
-        var token = GenerateToken(user);
-        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role)), null);
+        return (user, null);
     }
 
-    public async Task<AuthResult?> LoginAsync(LoginRequest request)
+    /// <summary>Marks the account verified and issues a session. Called once an OTP has been
+    /// confirmed - either right after registration, or when a user who abandoned that step
+    /// comes back through the login screen.</summary>
+    public async Task<AuthResult?> CompleteEmailVerificationAsync(string email)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        var user = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
+        if (user == null)
+            return null;
+
+        if (!user.IsEmailVerified)
+        {
+            await _db.Users.UpdateOneAsync(
+                Builders<User>.Filter.Eq(u => u.Id, user.Id),
+                Builders<User>.Update.Set(u => u.IsEmailVerified, true));
+            user.IsEmailVerified = true;
+        }
+
+        var token = GenerateToken(user);
+        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role));
+    }
+
+    public async Task<(AuthResult? Result, bool NeedsEmailVerification)> LoginAsync(LoginRequest request)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
 
@@ -67,13 +90,38 @@ public class AuthService
             .FirstOrDefaultAsync();
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            return null;
+            return (null, false);
+
+        if (!user.IsEmailVerified)
+            return (null, true);
 
         if (string.IsNullOrWhiteSpace(user.Role))
             user.Role = UserRoles.Customer;
 
         var token = GenerateToken(user);
-        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role));
+        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role)), false);
+    }
+
+    // Email verification enforcement ships from here on. Accounts created before this date
+    // never went through an OTP step, so they're grandfathered in rather than locked out -
+    // this only ever widens who *can* log in, never narrows it, and only touches accounts
+    // that predate the cutoff, so it can safely run on every startup.
+    private static readonly DateTime EmailVerificationEnforcedFrom = new(2026, 8, 17, 0, 0, 0, DateTimeKind.Utc);
+
+    public async Task GrandfatherPreExistingUsersAsync()
+    {
+        var filter = Builders<User>.Filter.And(
+            Builders<User>.Filter.Eq(u => u.IsEmailVerified, false),
+            Builders<User>.Filter.Lt(u => u.CreatedAt, EmailVerificationEnforcedFrom));
+
+        await _db.Users.UpdateManyAsync(filter, Builders<User>.Update.Set(u => u.IsEmailVerified, true));
+    }
+
+    public async Task MarkPhoneVerifiedAsync(string userId)
+    {
+        await _db.Users.UpdateOneAsync(
+            Builders<User>.Filter.Eq(u => u.Id, userId),
+            Builders<User>.Update.Set(u => u.IsPhoneVerified, true));
     }
 
     public async Task<(StaffUserResponse? Staff, string? ConflictField, string? Error)> CreateStaffAsync(CreateStaffRequest request)
