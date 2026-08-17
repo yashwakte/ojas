@@ -6,9 +6,13 @@ import {
   AuthResponse,
   CreateStaffRequest,
   LoginRequest,
+  RegisterPendingResponse,
   RegisterRequest,
+  ResendEmailOtpRequest,
+  ResendEmailOtpResponse,
   StaffUserResponse,
   UserRole,
+  VerifyEmailOtpRequest,
 } from '../models/interfaces';
 
 @Injectable({ providedIn: 'root' })
@@ -33,7 +37,15 @@ export class AuthService {
   }
 
   register(request: RegisterRequest) {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, request);
+    return this.http.post<RegisterPendingResponse>(`${this.apiUrl}/register`, request);
+  }
+
+  verifyEmailOtp(request: VerifyEmailOtpRequest) {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/verify-email-otp`, request);
+  }
+
+  resendEmailOtp(request: ResendEmailOtpRequest) {
+    return this.http.post<ResendEmailOtpResponse>(`${this.apiUrl}/resend-email-otp`, request);
   }
 
   checkEmail(email: string) {

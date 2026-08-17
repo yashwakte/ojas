@@ -135,6 +135,29 @@ export interface RegisterRequest {
   password: string;
 }
 
+/** Returned by /register while the account awaits OTP verification - not a session yet. */
+export interface RegisterPendingResponse {
+  email: string;
+  message: string;
+  /** Populated outside Production only, so the flow can be tested without real email set up. */
+  devCode?: string | null;
+}
+
+export interface VerifyEmailOtpRequest {
+  email: string;
+  code: string;
+}
+
+export interface ResendEmailOtpRequest {
+  email: string;
+}
+
+export interface ResendEmailOtpResponse {
+  message: string;
+  /** Populated outside Production only, so the flow can be tested without real email set up. */
+  devCode?: string | null;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

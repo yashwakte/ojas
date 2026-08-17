@@ -87,6 +87,12 @@ export class Login implements OnDestroy {
           this.loading = false;
           this.slowConnection = false;
           this.cdr.detectChanges();
+
+          if (err.status === 403 && err.error?.needsEmailVerification) {
+            this.router.navigate(['/register'], { queryParams: { verify: err.error.email } });
+            return;
+          }
+
           let msg = 'Something went wrong. Please try again.';
           if (err.status === 429) {
             msg = 'Too many attempts. Please wait a minute.';

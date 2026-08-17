@@ -4,7 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { Register } from './register';
 import { AuthService } from '../../services/auth.service';
-import { AuthResponse } from '../../models/interfaces';
+import { AuthResponse, RegisterPendingResponse } from '../../models/interfaces';
 
 describe('Register', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
@@ -18,10 +18,24 @@ describe('Register', () => {
     role: 'customer',
   };
 
+  const pendingResponse: RegisterPendingResponse = {
+    email: 'jane@x.com',
+    message: "We've sent a 6-digit code to your email.",
+    devCode: '123456',
+  };
+
   beforeEach(() => {
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['register', 'saveAuth', 'checkEmail', 'checkPhone']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', [
+      'register',
+      'verifyEmailOtp',
+      'resendEmailOtp',
+      'saveAuth',
+      'checkEmail',
+      'checkPhone',
+    ]);
     authServiceSpy.checkEmail.and.returnValue(of({ exists: false }));
     authServiceSpy.checkPhone.and.returnValue(of({ exists: false }));
+    authServiceSpy.resendEmailOtp.and.returnValue(of({ message: 'ok' }));
 
     TestBed.configureTestingModule({
       imports: [Register],
@@ -125,9 +139,8 @@ describe('Register', () => {
     expect(authServiceSpy.register).not.toHaveBeenCalled();
   });
 
-  it('onSubmit registers, saves auth, celebrates, and navigates home on success', () => {
-    authServiceSpy.register.and.returnValue(of(authResponse));
-    spyOn(router, 'navigate');
+  it('onSubmit registers, then advances to the OTP step instead of logging in directly', () => {
+    authServiceSpy.register.and.returnValue(of(pendingResponse));
     const { fixture } = create();
 
     jasmine.clock().install();
@@ -137,10 +150,100 @@ describe('Register', () => {
 
       fixture.componentInstance.onSubmit();
 
-      expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
-      // The success snackbar was replaced by the welcome celebration overlay.
-      expect(router.navigate).toHaveBeenCalledWith(['/']);
+      expect(fixture.componentInstance.showOtpStep).toBeTrue();
+      expect(fixture.componentInstance.pendingEmail).toBe(pendingResponse.email);
       expect(fixture.componentInstance.loading).toBeFalse();
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('verifyOtp verifies the code, saves auth, celebrates, and navigates home on success', () => {
+    authServiceSpy.register.and.returnValue(of(pendingResponse));
+    authServiceSpy.verifyEmailOtp.and.returnValue(of(authResponse));
+    spyOn(router, 'navigate');
+    const { fixture } = create();
+
+    jasmine.clock().install();
+    try {
+      fillValidForm(fixture);
+      jasmine.clock().tick(200);
+      fixture.componentInstance.onSubmit();
+
+      fixture.componentInstance.otpCode = '123456';
+      fixture.componentInstance.verifyOtp();
+
+      expect(authServiceSpy.verifyEmailOtp).toHaveBeenCalledWith({
+        email: pendingResponse.email,
+        code: '123456',
+      });
+      expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
+      expect(fixture.componentInstance.verifying).toBeFalse();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('verifyOtp surfaces an error message and does not log in on an invalid code', () => {
+    authServiceSpy.register.and.returnValue(of(pendingResponse));
+    authServiceSpy.verifyEmailOtp.and.returnValue(
+      throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
+    );
+    const { fixture } = create();
+
+    jasmine.clock().install();
+    try {
+      fillValidForm(fixture);
+      jasmine.clock().tick(200);
+      fixture.componentInstance.onSubmit();
+
+      fixture.componentInstance.otpCode = '000000';
+      fixture.componentInstance.verifyOtp();
+
+      expect(fixture.componentInstance.otpError).toBe('That code is invalid or has expired.');
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('resendOtp calls the service and starts a cooldown', () => {
+    authServiceSpy.register.and.returnValue(of(pendingResponse));
+    const { fixture } = create();
+
+    jasmine.clock().install();
+    try {
+      fillValidForm(fixture);
+      jasmine.clock().tick(200);
+      fixture.componentInstance.onSubmit();
+      authServiceSpy.resendEmailOtp.calls.reset();
+
+      fixture.componentInstance.resendCooldown = 0;
+      fixture.componentInstance.resendOtp();
+
+      expect(authServiceSpy.resendEmailOtp).toHaveBeenCalledWith({ email: pendingResponse.email });
+      expect(fixture.componentInstance.resendCooldown).toBeGreaterThan(0);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('resendOtp does nothing while a cooldown is active', () => {
+    authServiceSpy.register.and.returnValue(of(pendingResponse));
+    const { fixture } = create();
+
+    jasmine.clock().install();
+    try {
+      fillValidForm(fixture);
+      jasmine.clock().tick(200);
+      fixture.componentInstance.onSubmit();
+      authServiceSpy.resendEmailOtp.calls.reset();
+
+      fixture.componentInstance.resendOtp();
+
+      expect(authServiceSpy.resendEmailOtp).not.toHaveBeenCalled();
     } finally {
       jasmine.clock().uninstall();
     }

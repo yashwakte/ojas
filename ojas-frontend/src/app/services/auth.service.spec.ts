@@ -76,11 +76,33 @@ describe('AuthService', () => {
   it('register() posts to /auth/register', () => {
     setup();
     const req = { fullName: 'A', email: 'a@b.com', phone: '9999999999', password: 'secret' };
-    service.register(req).subscribe((res) => expect(res).toEqual(authResponse));
+    const pending = { email: 'a@b.com', message: 'Check your inbox' };
+    service.register(req).subscribe((res) => expect(res).toEqual(pending));
     const call = httpMock.expectOne(`${environment.apiUrl}/auth/register`);
     expect(call.request.method).toBe('POST');
     expect(call.request.body).toEqual(req);
+    call.flush(pending);
+  });
+
+  it('verifyEmailOtp() posts to /auth/verify-email-otp', () => {
+    setup();
+    const req = { email: 'a@b.com', code: '123456' };
+    service.verifyEmailOtp(req).subscribe((res) => expect(res).toEqual(authResponse));
+    const call = httpMock.expectOne(`${environment.apiUrl}/auth/verify-email-otp`);
+    expect(call.request.method).toBe('POST');
+    expect(call.request.body).toEqual(req);
     call.flush(authResponse);
+  });
+
+  it('resendEmailOtp() posts to /auth/resend-email-otp', () => {
+    setup();
+    const req = { email: 'a@b.com' };
+    const res = { message: 'ok' };
+    service.resendEmailOtp(req).subscribe((r) => expect(r).toEqual(res));
+    const call = httpMock.expectOne(`${environment.apiUrl}/auth/resend-email-otp`);
+    expect(call.request.method).toBe('POST');
+    expect(call.request.body).toEqual(req);
+    call.flush(res);
   });
 
   it('checkEmail() gets /auth/check-email with query param', () => {

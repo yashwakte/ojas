@@ -1,8 +1,9 @@
-import { Component, ChangeDetectorRef, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, ChangeDetectorRef, OnDestroy, inject } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   FormBuilder,
   FormGroup,
+  FormsModule,
   Validators,
   ReactiveFormsModule,
   AbstractControl,
@@ -17,10 +18,13 @@ import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
 import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
 
+const RESEND_COOLDOWN_SECONDS = 30;
+
 @Component({
   selector: 'app-register',
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     RouterLink,
     MatFormFieldModule,
     MatInputModule,
@@ -31,13 +35,28 @@ import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
   templateUrl: './register.html',
   styleUrl: './register.scss',
 })
-export class Register {
+export class Register implements OnDestroy {
   private readonly welcome = inject(WelcomeService);
+  private readonly route = inject(ActivatedRoute);
 
   registerForm: FormGroup;
   loading = false;
   hidePassword = true;
   serverError = '';
+
+  // Step 2: OTP entry. showOtpStep flips on once registration succeeds (or when arriving
+  // from /login with a "verify your email" redirect for an account that never finished).
+  showOtpStep = false;
+  pendingEmail = '';
+  // Only ever populated outside Production (see AuthController.Register) - lets the flow be
+  // tested end-to-end before real email sending is configured.
+  devCode: string | null = null;
+  otpCode = '';
+  otpError = '';
+  verifying = false;
+  resending = false;
+  resendCooldown = 0;
+  private resendTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -65,6 +84,15 @@ export class Register {
       ],
       password: ['', [Validators.required, Validators.minLength(10)]],
     });
+
+    // Login redirects here with ?verify=<email> when the account exists but never
+    // completed OTP verification, so they can pick the flow back up without re-registering.
+    const verifyEmail = this.route.snapshot.queryParamMap.get('verify');
+    if (verifyEmail) {
+      this.pendingEmail = verifyEmail;
+      this.showOtpStep = true;
+      this.sendResend();
+    }
   }
 
   private emailExistsValidator(): AsyncValidatorFn {
@@ -115,9 +143,11 @@ export class Register {
       .subscribe({
         next: (res) => {
           this.loading = false;
-          this.auth.saveAuth(res);
-          this.welcome.celebrate('register', res.fullName);
-          this.router.navigate(['/']);
+          this.pendingEmail = res.email;
+          this.devCode = res.devCode ?? null;
+          this.showOtpStep = true;
+          this.startResendCooldown();
+          this.cdr.detectChanges();
         },
         error: (err) => {
           this.loading = false;
@@ -141,5 +171,87 @@ export class Register {
           this.cdr.detectChanges();
         },
       });
+  }
+
+  verifyOtp() {
+    if (this.otpCode.trim().length !== 6 || this.verifying) return;
+
+    this.otpError = '';
+    this.verifying = true;
+    this.cdr.detectChanges();
+
+    this.auth
+      .verifyEmailOtp({ email: this.pendingEmail, code: this.otpCode.trim() })
+      .pipe(timeout(8000))
+      .subscribe({
+        next: (res) => {
+          this.verifying = false;
+          this.auth.saveAuth(res);
+          this.welcome.celebrate('register', res.fullName);
+          this.router.navigate(['/']);
+        },
+        error: (err) => {
+          this.verifying = false;
+          if (err.status === 429) {
+            this.otpError = 'Too many attempts. Please wait a minute and try again.';
+          } else if (err.status === 0 || err.name === 'TimeoutError') {
+            this.otpError = 'Server not reachable. Please check your connection and try again.';
+          } else {
+            this.otpError = err.error?.message ?? "That code is invalid or has expired.";
+          }
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  resendOtp() {
+    if (this.resendCooldown > 0 || this.resending) return;
+    this.sendResend();
+  }
+
+  private sendResend() {
+    this.resending = true;
+    this.otpError = '';
+    this.cdr.detectChanges();
+
+    this.auth
+      .resendEmailOtp({ email: this.pendingEmail })
+      .pipe(timeout(8000))
+      .subscribe({
+        next: (res) => {
+          this.resending = false;
+          this.devCode = res.devCode ?? null;
+          this.startResendCooldown();
+        },
+        error: () => {
+          this.resending = false;
+          // Resend still starts a cooldown even on failure to avoid hammering the endpoint.
+          this.startResendCooldown();
+        },
+      });
+  }
+
+  private startResendCooldown() {
+    this.clearResendTimer();
+    this.resendCooldown = RESEND_COOLDOWN_SECONDS;
+    this.cdr.detectChanges();
+    this.resendTimer = setInterval(() => {
+      this.resendCooldown -= 1;
+      if (this.resendCooldown <= 0) {
+        this.clearResendTimer();
+      }
+      this.cdr.detectChanges();
+    }, 1000);
+  }
+
+  private clearResendTimer() {
+    if (this.resendTimer) {
+      clearInterval(this.resendTimer);
+      this.resendTimer = null;
+    }
+  }
+
+  ngOnDestroy() {
+    this.clearResendTimer();
   }
 }
