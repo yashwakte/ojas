@@ -6,4 +6,6 @@
 <app-site-intro />
 <app-welcome-celebration />
 <app-guest-welcome />
-<app-address-picker />
+@defer (on idle) {
+  <app-address-picker />
+}
