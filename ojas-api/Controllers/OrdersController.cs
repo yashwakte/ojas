@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MongoDB.Driver;
 using OjasApi.Models;
 using OjasApi.Services;
@@ -10,6 +11,7 @@ namespace OjasApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
+[EnableRateLimiting("general")]
 public class OrdersController : ControllerBase
 {
     private readonly OrderService _orderService;
@@ -87,6 +89,9 @@ public class OrdersController : ControllerBase
 
         if (request.Latitude is null || request.Longitude is null)
             return BadRequest(new { message = "Please pin your exact delivery location on the map." });
+
+        if (request.Latitude == 0 && request.Longitude == 0)
+            return BadRequest(new { message = "That saved address has an unset location pin. Please edit it and drop a pin on the map before ordering." });
 
         var items = request.Items.Select(i => new OrderItem
         {
@@ -199,6 +204,9 @@ public class OrdersController : ControllerBase
 
         if (request.Latitude is null || request.Longitude is null)
             return BadRequest(new { message = "Please pin your exact delivery location on the map." });
+
+        if (request.Latitude == 0 && request.Longitude == 0)
+            return BadRequest(new { message = "That saved address has an unset location pin. Please edit it and drop a pin on the map before ordering." });
 
         var quote = await _deliveryChargesService.CalculateDeliveryChargeAsync(request.Latitude.Value, request.Longitude.Value);
         if (!quote.IsServiceable)

@@ -167,6 +167,13 @@ export class Checkout implements OnInit {
       return;
     }
 
+    if (this.selectedSavedAddress() && this.isUnsetPin(this.selectedSavedAddress()!)) {
+      this.errorMsg.set(
+        'That saved address has an unset location pin. Edit it in your profile and drop a pin on the map before using it.',
+      );
+      return;
+    }
+
     const selectedAddress = this.selectedSavedAddress();
     const deliveryAddress = selectedAddress?.fullAddress ?? this.composedAddress;
     const latitude = selectedAddress?.latitude ?? this.manualLat!;
@@ -233,6 +240,10 @@ export class Checkout implements OnInit {
         }
       },
     });
+  }
+
+  isUnsetPin(addr: SavedAddress): boolean {
+    return addr.latitude === 0 && addr.longitude === 0;
   }
 
   selectAddress(addr: SavedAddress): void {

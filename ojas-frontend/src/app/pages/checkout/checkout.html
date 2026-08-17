@@ -42,6 +42,12 @@
                   <div class="addr-chip-body">
                     <span class="addr-chip-label">{{ addr.label }}</span>
                     <span class="addr-chip-text">{{ addr.fullAddress }}</span>
+                    @if (isUnsetPin(addr)) {
+                      <span class="addr-chip-warning">
+                        <mat-icon inline="true">warning</mat-icon>
+                        Needs re-pin — edit in profile before using
+                      </span>
+                    }
                   </div>
                   @if (selectedSavedAddress()?.label === addr.label) {
                     <mat-icon class="addr-chip-check">check_circle</mat-icon>

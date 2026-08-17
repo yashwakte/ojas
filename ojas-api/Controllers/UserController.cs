@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MongoDB.Driver;
 using OjasApi.Models;
 using OjasApi.Services;
@@ -10,6 +11,7 @@ namespace OjasApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
+[EnableRateLimiting("general")]
 public class UserController : ControllerBase
 {
     private readonly IMongoDbService _db;
@@ -100,6 +102,9 @@ public class UserController : ControllerBase
 
         if (request.Latitude is null || request.Longitude is null)
             return BadRequest(new { message = "Please pin your exact location on the map." });
+
+        if (request.Latitude == 0 && request.Longitude == 0)
+            return BadRequest(new { message = "That pin looks unset. Please drop a pin on the map before saving this address." });
 
         // Ensure savedAddresses array exists for documents created before this field was added
         await _db.Users.UpdateOneAsync(
