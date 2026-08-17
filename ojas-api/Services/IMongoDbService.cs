@@ -11,4 +11,5 @@ public interface IMongoDbService
     IMongoCollection<DeliveryCharges> DeliveryCharges { get; }
     IMongoCollection<CampaignBanner> CampaignBanners { get; }
     IMongoCollection<OtpCode> OtpCodes { get; }
+    IMongoCollection<RefreshToken> RefreshTokens { get; }
 }

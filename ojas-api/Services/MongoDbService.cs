@@ -27,6 +27,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<DeliveryCharges> DeliveryCharges => _database.GetCollection<DeliveryCharges>("delivery_charges");
     public IMongoCollection<CampaignBanner> CampaignBanners => _database.GetCollection<CampaignBanner>("campaign_banner");
     public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
+    public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
 
     private void TryEnsureIndexes()
     {
@@ -49,6 +50,16 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "otp_ttl" }
             );
             OtpCodes.Indexes.CreateOne(otpTtlIndex);
+
+            var refreshTokenTtlIndex = new CreateIndexModel<RefreshToken>(
+                Builders<RefreshToken>.IndexKeys.Ascending(r => r.ExpiresAt),
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "refresh_token_ttl" }
+            );
+            var refreshTokenUserIdIndex = new CreateIndexModel<RefreshToken>(
+                Builders<RefreshToken>.IndexKeys.Ascending(r => r.UserId),
+                new CreateIndexOptions { Name = "refresh_token_user_id" }
+            );
+            RefreshTokens.Indexes.CreateMany([refreshTokenTtlIndex, refreshTokenUserIdIndex]);
         }
         catch (MongoCommandException ex)
         {
