@@ -55,6 +55,7 @@ builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<DeviceService>();
+builder.Services.AddScoped<StaffInviteService>();
 // Real mail is only worth sending in Production. Everywhere else the OTP already comes back in
 // the response as devCode and is shown in the UI, so a real send would just spend free-tier
 // quota - set Email:SendInDevelopment=true to opt back in when deliverability itself is what
@@ -290,7 +291,8 @@ app.Use(async (context, next) =>
         path.StartsWithSegments("/api/auth/forgot-password") ||
         path.StartsWithSegments("/api/auth/reset-password") ||
         path.StartsWithSegments("/api/auth/device/send-otp") ||
-        path.StartsWithSegments("/api/auth/device/enroll");
+        path.StartsWithSegments("/api/auth/device/enroll") ||
+        path.StartsWithSegments("/api/auth/accept-invite");
 
     if (!isAuthBootstrapEndpoint &&
         context.User.Identity?.IsAuthenticated == true &&

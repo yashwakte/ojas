@@ -221,7 +221,7 @@ public class AuthServiceTests
     public async Task CreateStaffAsync_HappyPath_ForAdminRole_InsertsUser()
     {
         _usersMock.SetupFind(new List<User>());
-        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "Passw0rd!", "admin");
+        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "admin");
 
         var (staff, conflictField, error) = await _sut.CreateStaffAsync(request);
 
@@ -236,7 +236,7 @@ public class AuthServiceTests
     public async Task CreateStaffAsync_HappyPath_ForDeliveryRole_InsertsUser()
     {
         _usersMock.SetupFind(new List<User>());
-        var request = new CreateStaffRequest("Staff Delivery", "delivery@example.com", "9123456789", "Passw0rd!", "delivery");
+        var request = new CreateStaffRequest("Staff Delivery", "delivery@example.com", "9123456789", "delivery");
 
         var (staff, conflictField, error) = await _sut.CreateStaffAsync(request);
 
@@ -249,7 +249,7 @@ public class AuthServiceTests
     [Fact]
     public async Task CreateStaffAsync_ReturnsError_WhenRoleIsInvalid()
     {
-        var request = new CreateStaffRequest("Someone", "someone@example.com", "9123456789", "Passw0rd!", "superadmin");
+        var request = new CreateStaffRequest("Someone", "someone@example.com", "9123456789", "superadmin");
 
         var (staff, conflictField, error) = await _sut.CreateStaffAsync(request);
 
@@ -263,7 +263,7 @@ public class AuthServiceTests
     public async Task CreateStaffAsync_ReturnsEmailConflict_WhenEmailExists()
     {
         _usersMock.SetupFind(new List<User> { MakeUser(email: "admin@example.com") });
-        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "Passw0rd!", "admin");
+        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "admin");
 
         var (staff, conflictField, error) = await _sut.CreateStaffAsync(request);
 

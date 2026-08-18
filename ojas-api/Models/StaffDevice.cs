@@ -49,4 +49,9 @@ public static class DeviceEnrollmentMethods
 {
     public const string EmailOtp = "email-otp";
     public const string Bootstrap = "bootstrap";
+
+    /// <summary>Bound by accepting a staff invite. Opening a single-use link sent to the
+    /// account's own address proves the same thing an emailed code would, so activation and
+    /// device approval collapse into one step rather than asking for a code immediately after.</summary>
+    public const string Invite = "invite";
 }

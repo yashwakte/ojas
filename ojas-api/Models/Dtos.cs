@@ -14,12 +14,21 @@ public record LoginRequest(
 	[Required, MinLength(6), MaxLength(128)] string Password,
 	[Required] string TurnstileToken);
 
+/// <summary>No password: the account is created dormant and the staff member sets their own
+/// when they accept the emailed invite, so an admin never learns their credentials.</summary>
 public record CreateStaffRequest(
 	[Required, MinLength(2), MaxLength(80)] string FullName,
 	[Required, EmailAddress, MaxLength(120)] string Email,
 	[Required, MinLength(10), MaxLength(20)] string Phone,
-	[Required, MinLength(10), MaxLength(128)] string Password,
 	[Required] string Role);
+
+public record AcceptInviteRequest(
+	[Required] string Token,
+	[Required, MinLength(10), MaxLength(128)] string Password);
+
+/// <summary>Shown on the invite screen before the password is set, so the person can see whose
+/// account they're activating without the token itself revealing anything if it leaks.</summary>
+public record InvitePreviewResponse(string FullName, string Email, string Role);
 
 public record AuthResponse(string Id, string FullName, string Email, string Phone, string Role, string CsrfToken = "");
 
@@ -80,7 +89,15 @@ public record VerifyPhoneOtpRequest(
 	[Required] string Phone,
 	[Required, RegularExpression(@"^\d{6}$")] string Code);
 
-public record StaffUserResponse(string Id, string FullName, string Email, string Phone, string Role);
+/// <summary>InvitePending is true while the account still has no password - i.e. the invite was
+/// sent but never accepted. The admin UI surfaces it so a stalled onboarding is visible.</summary>
+public record StaffUserResponse(
+	string Id,
+	string FullName,
+	string Email,
+	string Phone,
+	string Role,
+	bool InvitePending = false);
 
 public record SavedAddressDto(string Label, string FullAddress, double Latitude, double Longitude, string? MapLink, bool IsDefault);
 public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault);

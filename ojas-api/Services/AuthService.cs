@@ -127,7 +127,12 @@ public class AuthService
         var normalizedEmail = NormalizeEmail(email);
         var user = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+        // A staff account whose invite hasn't been accepted has no password yet. Bail before
+        // BCrypt.Verify, which throws rather than returning false on an empty hash.
+        if (user == null || string.IsNullOrEmpty(user.PasswordHash))
+            return null;
+
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             return null;
 
         return user;
@@ -204,7 +209,12 @@ public class AuthService
             Builders<User>.Update.Set(u => u.IsPhoneVerified, true));
     }
 
-    public async Task<(StaffUserResponse? Staff, string? ConflictField, string? Error)> CreateStaffAsync(CreateStaffRequest request)
+    /// <summary>
+    /// Creates the account dormant - no password at all. It can't be signed into until the staff
+    /// member accepts their emailed invite and sets one, which means an admin never handles
+    /// somebody else's credentials.
+    /// </summary>
+    public async Task<(User? Staff, string? ConflictField, string? Error)> CreateStaffAsync(CreateStaffRequest request)
     {
         var normalizedRole = request.Role.Trim().ToLowerInvariant();
         if (normalizedRole is not (UserRoles.Admin or UserRoles.Delivery))
@@ -226,19 +236,39 @@ public class AuthService
             FullName = request.FullName.Trim(),
             Email = normalizedEmail,
             Phone = normalizedPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            PasswordHash = string.Empty,
             Role = normalizedRole,
+            // The invite link is sent to this address, so accepting it proves the address works.
             IsEmailVerified = true,
             IsPhoneVerified = true
         };
 
         await _db.Users.InsertOneAsync(user);
-        return (
-            new StaffUserResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role),
-            null,
-            null
-        );
+        return (user, null, null);
     }
+
+    /// <summary>
+    /// Sets the password on a dormant account and binds the device it was accepted on, in one
+    /// step. Opening a single-use link sent to the account's own address proves control of that
+    /// address just as an emailed code would, so there's nothing left for a separate device
+    /// approval to establish.
+    /// </summary>
+    public async Task<AuthResult> AcceptInviteAsync(User user, string password, string deviceLabel, string? presentedRawDeviceId)
+    {
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        await _db.Users.UpdateOneAsync(
+            Builders<User>.Filter.Eq(u => u.Id, user.Id),
+            Builders<User>.Update.Set(u => u.PasswordHash, passwordHash));
+        user.PasswordHash = passwordHash;
+
+        var rawDeviceId = await _devices.EnrollDeviceAsync(
+            user.Id!, deviceLabel, DeviceEnrollmentMethods.Invite, presentedRawDeviceId);
+        var result = await IssueSessionAsync(user, DeviceService.HashDeviceId(rawDeviceId));
+        return result with { RawDeviceId = rawDeviceId };
+    }
+
+    public async Task<User?> FindByIdAsync(string userId) =>
+        await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
 
     // Lets the very first admin account be created through the API instead of a manual
     // Atlas edit. Self-disables the moment any admin exists, so it can't be used as a

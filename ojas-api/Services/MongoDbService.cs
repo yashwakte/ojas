@@ -29,6 +29,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
+    public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
 
     private void TryEnsureIndexes()
     {
@@ -73,6 +74,17 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Unique = true, Name = "staff_device_user_and_device" }
             );
             StaffDevices.Indexes.CreateOne(staffDeviceIndex);
+
+            // An unused invite should not linger indefinitely - Mongo drops it once it expires.
+            var staffInviteTtlIndex = new CreateIndexModel<StaffInvite>(
+                Builders<StaffInvite>.IndexKeys.Ascending(i => i.ExpiresAt),
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "staff_invite_ttl" }
+            );
+            var staffInviteUserIdIndex = new CreateIndexModel<StaffInvite>(
+                Builders<StaffInvite>.IndexKeys.Ascending(i => i.UserId),
+                new CreateIndexOptions { Name = "staff_invite_user_id" }
+            );
+            StaffInvites.Indexes.CreateMany([staffInviteTtlIndex, staffInviteUserIdIndex]);
         }
         catch (MongoCommandException ex)
         {

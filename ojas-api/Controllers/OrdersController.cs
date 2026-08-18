@@ -332,7 +332,12 @@ public class OrdersController : ControllerBase
             .SortBy(u => u.FullName)
             .ToListAsync();
 
-        return Ok(users.Select(u => new StaffUserResponse(u.Id!, u.FullName, u.Email, u.Phone, u.Role)).ToList());
+        // An empty password hash means the invite was never accepted - surfaced so the admin can
+        // see a stalled onboarding rather than wondering why someone never appears online.
+        return Ok(users
+            .Select(u => new StaffUserResponse(
+                u.Id!, u.FullName, u.Email, u.Phone, u.Role, string.IsNullOrEmpty(u.PasswordHash)))
+            .ToList());
     }
 
     [HttpPatch("admin/{orderId}/status")]

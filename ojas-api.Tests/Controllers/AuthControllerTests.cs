@@ -20,6 +20,7 @@ public class AuthControllerTests
     private readonly Mock<IMongoCollection<OtpCode>> _otpCodesMock = new();
     private readonly Mock<IMongoCollection<RefreshToken>> _refreshTokensMock = new();
     private readonly Mock<IMongoCollection<StaffDevice>> _staffDevicesMock = new();
+    private readonly Mock<IMongoCollection<StaffInvite>> _staffInvitesMock = new();
     private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly Mock<IPhoneOtpSender> _phoneOtpSenderMock = new();
     private readonly Mock<ITurnstileVerifier> _turnstileVerifierMock = new();
@@ -31,7 +32,12 @@ public class AuthControllerTests
         _dbMock.Setup(d => d.OtpCodes).Returns(_otpCodesMock.Object);
         _dbMock.Setup(d => d.RefreshTokens).Returns(_refreshTokensMock.Object);
         _dbMock.Setup(d => d.StaffDevices).Returns(_staffDevicesMock.Object);
+        _dbMock.Setup(d => d.StaffInvites).Returns(_staffInvitesMock.Object);
         _staffDevicesMock.SetupFind(new List<StaffDevice>());
+        _staffInvitesMock.SetupFind(new List<StaffInvite>());
+        _staffInvitesMock
+            .Setup(c => c.InsertOneAsync(It.IsAny<StaffInvite>(), null, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         _staffDevicesMock
             .Setup(c => c.InsertOneAsync(It.IsAny<StaffDevice>(), null, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -58,8 +64,10 @@ public class AuthControllerTests
         var otpService = new OtpService(_dbMock.Object, _emailSenderMock.Object, _phoneOtpSenderMock.Object, NullLogger<OtpService>.Instance);
         var envMock = new Mock<IWebHostEnvironment>();
         envMock.Setup(e => e.EnvironmentName).Returns("Development");
+        var inviteService = new StaffInviteService(
+            _dbMock.Object, _emailSenderMock.Object, config, NullLogger<StaffInviteService>.Instance);
 
-        _sut = new AuthController(authService, otpService, deviceService, _turnstileVerifierMock.Object, envMock.Object, NullLogger<AuthController>.Instance)
+        _sut = new AuthController(authService, otpService, deviceService, inviteService, _turnstileVerifierMock.Object, envMock.Object, NullLogger<AuthController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -342,19 +350,25 @@ public class AuthControllerTests
     public async Task CreateStaff_Success_ReturnsOkWithStaffUser()
     {
         _usersMock.SetupFind(new List<User>());
-        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "Passw0rd!", "admin");
+        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "admin");
 
         var result = await _sut.CreateStaff(request);
 
+        // The response is an anonymous object rather than StaffUserResponse so it can also carry
+        // the dev-only invite token, so assert on the shape reflectively.
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
-        var staff = okResult.Value.ShouldBeOfType<StaffUserResponse>();
-        staff.Role.ShouldBe(UserRoles.Admin);
+        var value = okResult.Value.ShouldNotBeNull();
+        var type = value.GetType();
+        type.GetProperty("role")!.GetValue(value).ShouldBe(UserRoles.Admin);
+        type.GetProperty("invitePending")!.GetValue(value).ShouldBe(true);
+        // Created dormant: the staff member sets their own password from the emailed link.
+        type.GetProperty("devInviteToken")!.GetValue(value).ShouldNotBeNull();
     }
 
     [Fact]
     public async Task CreateStaff_InvalidRole_ReturnsBadRequest()
     {
-        var request = new CreateStaffRequest("Someone", "someone@example.com", "9123456789", "Passw0rd!", "superadmin");
+        var request = new CreateStaffRequest("Someone", "someone@example.com", "9123456789", "superadmin");
 
         var result = await _sut.CreateStaff(request);
 
@@ -365,7 +379,7 @@ public class AuthControllerTests
     public async Task CreateStaff_Conflict_ReturnsConflict()
     {
         _usersMock.SetupFind(new List<User> { MakeUser(email: "admin@example.com") });
-        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "Passw0rd!", "admin");
+        var request = new CreateStaffRequest("Staff Admin", "admin@example.com", "9123456789", "admin");
 
         var result = await _sut.CreateStaff(request);
 

@@ -288,53 +288,6 @@ public class DeviceRestrictionTests : IDisposable
         body!.DevCode.ShouldBeNull();
     }
 
-    /// <summary>
-    /// The full path an admin-created delivery partner actually walks: the admin sets a
-    /// temporary password, then the partner signs in with exactly that password on their own
-    /// device. Covers the whole hand-off, since a mismatch anywhere in it (hashing, email
-    /// normalisation, the device gate rejecting before the password is even checked) would
-    /// surface to the partner as an indistinguishable "invalid email or password".
-    /// </summary>
-    [Fact]
-    public async Task AnAdminCreatedStaffAccount_CanSignInWithThatExactPassword()
-    {
-        using var adminClient = _factory.CreateClient();
-        var (_, adminCsrf) = await _factory.SeedAndLoginAsStaffAsync(adminClient, UserRoles.Admin);
-
-        var suffix = Guid.NewGuid().ToString("N")[..8];
-        var staffEmail = $"partner.{suffix}@example.com";
-        const string temporaryPassword = "TempPassw0rd!";
-
-        var create = new HttpRequestMessage(HttpMethod.Post, "/api/auth/staff")
-        {
-            Content = JsonContent.Create(new CreateStaffRequest(
-                $"Partner {suffix}", staffEmail, $"7{suffix.PadRight(9, '0')}", temporaryPassword, UserRoles.Delivery)),
-        };
-        create.AttachCsrf(adminCsrf);
-        var createResponse = await adminClient.SendAsync(create);
-        createResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        using var partnerClient = _factory.CreateClient();
-
-        // A plain login is refused - but on device grounds, not credentials.
-        var blocked = await LoginAsync(partnerClient, staffEmail, temporaryPassword);
-        blocked.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-
-        // send-otp only returns a code when the password actually verified, so a code coming
-        // back is proof the admin-set password works.
-        var otpResponse = await partnerClient.PostAsJsonAsync(
-            "/api/auth/device/send-otp", new DeviceOtpRequest(staffEmail, temporaryPassword));
-        var otp = await otpResponse.Content.ReadFromJsonAsync<DeviceOtpDevResponse>();
-        otp!.DevCode.ShouldNotBeNull();
-
-        var enroll = await partnerClient.PostAsJsonAsync(
-            "/api/auth/device/enroll", new EnrollDeviceRequest(staffEmail, temporaryPassword, otp.DevCode!));
-        enroll.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        var auth = await enroll.Content.ReadFromJsonAsync<AuthResponse>();
-        auth!.Role.ShouldBe(UserRoles.Delivery);
-    }
-
     [Fact]
     public async Task StaffLogin_IsCaseInsensitiveOnEmail_JustLikeCustomerLogin()
     {

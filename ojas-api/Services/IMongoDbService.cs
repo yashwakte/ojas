@@ -13,4 +13,5 @@ public interface IMongoDbService
     IMongoCollection<OtpCode> OtpCodes { get; }
     IMongoCollection<RefreshToken> RefreshTokens { get; }
     IMongoCollection<StaffDevice> StaffDevices { get; }
+    IMongoCollection<StaffInvite> StaffInvites { get; }
 }

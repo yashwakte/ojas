@@ -31,6 +31,7 @@ public class AuthController : ControllerBase
     private readonly AuthService _authService;
     private readonly OtpService _otpService;
     private readonly DeviceService _deviceService;
+    private readonly StaffInviteService _inviteService;
     private readonly ITurnstileVerifier _turnstileVerifier;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AuthController> _logger;
@@ -39,6 +40,7 @@ public class AuthController : ControllerBase
         AuthService authService,
         OtpService otpService,
         DeviceService deviceService,
+        StaffInviteService inviteService,
         ITurnstileVerifier turnstileVerifier,
         IWebHostEnvironment env,
         ILogger<AuthController> logger)
@@ -46,6 +48,7 @@ public class AuthController : ControllerBase
         _authService = authService;
         _otpService = otpService;
         _deviceService = deviceService;
+        _inviteService = inviteService;
         _turnstileVerifier = turnstileVerifier;
         _env = env;
         _logger = logger;
@@ -367,7 +370,74 @@ public class AuthController : ControllerBase
             return Conflict(new { message, field = conflictField });
         }
 
-        return Ok(staff);
+        var inviteToken = await _inviteService.IssueAsync(staff);
+        _logger.LogInformation("Staff account {UserId} created and invited as {Role}.", staff.Id, staff.Role);
+
+        return Ok(new
+        {
+            id = staff.Id!,
+            fullName = staff.FullName,
+            email = staff.Email,
+            phone = staff.Phone,
+            role = staff.Role,
+            invitePending = true,
+            // Same dev-only convenience as devCode: lets the flow be walked locally without a
+            // working inbox. Never populated in Production.
+            devInviteToken = _env.IsProduction() ? null : inviteToken,
+        });
+    }
+
+    /// <summary>Re-sends the invite, invalidating the previous link. For an address that was
+    /// mistyped, or an invite that expired before it was opened.</summary>
+    [HttpPost("staff/{userId}/invite")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> ResendStaffInvite(string userId)
+    {
+        var user = await _authService.FindByIdAsync(userId);
+        if (user == null || !DeviceService.IsRestrictedRole(user.Role))
+            return NotFound();
+
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+            return BadRequest(new { message = "That account has already been set up." });
+
+        var inviteToken = await _inviteService.IssueAsync(user);
+        return Ok(new
+        {
+            message = "Invite sent.",
+            devInviteToken = _env.IsProduction() ? null : inviteToken,
+        });
+    }
+
+    /// <summary>Unauthenticated: the token is the credential. Returns just enough for the page
+    /// to show whose account is being activated.</summary>
+    [HttpGet("invite")]
+    public async Task<ActionResult<InvitePreviewResponse>> GetInvite([FromQuery] string token)
+    {
+        var user = await _inviteService.ResolveAsync(token);
+        if (user == null)
+            return NotFound(new { message = "This invite link is invalid or has expired." });
+
+        return Ok(new InvitePreviewResponse(user.FullName, user.Email, user.Role));
+    }
+
+    /// <summary>Sets the password and binds the device this was accepted on, then signs them in.
+    /// The invite is consumed only after the password is stored, so a failure partway through
+    /// leaves the link usable rather than stranding the account.</summary>
+    [HttpPost("accept-invite")]
+    public async Task<ActionResult<AuthResponse>> AcceptInvite([FromBody] AcceptInviteRequest request)
+    {
+        var user = await _inviteService.ResolveAsync(request.Token);
+        if (user == null)
+            return BadRequest(new { message = "This invite link is invalid or has expired." });
+
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+            return BadRequest(new { message = "That account has already been set up. Please sign in." });
+
+        var result = await _authService.AcceptInviteAsync(user, request.Password, CurrentDeviceLabel, RawDeviceId);
+        await _inviteService.ConsumeAsync(request.Token);
+        _logger.LogInformation("Staff invite accepted for {UserId}.", user.Id);
+
+        return Ok(IssueSession(result));
     }
 
     /// <summary>Never reveals whether the address is registered - the response is identical
