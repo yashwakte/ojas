@@ -27,6 +27,15 @@ var mongoConnectionString = builder.Configuration["MongoDb:ConnectionString"];
 if (string.IsNullOrWhiteSpace(mongoConnectionString))
     throw new InvalidOperationException("MongoDb:ConnectionString must be set.");
 
+// Unlike Brevo/MSG91 (which degrade gracefully when unconfigured), a missing CAPTCHA secret
+// isn't safe to silently skip past - that would mean shipping with zero bot protection and no
+// signal it happened. For local dev, use Cloudflare's documented dummy pair (site key
+// 1x00000000000000000000AA / secret 1x0000000000000000000000000000000AA), which always
+// passes and works on any domain including localhost.
+var turnstileSecretKey = builder.Configuration["Turnstile:SecretKey"];
+if (string.IsNullOrWhiteSpace(turnstileSecretKey))
+    throw new InvalidOperationException("Turnstile:SecretKey must be set.");
+
 var productionOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()
@@ -47,6 +56,7 @@ builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
 builder.Services.AddHttpClient<IPhoneOtpSender, Msg91PhoneOtpSender>();
+builder.Services.AddHttpClient<ITurnstileVerifier, CloudflareTurnstileVerifier>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

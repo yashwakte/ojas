@@ -6,11 +6,13 @@ public record RegisterRequest(
 	[Required, MinLength(2), MaxLength(80)] string FullName,
 	[Required, EmailAddress, MaxLength(120)] string Email,
 	[Required, MinLength(10), MaxLength(20)] string Phone,
-	[Required, MinLength(10), MaxLength(128)] string Password);
+	[Required, MinLength(10), MaxLength(128)] string Password,
+	[Required] string TurnstileToken);
 
 public record LoginRequest(
 	[Required, EmailAddress, MaxLength(120)] string Email,
-	[Required, MinLength(6), MaxLength(128)] string Password);
+	[Required, MinLength(6), MaxLength(128)] string Password,
+	[Required] string TurnstileToken);
 
 public record CreateStaffRequest(
 	[Required, MinLength(2), MaxLength(80)] string FullName,

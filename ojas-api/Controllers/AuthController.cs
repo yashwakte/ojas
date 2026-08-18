@@ -24,16 +24,26 @@ public class AuthController : ControllerBase
 
     private readonly AuthService _authService;
     private readonly OtpService _otpService;
+    private readonly ITurnstileVerifier _turnstileVerifier;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(AuthService authService, OtpService otpService, IWebHostEnvironment env, ILogger<AuthController> logger)
+    public AuthController(
+        AuthService authService,
+        OtpService otpService,
+        ITurnstileVerifier turnstileVerifier,
+        IWebHostEnvironment env,
+        ILogger<AuthController> logger)
     {
         _authService = authService;
         _otpService = otpService;
+        _turnstileVerifier = turnstileVerifier;
         _env = env;
         _logger = logger;
     }
+
+    private Task<bool> VerifyTurnstileAsync(string token) =>
+        _turnstileVerifier.VerifyAsync(token, HttpContext.Connection.RemoteIpAddress?.ToString());
 
     private CookieOptions BuildAuthCookieOptions() => new()
     {
@@ -112,6 +122,9 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<RegisterPendingResponse>> Register([FromBody] RegisterRequest request)
     {
+        if (!await VerifyTurnstileAsync(request.TurnstileToken))
+            return BadRequest(new { message = "Verification failed. Please try again." });
+
         var (user, conflictField) = await _authService.RegisterAsync(request);
         if (user == null)
         {
@@ -159,6 +172,9 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
     {
+        if (!await VerifyTurnstileAsync(request.TurnstileToken))
+            return BadRequest(new { message = "Verification failed. Please try again." });
+
         var (result, needsEmailVerification) = await _authService.LoginAsync(request);
         if (needsEmailVerification)
         {
@@ -231,6 +247,9 @@ public class AuthController : ControllerBase
     [HttpPost("bootstrap-admin")]
     public async Task<ActionResult<AuthResponse>> BootstrapAdmin([FromBody] RegisterRequest request)
     {
+        if (!await VerifyTurnstileAsync(request.TurnstileToken))
+            return BadRequest(new { message = "Verification failed. Please try again." });
+
         var (result, conflictField, error) = await _authService.BootstrapAdminAsync(request);
         if (error != null)
             return Conflict(new { message = error });

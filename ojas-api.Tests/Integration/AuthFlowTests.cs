@@ -45,7 +45,7 @@ public class AuthFlowTests : IDisposable
         var (first, _) = await _client.RegisterAsync(email: "duplicate@example.com");
 
         using var client2 = _factory.CreateClient();
-        var request = new RegisterRequest("Someone Else", first.Email, "9123456780", "Passw0rd123!");
+        var request = new RegisterRequest("Someone Else", first.Email, "9123456780", "Passw0rd123!", "test-turnstile-token");
         var response = await client2.PostAsJsonAsync("/api/auth/register", request);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
@@ -57,7 +57,7 @@ public class AuthFlowTests : IDisposable
         var (auth, _) = await _client.RegisterAsync();
 
         using var client2 = _factory.CreateClient();
-        var response = await client2.PostAsJsonAsync("/api/auth/login", new LoginRequest(auth.Email, "WrongPassword1!"));
+        var response = await client2.PostAsJsonAsync("/api/auth/login", new LoginRequest(auth.Email, "WrongPassword1!", "test-turnstile-token"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -132,7 +132,7 @@ public class AuthFlowTests : IDisposable
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var registerRequest = new RegisterRequest(
-            $"Test User {suffix}", $"user.{suffix}@example.com", $"9{suffix.PadRight(9, '0')}", "Passw0rd123!");
+            $"Test User {suffix}", $"user.{suffix}@example.com", $"9{suffix.PadRight(9, '0')}", "Passw0rd123!", "test-turnstile-token");
         var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", registerRequest);
         var pending = await registerResponse.Content.ReadFromJsonAsync<RegisterPendingResponse>();
 

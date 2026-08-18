@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using OjasApi.Models;
 using OjasApi.Services;
+using OjasApi.Tests.TestHelpers;
 
 namespace OjasApi.Tests.Integration;
 
@@ -47,6 +49,9 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Jwt__Audience", "OjasApiTests");
         Environment.SetEnvironmentVariable("MongoDb__ConnectionString", _connectionString);
         Environment.SetEnvironmentVariable("MongoDb__DatabaseName", _databaseName);
+        // Program.cs throws at startup if this is unset, same as Jwt:Key/MongoDb:ConnectionString -
+        // the value itself is never checked since ITurnstileVerifier is swapped for a fake below.
+        Environment.SetEnvironmentVariable("Turnstile__SecretKey", "test-secret-key");
     }
 
     public string DatabaseName => _databaseName;
@@ -54,6 +59,13 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+
+        // Swap the real Cloudflare-calling verifier for one that always passes, so the suite
+        // doesn't depend on a live network call to siteverify for every register/login.
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddScoped<ITurnstileVerifier, FakeTurnstileVerifier>();
+        });
     }
 
     /// <summary>Inserts a document directly into this factory's database, bypassing the HTTP API.

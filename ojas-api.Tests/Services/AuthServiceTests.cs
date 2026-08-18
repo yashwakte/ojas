@@ -98,7 +98,7 @@ public class AuthServiceTests
     public async Task RegisterAsync_HappyPath_InsertsUnverifiedUser()
     {
         _usersMock.SetupFind(new List<User>());
-        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!");
+        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!", "test-turnstile-token");
 
         var (result, conflictField) = await _sut.RegisterAsync(request);
 
@@ -114,7 +114,7 @@ public class AuthServiceTests
     public async Task RegisterAsync_ReturnsEmailConflict_WhenEmailAlreadyExists()
     {
         _usersMock.SetupFind(new List<User> { MakeUser(email: "new@example.com") });
-        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!");
+        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!", "test-turnstile-token");
 
         var (result, conflictField) = await _sut.RegisterAsync(request);
 
@@ -140,7 +140,7 @@ public class AuthServiceTests
             .ReturnsAsync(emptyCursor.Object)
             .ReturnsAsync(matchCursor.Object);
 
-        var request = new RegisterRequest("New User", "different@example.com", "9123456789", "Passw0rd!");
+        var request = new RegisterRequest("New User", "different@example.com", "9123456789", "Passw0rd!", "test-turnstile-token");
 
         var (result, conflictField) = await _sut.RegisterAsync(request);
 
@@ -155,7 +155,7 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
 
         needsEmailVerification.ShouldBeFalse();
         result.ShouldNotBeNull();
@@ -169,7 +169,7 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "WrongPassword1!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "WrongPassword1!", "test-turnstile-token"));
 
         result.ShouldBeNull();
         needsEmailVerification.ShouldBeFalse();
@@ -180,7 +180,7 @@ public class AuthServiceTests
     {
         _usersMock.SetupFind(new List<User>());
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest("unknown@example.com", "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest("unknown@example.com", "Passw0rd!", "test-turnstile-token"));
 
         result.ShouldBeNull();
         needsEmailVerification.ShouldBeFalse();
@@ -192,7 +192,7 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!", role: "");
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
 
         needsEmailVerification.ShouldBeFalse();
         result.ShouldNotBeNull();
@@ -205,7 +205,7 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!"));
+        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
 
         result.ShouldBeNull();
         needsEmailVerification.ShouldBeTrue();

@@ -25,7 +25,8 @@ public static class AuthFlowExtensions
             fullName ?? $"Test User {suffix}",
             email ?? $"user.{suffix}@example.com",
             phone ?? $"9{suffix.PadRight(9, '0')}",
-            password);
+            password,
+            "test-turnstile-token");
 
         var response = await client.PostAsJsonAsync("/api/auth/register", request);
         response.EnsureSuccessStatusCode();
@@ -42,7 +43,7 @@ public static class AuthFlowExtensions
     public static async Task<(AuthResponse Auth, string CsrfToken)> LoginAsync(
         this HttpClient client, string email, string password)
     {
-        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password));
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, "test-turnstile-token"));
         response.EnsureSuccessStatusCode();
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         return (auth!, auth!.CsrfToken!);

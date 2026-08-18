@@ -21,6 +21,7 @@ public class AuthControllerTests
     private readonly Mock<IMongoCollection<RefreshToken>> _refreshTokensMock = new();
     private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly Mock<IPhoneOtpSender> _phoneOtpSenderMock = new();
+    private readonly Mock<ITurnstileVerifier> _turnstileVerifierMock = new();
     private readonly AuthController _sut;
 
     public AuthControllerTests()
@@ -33,6 +34,9 @@ public class AuthControllerTests
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
             .Returns(Task.CompletedTask);
         _phoneOtpSenderMock.Setup(s => s.IsConfigured).Returns(false);
+        _turnstileVerifierMock
+            .Setup(v => v.VerifyAsync(It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(true);
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -48,7 +52,7 @@ public class AuthControllerTests
         var envMock = new Mock<IWebHostEnvironment>();
         envMock.Setup(e => e.EnvironmentName).Returns("Development");
 
-        _sut = new AuthController(authService, otpService, envMock.Object, NullLogger<AuthController>.Instance)
+        _sut = new AuthController(authService, otpService, _turnstileVerifierMock.Object, envMock.Object, NullLogger<AuthController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -121,7 +125,7 @@ public class AuthControllerTests
     public async Task Register_Success_ReturnsPendingVerification_AndSetsNoCookiesYet()
     {
         _usersMock.SetupFind(new List<User>());
-        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!");
+        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!", "test-turnstile-token");
 
         var result = await _sut.Register(request);
 
@@ -135,10 +139,22 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task Register_TurnstileFails_ReturnsBadRequest_AndNeverTouchesTheDatabase()
+    {
+        _turnstileVerifierMock.Setup(v => v.VerifyAsync(It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
+        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!", "bad-token");
+
+        var result = await _sut.Register(request);
+
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
+        _usersMock.Verify(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Register_EmailConflict_ReturnsConflictWithEmailField()
     {
         _usersMock.SetupFind(new List<User> { MakeUser(email: "new@example.com") });
-        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!");
+        var request = new RegisterRequest("New User", "new@example.com", "9123456789", "Passw0rd!", "test-turnstile-token");
 
         var result = await _sut.Register(request);
 
@@ -197,7 +213,7 @@ public class AuthControllerTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!"));
+        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
 
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
         var response = okResult.Value.ShouldBeOfType<AuthResponse>();
@@ -210,11 +226,25 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task Login_TurnstileFails_ReturnsBadRequest_AndSetsNoCookies()
+    {
+        var user = MakeUser(password: "Passw0rd!");
+        _usersMock.SetupFind(new List<User> { user });
+        _turnstileVerifierMock.Setup(v => v.VerifyAsync(It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
+
+        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!", "bad-token"));
+
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
+        var cookies = SetCookieHeaders(_sut.ControllerContext);
+        cookies.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Login_InvalidCredentials_ReturnsUnauthorized()
     {
         _usersMock.SetupFind(new List<User>());
 
-        var result = await _sut.Login(new LoginRequest("unknown@example.com", "Passw0rd!"));
+        var result = await _sut.Login(new LoginRequest("unknown@example.com", "Passw0rd!", "test-turnstile-token"));
 
         result.Result.ShouldBeOfType<UnauthorizedObjectResult>();
     }
@@ -225,7 +255,7 @@ public class AuthControllerTests
         var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
-        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!"));
+        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
 
         var objectResult = result.Result.ShouldBeOfType<ObjectResult>();
         objectResult.StatusCode.ShouldBe(403);
