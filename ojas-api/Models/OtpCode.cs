@@ -33,4 +33,13 @@ public static class OtpChannels
 {
     public const string Email = "email";
     public const string Phone = "phone";
+
+    /// <summary>Kept separate from Email so a device-enrollment code and a registration code
+    /// for the same address can't overwrite one another - StoreCodeAsync clears prior codes
+    /// per (target, channel).</summary>
+    public const string Device = "device";
+
+    /// <summary>Password reset. Separate channel again, so requesting a reset never invalidates
+    /// a device-approval code the same person is midway through using.</summary>
+    public const string PasswordReset = "password-reset";
 }

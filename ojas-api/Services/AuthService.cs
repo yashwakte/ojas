@@ -19,11 +19,13 @@ public class AuthService
 
     private readonly IMongoDbService _db;
     private readonly IConfiguration _config;
+    private readonly DeviceService _devices;
 
-    public AuthService(IMongoDbService db, IConfiguration config)
+    public AuthService(IMongoDbService db, IConfiguration config, DeviceService devices)
     {
         _db = db;
         _config = config;
+        _devices = devices;
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
@@ -85,31 +87,71 @@ public class AuthService
             user.IsEmailVerified = true;
         }
 
-        var token = GenerateToken(user);
-        var refreshToken = await IssueRefreshTokenAsync(user.Id!);
-        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), refreshToken);
+        // Staff accounts are created already-verified, so this path only ever runs for
+        // customers - no device to bind.
+        return await IssueSessionAsync(user, null);
     }
 
-    public async Task<(AuthResult? Result, bool NeedsEmailVerification)> LoginAsync(LoginRequest request)
+    public async Task<LoginServiceResult> LoginAsync(LoginRequest request, string? rawDeviceId)
     {
-        var normalizedEmail = NormalizeEmail(request.Email);
-
-        var user = await _db.Users
-            .Find(u => u.Email == normalizedEmail)
-            .FirstOrDefaultAsync();
-
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            return (null, false);
+        var user = await FindByCredentialsAsync(request.Email, request.Password);
+        if (user == null)
+            return new LoginServiceResult(LoginOutcome.InvalidCredentials);
 
         if (!user.IsEmailVerified)
-            return (null, true);
+            return new LoginServiceResult(LoginOutcome.NeedsEmailVerification);
 
         if (string.IsNullOrWhiteSpace(user.Role))
             user.Role = UserRoles.Customer;
 
+        // Staff may only sign in from the single device bound to their account. Anything else -
+        // an unbound account, a replaced phone, or someone with a stolen password on their own
+        // machine - has to prove control of the account's email before a session is issued.
+        if (DeviceService.IsRestrictedRole(user.Role) &&
+            !await _devices.IsDeviceTrustedAsync(user.Id!, rawDeviceId))
+        {
+            return new LoginServiceResult(LoginOutcome.NeedsDeviceEnrollment);
+        }
+
+        var deviceIdHash = DeviceService.IsRestrictedRole(user.Role) && rawDeviceId != null
+            ? DeviceService.HashDeviceId(rawDeviceId)
+            : null;
+
+        return new LoginServiceResult(LoginOutcome.Success, await IssueSessionAsync(user, deviceIdHash));
+    }
+
+    /// <summary>Shared by login and the device-enrollment endpoints, which re-check the password
+    /// rather than carrying a half-authenticated session between the two steps.</summary>
+    public async Task<User?> FindByCredentialsAsync(string email, string password)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        var user = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
+
+        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            return null;
+
+        return user;
+    }
+
+    /// <summary>Binds the calling device to a staff account and issues a session on it. Because
+    /// the cap is one device, this replaces whatever was bound before and logs that device out.</summary>
+    public async Task<AuthResult> EnrollDeviceAndIssueSessionAsync(
+        User user, string deviceLabel, string? presentedRawDeviceId)
+    {
+        var rawDeviceId = await _devices.EnrollDeviceAsync(
+            user.Id!, deviceLabel, DeviceEnrollmentMethods.EmailOtp, presentedRawDeviceId);
+        var result = await IssueSessionAsync(user, DeviceService.HashDeviceId(rawDeviceId));
+        return result with { RawDeviceId = rawDeviceId };
+    }
+
+    private async Task<AuthResult> IssueSessionAsync(User user, string? deviceIdHash)
+    {
         var token = GenerateToken(user);
-        var refreshToken = await IssueRefreshTokenAsync(user.Id!);
-        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), refreshToken), false);
+        var refreshToken = await IssueRefreshTokenAsync(user.Id!, deviceIdHash);
+        return new AuthResult(
+            token,
+            new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role),
+            refreshToken);
     }
 
     // Email verification enforcement ships from here on. Accounts created before this date
@@ -125,6 +167,34 @@ public class AuthService
             Builders<User>.Filter.Lt(u => u.CreatedAt, EmailVerificationEnforcedFrom));
 
         await _db.Users.UpdateManyAsync(filter, Builders<User>.Update.Set(u => u.IsEmailVerified, true));
+    }
+
+    /// <summary>
+    /// Sets a new password and ends every existing session by revoking all refresh tokens - if
+    /// the reset was triggered by someone who had gained access, this is what actually evicts
+    /// them rather than leaving their session alive for another 30 days.
+    ///
+    /// Staff device bindings are deliberately left intact. Keeping them means a compromised
+    /// email inbox still isn't enough to reach an admin account: whoever resets the password
+    /// must also be on the bound device to use it.
+    /// </summary>
+    public async Task<bool> ResetPasswordAsync(string email, string newPassword)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        var user = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
+        if (user == null)
+            return false;
+
+        await _db.Users.UpdateOneAsync(
+            Builders<User>.Filter.Eq(u => u.Id, user.Id),
+            Builders<User>.Update
+                .Set(u => u.PasswordHash, BCrypt.Net.BCrypt.HashPassword(newPassword))
+                // An account that never finished email verification has now proven control of
+                // the address by redeeming a code sent to it, so there's nothing left to verify.
+                .Set(u => u.IsEmailVerified, true));
+
+        await RevokeAllRefreshTokensForUserAsync(user.Id!);
+        return true;
     }
 
     public async Task MarkPhoneVerifiedAsync(string userId)
@@ -173,7 +243,10 @@ public class AuthService
     // Lets the very first admin account be created through the API instead of a manual
     // Atlas edit. Self-disables the moment any admin exists, so it can't be used as a
     // standing backdoor once the team has a real admin account.
-    public async Task<(AuthResult? Result, string? ConflictField, string? Error)> BootstrapAdminAsync(RegisterRequest request)
+    public async Task<(AuthResult? Result, string? ConflictField, string? Error)> BootstrapAdminAsync(
+        RegisterRequest request,
+        string deviceLabel,
+        string? presentedRawDeviceId)
     {
         var adminExists = await _db.Users.Find(u => u.Role == UserRoles.Admin).AnyAsync();
         if (adminExists)
@@ -202,9 +275,14 @@ public class AuthService
         };
 
         await _db.Users.InsertOneAsync(user);
-        var token = GenerateToken(user);
-        var refreshToken = await IssueRefreshTokenAsync(user.Id!);
-        return (new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), refreshToken), null, null);
+
+        // The machine that bootstraps the first admin is, by definition, a trusted one - binding
+        // it here means the very first admin never has to enrol through email OTP, and there is
+        // never a window where an admin account exists with no device bound to it.
+        var rawDeviceId = await _devices.EnrollDeviceAsync(
+            user.Id!, deviceLabel, DeviceEnrollmentMethods.Bootstrap, presentedRawDeviceId);
+        var result = await IssueSessionAsync(user, DeviceService.HashDeviceId(rawDeviceId));
+        return (result with { RawDeviceId = rawDeviceId }, null, null);
     }
 
     private string GenerateToken(User user)
@@ -235,13 +313,14 @@ public class AuthService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private async Task<string> IssueRefreshTokenAsync(string userId)
+    private async Task<string> IssueRefreshTokenAsync(string userId, string? deviceIdHash = null)
     {
         var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var record = new RefreshToken
         {
             TokenHash = HashToken(rawToken),
             UserId = userId,
+            DeviceIdHash = deviceIdHash,
             ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime),
         };
         await _db.RefreshTokens.InsertOneAsync(record);
@@ -251,7 +330,7 @@ public class AuthService
     /// <summary>Verifies the presented refresh token, then rotates it - the old one is deleted
     /// and a new one issued alongside the new access token, so a stolen-but-unused refresh
     /// token stops working the moment the legitimate owner's client refreshes again.</summary>
-    public async Task<AuthResult?> RefreshAsync(string rawRefreshToken)
+    public async Task<AuthResult?> RefreshAsync(string rawRefreshToken, string? rawDeviceId)
     {
         var tokenHash = HashToken(rawRefreshToken);
         var record = await _db.RefreshTokens.Find(r => r.TokenHash == tokenHash).FirstOrDefaultAsync();
@@ -262,11 +341,27 @@ public class AuthService
         if (user == null)
             return null;
 
+        // Without this, a refresh token lifted from a staff session would keep minting access
+        // tokens on the attacker's machine for the next 30 days, silently bypassing the whole
+        // device restriction - the token itself must be pinned to the device it was issued to,
+        // and that device must still be the bound one.
+        if (DeviceService.IsRestrictedRole(user.Role))
+        {
+            if (string.IsNullOrWhiteSpace(rawDeviceId) ||
+                record.DeviceIdHash != DeviceService.HashDeviceId(rawDeviceId) ||
+                !await _devices.IsDeviceTrustedAsync(user.Id!, rawDeviceId))
+            {
+                return null;
+            }
+        }
+
         await _db.RefreshTokens.DeleteOneAsync(r => r.TokenHash == tokenHash);
 
-        var token = GenerateToken(user);
-        var newRefreshToken = await IssueRefreshTokenAsync(user.Id!);
-        return new AuthResult(token, new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role), newRefreshToken);
+        var newRefreshToken = await IssueRefreshTokenAsync(user.Id!, record.DeviceIdHash);
+        return new AuthResult(
+            GenerateToken(user),
+            new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role),
+            newRefreshToken);
     }
 
     public async Task RevokeRefreshTokenAsync(string rawRefreshToken)

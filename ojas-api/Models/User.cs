@@ -3,6 +3,14 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace OjasApi.Models;
 
+/// <summary>
+/// Tolerant of fields that no longer map to a property. The driver writes every mapped member,
+/// nulls included, so a field lives on in stored documents long after the property is deleted -
+/// and without this attribute the driver throws on those documents, making existing accounts
+/// unreadable. That is exactly what happened when RegisteredDeviceId was retired in favour of
+/// the staff_devices collection.
+/// </summary>
+[BsonIgnoreExtraElements]
 public class User
 {
     [BsonId]
@@ -29,9 +37,6 @@ public class User
 
     [BsonElement("isPhoneVerified")]
     public bool IsPhoneVerified { get; set; }
-
-    [BsonElement("registeredDeviceId")]
-    public string? RegisteredDeviceId { get; set; }
 
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

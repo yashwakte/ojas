@@ -13,12 +13,18 @@ public class AuthServiceTests
     private readonly Mock<IMongoDbService> _dbMock = new();
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
     private readonly Mock<IMongoCollection<RefreshToken>> _refreshTokensMock = new();
+    private readonly Mock<IMongoCollection<StaffDevice>> _staffDevicesMock = new();
     private readonly AuthService _sut;
 
     public AuthServiceTests()
     {
         _dbMock.Setup(d => d.Users).Returns(_usersMock.Object);
         _dbMock.Setup(d => d.RefreshTokens).Returns(_refreshTokensMock.Object);
+        _dbMock.Setup(d => d.StaffDevices).Returns(_staffDevicesMock.Object);
+        _staffDevicesMock.SetupFind(new List<StaffDevice>());
+        _staffDevicesMock
+            .Setup(c => c.InsertOneAsync(It.IsAny<StaffDevice>(), null, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         // Mimics the real MongoDB driver's server-assigned ObjectId behaviour on insert, since
         // AuthService reads user.Id right back off the object immediately after InsertOneAsync
@@ -40,7 +46,7 @@ public class AuthServiceTests
             })
             .Build();
 
-        _sut = new AuthService(_dbMock.Object, config);
+        _sut = new AuthService(_dbMock.Object, config, new DeviceService(_dbMock.Object));
     }
 
     private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!", string role = UserRoles.Customer, bool isEmailVerified = true) => new()
@@ -155,12 +161,12 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
+        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"), null);
 
-        needsEmailVerification.ShouldBeFalse();
-        result.ShouldNotBeNull();
-        result!.User.Email.ShouldBe(user.Email);
-        result.Token.ShouldNotBeNullOrWhiteSpace();
+        result.Outcome.ShouldBe(LoginOutcome.Success);
+        result.Auth.ShouldNotBeNull();
+        result.Auth!.User.Email.ShouldBe(user.Email);
+        result.Auth.Token.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -169,10 +175,10 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "WrongPassword1!", "test-turnstile-token"));
+        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "WrongPassword1!", "test-turnstile-token"), null);
 
-        result.ShouldBeNull();
-        needsEmailVerification.ShouldBeFalse();
+        result.Outcome.ShouldBe(LoginOutcome.InvalidCredentials);
+        result.Auth.ShouldBeNull();
     }
 
     [Fact]
@@ -180,10 +186,10 @@ public class AuthServiceTests
     {
         _usersMock.SetupFind(new List<User>());
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest("unknown@example.com", "Passw0rd!", "test-turnstile-token"));
+        var result = await _sut.LoginAsync(new LoginRequest("unknown@example.com", "Passw0rd!", "test-turnstile-token"), null);
 
-        result.ShouldBeNull();
-        needsEmailVerification.ShouldBeFalse();
+        result.Outcome.ShouldBe(LoginOutcome.InvalidCredentials);
+        result.Auth.ShouldBeNull();
     }
 
     [Fact]
@@ -192,11 +198,11 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!", role: "");
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
+        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"), null);
 
-        needsEmailVerification.ShouldBeFalse();
-        result.ShouldNotBeNull();
-        result!.User.Role.ShouldBe(UserRoles.Customer);
+        result.Outcome.ShouldBe(LoginOutcome.Success);
+        result.Auth.ShouldNotBeNull();
+        result.Auth!.User.Role.ShouldBe(UserRoles.Customer);
     }
 
     [Fact]
@@ -205,10 +211,10 @@ public class AuthServiceTests
         var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
-        var (result, needsEmailVerification) = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
+        var result = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"), null);
 
-        result.ShouldBeNull();
-        needsEmailVerification.ShouldBeTrue();
+        result.Outcome.ShouldBe(LoginOutcome.NeedsEmailVerification);
+        result.Auth.ShouldBeNull();
     }
 
     [Fact]
@@ -304,7 +310,7 @@ public class AuthServiceTests
             new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(10) },
         });
 
-        var result = await _sut.RefreshAsync("some-raw-refresh-token");
+        var result = await _sut.RefreshAsync("some-raw-refresh-token", null);
 
         result.ShouldNotBeNull();
         result!.User.Email.ShouldBe(user.Email);
@@ -321,7 +327,7 @@ public class AuthServiceTests
     {
         _refreshTokensMock.SetupFind(new List<RefreshToken>());
 
-        var result = await _sut.RefreshAsync("unknown-token");
+        var result = await _sut.RefreshAsync("unknown-token", null);
 
         result.ShouldBeNull();
     }
@@ -336,7 +342,7 @@ public class AuthServiceTests
             new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(-1) },
         });
 
-        var result = await _sut.RefreshAsync("expired-token");
+        var result = await _sut.RefreshAsync("expired-token", null);
 
         result.ShouldBeNull();
     }

@@ -15,7 +15,8 @@
 
 - Modern responsive UI with glassmorphism & animations
 - 13 product catalog with category filtering
-- JWT authentication (Register / Login)
+- JWT authentication (Register / Login) with email OTP verification and Cloudflare Turnstile
+- Staff accounts locked to a single device — see [docs/staff-device-restriction.md](docs/staff-device-restriction.md)
 - RESTful API with MongoDB Atlas backend
 - Mobile-first responsive design
 

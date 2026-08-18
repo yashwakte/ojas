@@ -51,6 +51,57 @@ public class OtpService
         return code;
     }
 
+    /// <summary>Same mechanism as the email OTP but on its own channel, and with wording that
+    /// makes clear what is being approved - a staff member who gets this without asking should
+    /// understand immediately that someone has their password.</summary>
+    public async Task<string> SendDeviceOtpAsync(string email)
+    {
+        var code = GenerateCode();
+        await StoreCodeAsync(email, OtpChannels.Device, code);
+
+        try
+        {
+            var html = $"""
+                <p>Someone is trying to sign in to your Ojas staff account from a new device.</p>
+                <p>If this was you, use this code to approve that device:</p>
+                <p style="font-size:28px;font-weight:700;letter-spacing:6px;">{code}</p>
+                <p>This code expires in 10 minutes, and approving a new device signs you out everywhere else.</p>
+                <p><strong>If this wasn't you, your password is no longer safe - change it and tell your administrator.</strong></p>
+                """;
+            await _emailSender.SendAsync(email, "Approve a new device for your Ojas account", html);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not send device OTP to {Email}; the code was still generated.", email);
+        }
+
+        return code;
+    }
+
+    public async Task<string> SendPasswordResetOtpAsync(string email)
+    {
+        var code = GenerateCode();
+        await StoreCodeAsync(email, OtpChannels.PasswordReset, code);
+
+        try
+        {
+            var html = $"""
+                <p>We received a request to reset the password on your Ojas account.</p>
+                <p>Use this code to choose a new one:</p>
+                <p style="font-size:28px;font-weight:700;letter-spacing:6px;">{code}</p>
+                <p>This code expires in 10 minutes, and resetting your password signs you out on every device.</p>
+                <p>If you didn't request this, you can ignore this email - your password hasn't changed.</p>
+                """;
+            await _emailSender.SendAsync(email, "Reset your Ojas password", html);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not send password reset OTP to {Email}; the code was still generated.", email);
+        }
+
+        return code;
+    }
+
     public async Task<string> SendPhoneOtpAsync(string phone)
     {
         if (!_phoneOtpSender.IsConfigured)

@@ -54,8 +54,28 @@ public static class AuthFlowExtensions
         request.Headers.Add("X-CSRF-Token", csrfToken);
     }
 
-    /// <summary>Inserts a pre-hashed admin/delivery user straight into the test database and logs
-    /// in as them, sidestepping the admin-only /api/auth/staff endpoint's bootstrap problem.</summary>
+    /// <summary>Enrols the calling client as a staff account's single trusted device, which is
+    /// what an ordinary login now requires. Mirrors the real two-step flow (request a code, then
+    /// redeem it); the test host runs in Development so the code comes back in the response.</summary>
+    public static async Task<(AuthResponse Auth, string CsrfToken)> EnrollDeviceAndLoginAsync(
+        this HttpClient client, string email, string password)
+    {
+        var otpResponse = await client.PostAsJsonAsync(
+            "/api/auth/device/send-otp", new DeviceOtpRequest(email, password));
+        otpResponse.EnsureSuccessStatusCode();
+        var otp = await otpResponse.Content.ReadFromJsonAsync<DeviceOtpDevResponse>();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/device/enroll", new EnrollDeviceRequest(email, password, otp!.DevCode!));
+        response.EnsureSuccessStatusCode();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        return (auth!, auth!.CsrfToken!);
+    }
+
+    /// <summary>Inserts a pre-hashed admin/delivery user straight into the test database and signs
+    /// in as them, sidestepping the admin-only /api/auth/staff endpoint's bootstrap problem. Staff
+    /// are device-restricted, so this enrols the calling client as their trusted device rather
+    /// than logging in directly - a plain login would (correctly) be refused with a 403.</summary>
     public static async Task<(AuthResponse Auth, string CsrfToken)> SeedAndLoginAsStaffAsync(
         this OjasApiFactory factory, HttpClient client, string role, string? email = null, string password = "Passw0rd123!")
     {
@@ -77,6 +97,10 @@ public static class AuthFlowExtensions
             await db.Users.InsertOneAsync(user);
         });
 
-        return await client.LoginAsync(email, password);
+        return await client.EnrollDeviceAndLoginAsync(email, password);
     }
+
+    /// <summary>The device/send-otp response is an anonymous object on the server side; this is
+    /// just the shape the tests need to read the Development-only code back out of it.</summary>
+    private record DeviceOtpDevResponse(string Message, string? DevCode);
 }

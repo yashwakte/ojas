@@ -18,6 +18,12 @@ public class RefreshToken
     [BsonElement("userId")]
     public required string UserId { get; set; }
 
+    /// <summary>For staff sessions, the hashed id of the device this token was issued to; null
+    /// for customers, who aren't device-restricted. Checked on every refresh so a stolen refresh
+    /// token can't quietly outlive the device binding for the rest of its 30-day life.</summary>
+    [BsonElement("deviceIdHash")]
+    public string? DeviceIdHash { get; set; }
+
     [BsonElement("expiresAt")]
     public DateTime ExpiresAt { get; set; }
 

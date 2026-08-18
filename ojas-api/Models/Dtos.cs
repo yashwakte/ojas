@@ -22,7 +22,47 @@ public record CreateStaffRequest(
 	[Required] string Role);
 
 public record AuthResponse(string Id, string FullName, string Email, string Phone, string Role, string CsrfToken = "");
-public record AuthResult(string Token, AuthResponse User, string RefreshToken);
+
+/// <summary>RawDeviceId is set only when a session also binds a new staff device, so the
+/// controller knows to write the device cookie; null for ordinary customer sessions.</summary>
+public record AuthResult(string Token, AuthResponse User, string RefreshToken, string? RawDeviceId = null);
+
+public enum LoginOutcome
+{
+	Success,
+	InvalidCredentials,
+	NeedsEmailVerification,
+	/// <summary>Password was correct, but this staff account is bound to a different device.</summary>
+	NeedsDeviceEnrollment,
+}
+
+public record LoginServiceResult(LoginOutcome Outcome, AuthResult? Auth = null);
+
+public record DeviceOtpRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, MinLength(6), MaxLength(128)] string Password);
+
+public record EnrollDeviceRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, MinLength(6), MaxLength(128)] string Password,
+	[Required, RegularExpression(@"^\d{6}$")] string Code);
+
+public record ForgotPasswordRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required] string TurnstileToken);
+
+/// <summary>The new password is held to the same 10-character floor as registration - a reset
+/// must never be a way to downgrade an account to a weaker password than signup allows.</summary>
+public record ResetPasswordRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, RegularExpression(@"^\d{6}$")] string Code,
+	[Required, MinLength(10), MaxLength(128)] string NewPassword);
+
+public record StaffDeviceResponse(
+	string Label,
+	string EnrolledVia,
+	DateTime CreatedAt,
+	DateTime LastSeenAt);
 
 /// <summary>Returned by /register while the account is awaiting OTP verification - deliberately
 /// not an AuthResponse, since no session exists until the code is verified.</summary>

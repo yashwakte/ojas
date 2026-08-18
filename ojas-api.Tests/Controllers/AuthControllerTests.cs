@@ -19,6 +19,7 @@ public class AuthControllerTests
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
     private readonly Mock<IMongoCollection<OtpCode>> _otpCodesMock = new();
     private readonly Mock<IMongoCollection<RefreshToken>> _refreshTokensMock = new();
+    private readonly Mock<IMongoCollection<StaffDevice>> _staffDevicesMock = new();
     private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly Mock<IPhoneOtpSender> _phoneOtpSenderMock = new();
     private readonly Mock<ITurnstileVerifier> _turnstileVerifierMock = new();
@@ -29,6 +30,11 @@ public class AuthControllerTests
         _dbMock.Setup(d => d.Users).Returns(_usersMock.Object);
         _dbMock.Setup(d => d.OtpCodes).Returns(_otpCodesMock.Object);
         _dbMock.Setup(d => d.RefreshTokens).Returns(_refreshTokensMock.Object);
+        _dbMock.Setup(d => d.StaffDevices).Returns(_staffDevicesMock.Object);
+        _staffDevicesMock.SetupFind(new List<StaffDevice>());
+        _staffDevicesMock
+            .Setup(c => c.InsertOneAsync(It.IsAny<StaffDevice>(), null, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         _usersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
@@ -47,12 +53,13 @@ public class AuthControllerTests
             })
             .Build();
 
-        var authService = new AuthService(_dbMock.Object, config);
+        var deviceService = new DeviceService(_dbMock.Object);
+        var authService = new AuthService(_dbMock.Object, config, deviceService);
         var otpService = new OtpService(_dbMock.Object, _emailSenderMock.Object, _phoneOtpSenderMock.Object, NullLogger<OtpService>.Instance);
         var envMock = new Mock<IWebHostEnvironment>();
         envMock.Setup(e => e.EnvironmentName).Returns("Development");
 
-        _sut = new AuthController(authService, otpService, _turnstileVerifierMock.Object, envMock.Object, NullLogger<AuthController>.Instance)
+        _sut = new AuthController(authService, otpService, deviceService, _turnstileVerifierMock.Object, envMock.Object, NullLogger<AuthController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };

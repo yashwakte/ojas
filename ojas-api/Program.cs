@@ -54,7 +54,19 @@ builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
-builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
+builder.Services.AddScoped<DeviceService>();
+// Real mail is only worth sending in Production. Everywhere else the OTP already comes back in
+// the response as devCode and is shown in the UI, so a real send would just spend free-tier
+// quota - set Email:SendInDevelopment=true to opt back in when deliverability itself is what
+// you're testing.
+if (builder.Environment.IsProduction() || builder.Configuration.GetValue<bool>("Email:SendInDevelopment"))
+{
+    builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+}
 builder.Services.AddHttpClient<IPhoneOtpSender, Msg91PhoneOtpSender>();
 builder.Services.AddHttpClient<ITurnstileVerifier, CloudflareTurnstileVerifier>();
 
@@ -131,13 +143,20 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Strict limit for auth endpoints: 5 requests per minute per IP
+    // Strict limit for auth endpoints: 5 requests per minute per IP.
+    //
+    // Outside Production this is deliberately loosened. The limit exists to slow credential
+    // stuffing from the internet, which is not a threat on a developer's machine - whereas the
+    // integration and Playwright suites hammer these endpoints from a single loopback IP and
+    // would otherwise fail on the rate limiter rather than on anything real. Device enrolment
+    // in particular costs two auth-policy calls (request a code, then redeem it).
+    var authPermitLimit = builder.Environment.IsProduction() ? 5 : 50;
     options.AddPolicy("auth", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = authPermitLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -257,11 +276,21 @@ app.Use(async (context, next) =>
     // already expired (IsAuthenticated is false by then, so this exemption wouldn't even be
     // reached) - but nothing stops it from also being called while the old token is still
     // valid, and it shouldn't depend on that timing to behave consistently.
+    // Password reset and staff device approval belong here for the same reason: they are
+    // unauthenticated flows that establish or replace credentials, and each one can legitimately
+    // be reached while a stale-but-still-valid auth cookie is sitting in the browser (an admin
+    // whose device was revoked mid-session re-approving a device, or anyone resetting a password
+    // without signing out first). Requiring a CSRF token there would reject the very request
+    // meant to recover the account.
     var path = context.Request.Path;
     var isAuthBootstrapEndpoint = path.StartsWithSegments("/api/auth/login") ||
         path.StartsWithSegments("/api/auth/register") ||
         path.StartsWithSegments("/api/auth/logout") ||
-        path.StartsWithSegments("/api/auth/refresh");
+        path.StartsWithSegments("/api/auth/refresh") ||
+        path.StartsWithSegments("/api/auth/forgot-password") ||
+        path.StartsWithSegments("/api/auth/reset-password") ||
+        path.StartsWithSegments("/api/auth/device/send-otp") ||
+        path.StartsWithSegments("/api/auth/device/enroll");
 
     if (!isAuthBootstrapEndpoint &&
         context.User.Identity?.IsAuthenticated == true &&

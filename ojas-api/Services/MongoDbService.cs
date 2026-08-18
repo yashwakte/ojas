@@ -28,6 +28,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<CampaignBanner> CampaignBanners => _database.GetCollection<CampaignBanner>("campaign_banner");
     public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
+    public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
 
     private void TryEnsureIndexes()
     {
@@ -60,6 +61,18 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Name = "refresh_token_user_id" }
             );
             RefreshTokens.Indexes.CreateMany([refreshTokenTtlIndex, refreshTokenUserIdIndex]);
+
+            // userId leads the key so this one index serves both access patterns: "is this user
+            // bound to this device" on every staff login and refresh, and "which device does
+            // this user have" for the admin listing and for replacing an old binding. Unique,
+            // because a user must never accumulate two rows for the same device.
+            var staffDeviceIndex = new CreateIndexModel<StaffDevice>(
+                Builders<StaffDevice>.IndexKeys
+                    .Ascending(d => d.UserId)
+                    .Ascending(d => d.DeviceIdHash),
+                new CreateIndexOptions { Unique = true, Name = "staff_device_user_and_device" }
+            );
+            StaffDevices.Indexes.CreateOne(staffDeviceIndex);
         }
         catch (MongoCommandException ex)
         {

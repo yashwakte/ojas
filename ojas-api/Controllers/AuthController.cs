@@ -15,6 +15,12 @@ public class AuthController : ControllerBase
     private const string AuthCookieName = "ojas_auth";
     private const string CsrfCookieName = "ojas_csrf";
     private const string RefreshCookieName = "ojas_refresh";
+    private const string DeviceCookieName = "ojas_device";
+
+    // Deliberately long-lived: this cookie *is* the device binding, so it has to outlive
+    // ordinary sessions - a staff member logging out at the end of a shift must not have to
+    // re-enrol the next morning. 400 days is the maximum Chrome will honour.
+    private static readonly TimeSpan DeviceCookieLifetime = TimeSpan.FromDays(400);
 
     // Must match AuthService's AccessTokenMinutes/RefreshTokenLifetime - these govern how long
     // the browser keeps offering each cookie, the token's own claims/hash-expiry are what the
@@ -24,6 +30,7 @@ public class AuthController : ControllerBase
 
     private readonly AuthService _authService;
     private readonly OtpService _otpService;
+    private readonly DeviceService _deviceService;
     private readonly ITurnstileVerifier _turnstileVerifier;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AuthController> _logger;
@@ -31,16 +38,26 @@ public class AuthController : ControllerBase
     public AuthController(
         AuthService authService,
         OtpService otpService,
+        DeviceService deviceService,
         ITurnstileVerifier turnstileVerifier,
         IWebHostEnvironment env,
         ILogger<AuthController> logger)
     {
         _authService = authService;
         _otpService = otpService;
+        _deviceService = deviceService;
         _turnstileVerifier = turnstileVerifier;
         _env = env;
         _logger = logger;
     }
+
+    private string? RawDeviceId =>
+        Request.Cookies.TryGetValue(DeviceCookieName, out var id) && !string.IsNullOrWhiteSpace(id)
+            ? id
+            : null;
+
+    private string CurrentDeviceLabel =>
+        DeviceService.DescribeDevice(Request.Headers.UserAgent.ToString());
 
     private Task<bool> VerifyTurnstileAsync(string token) =>
         _turnstileVerifier.VerifyAsync(token, HttpContext.Connection.RemoteIpAddress?.ToString());
@@ -76,6 +93,18 @@ public class AuthController : ControllerBase
         Expires = DateTimeOffset.UtcNow.Add(RefreshTokenLifetime)
     };
 
+    // HttpOnly is the whole point: script on the page can't read the device id, so an XSS bug
+    // can't exfiltrate the thing that makes this device trusted. Scoped to /api/auth because
+    // login, refresh and enrolment are the only endpoints that ever consult it.
+    private CookieOptions BuildDeviceCookieOptions() => new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.None,
+        Path = "/api/auth",
+        Expires = DateTimeOffset.UtcNow.Add(DeviceCookieLifetime)
+    };
+
     /// <summary>Sets the auth+CSRF+refresh cookies for a verified session and returns the
     /// response body every login-equivalent endpoint (login, register-verify, refresh,
     /// bootstrap-admin) shares.</summary>
@@ -85,6 +114,12 @@ public class AuthController : ControllerBase
         Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
         Response.Cookies.Append(RefreshCookieName, result.RefreshToken, BuildRefreshCookieOptions());
         Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
+
+        // Only set when this session also bound a new device (enrolment or first-admin
+        // bootstrap); ordinary logins reuse the cookie the browser already holds.
+        if (result.RawDeviceId != null)
+            Response.Cookies.Append(DeviceCookieName, result.RawDeviceId, BuildDeviceCookieOptions());
+
         return result.User with { CsrfToken = csrfToken };
     }
 
@@ -175,21 +210,35 @@ public class AuthController : ControllerBase
         if (!await VerifyTurnstileAsync(request.TurnstileToken))
             return BadRequest(new { message = "Verification failed. Please try again." });
 
-        var (result, needsEmailVerification) = await _authService.LoginAsync(request);
-        if (needsEmailVerification)
+        var login = await _authService.LoginAsync(request, RawDeviceId);
+
+        switch (login.Outcome)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new
-            {
-                message = "Please verify your email before signing in.",
-                needsEmailVerification = true,
-                email = request.Email,
-            });
+            case LoginOutcome.NeedsEmailVerification:
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Please verify your email before signing in.",
+                    needsEmailVerification = true,
+                    email = request.Email,
+                });
+
+            // Deliberately the same shape as the email-verification case: the password was
+            // correct, but a session is withheld until the caller proves control of the
+            // account's email from this device.
+            case LoginOutcome.NeedsDeviceEnrollment:
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "This device isn't recognised. We'll email you a code to approve it.",
+                    needsDeviceEnrollment = true,
+                    email = request.Email,
+                });
+
+            case LoginOutcome.InvalidCredentials:
+                return Unauthorized(new { message = "Invalid email or password" });
+
+            default:
+                return Ok(IssueSession(login.Auth!));
         }
-
-        if (result == null)
-            return Unauthorized(new { message = "Invalid email or password" });
-
-        return Ok(IssueSession(result));
     }
 
     // Called automatically by the frontend's HTTP interceptor whenever the access token has
@@ -202,7 +251,7 @@ public class AuthController : ControllerBase
         if (!Request.Cookies.TryGetValue(RefreshCookieName, out var rawRefreshToken) || string.IsNullOrWhiteSpace(rawRefreshToken))
             return Unauthorized();
 
-        var result = await _authService.RefreshAsync(rawRefreshToken);
+        var result = await _authService.RefreshAsync(rawRefreshToken, RawDeviceId);
         if (result == null)
         {
             // Stale, expired, or already-rotated - clear it so the browser stops offering it.
@@ -250,7 +299,8 @@ public class AuthController : ControllerBase
         if (!await VerifyTurnstileAsync(request.TurnstileToken))
             return BadRequest(new { message = "Verification failed. Please try again." });
 
-        var (result, conflictField, error) = await _authService.BootstrapAdminAsync(request);
+        var (result, conflictField, error) = await _authService.BootstrapAdminAsync(
+            request, CurrentDeviceLabel, RawDeviceId);
         if (error != null)
             return Conflict(new { message = error });
 
@@ -320,4 +370,103 @@ public class AuthController : ControllerBase
         return Ok(staff);
     }
 
+    /// <summary>Never reveals whether the address is registered - the response is identical
+    /// either way, so this can't be used to enumerate accounts. Turnstile-gated because a
+    /// correct password isn't required here, which would otherwise make it a free way to send
+    /// mail to arbitrary addresses.</summary>
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (!await VerifyTurnstileAsync(request.TurnstileToken))
+            return BadRequest(new { message = "Verification failed. Please try again." });
+
+        string? devCode = null;
+        if (await _authService.EmailExistsAsync(request.Email))
+        {
+            var code = await _otpService.SendPasswordResetOtpAsync(request.Email);
+            devCode = _env.IsProduction() ? null : code;
+        }
+
+        return Ok(new { message = "If that email is registered, we've sent a reset code.", devCode });
+    }
+
+    /// <summary>Redeems the code and sets the new password. Issues no session - the user signs
+    /// in again afterwards, which for staff still means passing the device check.</summary>
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        var isValid = await _otpService.VerifyAsync(request.Email, OtpChannels.PasswordReset, request.Code);
+        if (!isValid)
+            return BadRequest(new { message = "That code is invalid or has expired." });
+
+        var reset = await _authService.ResetPasswordAsync(request.Email, request.NewPassword);
+        if (!reset)
+            return BadRequest(new { message = "That code is invalid or has expired." });
+
+        _logger.LogInformation("Password reset completed for {Email}.", request.Email);
+        return Ok(new { message = "Your password has been updated. Please sign in." });
+    }
+
+    /// <summary>Step one of moving a staff account to a new device. Requires the correct
+    /// password, so it can't be used to spray codes at staff inboxes, and returns the same
+    /// generic response either way so it never reveals whether an account exists.</summary>
+    [HttpPost("device/send-otp")]
+    public async Task<IActionResult> SendDeviceOtp([FromBody] DeviceOtpRequest request)
+    {
+        string? devCode = null;
+        var user = await _authService.FindByCredentialsAsync(request.Email, request.Password);
+
+        if (user != null && DeviceService.IsRestrictedRole(user.Role))
+        {
+            var code = await _otpService.SendDeviceOtpAsync(user.Email);
+            devCode = _env.IsProduction() ? null : code;
+        }
+
+        return Ok(new { message = "If those details are correct, we've sent a code to your email.", devCode });
+    }
+
+    /// <summary>Step two: a correct code binds *this* device to the account and signs in. The
+    /// password is re-checked rather than trusting anything carried over from step one.</summary>
+    [HttpPost("device/enroll")]
+    public async Task<ActionResult<AuthResponse>> EnrollDevice([FromBody] EnrollDeviceRequest request)
+    {
+        var user = await _authService.FindByCredentialsAsync(request.Email, request.Password);
+        if (user == null || !DeviceService.IsRestrictedRole(user.Role))
+            return Unauthorized(new { message = "Invalid email or password" });
+
+        var isValid = await _otpService.VerifyAsync(user.Email, OtpChannels.Device, request.Code);
+        if (!isValid)
+            return BadRequest(new { message = "That code is invalid or has expired." });
+
+        var result = await _authService.EnrollDeviceAndIssueSessionAsync(user, CurrentDeviceLabel, RawDeviceId);
+        _logger.LogInformation("Staff device enrolled for user {UserId} ({Role}).", user.Id, user.Role);
+
+        return Ok(IssueSession(result));
+    }
+
+    [HttpGet("staff/{userId}/devices")]
+    [Authorize(Roles = UserRoles.Admin)]
+    [DisableRateLimiting]
+    public async Task<ActionResult<List<StaffDeviceResponse>>> GetStaffDevices(string userId)
+    {
+        var devices = await _deviceService.GetDevicesForUserAsync(userId);
+        return Ok(devices
+            .Select(d => new StaffDeviceResponse(d.Label, d.EnrolledVia, d.CreatedAt, d.LastSeenAt))
+            .ToList());
+    }
+
+    /// <summary>Unbinds a staff member's device and ends their sessions - the recovery path for
+    /// a lost or stolen phone. They re-enrol from their next device via email OTP.</summary>
+    [HttpDelete("staff/{userId}/devices")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> RevokeStaffDevice(string userId)
+    {
+        await _deviceService.RevokeAllDevicesForUserAsync(userId);
+        _logger.LogInformation(
+            "Admin {AdminId} revoked the bound device for user {UserId}.",
+            User.FindFirstValue(ClaimTypes.NameIdentifier),
+            userId);
+
+        return NoContent();
+    }
 }
