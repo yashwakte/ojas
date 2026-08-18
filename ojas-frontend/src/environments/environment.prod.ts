@@ -8,4 +8,7 @@ export const environment = {
   // makes it a first-party cookie instead, so this isn't just a workaround
   // for a niche browser mode; it's what makes cookie auth actually reliable.
   apiUrl: '/api',
+  // Real site key from the Cloudflare Turnstile dashboard - replace before going live. The
+  // matching secret key lives in the API's config (Turnstile:SecretKey), never here.
+  turnstileSiteKey: '0x4AAAAAAET1pPvaGYSRgVPd',
 };

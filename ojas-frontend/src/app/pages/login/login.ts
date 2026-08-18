@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, OnDestroy, inject } from '@angular/core';
+import { Component, ChangeDetectorRef, OnDestroy, inject, viewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
 import { timeout } from 'rxjs';
@@ -22,6 +23,7 @@ import { timeout } from 'rxjs';
     MatIconModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    TurnstileWidget,
   ],
   templateUrl: './login.html',
   styleUrl: './login.scss',
@@ -29,11 +31,13 @@ import { timeout } from 'rxjs';
 export class Login implements OnDestroy {
   private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
+  private readonly turnstileWidget = viewChild(TurnstileWidget);
 
   loginForm: FormGroup;
   loading = false;
   slowConnection = false;
   hidePassword = true;
+  turnstileToken: string | null = null;
   private slowTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -49,8 +53,16 @@ export class Login implements OnDestroy {
     });
   }
 
+  onTurnstileVerified(token: string) {
+    this.turnstileToken = token;
+  }
+
+  onTurnstileExpired() {
+    this.turnstileToken = null;
+  }
+
   onSubmit() {
-    if (this.loginForm.invalid) return;
+    if (this.loginForm.invalid || !this.turnstileToken) return;
 
     this.loading = true;
     this.slowConnection = false;
@@ -62,7 +74,7 @@ export class Login implements OnDestroy {
     }, 5000);
 
     this.auth
-      .login(this.loginForm.value)
+      .login({ ...this.loginForm.value, turnstileToken: this.turnstileToken })
       .pipe(timeout(35000))
       .subscribe({
         next: (res) => {
@@ -86,6 +98,9 @@ export class Login implements OnDestroy {
           this.clearSlowTimer();
           this.loading = false;
           this.slowConnection = false;
+          // A Turnstile token is single-use - whatever happened, this one is spent.
+          this.turnstileToken = null;
+          this.turnstileWidget()?.reset();
           this.cdr.detectChanges();
 
           if (err.status === 403 && err.error?.needsEmailVerification) {
@@ -96,8 +111,11 @@ export class Login implements OnDestroy {
           let msg = 'Something went wrong. Please try again.';
           if (err.status === 429) {
             msg = 'Too many attempts. Please wait a minute.';
-          } else if (err.status === 401 || err.status === 400) {
+          } else if (err.status === 401) {
             msg = 'Invalid email or password';
+          } else if (err.status === 400) {
+            // Distinct from a credentials failure (401) - this is Turnstile verification failing.
+            msg = err.error?.message ?? 'Verification failed. Please try again.';
           } else if (err.status === 0 || err.name === 'TimeoutError') {
             msg = 'Server is taking too long. Please try again.';
           }

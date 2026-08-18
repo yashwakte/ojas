@@ -32,8 +32,13 @@ describe('Login', () => {
   // MatSnackBarModule declares its own `providers: [MatSnackBar]`, and importing it into this
   // standalone component pulls that provider into the component's own injector - shadowing any
   // TestBed-level override. So we spy on the real, component-scoped instance instead of mocking it.
+  //
+  // Everything in this file except the dedicated Turnstile tests below is testing other
+  // concerns, so treat "widget already solved" as the default baseline rather than making
+  // every single test set this explicitly.
   function create() {
     const fixture = TestBed.createComponent(Login);
+    fixture.componentInstance.turnstileToken = 'test-turnstile-token';
     fixture.detectChanges();
     const snackBar = fixture.debugElement.injector.get(MatSnackBar);
     spyOn(snackBar, 'open').and.stub();
@@ -66,6 +71,39 @@ describe('Login', () => {
     expect(authServiceSpy.login).not.toHaveBeenCalled();
   });
 
+  it('onSubmit does nothing until the Turnstile widget has been solved', () => {
+    const { fixture } = create();
+    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.turnstileToken = null;
+
+    fixture.componentInstance.onSubmit();
+
+    expect(authServiceSpy.login).not.toHaveBeenCalled();
+  });
+
+  it('onSubmit includes the Turnstile token in the login request', () => {
+    authServiceSpy.login.and.returnValue(of(authResponse));
+    const { fixture } = create();
+    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.turnstileToken = 'solved-token';
+
+    fixture.componentInstance.onSubmit();
+
+    expect(authServiceSpy.login).toHaveBeenCalledWith(
+      jasmine.objectContaining({ turnstileToken: 'solved-token' }),
+    );
+  });
+
+  it('a failed submit clears the spent Turnstile token so the widget must be resolved again', () => {
+    authServiceSpy.login.and.returnValue(throwError(() => ({ status: 500 })));
+    const { fixture } = create();
+    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+
+    fixture.componentInstance.onSubmit();
+
+    expect(fixture.componentInstance.turnstileToken).toBeNull();
+  });
+
   it('onSubmit logs in, saves auth, celebrates, and navigates to the role home on success', () => {
     authServiceSpy.login.and.returnValue(of(authResponse));
     spyOn(router, 'navigateByUrl');
@@ -80,7 +118,7 @@ describe('Login', () => {
     expect(fixture.componentInstance.loading).toBeFalse();
   });
 
-  it('shows an "Invalid email or password" message for 401/400 errors', () => {
+  it('shows an "Invalid email or password" message for a 401', () => {
     authServiceSpy.login.and.returnValue(throwError(() => ({ status: 401 })));
     const { fixture, snackBar } = create();
     fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
@@ -89,6 +127,22 @@ describe('Login', () => {
 
     expect(snackBar.open).toHaveBeenCalledWith('Invalid email or password', 'Close', jasmine.any(Object));
     expect(fixture.componentInstance.loading).toBeFalse();
+  });
+
+  it('shows the server Turnstile-failure message for a 400 - distinct from bad credentials', () => {
+    authServiceSpy.login.and.returnValue(
+      throwError(() => ({ status: 400, error: { message: 'Verification failed. Please try again.' } })),
+    );
+    const { fixture, snackBar } = create();
+    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+
+    fixture.componentInstance.onSubmit();
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Verification failed. Please try again.',
+      'Close',
+      jasmine.any(Object),
+    );
   });
 
   it('shows a rate-limit message for 429 errors', () => {

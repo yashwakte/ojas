@@ -75,7 +75,7 @@ describe('AuthService', () => {
 
   it('register() posts to /auth/register', () => {
     setup();
-    const req = { fullName: 'A', email: 'a@b.com', phone: '9999999999', password: 'secret' };
+    const req = { fullName: 'A', email: 'a@b.com', phone: '9999999999', password: 'secret', turnstileToken: 'tok' };
     const pending = { email: 'a@b.com', message: 'Check your inbox' };
     service.register(req).subscribe((res) => expect(res).toEqual(pending));
     const call = httpMock.expectOne(`${environment.apiUrl}/auth/register`);
@@ -126,7 +126,7 @@ describe('AuthService', () => {
 
   it('login() posts to /auth/login', () => {
     setup();
-    const req = { email: 'a@b.com', password: 'secret' };
+    const req = { email: 'a@b.com', password: 'secret', turnstileToken: 'tok' };
     service.login(req).subscribe((res) => expect(res).toEqual(authResponse));
     const call = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
     expect(call.request.method).toBe('POST');

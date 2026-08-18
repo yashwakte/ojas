@@ -46,8 +46,12 @@ describe('Register', () => {
 
   // See login.spec.ts: MatSnackBarModule provides its own MatSnackBar at the component's
   // injector level, so a TestBed-level override is shadowed. Spy on the real instance instead.
+  // Everything in this file except the dedicated Turnstile tests below is testing other
+  // concerns, so treat "widget already solved" as the default baseline rather than making
+  // every single test set this explicitly.
   function create() {
     const fixture = TestBed.createComponent(Register);
+    fixture.componentInstance.turnstileToken = 'test-turnstile-token';
     fixture.detectChanges();
     const snackBar = fixture.debugElement.injector.get(MatSnackBar);
     spyOn(snackBar, 'open').and.stub();
@@ -176,6 +180,52 @@ describe('Register', () => {
     const { fixture } = create();
     fixture.componentInstance.onSubmit();
     expect(authServiceSpy.register).not.toHaveBeenCalled();
+  });
+
+  it('onSubmit does nothing until the Turnstile widget has been solved', () => {
+    const { fixture } = create();
+    fillValidForm(fixture);
+    fixture.componentInstance.turnstileToken = null;
+
+    fixture.componentInstance.onSubmit();
+
+    expect(authServiceSpy.register).not.toHaveBeenCalled();
+  });
+
+  it('onSubmit includes the Turnstile token in the register request', () => {
+    authServiceSpy.register.and.returnValue(of(pendingResponse));
+    const { fixture } = create();
+
+    jasmine.clock().install();
+    try {
+      fillValidForm(fixture);
+      jasmine.clock().tick(200);
+      fixture.componentInstance.turnstileToken = 'solved-token';
+
+      fixture.componentInstance.onSubmit();
+
+      expect(authServiceSpy.register).toHaveBeenCalledWith(
+        jasmine.objectContaining({ turnstileToken: 'solved-token' }),
+      );
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('a failed submit clears the spent Turnstile token so the widget must be resolved again', () => {
+    authServiceSpy.register.and.returnValue(throwError(() => ({ status: 500, error: {} })));
+    const { fixture } = create();
+
+    jasmine.clock().install();
+    try {
+      fillValidForm(fixture);
+      jasmine.clock().tick(200);
+      fixture.componentInstance.onSubmit();
+
+      expect(fixture.componentInstance.turnstileToken).toBeNull();
+    } finally {
+      jasmine.clock().uninstall();
+    }
   });
 
   it('onSubmit registers, then advances to the OTP step instead of logging in directly', () => {

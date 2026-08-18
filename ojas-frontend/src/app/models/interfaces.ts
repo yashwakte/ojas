@@ -133,6 +133,7 @@ export interface RegisterRequest {
   email: string;
   phone: string;
   password: string;
+  turnstileToken: string;
 }
 
 /** Returned by /register while the account awaits OTP verification - not a session yet. */
@@ -161,6 +162,7 @@ export interface ResendEmailOtpResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  turnstileToken: string;
 }
 
 export interface CartItem {

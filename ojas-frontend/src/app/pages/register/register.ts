@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, ChangeDetectorRef, OnDestroy, OnInit, inject, viewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   FormBuilder,
@@ -14,6 +14,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
 import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
@@ -31,6 +32,7 @@ const RESEND_COOLDOWN_SECONDS = 30;
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    TurnstileWidget,
   ],
   templateUrl: './register.html',
   styleUrl: './register.scss',
@@ -38,11 +40,13 @@ const RESEND_COOLDOWN_SECONDS = 30;
 export class Register implements OnInit, OnDestroy {
   private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
+  private readonly turnstileWidget = viewChild(TurnstileWidget);
 
   registerForm: FormGroup;
   loading = false;
   hidePassword = true;
   serverError = '';
+  turnstileToken: string | null = null;
 
   // Step 2: OTP entry. showOtpStep flips on once registration succeeds (or when arriving
   // from /login with a "verify your email" redirect for an account that never finished).
@@ -134,16 +138,24 @@ export class Register implements OnInit, OnDestroy {
     return this.registerForm.get('phone')?.status === 'PENDING';
   }
 
+  onTurnstileVerified(token: string) {
+    this.turnstileToken = token;
+  }
+
+  onTurnstileExpired() {
+    this.turnstileToken = null;
+  }
+
   onSubmit() {
     this.registerForm.markAllAsTouched();
-    if (this.registerForm.invalid || this.registerForm.pending) return;
+    if (this.registerForm.invalid || this.registerForm.pending || !this.turnstileToken) return;
 
     this.serverError = '';
     this.loading = true;
     this.cdr.detectChanges();
 
     this.auth
-      .register(this.registerForm.value)
+      .register({ ...this.registerForm.value, turnstileToken: this.turnstileToken })
       .pipe(timeout(8000))
       .subscribe({
         next: (res) => {
@@ -156,6 +168,9 @@ export class Register implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.loading = false;
+          // A Turnstile token is single-use - whatever happened, this one is spent.
+          this.turnstileToken = null;
+          this.turnstileWidget()?.reset();
           // 409 is a safety net — async validators should have caught this already
           if (err.status === 409) {
             const field = err.error?.field;

@@ -65,11 +65,17 @@
           }
         </mat-form-field>
 
+        <app-turnstile-widget
+          class="turnstile-slot"
+          (verified)="onTurnstileVerified($event)"
+          (expired)="onTurnstileExpired()"
+        />
+
         <button
           mat-flat-button
           class="submit-btn"
           type="submit"
-          [disabled]="loading || loginForm.invalid"
+          [disabled]="loading || loginForm.invalid || !turnstileToken"
         >
           @if (loading) {
             <mat-spinner diameter="20"></mat-spinner>
