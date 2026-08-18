@@ -198,7 +198,8 @@
   color: var(--ojas-text-light);
   font-size: 0.92rem;
 
-  a {
+  a,
+  .link-btn {
     color: var(--ojas-ink);
     font-weight: 600;
     transition: color 0.2s;
@@ -207,6 +208,121 @@
       color: var(--ojas-ink-soft);
       text-decoration: underline;
     }
+  }
+
+  .link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+}
+
+// Sits tight under the password field rather than in the footer, where it reads as a fix for
+// the field directly above it.
+.forgot-password-row {
+  margin: -4px 0 4px;
+  text-align: right;
+
+  .link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--ojas-text-light);
+    cursor: pointer;
+    transition: color 0.2s;
+
+    &:hover {
+      color: var(--ojas-ink);
+      text-decoration: underline;
+    }
+  }
+}
+
+// ===== DEVICE APPROVAL STEP =====
+// Staff-only, and rare - it appears when someone signs in from a browser their account isn't
+// bound to. Styled as a calm notice rather than an error: the usual reason is an honest one
+// (a new phone), and the warning below spells out the consequence before they commit.
+.device-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f2f6ff;
+  border: 1px solid #c9d9f7;
+  border-left: 4px solid #3f6fd8;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #1f4494;
+  font-size: 0.88rem;
+  font-weight: 500;
+  animation: fadeInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff2f2;
+  border: 1px solid #ffc8c8;
+  border-left: 4px solid #e53935;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #c62828;
+  font-size: 0.88rem;
+  font-weight: 500;
+  animation: fadeInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+}
+
+// Only ever rendered when the backend is outside Production and real email sending isn't
+// configured (see AuthController's devCode).
+.dev-code-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff8ec;
+  border: 1px dashed #e0ad4f;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #8a5c00;
+  font-size: 0.85rem;
+  font-weight: 500;
+
+  strong {
+    font-family: monospace;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+  }
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
   }
 }
 

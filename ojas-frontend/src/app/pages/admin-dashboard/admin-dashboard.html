@@ -375,6 +375,32 @@
                           <mat-icon>{{ partner.role === 'admin' ? 'shield' : 'moped' }}</mat-icon>
                           {{ partner.role === 'admin' ? 'Admin' : 'Delivery' }}
                         </span>
+
+                        <div class="partner-device">
+                          @if (deviceFor(partner.id); as device) {
+                            <p class="device-bound">
+                              <mat-icon>smartphone</mat-icon>
+                              <span
+                                >{{ device.label }} · last used
+                                {{ device.lastSeenAt | date: 'd MMM, h:mm a' }}</span
+                              >
+                            </p>
+                            <button
+                              type="button"
+                              class="revoke-device-btn"
+                              (click)="revokeDevice(partner)"
+                              [disabled]="revokingDeviceFor() === partner.id"
+                            >
+                              <mat-icon>link_off</mat-icon>
+                              {{ revokingDeviceFor() === partner.id ? 'Unbinding…' : 'Unbind device' }}
+                            </button>
+                          } @else {
+                            <p class="device-unbound">
+                              <mat-icon>phonelink_erase</mat-icon>
+                              <span>No device approved yet</span>
+                            </p>
+                          }
+                        </div>
                       </div>
                     }
                   </div>

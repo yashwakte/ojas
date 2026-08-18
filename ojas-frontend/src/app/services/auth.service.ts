@@ -6,11 +6,18 @@ import { environment } from '../../environments/environment';
 import {
   AuthResponse,
   CreateStaffRequest,
+  DeviceOtpRequest,
+  DeviceOtpResponse,
+  EnrollDeviceRequest,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   LoginRequest,
+  ResetPasswordRequest,
   RegisterPendingResponse,
   RegisterRequest,
   ResendEmailOtpRequest,
   ResendEmailOtpResponse,
+  StaffDeviceResponse,
   StaffUserResponse,
   UserRole,
   VerifyEmailOtpRequest,
@@ -71,6 +78,35 @@ export class AuthService {
 
   login(request: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request);
+  }
+
+  forgotPassword(request: ForgotPasswordRequest) {
+    return this.http.post<ForgotPasswordResponse>(`${this.apiUrl}/forgot-password`, request);
+  }
+
+  // Deliberately issues no session - the user signs in again afterwards, which for staff still
+  // means passing the device check.
+  resetPassword(request: ResetPasswordRequest) {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/reset-password`, request);
+  }
+
+  // Staff accounts are restricted to a single device. When login comes back 403 with
+  // needsDeviceEnrollment, these two calls move the binding to the browser making them -
+  // which also signs the previously bound device out.
+  sendDeviceOtp(request: DeviceOtpRequest) {
+    return this.http.post<DeviceOtpResponse>(`${this.apiUrl}/device/send-otp`, request);
+  }
+
+  enrollDevice(request: EnrollDeviceRequest) {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/device/enroll`, request);
+  }
+
+  getStaffDevices(userId: string) {
+    return this.http.get<StaffDeviceResponse[]>(`${this.apiUrl}/staff/${userId}/devices`);
+  }
+
+  revokeStaffDevice(userId: string) {
+    return this.http.delete<void>(`${this.apiUrl}/staff/${userId}/devices`);
   }
 
   // Called by the auth interceptor when a request 401s because the short-lived access token

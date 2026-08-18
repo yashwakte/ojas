@@ -27,6 +27,205 @@
 
   <div class="auth-form-side">
     <div class="auth-card">
+      @if (resetStage !== 'none') {
+        <div class="auth-header">
+          <span class="auth-logo-mobile">ओजस</span>
+          <h2>Reset your password</h2>
+          @if (resetStage === 'request') {
+            <p>Enter your email and we'll send you a 6-digit code.</p>
+          } @else {
+            <p>Enter the code we sent to <strong>{{ resetEmail }}</strong> and choose a new password.</p>
+          }
+        </div>
+
+        @if (resetDevCode) {
+          <div class="dev-code-hint">
+            <mat-icon>code</mat-icon>
+            <span
+              >Dev mode — real email isn't configured yet. Your code is
+              <strong>{{ resetDevCode }}</strong></span
+            >
+          </div>
+        }
+
+        @if (resetError) {
+          <div class="error-banner" role="alert">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ resetError }}</span>
+          </div>
+        }
+
+        @if (resetStage === 'request') {
+          <form (ngSubmit)="requestResetCode()">
+            <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+              <mat-label>Email</mat-label>
+              <input
+                matInput
+                [(ngModel)]="resetEmail"
+                name="resetEmail"
+                type="email"
+                placeholder="Enter your email"
+              />
+              <mat-icon matPrefix>email</mat-icon>
+            </mat-form-field>
+
+            <app-turnstile-widget
+              class="turnstile-slot"
+              (verified)="onTurnstileVerified($event)"
+              (expired)="onTurnstileExpired()"
+            />
+
+            <button
+              mat-flat-button
+              class="submit-btn"
+              type="submit"
+              [disabled]="resetBusy || !resetEmail.trim() || !turnstileToken"
+            >
+              @if (resetBusy) {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                <ng-container>Send reset code</ng-container>
+              }
+            </button>
+          </form>
+        } @else {
+          <form (ngSubmit)="submitNewPassword()">
+            <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+              <mat-label>Reset code</mat-label>
+              <input
+                matInput
+                [(ngModel)]="resetCode"
+                name="resetCode"
+                inputmode="numeric"
+                maxlength="6"
+                placeholder="6-digit code"
+                autocomplete="one-time-code"
+              />
+              <mat-icon matPrefix>pin</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+              <mat-label>New password</mat-label>
+              <input
+                matInput
+                [(ngModel)]="resetNewPassword"
+                name="resetNewPassword"
+                [type]="hideResetPassword ? 'password' : 'text'"
+                placeholder="Min 10 characters"
+                autocomplete="new-password"
+              />
+              <mat-icon matPrefix>lock</mat-icon>
+              <button
+                mat-icon-button
+                matSuffix
+                (click)="hideResetPassword = !hideResetPassword"
+                type="button"
+              >
+                <mat-icon>{{ hideResetPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+              @if (resetNewPassword && resetNewPassword.length < 10) {
+                <mat-hint>Password must be at least 10 characters</mat-hint>
+              }
+            </mat-form-field>
+
+            <button
+              mat-flat-button
+              class="submit-btn"
+              type="submit"
+              [disabled]="resetBusy || resetCode.trim().length !== 6 || resetNewPassword.length < 10"
+            >
+              @if (resetBusy) {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                <ng-container>Set new password</ng-container>
+              }
+            </button>
+          </form>
+        }
+
+        <p class="auth-switch">
+          <button type="button" class="link-btn" (click)="cancelPasswordReset()">
+            Back to sign in
+          </button>
+        </p>
+      } @else if (showDeviceStep) {
+        <div class="auth-header">
+          <span class="auth-logo-mobile">ओजस</span>
+          <h2>Approve this device</h2>
+          <p>
+            Staff accounts can only be used on one device. Enter the code we sent to
+            <strong>{{ deviceEmail }}</strong> to move your account to this one.
+          </p>
+        </div>
+
+        <div class="device-warning" role="note">
+          <mat-icon>devices</mat-icon>
+          <span>Approving this device will sign you out everywhere else.</span>
+        </div>
+
+        @if (deviceDevCode) {
+          <div class="dev-code-hint">
+            <mat-icon>code</mat-icon>
+            <span
+              >Dev mode — real email isn't configured yet. Your code is
+              <strong>{{ deviceDevCode }}</strong></span
+            >
+          </div>
+        }
+
+        @if (deviceError) {
+          <div class="error-banner" role="alert">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ deviceError }}</span>
+          </div>
+        }
+
+        <form (ngSubmit)="enrollDevice()">
+          <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+            <mat-label>Approval code</mat-label>
+            <input
+              matInput
+              [(ngModel)]="deviceCode"
+              name="deviceCode"
+              inputmode="numeric"
+              maxlength="6"
+              placeholder="6-digit code"
+              autocomplete="one-time-code"
+            />
+            <mat-icon matPrefix>pin</mat-icon>
+          </mat-form-field>
+
+          <button
+            mat-flat-button
+            class="submit-btn"
+            type="submit"
+            [disabled]="enrolling || deviceCode.trim().length !== 6"
+          >
+            @if (enrolling) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              <ng-container>Approve &amp; Sign In</ng-container>
+            }
+          </button>
+        </form>
+
+        <p class="auth-switch">
+          Didn't get it?
+          <button
+            type="button"
+            class="link-btn"
+            (click)="sendDeviceCode()"
+            [disabled]="resendingDeviceCode"
+          >
+            {{ resendingDeviceCode ? 'Sending…' : 'Resend code' }}
+          </button>
+        </p>
+        <p class="auth-switch">
+          <button type="button" class="link-btn" (click)="cancelDeviceEnrollment()">
+            Back to sign in
+          </button>
+        </p>
+      } @else {
       <div class="auth-header">
         <span class="auth-logo-mobile">ओजस</span>
         <h2>Sign In</h2>
@@ -65,6 +264,12 @@
           }
         </mat-form-field>
 
+        <p class="forgot-password-row">
+          <button type="button" class="link-btn" (click)="startPasswordReset()">
+            Forgot password?
+          </button>
+        </p>
+
         <app-turnstile-widget
           class="turnstile-slot"
           (verified)="onTurnstileVerified($event)"
@@ -93,6 +298,7 @@
       </form>
 
       <p class="auth-switch">Don't have an account? <a routerLink="/register">Create one</a></p>
+      }
     </div>
   </div>
 </div>

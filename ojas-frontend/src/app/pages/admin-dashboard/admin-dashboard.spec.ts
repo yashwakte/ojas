@@ -50,7 +50,14 @@ describe('AdminDashboard', () => {
   let campaignBannerServiceSpy: any;
 
   beforeEach(() => {
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['createStaff', 'logout']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', [
+      'createStaff',
+      'logout',
+      'getStaffDevices',
+      'revokeStaffDevice',
+    ]);
+    // Every partner card looks up its bound device on load, so this needs a default.
+    authServiceSpy.getStaffDevices.and.returnValue(of([]));
     orderServiceSpy = jasmine.createSpyObj('OrderService', [
       'getAdminOrders',
       'getDeliveryPartners',
@@ -119,6 +126,77 @@ describe('AdminDashboard', () => {
     orderServiceSpy.getDeliveryPartners.and.returnValue(throwError(() => new Error('fail')));
     const { fixture } = create();
     expect(fixture.componentInstance.partnersError()).toBe('Failed to load delivery partners');
+  });
+
+  describe('staff device bindings', () => {
+    const device = {
+      label: 'Chrome on Android',
+      enrolledVia: 'email-otp',
+      createdAt: '2026-08-01T10:00:00Z',
+      lastSeenAt: '2026-08-18T09:30:00Z',
+    };
+
+    it('loads each partner`s bound device and exposes it by user id', () => {
+      authServiceSpy.getStaffDevices.and.returnValue(of([device]));
+
+      const { fixture } = create();
+
+      expect(authServiceSpy.getStaffDevices).toHaveBeenCalledWith(partner.id);
+      expect(fixture.componentInstance.deviceFor(partner.id)).toEqual(device);
+    });
+
+    it('reports no device for a partner who has never approved one', () => {
+      const { fixture } = create();
+      expect(fixture.componentInstance.deviceFor(partner.id)).toBeNull();
+    });
+
+    it('a failed device lookup leaves the partner list usable', () => {
+      authServiceSpy.getStaffDevices.and.returnValue(throwError(() => new Error('fail')));
+
+      const { fixture } = create();
+
+      expect(fixture.componentInstance.deliveryPartners()).toEqual([partner]);
+      expect(fixture.componentInstance.deviceFor(partner.id)).toBeNull();
+    });
+
+    it('revoking clears the binding once the user confirms', () => {
+      authServiceSpy.getStaffDevices.and.returnValue(of([device]));
+      authServiceSpy.revokeStaffDevice.and.returnValue(of(void 0));
+      spyOn(window, 'confirm').and.returnValue(true);
+      const { fixture } = create();
+
+      fixture.componentInstance.revokeDevice(partner);
+
+      expect(authServiceSpy.revokeStaffDevice).toHaveBeenCalledWith(partner.id);
+      expect(fixture.componentInstance.deviceFor(partner.id)).toBeNull();
+      expect(fixture.componentInstance.revokingDeviceFor()).toBeNull();
+    });
+
+    it('does nothing when the confirmation is dismissed', () => {
+      authServiceSpy.getStaffDevices.and.returnValue(of([device]));
+      spyOn(window, 'confirm').and.returnValue(false);
+      const { fixture } = create();
+
+      fixture.componentInstance.revokeDevice(partner);
+
+      expect(authServiceSpy.revokeStaffDevice).not.toHaveBeenCalled();
+      expect(fixture.componentInstance.deviceFor(partner.id)).toEqual(device);
+    });
+
+    it('surfaces an error and keeps the binding when revoking fails', () => {
+      authServiceSpy.getStaffDevices.and.returnValue(of([device]));
+      authServiceSpy.revokeStaffDevice.and.returnValue(throwError(() => new Error('fail')));
+      spyOn(window, 'confirm').and.returnValue(true);
+      const { fixture } = create();
+
+      fixture.componentInstance.revokeDevice(partner);
+
+      expect(fixture.componentInstance.staffError()).toBe(
+        'Could not unbind that device. Please try again.',
+      );
+      expect(fixture.componentInstance.deviceFor(partner.id)).toEqual(device);
+      expect(fixture.componentInstance.revokingDeviceFor()).toBeNull();
+    });
   });
 
   it('getTabIndex reflects the active tab and onTabChange updates it', () => {

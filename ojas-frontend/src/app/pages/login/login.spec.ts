@@ -19,8 +19,17 @@ describe('Login', () => {
   };
 
   beforeEach(() => {
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['login', 'saveAuth', 'getDefaultRouteForRole']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', [
+      'login',
+      'saveAuth',
+      'getDefaultRouteForRole',
+      'sendDeviceOtp',
+      'enrollDevice',
+      'forgotPassword',
+      'resetPassword',
+    ]);
     authServiceSpy.getDefaultRouteForRole.and.returnValue('/');
+    authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'sent', devCode: null }));
 
     TestBed.configureTestingModule({
       imports: [Login],
@@ -185,6 +194,210 @@ describe('Login', () => {
       'Close',
       jasmine.any(Object),
     );
+  });
+
+  describe('staff device approval', () => {
+    const deviceBlocked = {
+      status: 403,
+      error: { needsDeviceEnrollment: true, email: 'admin@x.com' },
+    };
+
+    function blockedOnDevice() {
+      authServiceSpy.login.and.returnValue(throwError(() => deviceBlocked));
+      const created = create();
+      created.fixture.componentInstance.loginForm.setValue({
+        email: 'admin@x.com',
+        password: '123456',
+      });
+      created.fixture.componentInstance.onSubmit();
+      return created;
+    }
+
+    it('switches to the approval step and requests a code straight away', () => {
+      const { fixture } = blockedOnDevice();
+
+      expect(fixture.componentInstance.showDeviceStep).toBeTrue();
+      expect(fixture.componentInstance.deviceEmail).toBe('admin@x.com');
+      expect(authServiceSpy.sendDeviceOtp).toHaveBeenCalledWith({
+        email: 'admin@x.com',
+        password: '123456',
+      });
+    });
+
+    it('does not navigate away to the email-verification screen', () => {
+      spyOn(router, 'navigate');
+
+      blockedOnDevice();
+
+      // The two 403 shapes are easy to conflate - this one must stay on the login card.
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('surfaces the dev-mode code when the backend returns one', () => {
+      authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'sent', devCode: '123456' }));
+
+      const { fixture } = blockedOnDevice();
+
+      expect(fixture.componentInstance.deviceDevCode).toBe('123456');
+    });
+
+    it('enrollDevice does nothing until a full 6-digit code is entered', () => {
+      const { fixture } = blockedOnDevice();
+      fixture.componentInstance.deviceCode = '123';
+
+      fixture.componentInstance.enrollDevice();
+
+      expect(authServiceSpy.enrollDevice).not.toHaveBeenCalled();
+    });
+
+    it('a valid code enrolls the device, saves auth, and navigates to the role home', () => {
+      authServiceSpy.enrollDevice.and.returnValue(of({ ...authResponse, role: 'admin' }));
+      authServiceSpy.getDefaultRouteForRole.and.returnValue('/admin');
+      spyOn(router, 'navigateByUrl');
+      const { fixture } = blockedOnDevice();
+      fixture.componentInstance.deviceCode = '654321';
+
+      fixture.componentInstance.enrollDevice();
+
+      expect(authServiceSpy.enrollDevice).toHaveBeenCalledWith({
+        email: 'admin@x.com',
+        password: '123456',
+        code: '654321',
+      });
+      expect(authServiceSpy.saveAuth).toHaveBeenCalled();
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+    });
+
+    it('shows the server message and stays put when the code is wrong', () => {
+      authServiceSpy.enrollDevice.and.returnValue(
+        throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
+      );
+      const { fixture } = blockedOnDevice();
+      fixture.componentInstance.deviceCode = '000000';
+
+      fixture.componentInstance.enrollDevice();
+
+      expect(fixture.componentInstance.deviceError).toBe('That code is invalid or has expired.');
+      expect(fixture.componentInstance.showDeviceStep).toBeTrue();
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    });
+
+    it('cancelling returns to the credentials form', () => {
+      const { fixture } = blockedOnDevice();
+
+      fixture.componentInstance.cancelDeviceEnrollment();
+
+      expect(fixture.componentInstance.showDeviceStep).toBeFalse();
+      expect(fixture.componentInstance.deviceCode).toBe('');
+    });
+  });
+
+  describe('forgot password', () => {
+    it('carries the already-typed email into the reset form', () => {
+      const { fixture } = create();
+      fixture.componentInstance.loginForm.patchValue({ email: 'jane@x.com' });
+
+      fixture.componentInstance.startPasswordReset();
+
+      expect(fixture.componentInstance.resetStage).toBe('request');
+      expect(fixture.componentInstance.resetEmail).toBe('jane@x.com');
+    });
+
+    it('will not request a code without a solved Turnstile', () => {
+      const { fixture } = create();
+      fixture.componentInstance.startPasswordReset();
+      fixture.componentInstance.resetEmail = 'jane@x.com';
+      fixture.componentInstance.turnstileToken = null;
+
+      fixture.componentInstance.requestResetCode();
+
+      expect(authServiceSpy.forgotPassword).not.toHaveBeenCalled();
+    });
+
+    it('requesting a code advances to the reset stage and spends the Turnstile token', () => {
+      authServiceSpy.forgotPassword.and.returnValue(of({ message: 'sent', devCode: null }));
+      const { fixture } = create();
+      fixture.componentInstance.startPasswordReset();
+      fixture.componentInstance.resetEmail = 'jane@x.com';
+
+      fixture.componentInstance.requestResetCode();
+
+      expect(authServiceSpy.forgotPassword).toHaveBeenCalledWith({
+        email: 'jane@x.com',
+        turnstileToken: 'test-turnstile-token',
+      });
+      expect(fixture.componentInstance.resetStage).toBe('reset');
+      expect(fixture.componentInstance.turnstileToken).toBeNull();
+    });
+
+    it('surfaces the dev-mode code when the backend returns one', () => {
+      authServiceSpy.forgotPassword.and.returnValue(of({ message: 'sent', devCode: '424242' }));
+      const { fixture } = create();
+      fixture.componentInstance.startPasswordReset();
+      fixture.componentInstance.resetEmail = 'jane@x.com';
+
+      fixture.componentInstance.requestResetCode();
+
+      expect(fixture.componentInstance.resetDevCode).toBe('424242');
+    });
+
+    it('rejects a new password shorter than 10 characters without calling the API', () => {
+      const { fixture } = create();
+      fixture.componentInstance.resetStage = 'reset';
+      fixture.componentInstance.resetCode = '123456';
+      fixture.componentInstance.resetNewPassword = 'tooshort';
+
+      fixture.componentInstance.submitNewPassword();
+
+      expect(authServiceSpy.resetPassword).not.toHaveBeenCalled();
+    });
+
+    it('a successful reset returns to sign-in with the email prefilled and no session', () => {
+      authServiceSpy.resetPassword.and.returnValue(of({ message: 'ok' }));
+      const { fixture, snackBar } = create();
+      fixture.componentInstance.resetStage = 'reset';
+      fixture.componentInstance.resetEmail = 'jane@x.com';
+      fixture.componentInstance.resetCode = '123456';
+      fixture.componentInstance.resetNewPassword = 'BrandNewPassw0rd!';
+
+      fixture.componentInstance.submitNewPassword();
+
+      expect(fixture.componentInstance.resetStage).toBe('none');
+      expect(fixture.componentInstance.loginForm.value.email).toBe('jane@x.com');
+      expect(fixture.componentInstance.loginForm.value.password).toBe('');
+      // Reset deliberately issues no session, so nothing should have been saved.
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+      expect(snackBar.open).toHaveBeenCalledWith(
+        'Password updated. Please sign in.',
+        'Close',
+        jasmine.any(Object),
+      );
+    });
+
+    it('shows the server message and stays on the reset step when the code is wrong', () => {
+      authServiceSpy.resetPassword.and.returnValue(
+        throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
+      );
+      const { fixture } = create();
+      fixture.componentInstance.resetStage = 'reset';
+      fixture.componentInstance.resetEmail = 'jane@x.com';
+      fixture.componentInstance.resetCode = '000000';
+      fixture.componentInstance.resetNewPassword = 'BrandNewPassw0rd!';
+
+      fixture.componentInstance.submitNewPassword();
+
+      expect(fixture.componentInstance.resetError).toBe('That code is invalid or has expired.');
+      expect(fixture.componentInstance.resetStage).toBe('reset');
+    });
+
+    it('cancelling returns to the credentials form', () => {
+      const { fixture } = create();
+      fixture.componentInstance.startPasswordReset();
+
+      fixture.componentInstance.cancelPasswordReset();
+
+      expect(fixture.componentInstance.resetStage).toBe('none');
+    });
   });
 
   it('sets slowConnection true after 5s while the request is still pending', () => {

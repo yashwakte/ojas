@@ -234,6 +234,49 @@ export interface CreateStaffRequest {
   role: Exclude<UserRole, 'customer'>;
 }
 
+/** Step one of moving a staff account to a new device: proves the password, triggers the code. */
+export interface DeviceOtpRequest {
+  email: string;
+  password: string;
+}
+
+export interface DeviceOtpResponse {
+  message: string;
+  /** Populated outside Production only, so the flow can be tested without real email set up. */
+  devCode?: string | null;
+}
+
+/** Step two: redeeming the code binds the calling browser as the account's one trusted device. */
+export interface EnrollDeviceRequest {
+  email: string;
+  password: string;
+  code: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+  turnstileToken: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+  /** Populated outside Production only, so the flow can be tested without real email set up. */
+  devCode?: string | null;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface StaffDeviceResponse {
+  label: string;
+  enrolledVia: string;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
 export interface UpdateOrderStatusRequest {
   status: string;
 }

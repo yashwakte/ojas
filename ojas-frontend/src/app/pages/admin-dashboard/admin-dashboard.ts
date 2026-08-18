@@ -24,6 +24,7 @@ import {
   CreateStaffRequest,
   OrderResponse,
   Product,
+  StaffDeviceResponse,
   StaffUserResponse,
   UpdateOrderStatusRequest,
   UserRole,
@@ -102,6 +103,11 @@ export class AdminDashboard implements OnInit {
   readonly staffMessage = signal('');
   readonly staffError = signal('');
   readonly showStaffPassword = signal(false);
+
+  // Staff are restricted to one device each. Keyed by user id so each partner card can show
+  // its own binding without a separate request per render.
+  readonly staffDevices = signal<Record<string, StaffDeviceResponse[]>>({});
+  readonly revokingDeviceFor = signal<string | null>(null);
 
   // Products tab - using ProductManagement component
   readonly productsLoading = computed(() => this.productService.loading());
@@ -313,10 +319,42 @@ export class AdminDashboard implements OnInit {
       next: (partners: StaffUserResponse[]) => {
         this.deliveryPartners.set(partners);
         this.loadingPartners.set(false);
+        partners.forEach((partner) => this.loadDevicesFor(partner.id));
       },
       error: () => {
         this.partnersError.set('Failed to load delivery partners');
         this.loadingPartners.set(false);
+      },
+    });
+  }
+
+  private loadDevicesFor(userId: string): void {
+    this.authService.getStaffDevices(userId).subscribe({
+      next: (devices) => this.staffDevices.update((all) => ({ ...all, [userId]: devices })),
+      // A failed lookup shouldn't break the partner list - the card just shows no binding.
+      error: () => this.staffDevices.update((all) => ({ ...all, [userId]: [] })),
+    });
+  }
+
+  deviceFor(userId: string): StaffDeviceResponse | null {
+    return this.staffDevices()[userId]?.[0] ?? null;
+  }
+
+  // Unbinds a staff member's device and ends their sessions - the recovery path when someone
+  // loses their phone. They re-approve a new device by email code on their next sign-in.
+  revokeDevice(partner: StaffUserResponse): void {
+    if (!confirm(`Sign ${partner.fullName} out and unbind their device?`)) return;
+
+    this.revokingDeviceFor.set(partner.id);
+    this.authService.revokeStaffDevice(partner.id).subscribe({
+      next: () => {
+        this.staffDevices.update((all) => ({ ...all, [partner.id]: [] }));
+        this.revokingDeviceFor.set(null);
+        this.showSuccess(`${partner.fullName}'s device was unbound`);
+      },
+      error: () => {
+        this.revokingDeviceFor.set(null);
+        this.staffError.set('Could not unbind that device. Please try again.');
       },
     });
   }

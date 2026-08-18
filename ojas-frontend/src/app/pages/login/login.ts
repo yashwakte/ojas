@@ -1,6 +1,6 @@
 import { Component, ChangeDetectorRef, OnDestroy, inject, viewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,6 +16,7 @@ import { timeout } from 'rxjs';
   selector: 'app-login',
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     RouterLink,
     MatFormFieldModule,
     MatInputModule,
@@ -39,6 +40,27 @@ export class Login implements OnDestroy {
   hidePassword = true;
   turnstileToken: string | null = null;
   private slowTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Forgot-password flow. 'request' collects the email, 'reset' takes the code + new password;
+  // both live on this card rather than a separate route so the user never loses their place.
+  resetStage: 'none' | 'request' | 'reset' = 'none';
+  resetEmail = '';
+  resetCode = '';
+  resetNewPassword = '';
+  resetDevCode: string | null = null;
+  resetError = '';
+  resetNotice = '';
+  resetBusy = false;
+  hideResetPassword = true;
+
+  // Device-approval step, shown only to staff signing in from an unrecognised browser.
+  showDeviceStep = false;
+  deviceCode = '';
+  deviceEmail = '';
+  deviceDevCode: string | null = null;
+  deviceError = '';
+  enrolling = false;
+  resendingDeviceCode = false;
 
   constructor(
     private fb: FormBuilder,
@@ -108,6 +130,12 @@ export class Login implements OnDestroy {
             return;
           }
 
+          // The password was right, but this staff account is bound to a different device.
+          if (err.status === 403 && err.error?.needsDeviceEnrollment) {
+            this.startDeviceEnrollment(err.error.email);
+            return;
+          }
+
           let msg = 'Something went wrong. Please try again.';
           if (err.status === 429) {
             msg = 'Too many attempts. Please wait a minute.';
@@ -125,6 +153,157 @@ export class Login implements OnDestroy {
           });
         },
       });
+  }
+
+  startPasswordReset() {
+    this.resetStage = 'request';
+    // Carry across whatever they already typed - they usually got here after a failed attempt.
+    this.resetEmail = this.loginForm.value.email ?? '';
+    this.resetCode = '';
+    this.resetNewPassword = '';
+    this.resetError = '';
+    this.resetNotice = '';
+    this.resetDevCode = null;
+  }
+
+  cancelPasswordReset() {
+    this.resetStage = 'none';
+    this.resetError = '';
+    this.resetNotice = '';
+    this.resetDevCode = null;
+  }
+
+  requestResetCode() {
+    if (!this.resetEmail.trim() || !this.turnstileToken) return;
+
+    this.resetBusy = true;
+    this.resetError = '';
+
+    this.auth
+      .forgotPassword({ email: this.resetEmail.trim(), turnstileToken: this.turnstileToken })
+      .subscribe({
+        next: (res) => {
+          this.resetBusy = false;
+          this.resetDevCode = res.devCode ?? null;
+          this.resetNotice = res.message;
+          this.resetStage = 'reset';
+          // The token is spent whether or not the address was registered.
+          this.turnstileToken = null;
+          this.turnstileWidget()?.reset();
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.resetBusy = false;
+          this.turnstileToken = null;
+          this.turnstileWidget()?.reset();
+          this.resetError =
+            err.status === 429
+              ? 'Too many attempts. Please wait a minute.'
+              : (err.error?.message ?? 'Something went wrong. Please try again.');
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  submitNewPassword() {
+    if (this.resetCode.trim().length !== 6 || this.resetNewPassword.length < 10) return;
+
+    this.resetBusy = true;
+    this.resetError = '';
+
+    this.auth
+      .resetPassword({
+        email: this.resetEmail.trim(),
+        code: this.resetCode.trim(),
+        newPassword: this.resetNewPassword,
+      })
+      .subscribe({
+        next: () => {
+          this.resetBusy = false;
+          this.resetStage = 'none';
+          this.resetDevCode = null;
+          // No session is issued by design, so drop them back on the sign-in form with the
+          // email prefilled rather than pretending they're logged in.
+          this.loginForm.patchValue({ email: this.resetEmail.trim(), password: '' });
+          this.cdr.detectChanges();
+          this.snackBar.open('Password updated. Please sign in.', 'Close', { duration: 5000 });
+        },
+        error: (err) => {
+          this.resetBusy = false;
+          this.resetError = err.error?.message ?? 'That code is invalid or has expired.';
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  // Switches the card over to the code entry step and immediately requests a code, so the
+  // staff member doesn't have to ask for one before they can do anything.
+  private startDeviceEnrollment(email: string) {
+    this.showDeviceStep = true;
+    this.deviceEmail = email;
+    this.deviceCode = '';
+    this.deviceError = '';
+    this.sendDeviceCode();
+  }
+
+  sendDeviceCode() {
+    const password = this.loginForm.value.password;
+    if (!password) return;
+
+    this.resendingDeviceCode = true;
+    this.deviceDevCode = null;
+    this.cdr.detectChanges();
+
+    this.auth.sendDeviceOtp({ email: this.deviceEmail, password }).subscribe({
+      next: (res) => {
+        this.resendingDeviceCode = false;
+        this.deviceDevCode = res.devCode ?? null;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.resendingDeviceCode = false;
+        this.deviceError = "We couldn't send a code. Please try again.";
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  enrollDevice() {
+    if (this.deviceCode.trim().length !== 6) return;
+
+    this.enrolling = true;
+    this.deviceError = '';
+
+    this.auth
+      .enrollDevice({
+        email: this.deviceEmail,
+        password: this.loginForm.value.password,
+        code: this.deviceCode.trim(),
+      })
+      .subscribe({
+        next: (res) => {
+          this.enrolling = false;
+          this.cdr.detectChanges();
+          this.auth.saveAuth(res);
+          this.welcome.celebrate('login', res.fullName);
+          this.router.navigateByUrl(this.auth.getDefaultRouteForRole(res.role));
+        },
+        error: (err) => {
+          this.enrolling = false;
+          this.deviceError =
+            err.status === 400
+              ? (err.error?.message ?? 'That code is invalid or has expired.')
+              : 'Something went wrong. Please try again.';
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  cancelDeviceEnrollment() {
+    this.showDeviceStep = false;
+    this.deviceCode = '';
+    this.deviceError = '';
+    this.deviceDevCode = null;
   }
 
   private clearSlowTimer() {
