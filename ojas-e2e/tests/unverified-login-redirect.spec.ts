@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures';
+import { MONGO_URL, deleteUsersByEmail } from './db';
 
 function uniqueUser() {
   const suffix = Date.now().toString().slice(-8);
@@ -10,8 +11,18 @@ function uniqueUser() {
   };
 }
 
+const created: string[] = [];
+
+// These specs register real accounts against a real database, so without this every run leaves
+// another one behind. Skipped silently when no connection string is configured - the tests
+// themselves don't need one, only the tidying does.
+test.afterAll(async () => {
+  if (MONGO_URL && created.length > 0) await deleteUsersByEmail(created);
+});
+
 test('logging into an account that abandoned OTP verification lands on a working OTP screen, not a blank page', async ({ page }) => {
   const user = uniqueUser();
+  created.push(user.email);
 
   // Register, but abandon at the OTP step - never verify. Simulates someone who closed the
   // tab, or a pre-existing account created before this feature shipped.

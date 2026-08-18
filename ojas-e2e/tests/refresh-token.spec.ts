@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures';
+import { MONGO_URL, deleteUsersByEmail } from './db';
 
 const API_URL = 'https://localhost:7126/api';
 
@@ -12,8 +13,17 @@ function uniqueUser() {
   };
 }
 
+const created: string[] = [];
+
+// Without this every run leaves another registered account behind in a real database. Skipped
+// silently when no connection string is configured - only the tidying needs one.
+test.afterAll(async () => {
+  if (MONGO_URL && created.length > 0) await deleteUsersByEmail(created);
+});
+
 test('register, verify OTP, then the refresh token rotates the session and revokes on logout', async ({ page }) => {
   const user = uniqueUser();
+  created.push(user.email);
 
   await page.goto('/register');
   await page.getByLabel('Full Name').fill(user.fullName);
