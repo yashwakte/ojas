@@ -265,7 +265,8 @@
               <mat-card-header>
                 <mat-card-title><mat-icon>badge</mat-icon> Create Staff Credential</mat-card-title>
                 <mat-card-subtitle
-                  >Add delivery or admin accounts from one place.</mat-card-subtitle
+                  >They'll get an email link to set their own password — you never see
+                  it.</mat-card-subtitle
                 >
               </mat-card-header>
               <mat-card-content>
@@ -299,27 +300,6 @@
                       (ngModelChange)="updateStaffField('phone', $event)"
                     />
                   </mat-form-field>
-                  <mat-form-field appearance="outline" class="password-field" floatLabel="always">
-                    <mat-label>Temporary Password</mat-label>
-                    <input
-                      [type]="showStaffPassword() ? 'text' : 'password'"
-                      matInput
-                      autocomplete="new-password"
-                      [(ngModel)]="staffForm().password"
-                      (ngModelChange)="updateStaffField('password', $event)"
-                    />
-                    <button
-                      mat-icon-button
-                      matSuffix
-                      type="button"
-                      (click)="toggleStaffPasswordVisibility()"
-                      [attr.aria-label]="showStaffPassword() ? 'Hide password' : 'Show password'"
-                    >
-                      <mat-icon>{{
-                        showStaffPassword() ? 'visibility_off' : 'visibility'
-                      }}</mat-icon>
-                    </button>
-                  </mat-form-field>
                   <mat-form-field appearance="outline" floatLabel="always">
                     <mat-label>Role</mat-label>
                     <mat-select
@@ -342,6 +322,15 @@
                 </div>
                 @if (staffMessage()) {
                   <p class="staff-success">{{ staffMessage() }}</p>
+                }
+                @if (devInviteLink(); as link) {
+                  <div class="dev-invite-hint">
+                    <mat-icon>code</mat-icon>
+                    <span>
+                      Dev mode — no real email was sent. Open the invite here:
+                      <a [href]="link" target="_blank" rel="noopener">{{ link }}</a>
+                    </span>
+                  </div>
                 }
                 @if (staffError()) {
                   <p class="staff-error">{{ staffError() }}</p>
@@ -377,7 +366,21 @@
                         </span>
 
                         <div class="partner-device">
-                          @if (deviceFor(partner.id); as device) {
+                          @if (partner.invitePending) {
+                            <p class="device-invite-pending">
+                              <mat-icon>mark_email_unread</mat-icon>
+                              <span>Invite sent — waiting for them to set a password</span>
+                            </p>
+                            <button
+                              type="button"
+                              class="resend-invite-btn"
+                              (click)="resendInvite(partner)"
+                              [disabled]="resendingInviteFor() === partner.id"
+                            >
+                              <mat-icon>forward_to_inbox</mat-icon>
+                              {{ resendingInviteFor() === partner.id ? 'Sending…' : 'Resend invite' }}
+                            </button>
+                          } @else if (deviceFor(partner.id); as device) {
                             <p class="device-bound">
                               <mat-icon>smartphone</mat-icon>
                               <span

@@ -224,14 +224,38 @@ export interface StaffUserResponse {
   email: string;
   phone: string;
   role: UserRole;
+  /** True while the account still has no password - the invite was sent but never accepted. */
+  invitePending?: boolean;
 }
 
+/** No password: the account is created dormant and the staff member sets their own via the
+ * emailed invite, so an admin never handles someone else's credentials. */
 export interface CreateStaffRequest {
   fullName: string;
   email: string;
   phone: string;
-  password: string;
   role: Exclude<UserRole, 'customer'>;
+}
+
+export interface CreateStaffResponse extends StaffUserResponse {
+  /** Populated outside Production only, so the flow can be walked without a working inbox. */
+  devInviteToken?: string | null;
+}
+
+export interface AcceptInviteRequest {
+  token: string;
+  password: string;
+}
+
+export interface InvitePreviewResponse {
+  fullName: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface ResendInviteResponse {
+  message: string;
+  devInviteToken?: string | null;
 }
 
 /** Step one of moving a staff account to a new device: proves the password, triggers the code. */

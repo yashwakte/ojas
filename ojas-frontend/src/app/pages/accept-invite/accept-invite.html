@@ -1,0 +1,118 @@
+<div class="auth-page">
+  <div class="auth-decorative">
+    <div class="decor-bg">
+      <div class="decor-orb orb-1"></div>
+      <div class="decor-orb orb-2"></div>
+    </div>
+    <div class="decor-content">
+      <span class="decor-logo">ओजस</span>
+      <h2>Welcome to the team!</h2>
+      <p>Set your password and you're ready to start.</p>
+      <div class="decor-features">
+        <div class="decor-feature">
+          <mat-icon>lock</mat-icon>
+          <span>Only you know your password</span>
+        </div>
+        <div class="decor-feature">
+          <mat-icon>smartphone</mat-icon>
+          <span>Locked to your own device</span>
+        </div>
+        <div class="decor-feature">
+          <mat-icon>support_agent</mat-icon>
+          <span>Help from your admin anytime</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-form-side">
+    <div class="auth-card">
+      @if (loading()) {
+        <div class="invite-loading">
+          <mat-spinner diameter="36"></mat-spinner>
+          <p>Checking your invite…</p>
+        </div>
+      } @else if (linkError()) {
+        <div class="auth-header">
+          <span class="auth-logo-mobile">ओजस</span>
+          <h2>Link not valid</h2>
+        </div>
+
+        <div class="error-banner" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          <span>{{ linkError() }}</span>
+        </div>
+
+        <p class="auth-switch">Already set up? <a routerLink="/login">Sign in</a></p>
+      } @else {
+        <div class="auth-header">
+          <span class="auth-logo-mobile">ओजस</span>
+          <h2>Set up your account</h2>
+          <p>
+            Choose a password for <strong>{{ invite()?.email }}</strong>
+          </p>
+        </div>
+
+        <div class="device-warning" role="note">
+          <mat-icon>smartphone</mat-icon>
+          <span>
+            The device you're on now becomes the only one this account can sign in from. If this
+            isn't your usual phone or computer, open the link there instead.
+          </span>
+        </div>
+
+        @if (submitError()) {
+          <div class="error-banner" role="alert">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ submitError() }}</span>
+          </div>
+        }
+
+        <form (ngSubmit)="onSubmit()">
+          <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+            <mat-label>New password</mat-label>
+            <input
+              matInput
+              [(ngModel)]="password"
+              name="password"
+              [type]="hidePassword ? 'password' : 'text'"
+              placeholder="Min 10 characters"
+              autocomplete="new-password"
+            />
+            <mat-icon matPrefix>lock</mat-icon>
+            <button mat-icon-button matSuffix (click)="hidePassword = !hidePassword" type="button">
+              <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            @if (password && password.length < 10) {
+              <mat-hint>Password must be at least 10 characters</mat-hint>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+            <mat-label>Confirm password</mat-label>
+            <input
+              matInput
+              [(ngModel)]="confirmPassword"
+              name="confirmPassword"
+              [type]="hidePassword ? 'password' : 'text'"
+              placeholder="Type it again"
+              autocomplete="new-password"
+            />
+            <mat-icon matPrefix>lock_reset</mat-icon>
+            @if (confirmPassword && !passwordsMatch) {
+              <mat-hint class="mismatch-hint">Passwords don't match</mat-hint>
+            }
+          </mat-form-field>
+
+          <button mat-flat-button class="submit-btn" type="submit" [disabled]="!canSubmit">
+            @if (submitting()) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              <ng-container>Set password &amp; continue</ng-container>
+            }
+          </button>
+        </form>
+      }
+    </div>
+  </div>
+</div>

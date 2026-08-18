@@ -4,8 +4,12 @@ import { Router } from '@angular/router';
 import { Observable, catchError, finalize, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
+  AcceptInviteRequest,
   AuthResponse,
   CreateStaffRequest,
+  CreateStaffResponse,
+  InvitePreviewResponse,
+  ResendInviteResponse,
   DeviceOtpRequest,
   DeviceOtpResponse,
   EnrollDeviceRequest,
@@ -138,7 +142,20 @@ export class AuthService {
   }
 
   createStaff(request: CreateStaffRequest) {
-    return this.http.post<StaffUserResponse>(`${this.apiUrl}/staff`, request);
+    return this.http.post<CreateStaffResponse>(`${this.apiUrl}/staff`, request);
+  }
+
+  resendStaffInvite(userId: string) {
+    return this.http.post<ResendInviteResponse>(`${this.apiUrl}/staff/${userId}/invite`, {});
+  }
+
+  // Unauthenticated - the invite token is the credential.
+  getInvite(token: string) {
+    return this.http.get<InvitePreviewResponse>(`${this.apiUrl}/invite`, { params: { token } });
+  }
+
+  acceptInvite(request: AcceptInviteRequest) {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/accept-invite`, request);
   }
 
   saveAuth(response: AuthResponse) {

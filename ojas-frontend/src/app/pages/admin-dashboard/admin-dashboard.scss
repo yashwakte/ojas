@@ -584,6 +584,37 @@
   gap: 12px;
 }
 
+// Only ever rendered outside Production, where the API returns the invite token instead of
+// relying on a real email. Dashed border marks it as a dev-only affordance.
+.dev-invite-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: #fff8ec;
+  border: 1px dashed #e0ad4f;
+  border-radius: 10px;
+  color: #8a5c00;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.5;
+
+  a {
+    color: #8a5c00;
+    font-family: monospace;
+    word-break: break-all;
+    text-decoration: underline;
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+}
+
 .partner-card {
   display: flex;
   align-items: center;
@@ -631,6 +662,45 @@
     .device-unbound {
       color: #b07a00;
       font-weight: 500;
+    }
+
+    .device-invite-pending {
+      color: #1f4494;
+      font-weight: 500;
+    }
+  }
+
+  .resend-invite-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid rgba(63, 111, 216, 0.35);
+    border-radius: 8px;
+    padding: 5px 10px;
+    color: #1f4494;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: #f2f6ff;
+      border-color: rgba(63, 111, 216, 0.6);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
   }
 

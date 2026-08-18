@@ -55,6 +55,7 @@ describe('AdminDashboard', () => {
       'logout',
       'getStaffDevices',
       'revokeStaffDevice',
+      'resendStaffInvite',
     ]);
     // Every partner card looks up its bound device on load, so this needs a default.
     authServiceSpy.getStaffDevices.and.returnValue(of([]));
@@ -181,6 +182,33 @@ describe('AdminDashboard', () => {
 
       expect(authServiceSpy.revokeStaffDevice).not.toHaveBeenCalled();
       expect(fixture.componentInstance.deviceFor(partner.id)).toEqual(device);
+    });
+
+    it('resending an invite reports success without touching the partner list', () => {
+      authServiceSpy.resendStaffInvite.and.returnValue(of({ message: 'Invite sent.' }));
+      const { fixture, snackBar } = create();
+
+      fixture.componentInstance.resendInvite(partner);
+
+      expect(authServiceSpy.resendStaffInvite).toHaveBeenCalledWith(partner.id);
+      expect(fixture.componentInstance.resendingInviteFor()).toBeNull();
+      expect(snackBar.open).toHaveBeenCalledWith(
+        `Invite re-sent to ${partner.email}`,
+        'Close',
+        jasmine.any(Object),
+      );
+    });
+
+    it('surfaces an error when resending an invite fails', () => {
+      authServiceSpy.resendStaffInvite.and.returnValue(throwError(() => new Error('fail')));
+      const { fixture } = create();
+
+      fixture.componentInstance.resendInvite(partner);
+
+      expect(fixture.componentInstance.staffError()).toBe(
+        'Could not resend that invite. Please try again.',
+      );
+      expect(fixture.componentInstance.resendingInviteFor()).toBeNull();
     });
 
     it('surfaces an error and keeps the binding when revoking fails', () => {
@@ -341,14 +369,10 @@ describe('AdminDashboard', () => {
     expect(fixture.componentInstance.getPartnerName('missing')).toBe('Unknown');
   });
 
-  it('updateStaffField / toggleStaffPasswordVisibility', () => {
+  it('updateStaffField writes through to the staff form', () => {
     const { fixture } = create();
     fixture.componentInstance.updateStaffField('fullName', 'New Staff');
     expect(fixture.componentInstance.staffForm().fullName).toBe('New Staff');
-
-    expect(fixture.componentInstance.showStaffPassword()).toBeFalse();
-    fixture.componentInstance.toggleStaffPasswordVisibility();
-    expect(fixture.componentInstance.showStaffPassword()).toBeTrue();
   });
 
   it('createStaffAccount validates required fields before calling the service', () => {
@@ -363,24 +387,10 @@ describe('AdminDashboard', () => {
     fixture.componentInstance.updateStaffField('fullName', 'New Staff');
     fixture.componentInstance.updateStaffField('email', 'not-an-email');
     fixture.componentInstance.updateStaffField('phone', '9999999999');
-    fixture.componentInstance.updateStaffField('password', 'password123');
 
     fixture.componentInstance.createStaffAccount();
 
     expect(fixture.componentInstance.staffError()).toBe('Please enter a valid email address');
-    expect(authServiceSpy.createStaff).not.toHaveBeenCalled();
-  });
-
-  it('createStaffAccount requires a password of at least 10 characters', () => {
-    const { fixture } = create();
-    fixture.componentInstance.updateStaffField('fullName', 'New Staff');
-    fixture.componentInstance.updateStaffField('email', 'n@x.com');
-    fixture.componentInstance.updateStaffField('phone', '9999999999');
-    fixture.componentInstance.updateStaffField('password', 'short');
-
-    fixture.componentInstance.createStaffAccount();
-
-    expect(fixture.componentInstance.staffError()).toBe('Password must be at least 10 characters');
     expect(authServiceSpy.createStaff).not.toHaveBeenCalled();
   });
 
@@ -391,19 +401,69 @@ describe('AdminDashboard', () => {
       email: 'n@x.com',
       phone: '9999999999',
       role: 'delivery',
+      invitePending: true,
     };
     authServiceSpy.createStaff.and.returnValue(of(newStaff));
     const { fixture, snackBar } = create();
     fixture.componentInstance.updateStaffField('fullName', 'New Guy');
     fixture.componentInstance.updateStaffField('email', 'n@x.com');
     fixture.componentInstance.updateStaffField('phone', '9999999999');
-    fixture.componentInstance.updateStaffField('password', 'password123');
 
     fixture.componentInstance.createStaffAccount();
 
     expect(fixture.componentInstance.deliveryPartners()).toContain(newStaff);
-    expect(snackBar.open).toHaveBeenCalledWith('Staff account created', 'Close', jasmine.any(Object));
+    expect(snackBar.open).toHaveBeenCalledWith('Invite sent', 'Close', jasmine.any(Object));
     expect(fixture.componentInstance.creatingStaff()).toBeFalse();
+  });
+
+  it('surfaces a clickable dev invite link when the API returns a token', () => {
+    authServiceSpy.createStaff.and.returnValue(
+      of({
+        id: 'd4',
+        fullName: 'New Guy',
+        email: 'n@x.com',
+        phone: '9999999999',
+        role: 'delivery' as const,
+        devInviteToken: 'raw tok/en',
+      }),
+    );
+    const { fixture } = create();
+    fixture.componentInstance.updateStaffField('fullName', 'New Guy');
+    fixture.componentInstance.updateStaffField('email', 'n@x.com');
+    fixture.componentInstance.updateStaffField('phone', '9999999999');
+
+    fixture.componentInstance.createStaffAccount();
+
+    expect(fixture.componentInstance.devInviteLink()).toBe('/accept-invite?token=raw%20tok%2Fen');
+  });
+
+  it('shows no dev invite link in production, where the API omits the token', () => {
+    authServiceSpy.createStaff.and.returnValue(
+      of({ id: 'd5', fullName: 'New Guy', email: 'n@x.com', phone: '9999999999', role: 'delivery' as const }),
+    );
+    const { fixture } = create();
+    fixture.componentInstance.updateStaffField('fullName', 'New Guy');
+    fixture.componentInstance.updateStaffField('email', 'n@x.com');
+    fixture.componentInstance.updateStaffField('phone', '9999999999');
+
+    fixture.componentInstance.createStaffAccount();
+
+    expect(fixture.componentInstance.devInviteLink()).toBeNull();
+  });
+
+  it('createStaffAccount never sends a password - the invite is what sets one', () => {
+    authServiceSpy.createStaff.and.returnValue(
+      of({ id: 'd3', fullName: 'New Guy', email: 'n@x.com', phone: '9999999999', role: 'delivery' as const }),
+    );
+    const { fixture } = create();
+    fixture.componentInstance.updateStaffField('fullName', 'New Guy');
+    fixture.componentInstance.updateStaffField('email', 'n@x.com');
+    fixture.componentInstance.updateStaffField('phone', '9999999999');
+
+    fixture.componentInstance.createStaffAccount();
+
+    const payload = authServiceSpy.createStaff.calls.mostRecent().args[0];
+    expect('password' in payload).toBeFalse();
   });
 
   it('createStaffAccount sets a staffError message on failure', () => {
@@ -412,7 +472,6 @@ describe('AdminDashboard', () => {
     fixture.componentInstance.updateStaffField('fullName', 'New Guy');
     fixture.componentInstance.updateStaffField('email', 'n@x.com');
     fixture.componentInstance.updateStaffField('phone', '9999999999');
-    fixture.componentInstance.updateStaffField('password', 'password123');
 
     fixture.componentInstance.createStaffAccount();
 

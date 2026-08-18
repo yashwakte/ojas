@@ -36,6 +36,12 @@ export const routes: Routes = [
     canActivate: [storefrontGuard],
   },
   {
+    // Deliberately unguarded: an invite link must open regardless of who is currently signed in
+    // on that browser, including a staff member whose own session is still active.
+    path: 'accept-invite',
+    loadComponent: () => import('./pages/accept-invite/accept-invite').then((m) => m.AcceptInvite),
+  },
+  {
     path: 'cart',
     // Guests may build a cart freely; the login gate is at checkout.
     loadComponent: () => import('./pages/cart/cart').then((m) => m.Cart),

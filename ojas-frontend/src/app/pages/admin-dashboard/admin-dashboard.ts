@@ -96,18 +96,22 @@ export class AdminDashboard implements OnInit {
     fullName: '',
     email: '',
     phone: '',
-    password: '',
     role: 'delivery',
   });
   readonly creatingStaff = signal(false);
   readonly staffMessage = signal('');
   readonly staffError = signal('');
-  readonly showStaffPassword = signal(false);
 
   // Staff are restricted to one device each. Keyed by user id so each partner card can show
   // its own binding without a separate request per render.
   readonly staffDevices = signal<Record<string, StaffDeviceResponse[]>>({});
   readonly revokingDeviceFor = signal<string | null>(null);
+  readonly resendingInviteFor = signal<string | null>(null);
+
+  // Populated only outside Production, where the API hands the invite token back instead of
+  // relying on a real email. Without this the local flow dead-ends: no mail is sent, so there
+  // would be no way to reach the accept-invite page at all.
+  readonly devInviteLink = signal<string | null>(null);
 
   // Products tab - using ProductManagement component
   readonly productsLoading = computed(() => this.productService.loading());
@@ -359,12 +363,30 @@ export class AdminDashboard implements OnInit {
     });
   }
 
-  updateStaffField<K extends keyof CreateStaffRequest>(key: K, value: CreateStaffRequest[K]): void {
-    this.staffForm.update((form) => ({ ...form, [key]: value }));
+  private buildDevInviteLink(token: string | null | undefined): string | null {
+    return token ? `/accept-invite?token=${encodeURIComponent(token)}` : null;
   }
 
-  toggleStaffPasswordVisibility(): void {
-    this.showStaffPassword.update((visible) => !visible);
+  // Re-sends the setup link, which invalidates the one from the earlier email.
+  resendInvite(partner: StaffUserResponse): void {
+    this.resendingInviteFor.set(partner.id);
+    this.staffError.set('');
+
+    this.authService.resendStaffInvite(partner.id).subscribe({
+      next: (res) => {
+        this.resendingInviteFor.set(null);
+        this.devInviteLink.set(this.buildDevInviteLink(res.devInviteToken));
+        this.showSuccess(`Invite re-sent to ${partner.email}`);
+      },
+      error: () => {
+        this.resendingInviteFor.set(null);
+        this.staffError.set('Could not resend that invite. Please try again.');
+      },
+    });
+  }
+
+  updateStaffField<K extends keyof CreateStaffRequest>(key: K, value: CreateStaffRequest[K]): void {
+    this.staffForm.update((form) => ({ ...form, [key]: value }));
   }
 
   createStaffAccount(): void {
@@ -373,18 +395,13 @@ export class AdminDashboard implements OnInit {
     this.staffMessage.set('');
 
     // Basic validation
-    if (!payload.fullName.trim() || !payload.email.trim() || !payload.phone.trim() || !payload.password) {
+    if (!payload.fullName.trim() || !payload.email.trim() || !payload.phone.trim()) {
       this.staffError.set('All fields are required');
       return;
     }
 
     if (!this.isValidEmail(payload.email)) {
       this.staffError.set('Please enter a valid email address');
-      return;
-    }
-
-    if (payload.password.length < 10) {
-      this.staffError.set('Password must be at least 10 characters');
       return;
     }
 
@@ -399,12 +416,14 @@ export class AdminDashboard implements OnInit {
           fullName: '',
           email: '',
           phone: '',
-          password: '',
           role: payload.role,
         });
-        this.staffMessage.set(`${createdStaff.fullName} created successfully.`);
+        this.staffMessage.set(
+          `Invite sent to ${createdStaff.email}. They'll set their own password from that link.`,
+        );
+        this.devInviteLink.set(this.buildDevInviteLink(createdStaff.devInviteToken));
         this.creatingStaff.set(false);
-        this.showSuccess('Staff account created');
+        this.showSuccess('Invite sent');
       },
       error: (err) => {
         this.staffError.set(err?.error?.message ?? 'Could not create staff account.');
