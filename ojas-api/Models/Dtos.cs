@@ -56,6 +56,12 @@ public record EnrollDeviceRequest(
 	[Required, MinLength(6), MaxLength(128)] string Password,
 	[Required, RegularExpression(@"^\d{6}$")] string Code);
 
+/// <summary>No Code field, by design: trust here comes from an admin's own authenticated
+/// approval rather than proof of email control, so there's nothing for a code to add.</summary>
+public record PreApprovedEnrollRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, MinLength(6), MaxLength(128)] string Password);
+
 public record ForgotPasswordRequest(
 	[Required, EmailAddress, MaxLength(120)] string Email,
 	[Required] string TurnstileToken);
@@ -108,7 +114,8 @@ public record StaffUserResponse(
 	string Email,
 	string Phone,
 	string Role,
-	bool InvitePending = false);
+	bool InvitePending = false,
+	DateTime? PendingDeviceApprovalExpiresAt = null);
 
 public record SavedAddressDto(string Label, string FullAddress, double Latitude, double Longitude, string? MapLink, bool IsDefault);
 public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault);

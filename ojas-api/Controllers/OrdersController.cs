@@ -338,7 +338,8 @@ public class OrdersController : ControllerBase
         // see a stalled onboarding rather than wondering why someone never appears online.
         return Ok(users
             .Select(u => new StaffUserResponse(
-                u.Id!, u.FullName, u.Email, u.Phone, u.Role, string.IsNullOrEmpty(u.PasswordHash)))
+                u.Id!, u.FullName, u.Email, u.Phone, u.Role, string.IsNullOrEmpty(u.PasswordHash),
+                AuthService.HasActiveDeviceApproval(u) ? u.PendingDeviceApprovalExpiresAt : null))
             .ToList());
     }
 

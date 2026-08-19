@@ -488,11 +488,35 @@ public class AuthController : ControllerBase
 
         if (user != null && DeviceService.IsRestrictedRole(user.Role))
         {
+            // An admin already cleared this account's next device ahead of time - most likely
+            // because email delivery is the very thing that's down - so there's no code to send
+            // or wait for. The frontend calls device/enroll-preapproved instead of showing a
+            // code-entry screen.
+            if (AuthService.HasActiveDeviceApproval(user))
+                return Ok(new { message = "This device has already been approved by an admin.", devCode, preApproved = true });
+
             var code = await _otpService.SendDeviceOtpAsync(user.Email);
             devCode = _env.IsProduction() ? null : code;
         }
 
-        return Ok(new { message = "If those details are correct, we've sent a code to your email.", devCode });
+        return Ok(new { message = "If those details are correct, we've sent a code to your email.", devCode, preApproved = false });
+    }
+
+    /// <summary>Completes enrollment on a standing admin approval instead of an emailed code -
+    /// see AuthService.EnrollPreApprovedDeviceAsync.</summary>
+    [HttpPost("device/enroll-preapproved")]
+    public async Task<ActionResult<AuthResponse>> EnrollPreApprovedDevice([FromBody] PreApprovedEnrollRequest request)
+    {
+        var user = await _authService.FindByCredentialsAsync(request.Email, request.Password);
+        if (user == null || !DeviceService.IsRestrictedRole(user.Role))
+            return Unauthorized(new { message = "Invalid email or password" });
+
+        var result = await _authService.EnrollPreApprovedDeviceAsync(user, CurrentDeviceLabel, RawDeviceId);
+        if (result == null)
+            return BadRequest(new { message = "No admin approval is pending for this account, or it has expired. Ask an admin to approve your next device again." });
+
+        _logger.LogInformation("Staff device enrolled via admin pre-approval for user {UserId} ({Role}).", user.Id, user.Role);
+        return Ok(IssueSession(result));
     }
 
     /// <summary>Step two: a correct code binds *this* device to the account and signs in. The
@@ -576,5 +600,27 @@ public class AuthController : ControllerBase
             userId);
 
         return NoContent();
+    }
+
+    /// <summary>Lets this staff member's next device enroll on password alone, with no OTP
+    /// email - the break-glass path for when email delivery itself is down. Doesn't touch any
+    /// currently-bound device; combine with the revoke endpoint above when the point is to move
+    /// them off a lost device rather than approve an additional one.</summary>
+    [HttpPost("staff/{userId}/approve-next-device")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> ApproveNextDevice(string userId)
+    {
+        var user = await _authService.FindByIdAsync(userId);
+        if (user == null || !DeviceService.IsRestrictedRole(user.Role))
+            return NotFound();
+
+        var expiresAt = await _authService.ApproveNextDeviceAsync(userId);
+        _logger.LogInformation(
+            "Admin {AdminId} pre-approved the next device for user {UserId}, expiring {ExpiresAt}.",
+            User.FindFirstValue(ClaimTypes.NameIdentifier),
+            userId,
+            expiresAt);
+
+        return Ok(new { message = "Their next device will be approved automatically.", expiresAt });
     }
 }

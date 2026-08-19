@@ -43,6 +43,14 @@ public class User
 
     [BsonElement("savedAddresses")]
     public List<SavedAddress> SavedAddresses { get; set; } = [];
+
+    /// <summary>Set by an admin via "approve next device" so this staff member's next device
+    /// enrollment can complete on password alone, with no email round-trip. Exists for the case
+    /// where email delivery itself is down (the original break-glass gap: revoking a lost device
+    /// still left re-enrollment stuck behind an OTP email). Null means no standing approval;
+    /// cleared the moment it's consumed or once it expires.</summary>
+    [BsonElement("pendingDeviceApprovalExpiresAt")]
+    public DateTime? PendingDeviceApprovalExpiresAt { get; set; }
 }
 
 public static class UserRoles

@@ -54,4 +54,9 @@ public static class DeviceEnrollmentMethods
     /// account's own address proves the same thing an emailed code would, so activation and
     /// device approval collapse into one step rather than asking for a code immediately after.</summary>
     public const string Invite = "invite";
+
+    /// <summary>Bound without any OTP because an already-authenticated admin explicitly approved
+    /// this account's next device beforehand. The break-glass path for when email delivery
+    /// itself is the thing that's down.</summary>
+    public const string AdminPreApproval = "admin-pre-approval";
 }

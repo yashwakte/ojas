@@ -180,6 +180,48 @@ public class AuthService
         return result with { RawDeviceId = rawDeviceId };
     }
 
+    // Long enough that a staff member locked out overnight can act on it the next morning;
+    // short enough that a forgotten approval doesn't sit open indefinitely. Grants password-only
+    // enrollment, so it deliberately doesn't linger the way a normal OTP window (10 minutes)
+    // wouldn't need to.
+    private static readonly TimeSpan DeviceApprovalLifetime = TimeSpan.FromHours(12);
+
+    /// <summary>Grants this staff account's next device enrollment with no OTP email required.
+    /// Only ever reachable by an already-authenticated admin, which is where the trust comes
+    /// from - see PreApprovedEnrollRequest.</summary>
+    public async Task<DateTime> ApproveNextDeviceAsync(string userId)
+    {
+        var expiresAt = DateTime.UtcNow.Add(DeviceApprovalLifetime);
+        await _db.Users.UpdateOneAsync(
+            Builders<User>.Filter.Eq(u => u.Id, userId),
+            Builders<User>.Update.Set(u => u.PendingDeviceApprovalExpiresAt, expiresAt));
+        return expiresAt;
+    }
+
+    public static bool HasActiveDeviceApproval(User user) =>
+        user.PendingDeviceApprovalExpiresAt is { } expiresAt && expiresAt > DateTime.UtcNow;
+
+    /// <summary>Redeems a standing admin approval instead of an OTP code. Consumes it either way
+    /// - even a failed/expired check clears a stale grant rather than leaving it to be found
+    /// later - so this is safe to call speculatively once the caller already has credentials.</summary>
+    public async Task<AuthResult?> EnrollPreApprovedDeviceAsync(
+        User user, string deviceLabel, string? presentedRawDeviceId)
+    {
+        var wasApproved = HasActiveDeviceApproval(user);
+
+        await _db.Users.UpdateOneAsync(
+            Builders<User>.Filter.Eq(u => u.Id, user.Id),
+            Builders<User>.Update.Set(u => u.PendingDeviceApprovalExpiresAt, null));
+
+        if (!wasApproved)
+            return null;
+
+        var rawDeviceId = await _devices.EnrollDeviceAsync(
+            user.Id!, deviceLabel, DeviceEnrollmentMethods.AdminPreApproval, presentedRawDeviceId);
+        var result = await IssueSessionAsync(user, DeviceService.HashDeviceId(rawDeviceId));
+        return result with { RawDeviceId = rawDeviceId };
+    }
+
     private async Task<AuthResult> IssueSessionAsync(User user, string? deviceIdHash)
     {
         var token = GenerateToken(user);
