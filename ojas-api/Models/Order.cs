@@ -66,6 +66,14 @@ public class Order
     [BsonElement("status")]
     public string Status { get; set; } = "Pending";
 
+    /// <summary>Only "COD" today. Kept as a field rather than hardcoded everywhere so an
+    /// online method (Razorpay) can slot in later without touching the order shape again.</summary>
+    [BsonElement("paymentMethod")]
+    public string PaymentMethod { get; set; } = "COD";
+
+    [BsonElement("paymentStatus")]
+    public string PaymentStatus { get; set; } = "Pending";
+
     [BsonElement("deliveryPartnerId")]
     public string? DeliveryPartnerId { get; set; }
 

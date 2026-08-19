@@ -72,6 +72,8 @@ public class OrderFlowTests : IDisposable
         placedOrder!.DeliveryCharge.ShouldBe(1061.95m);
         placedOrder.TotalAmount.ShouldBe(250m + 1061.95m);
         placedOrder.Status.ShouldBe("Pending");
+        placedOrder.PaymentMethod.ShouldBe("COD");
+        placedOrder.PaymentStatus.ShouldBe("Pending");
 
         // Customer can see it in "my orders"
         var myOrdersResponse = await _customerClient.GetAsync("/api/orders/my");
@@ -110,5 +112,52 @@ public class OrderFlowTests : IDisposable
         var assignedOrders = await deliveryClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/delivery/my");
         assignedOrders.ShouldNotBeNull();
         assignedOrders!.ShouldContain(o => o.Id == placedOrder.Id && o.Status == "Delivered");
+    }
+
+    /// <summary>Payment collection is tracked separately from delivery status - a partner can
+    /// hand over the goods without successfully collecting cash, so the two must be settable
+    /// independently rather than one implying the other.</summary>
+    [Fact]
+    public async Task PaymentCollection_IsIndependentOfDeliveryStatus_AndOnlyTheAssignedPartnerCanRecordIt()
+    {
+        await SeedDeliveryChargesAsync();
+
+        var (_, customerCsrf) = await _customerClient.RegisterAsync(fullName: "COD Customer");
+        var items = new List<OrderItemDto> { new("p1", "Product One", 100, "1kg", 1) };
+        var placeRequest = new PlaceOrderRequest("COD Customer", "9123456789", "123 Main St", 19.0, 73.0, "", items);
+        var placeHttpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/orders") { Content = JsonContent.Create(placeRequest) };
+        placeHttpRequest.AttachCsrf(customerCsrf);
+        var placeResponse = await _customerClient.SendAsync(placeHttpRequest);
+        var placedOrder = (await placeResponse.Content.ReadFromJsonAsync<OrderResponse>())!;
+
+        using var adminClient = _factory.CreateClient();
+        var (_, adminCsrf) = await _factory.SeedAndLoginAsStaffAsync(adminClient, UserRoles.Admin);
+
+        using var deliveryClient = _factory.CreateClient();
+        var (deliveryAuth, deliveryCsrf) = await _factory.SeedAndLoginAsStaffAsync(deliveryClient, UserRoles.Delivery);
+        await adminClient.SendAsync(
+            PatchJson($"/api/orders/admin/{placedOrder.Id}/assign", new AssignDeliveryPartnerRequest(deliveryAuth.Id), adminCsrf));
+
+        // A different delivery partner cannot record the collection.
+        using var otherDeliveryClient = _factory.CreateClient();
+        var (_, otherDeliveryCsrf) = await _factory.SeedAndLoginAsStaffAsync(otherDeliveryClient, UserRoles.Delivery);
+        var forbiddenAttempt = await otherDeliveryClient.SendAsync(
+            PatchJson($"/api/orders/delivery/{placedOrder.Id}/payment-collected", new { }, otherDeliveryCsrf));
+        forbiddenAttempt.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        // Marking payment collected does not, by itself, mark the order Delivered.
+        var collectedResponse = await deliveryClient.SendAsync(
+            PatchJson($"/api/orders/delivery/{placedOrder.Id}/payment-collected", new { }, deliveryCsrf));
+        collectedResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var assignedOrders = await deliveryClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/delivery/my");
+        var afterCollection = assignedOrders!.Single(o => o.Id == placedOrder.Id);
+        afterCollection.PaymentStatus.ShouldBe("Collected");
+        afterCollection.Status.ShouldBe("Pending");
+
+        // Idempotent: calling it again after collection is already recorded is a no-op, not an error.
+        var repeatResponse = await deliveryClient.SendAsync(
+            PatchJson($"/api/orders/delivery/{placedOrder.Id}/payment-collected", new { }, deliveryCsrf));
+        repeatResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }
 }

@@ -30,6 +30,8 @@ public class OrderService(IMongoDbService db)
     public static bool IsCustomerEditable(string status) =>
         CustomerEditableStatuses.Contains(NormalizeStatus(status) ?? string.Empty);
 
+    public static readonly HashSet<string> AllowedPaymentStatuses = ["Pending", "Collected"];
+
     public async Task<Order> CreateOrderAsync(Order order)
     {
         await _orders.InsertOneAsync(order);
@@ -104,6 +106,20 @@ public class OrderService(IMongoDbService db)
 
         var update = Builders<Order>.Update
             .Set(o => o.Status, normalizedStatus)
+            .Set(o => o.UpdatedAt, DateTime.UtcNow);
+
+        var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+        return result.MatchedCount > 0;
+    }
+
+    /// <summary>Recorded by the delivery partner once cash actually changes hands - a
+    /// separate action from marking the order Delivered, since a partner can deliver
+    /// without successfully collecting (a dispute, no cash on hand) and that has to stay
+    /// visible rather than being masked by the delivery status alone.</summary>
+    public async Task<bool> MarkPaymentCollectedAsync(string orderId)
+    {
+        var update = Builders<Order>.Update
+            .Set(o => o.PaymentStatus, "Collected")
             .Set(o => o.UpdatedAt, DateTime.UtcNow);
 
         var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);

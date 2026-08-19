@@ -72,6 +72,8 @@ public class OrdersController : ControllerBase
             order.DeliveryDistanceKm,
             order.TotalAmount,
             order.Status,
+            order.PaymentMethod,
+            order.PaymentStatus,
             order.CreatedAt,
             order.DeliveryPartnerId,
             order.DeliveryPartnerName,
@@ -403,6 +405,33 @@ public class OrdersController : ControllerBase
             return NoContent();
 
         var updated = await _orderService.UpdateOrderStatusAsync(orderId, "Delivered");
+        if (!updated)
+            return NotFound(new { message = "Order not found." });
+
+        return NoContent();
+    }
+
+    /// <summary>Recorded separately from marking the order Delivered - a partner can hand
+    /// over the goods without successfully collecting payment, and that has to stay visible
+    /// to admins rather than being implied by delivery status alone.</summary>
+    [HttpPatch("delivery/{orderId}/payment-collected")]
+    [Authorize(Roles = UserRoles.Delivery)]
+    public async Task<IActionResult> MarkPaymentCollected(string orderId)
+    {
+        var deliveryPartnerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (deliveryPartnerId == null) return Unauthorized();
+
+        var order = await _orderService.GetOrderByIdAsync(orderId);
+        if (order == null)
+            return NotFound(new { message = "Order not found." });
+
+        if (!string.Equals(order.DeliveryPartnerId, deliveryPartnerId, StringComparison.Ordinal))
+            return Forbid();
+
+        if (string.Equals(order.PaymentStatus, "Collected", StringComparison.OrdinalIgnoreCase))
+            return NoContent();
+
+        var updated = await _orderService.MarkPaymentCollectedAsync(orderId);
         if (!updated)
             return NotFound(new { message = "Order not found." });
 

@@ -141,6 +141,8 @@ public record OrderResponse(
 	double DeliveryDistanceKm,
 	decimal TotalAmount,
 	string Status,
+	string PaymentMethod,
+	string PaymentStatus,
 	DateTime CreatedAt,
 	string? DeliveryPartnerId,
 	string? DeliveryPartnerName,
