@@ -22,6 +22,8 @@ describe('OrderService', () => {
     deliveryDistanceKm: 0,
     totalAmount: 100,
     status: 'Pending',
+    paymentMethod: 'COD',
+    paymentStatus: 'Pending',
     createdAt: '2024-01-01',
   };
 
@@ -130,6 +132,14 @@ describe('OrderService', () => {
   it('markDelivered() patches /orders/delivery/:id/delivered', () => {
     service.markDelivered('o1').subscribe();
     const req = httpMock.expectOne(`${environment.apiUrl}/orders/delivery/o1/delivered`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({});
+    req.flush(null);
+  });
+
+  it('markPaymentCollected() patches /orders/delivery/:id/payment-collected', () => {
+    service.markPaymentCollected('o1').subscribe();
+    const req = httpMock.expectOne(`${environment.apiUrl}/orders/delivery/o1/payment-collected`);
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({});
     req.flush(null);

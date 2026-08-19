@@ -170,6 +170,13 @@
 
                   <div class="order-total">
                     Total: {{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+                    <span
+                      class="payment-pill"
+                      [class.payment-pill--collected]="order.paymentStatus === 'Collected'"
+                    >
+                      <mat-icon>payments</mat-icon>
+                      COD · {{ order.paymentStatus === 'Collected' ? 'Collected' : 'Pending' }}
+                    </span>
                   </div>
 
                   <div class="action-row">

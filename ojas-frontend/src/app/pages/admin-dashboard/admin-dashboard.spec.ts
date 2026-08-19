@@ -30,6 +30,8 @@ describe('AdminDashboard', () => {
     deliveryDistanceKm: 0,
     totalAmount: 100,
     status: 'Pending',
+    paymentMethod: 'COD',
+    paymentStatus: 'Pending',
     createdAt: '2024-01-05',
   };
   const order2: OrderResponse = { ...order, id: 'o2', status: 'Delivered', totalAmount: 250, createdAt: '2024-01-01' };

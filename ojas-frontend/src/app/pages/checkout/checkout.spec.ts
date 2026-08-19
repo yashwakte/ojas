@@ -77,6 +77,8 @@ describe('Checkout', () => {
     deliveryDistanceKm: 3,
     totalAmount: 100,
     status: 'Pending',
+    paymentMethod: 'COD',
+    paymentStatus: 'Pending',
     createdAt: '2024-01-01',
   };
 

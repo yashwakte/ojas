@@ -216,6 +216,49 @@
   }
 }
 
+.payment-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.payment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #fff8e1;
+  color: #cc8a00;
+
+  mat-icon {
+    width: 15px;
+    height: 15px;
+    font-size: 15px;
+  }
+
+  &.payment-pill--collected {
+    background: #ecfdf3;
+    color: #157347;
+  }
+}
+
+.collect-btn {
+  border-color: rgba(21, 115, 71, 0.35) !important;
+  color: #157347 !important;
+  border-radius: 10px !important;
+  font-size: 0.78rem !important;
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
 .footer-row {
   display: flex;
   justify-content: space-between;

@@ -21,6 +21,8 @@ describe('MyOrders', () => {
     deliveryDistanceKm: 0,
     totalAmount: 100,
     status: 'Confirmed',
+    paymentMethod: 'COD',
+    paymentStatus: 'Pending',
     createdAt: '2024-01-01',
   };
 

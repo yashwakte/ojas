@@ -81,4 +81,10 @@ export class OrderService {
   markDelivered(orderId: string): Observable<void> {
     return this.http.patch<void>(`${this.apiUrl}/delivery/${orderId}/delivered`, {});
   }
+
+  /** Recorded separately from delivery - a partner can hand over the goods without
+   * successfully collecting cash, so the two aren't allowed to imply each other. */
+  markPaymentCollected(orderId: string): Observable<void> {
+    return this.http.patch<void>(`${this.apiUrl}/delivery/${orderId}/payment-collected`, {});
+  }
 }

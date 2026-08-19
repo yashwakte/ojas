@@ -18,6 +18,8 @@ describe('DeliveryOrders', () => {
     deliveryDistanceKm: 0,
     totalAmount: 100,
     status: 'Confirmed',
+    paymentMethod: 'COD',
+    paymentStatus: 'Pending',
     createdAt: '2024-01-01',
   };
   const deliveredOrder: OrderResponse = { ...order, id: 'o2', status: 'Delivered' };
@@ -25,7 +27,11 @@ describe('DeliveryOrders', () => {
   let orderServiceSpy: jasmine.SpyObj<OrderService>;
 
   beforeEach(() => {
-    orderServiceSpy = jasmine.createSpyObj('OrderService', ['getDeliveryOrders', 'markDelivered']);
+    orderServiceSpy = jasmine.createSpyObj('OrderService', [
+      'getDeliveryOrders',
+      'markDelivered',
+      'markPaymentCollected',
+    ]);
     TestBed.configureTestingModule({
       imports: [DeliveryOrders],
       providers: [{ provide: OrderService, useValue: orderServiceSpy }],
@@ -78,6 +84,30 @@ describe('DeliveryOrders', () => {
     fixture.componentInstance.markDelivered('o1');
 
     expect(fixture.componentInstance.error()).toBe('Could not mark order as delivered.');
+    expect(fixture.componentInstance.busyOrderId()).toBeNull();
+  });
+
+  it('markPaymentCollected updates the order paymentStatus to Collected on success', () => {
+    orderServiceSpy.getDeliveryOrders.and.returnValue(of([order]));
+    orderServiceSpy.markPaymentCollected.and.returnValue(of(undefined));
+    const fixture = create();
+
+    fixture.componentInstance.markPaymentCollected('o1');
+
+    expect(orderServiceSpy.markPaymentCollected).toHaveBeenCalledWith('o1');
+    expect(fixture.componentInstance.orders()[0].paymentStatus).toBe('Collected');
+    expect(fixture.componentInstance.busyPaymentOrderId()).toBeNull();
+  });
+
+  it('markPaymentCollected sets an error on failure, independently of the delivered busy flag', () => {
+    orderServiceSpy.getDeliveryOrders.and.returnValue(of([order]));
+    orderServiceSpy.markPaymentCollected.and.returnValue(throwError(() => new Error('fail')));
+    const fixture = create();
+
+    fixture.componentInstance.markPaymentCollected('o1');
+
+    expect(fixture.componentInstance.error()).toBe('Could not mark payment as collected.');
+    expect(fixture.componentInstance.busyPaymentOrderId()).toBeNull();
     expect(fixture.componentInstance.busyOrderId()).toBeNull();
   });
 

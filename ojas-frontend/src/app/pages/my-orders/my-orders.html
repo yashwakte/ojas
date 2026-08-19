@@ -193,6 +193,13 @@
               </div>
               <div class="order-total">
                 Total: <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+                <span
+                  class="payment-pill"
+                  [class.payment-pill--collected]="order.paymentStatus === 'Collected'"
+                >
+                  <mat-icon>payments</mat-icon>
+                  {{ order.paymentStatus === 'Collected' ? 'Payment Collected' : 'Pay on Delivery' }}
+                </span>
               </div>
             </div>
 

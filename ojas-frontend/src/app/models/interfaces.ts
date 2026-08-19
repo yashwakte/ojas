@@ -212,6 +212,9 @@ export interface OrderResponse {
   deliveryDistanceKm: number;
   totalAmount: number;
   status: string;
+  /** Only "COD" today - a field rather than an assumption so an online method can slot in later. */
+  paymentMethod: string;
+  paymentStatus: string;
   createdAt: string;
   deliveryPartnerId?: string | null;
   deliveryPartnerName?: string | null;

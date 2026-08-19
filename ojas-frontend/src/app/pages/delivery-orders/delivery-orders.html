@@ -67,6 +67,23 @@
             }
           </div>
 
+          <div class="payment-row">
+            <span class="payment-pill" [class.payment-pill--collected]="order.paymentStatus === 'Collected'">
+              <mat-icon>payments</mat-icon>
+              Cash on Delivery · {{ order.paymentStatus === 'Collected' ? 'Collected' : 'Payment Pending' }}
+            </span>
+            @if (order.paymentStatus !== 'Collected') {
+              <button
+                mat-stroked-button
+                class="collect-btn"
+                [disabled]="busyPaymentOrderId() === order.id"
+                (click)="markPaymentCollected(order.id)"
+              >
+                Mark Payment Collected
+              </button>
+            }
+          </div>
+
           <div class="footer-row">
             <span class="total">{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
             <button

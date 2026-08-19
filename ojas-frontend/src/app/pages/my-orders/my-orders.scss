@@ -286,6 +286,10 @@
 }
 
 .order-total {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 0.9rem;
   color: var(--ojas-text);
   white-space: nowrap;
@@ -293,6 +297,30 @@
   strong {
     color: var(--ojas-ink);
     font-size: 1rem;
+  }
+}
+
+.payment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: #fff8e1;
+  color: #cc8a00;
+
+  mat-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
+
+  &.payment-pill--collected {
+    background: #ecfdf3;
+    color: #157347;
   }
 }
 

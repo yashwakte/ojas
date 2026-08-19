@@ -16,6 +16,7 @@ export class DeliveryOrders implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly busyOrderId = signal<string | null>(null);
+  readonly busyPaymentOrderId = signal<string | null>(null);
 
   readonly openDeliveries = computed(
     () => this.orders().filter((order) => order.status.toLowerCase() !== 'delivered').length,
@@ -45,6 +46,28 @@ export class DeliveryOrders implements OnInit {
       error: () => {
         this.error.set('Could not mark order as delivered.');
         this.busyOrderId.set(null);
+      },
+    });
+  }
+
+  markPaymentCollected(orderId: string): void {
+    this.error.set('');
+    this.busyPaymentOrderId.set(orderId);
+
+    this.orderService.markPaymentCollected(orderId).subscribe({
+      next: () => {
+        this.orders.update((orders) =>
+          orders.map((order) =>
+            order.id === orderId
+              ? { ...order, paymentStatus: 'Collected', updatedAt: new Date().toISOString() }
+              : order,
+          ),
+        );
+        this.busyPaymentOrderId.set(null);
+      },
+      error: () => {
+        this.error.set('Could not mark payment as collected.');
+        this.busyPaymentOrderId.set(null);
       },
     });
   }
