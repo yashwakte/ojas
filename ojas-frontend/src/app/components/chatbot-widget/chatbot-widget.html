@@ -1,0 +1,104 @@
+@if (!ui.removed()) {
+  <button
+    type="button"
+    class="cw-bubble"
+    [class.cw-bubble--open]="ui.open()"
+    [style.right.px]="ui.position().right"
+    [style.bottom.px]="ui.position().bottom"
+    (pointerdown)="onBubblePointerDown($event)"
+    (pointermove)="onBubblePointerMove($event)"
+    (pointerup)="onBubblePointerUp()"
+    (pointercancel)="onBubblePointerUp()"
+    [attr.aria-expanded]="ui.open()"
+    aria-label="Chat with Ojas support"
+  >
+    @if (ui.open()) {
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      </svg>
+    } @else {
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M4 12a8 8 0 1 1 3.2 6.4L4 20l1.1-3.6A7.96 7.96 0 0 1 4 12Z"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linejoin="round"
+        />
+      </svg>
+    }
+  </button>
+
+  @if (showRemoveHint()) {
+    <div class="cw-remove-backdrop" (pointerdown)="dismissRemoveHint()"></div>
+    <div
+      class="cw-remove-hint"
+      [style.right.px]="ui.position().right"
+      [style.bottom.px]="ui.position().bottom + 68"
+    >
+      <button type="button" class="cw-remove-btn" (click)="confirmRemove()">
+        Remove chat helper
+      </button>
+      <span class="cw-remove-note">You can bring it back from the menu anytime.</span>
+    </div>
+  }
+}
+
+@if (ui.open()) {
+  <div class="cw-panel" [class.cw-panel--closing]="closing()">
+    <header class="cw-header">
+      <span class="cw-header-title">Ojas Assistant</span>
+      <span class="cw-header-sub">Usually replies instantly</span>
+    </header>
+
+    <div class="cw-messages" #messagesEl>
+      @for (msg of messages(); track $index) {
+        <div class="cw-row" [class.cw-row--user]="msg.from === 'user'">
+          <div class="cw-bubble-msg" [class.cw-bubble-msg--user]="msg.from === 'user'">
+            {{ msg.text }}
+          </div>
+        </div>
+
+        @if (msg.quickReplies && msg.quickReplies.length > 0) {
+          <div class="cw-quick-replies">
+            @for (qr of msg.quickReplies; track qr.topic) {
+              <button type="button" class="cw-chip" (click)="sendQuickReply(qr)">
+                {{ qr.label }}
+              </button>
+            }
+          </div>
+        }
+      }
+
+      @if (busy()) {
+        <div class="cw-row">
+          <div class="cw-bubble-msg cw-typing">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <form class="cw-input-row" (ngSubmit)="sendTyped()">
+      <input
+        type="text"
+        class="cw-input"
+        placeholder="Type a message…"
+        [ngModel]="inputValue()"
+        (ngModelChange)="inputValue.set($event)"
+        name="chatInput"
+        autocomplete="off"
+      />
+      <button type="submit" class="cw-send" [disabled]="!inputValue().trim() || busy()" aria-label="Send">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M17.5 2.5 9.2 10.8M17.5 2.5 12 17.5l-2.8-6.7-6.7-2.8 15-5.5Z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+    </form>
+  </div>
+}

@@ -6,6 +6,7 @@ import { Header } from './header';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
+import { ChatbotUiService } from '../../services/chatbot-ui.service';
 
 describe('Header', () => {
   let cartItems: ReturnType<typeof signal<any[]>>;
@@ -86,6 +87,19 @@ describe('Header', () => {
 
     header.toggleCategoriesSheet();
     expect(header.categoriesSheetOpen()).toBeFalse();
+  });
+
+  it('openChatSupport opens the shared chatbot and closes the hamburger menu', () => {
+    const fixture = create();
+    const header = fixture.componentInstance;
+    const chatbotUi = TestBed.inject(ChatbotUiService);
+    spyOn(chatbotUi, 'openChat');
+    header.menuOpen = true;
+
+    header.openChatSupport();
+
+    expect(chatbotUi.openChat).toHaveBeenCalled();
+    expect(header.menuOpen).toBeFalse();
   });
 
   it('openDesktopCategoryMenu / closeDesktopCategoryMenu set the signal', () => {

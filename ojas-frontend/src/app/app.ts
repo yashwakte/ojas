@@ -6,6 +6,7 @@ import { SiteIntro } from './components/site-intro/site-intro';
 import { WelcomeCelebration } from './components/welcome-celebration/welcome-celebration';
 import { GuestWelcome } from './components/guest-welcome/guest-welcome';
 import { AddressPicker } from './components/address-picker/address-picker';
+import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
 import { AuthService } from './services/auth.service';
 import { DeliveryAddressService } from './services/delivery-address.service';
 
@@ -22,6 +23,7 @@ const ADDRESS_PROMPT_DELAY_MS = 4200;
     WelcomeCelebration,
     GuestWelcome,
     AddressPicker,
+    ChatbotWidget,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',

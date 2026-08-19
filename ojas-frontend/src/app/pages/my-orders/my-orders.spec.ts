@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { MyOrders } from './my-orders';
 import { UserService } from '../../services/user.service';
+import { ChatbotUiService } from '../../services/chatbot-ui.service';
 import { OrderResponse } from '../../models/interfaces';
 
 describe('MyOrders', () => {
@@ -46,6 +47,17 @@ describe('MyOrders', () => {
     expect(fixture.componentInstance.orders()).toEqual([order]);
     expect(fixture.componentInstance.loading()).toBeFalse();
     expect(fixture.componentInstance.error()).toBe('');
+  });
+
+  it('openChatSupport opens the shared chatbot widget', () => {
+    userServiceSpy.getMyOrders.and.returnValue(of([]));
+    const fixture = create();
+    const chatbotUi = TestBed.inject(ChatbotUiService);
+    spyOn(chatbotUi, 'openChat');
+
+    fixture.componentInstance.openChatSupport();
+
+    expect(chatbotUi.openChat).toHaveBeenCalled();
   });
 
   it('sets an error message when loading fails', () => {

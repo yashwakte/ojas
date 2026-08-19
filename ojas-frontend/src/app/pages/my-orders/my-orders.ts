@@ -10,6 +10,7 @@ import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
+import { ChatbotUiService } from '../../services/chatbot-ui.service';
 import { MapPicker } from '../../components/map-picker/map-picker';
 import { OrderItem, OrderResponse, isOrderEditable } from '../../models/interfaces';
 
@@ -27,6 +28,7 @@ export class MyOrders implements OnInit {
   private readonly orderEditDraft = inject(OrderEditDraftService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly chatbotUi = inject(ChatbotUiService);
 
   orders = signal<OrderResponse[]>([]);
   loading = signal(true);
@@ -88,6 +90,10 @@ export class MyOrders implements OnInit {
 
   ngOnInit(): void {
     this.load();
+  }
+
+  openChatSupport(): void {
+    this.chatbotUi.openChat();
   }
 
   canModify(order: OrderResponse): boolean {

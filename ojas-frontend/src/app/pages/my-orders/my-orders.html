@@ -3,10 +3,14 @@
     <a routerLink="/profile" class="back-link">
       <mat-icon>arrow_back</mat-icon>
     </a>
-    <div>
+    <div class="page-header-titles">
       <h1>Your Orders</h1>
       <p class="subtitle">Track and review your purchases</p>
     </div>
+    <button type="button" class="help-btn" (click)="openChatSupport()">
+      <mat-icon>support_agent</mat-icon>
+      <span>Need help?</span>
+    </button>
   </div>
 
   @if (loading()) {

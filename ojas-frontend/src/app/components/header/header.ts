@@ -9,6 +9,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
+import { ChatbotUiService } from '../../services/chatbot-ui.service';
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
 import { HeaderAddressPicker } from '../header-address-picker/header-address-picker';
 
@@ -48,6 +49,7 @@ export class Header {
     public auth: AuthService,
     public cart: CartService,
     public checkoutService: CheckoutService,
+    public chatbotUi: ChatbotUiService,
     private router: Router,
   ) {
     effect(() => {
@@ -116,6 +118,11 @@ export class Header {
 
   isCustomerArea(): boolean {
     return !this.auth.isLoggedIn() || this.auth.role() === 'customer';
+  }
+
+  openChatSupport(): void {
+    this.chatbotUi.openChat();
+    this.toggleMenu();
   }
 
   homeRoute(): string {

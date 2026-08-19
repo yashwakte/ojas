@@ -142,6 +142,12 @@
         <a routerLink="/" (click)="toggleMenu()">Home</a>
         <a routerLink="/products" (click)="toggleMenu()">Products</a>
         <a routerLink="/about" (click)="toggleMenu()">About Us</a>
+        <a (click)="openChatSupport()">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >support_agent</mat-icon
+          >
+          Chat with us
+        </a>
       }
       @if (auth.isLoggedIn()) {
         @if (auth.role() === 'customer') {
