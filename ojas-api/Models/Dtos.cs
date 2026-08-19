@@ -161,3 +161,16 @@ public record DeliveryChargeCalculationResponse(
 	bool IsFree,
 	bool IsServiceable,
 	double MaxRadiusKm);
+
+/// <summary>Topic, when set, comes from the frontend's quick-reply buttons (or from it
+/// remembering "we're mid-lookup" client-side, e.g. after asking which product to check) and is
+/// trusted directly rather than re-guessed. Message is only interpreted with keyword matching
+/// when Topic is absent - see ChatbotService.DetectTopic.</summary>
+public record ChatbotRequest(string? Message, string? Topic);
+
+public record ChatbotQuickReply(string Label, string Topic);
+
+/// <summary>Escalate is a hint for the UI (e.g. show the "talk to a human" contact details more
+/// prominently) - it's not a separate channel, the reply text already contains everything the
+/// bot has to say.</summary>
+public record ChatbotResponse(string Reply, bool Escalate, List<ChatbotQuickReply> QuickReplies);

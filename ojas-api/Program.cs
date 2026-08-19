@@ -73,6 +73,7 @@ builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<StaffInviteService>();
+builder.Services.AddScoped<ChatbotService>();
 builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // Real mail is only worth sending in Production. Everywhere else the OTP already comes back in
 // the response as devCode and is shown in the UI, so a real send would just spend free-tier
