@@ -695,6 +695,11 @@
       color: #1f4494;
       font-weight: 500;
     }
+
+    .device-preapproved {
+      color: #138a3d;
+      font-weight: 500;
+    }
   }
 
   .resend-invite-btn {
@@ -717,6 +722,40 @@
     &:hover:not(:disabled) {
       background: #f2f6ff;
       border-color: rgba(63, 111, 216, 0.6);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .approve-device-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid rgba(19, 138, 61, 0.35);
+    border-radius: 8px;
+    padding: 5px 10px;
+    color: #138a3d;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: #f0faf3;
+      border-color: rgba(19, 138, 61, 0.6);
     }
 
     &:disabled {

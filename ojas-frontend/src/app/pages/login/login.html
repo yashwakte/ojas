@@ -148,6 +148,29 @@
             Back to sign in
           </button>
         </p>
+      } @else if (showDeviceStep && devicePreApproved) {
+        <div class="auth-header">
+          <span class="auth-logo-mobile">ओजस</span>
+          <h2>Device pre-approved</h2>
+          <p>An admin already approved this device. Signing you in…</p>
+        </div>
+
+        @if (deviceError) {
+          <div class="error-banner" role="alert">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ deviceError }}</span>
+          </div>
+          <p class="auth-switch">
+            <button type="button" class="link-btn" (click)="cancelDeviceEnrollment()">
+              Back to sign in
+            </button>
+          </p>
+        } @else {
+          <div class="device-warning" role="note">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Approving this device will sign you out everywhere else.</span>
+          </div>
+        }
       } @else if (showDeviceStep) {
         <div class="auth-header">
           <span class="auth-logo-mobile">ओजस</span>

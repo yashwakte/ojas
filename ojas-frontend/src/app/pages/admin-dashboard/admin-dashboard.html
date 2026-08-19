@@ -409,6 +409,31 @@
                               <mat-icon>phonelink_erase</mat-icon>
                               <span>No device approved yet</span>
                             </p>
+                            @if (partner.pendingDeviceApprovalExpiresAt) {
+                              <p class="device-preapproved">
+                                <mat-icon>verified</mat-icon>
+                                <span
+                                  >Next device approved until
+                                  {{
+                                    partner.pendingDeviceApprovalExpiresAt | date: 'd MMM, h:mm a'
+                                  }}</span
+                                >
+                              </p>
+                            } @else {
+                              <button
+                                type="button"
+                                class="approve-device-btn"
+                                (click)="approveNextDevice(partner)"
+                                [disabled]="approvingDeviceFor() === partner.id"
+                              >
+                                <mat-icon>verified_user</mat-icon>
+                                {{
+                                  approvingDeviceFor() === partner.id
+                                    ? 'Approving…'
+                                    : 'Approve next device'
+                                }}
+                              </button>
+                            }
                           }
                         </div>
                       </div>

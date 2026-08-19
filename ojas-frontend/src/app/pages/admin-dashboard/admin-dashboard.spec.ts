@@ -58,6 +58,7 @@ describe('AdminDashboard', () => {
       'getStaffDevices',
       'revokeStaffDevice',
       'resendStaffInvite',
+      'approveNextDevice',
     ]);
     // Every partner card looks up its bound device on load, so this needs a default.
     authServiceSpy.getStaffDevices.and.returnValue(of([]));
@@ -226,6 +227,39 @@ describe('AdminDashboard', () => {
       );
       expect(fixture.componentInstance.deviceFor(partner.id)).toEqual(device);
       expect(fixture.componentInstance.revokingDeviceFor()).toBeNull();
+    });
+
+    it('approving a next device stamps the expiry onto that partner and reports success', () => {
+      authServiceSpy.approveNextDevice.and.returnValue(
+        of({ message: 'ok', expiresAt: '2026-08-20T00:00:00Z' }),
+      );
+      const { fixture, snackBar } = create();
+
+      fixture.componentInstance.approveNextDevice(partner);
+
+      expect(authServiceSpy.approveNextDevice).toHaveBeenCalledWith(partner.id);
+      expect(
+        fixture.componentInstance.deliveryPartners().find((p) => p.id === partner.id)
+          ?.pendingDeviceApprovalExpiresAt,
+      ).toBe('2026-08-20T00:00:00Z');
+      expect(fixture.componentInstance.approvingDeviceFor()).toBeNull();
+      expect(snackBar.open).toHaveBeenCalledWith(
+        `${partner.fullName}'s next device will be approved automatically`,
+        'Close',
+        jasmine.any(Object),
+      );
+    });
+
+    it('surfaces an error when approving a next device fails', () => {
+      authServiceSpy.approveNextDevice.and.returnValue(throwError(() => new Error('fail')));
+      const { fixture } = create();
+
+      fixture.componentInstance.approveNextDevice(partner);
+
+      expect(fixture.componentInstance.staffError()).toBe(
+        'Could not approve a device for that account. Please try again.',
+      );
+      expect(fixture.componentInstance.approvingDeviceFor()).toBeNull();
     });
   });
 

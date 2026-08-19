@@ -19,6 +19,7 @@ import {
   PhoneLoginRequest,
   PhoneLoginResponse,
   PhoneLoginVerifyRequest,
+  PreApprovedEnrollRequest,
   ResetPasswordRequest,
   RegisterPendingResponse,
   RegisterRequest,
@@ -118,12 +119,26 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/device/enroll`, request);
   }
 
+  // Redeems a standing admin approval instead of a code - see PreApprovedEnrollRequest.
+  enrollPreApprovedDevice(request: PreApprovedEnrollRequest) {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/device/enroll-preapproved`, request);
+  }
+
   getStaffDevices(userId: string) {
     return this.http.get<StaffDeviceResponse[]>(`${this.apiUrl}/staff/${userId}/devices`);
   }
 
   revokeStaffDevice(userId: string) {
     return this.http.delete<void>(`${this.apiUrl}/staff/${userId}/devices`);
+  }
+
+  // Lets this staff member's next device enroll on password alone, with no OTP email - the
+  // break-glass path for when email delivery itself is down.
+  approveNextDevice(userId: string) {
+    return this.http.post<{ message: string; expiresAt: string }>(
+      `${this.apiUrl}/staff/${userId}/approve-next-device`,
+      {},
+    );
   }
 
   // Called by the auth interceptor when a request 401s because the short-lived access token

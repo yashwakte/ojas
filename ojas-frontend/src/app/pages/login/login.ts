@@ -61,6 +61,9 @@ export class Login implements OnDestroy {
   deviceError = '';
   enrolling = false;
   resendingDeviceCode = false;
+  // True when an admin already cleared this account's next device - enrollment completes
+  // automatically with no code to enter.
+  devicePreApproved = false;
 
   // Phone-number sign-in - a second, customer-only login method alongside email+password.
   // 'enter' collects the number, 'code' takes the OTP; both live on this card like the
@@ -255,6 +258,7 @@ export class Login implements OnDestroy {
     this.deviceEmail = email;
     this.deviceCode = '';
     this.deviceError = '';
+    this.devicePreApproved = false;
     this.sendDeviceCode();
   }
 
@@ -271,10 +275,42 @@ export class Login implements OnDestroy {
         this.resendingDeviceCode = false;
         this.deviceDevCode = res.devCode ?? null;
         this.cdr.detectChanges();
+
+        if (res.preApproved) {
+          this.devicePreApproved = true;
+          this.completePreApprovedEnrollment(password);
+        }
       },
       error: () => {
         this.resendingDeviceCode = false;
         this.deviceError = "We couldn't send a code. Please try again.";
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  // No code to enter here - the trust comes from an admin's own prior approval rather than
+  // proof of email control, so this fires as soon as sendDeviceCode reports preApproved.
+  private completePreApprovedEnrollment(password: string) {
+    this.enrolling = true;
+    this.deviceError = '';
+    this.cdr.detectChanges();
+
+    this.auth.enrollPreApprovedDevice({ email: this.deviceEmail, password }).subscribe({
+      next: (res) => {
+        this.enrolling = false;
+        this.cdr.detectChanges();
+        this.auth.saveAuth(res);
+        this.welcome.celebrate('login', res.fullName);
+        this.router.navigateByUrl(this.auth.getDefaultRouteForRole(res.role));
+      },
+      error: (err) => {
+        this.enrolling = false;
+        this.devicePreApproved = false;
+        this.deviceError =
+          err.status === 400
+            ? (err.error?.message ?? 'That approval is no longer valid. Please try again.')
+            : 'Something went wrong. Please try again.';
         this.cdr.detectChanges();
       },
     });
@@ -316,6 +352,7 @@ export class Login implements OnDestroy {
     this.deviceCode = '';
     this.deviceError = '';
     this.deviceDevCode = null;
+    this.devicePreApproved = false;
   }
 
   switchToPhoneLogin() {

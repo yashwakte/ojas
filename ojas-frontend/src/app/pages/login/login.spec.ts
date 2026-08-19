@@ -25,6 +25,7 @@ describe('Login', () => {
       'getDefaultRouteForRole',
       'sendDeviceOtp',
       'enrollDevice',
+      'enrollPreApprovedDevice',
       'forgotPassword',
       'resetPassword',
       'sendPhoneLoginOtp',
@@ -291,6 +292,38 @@ describe('Login', () => {
 
       expect(fixture.componentInstance.showDeviceStep).toBeFalse();
       expect(fixture.componentInstance.deviceCode).toBe('');
+    });
+
+    describe('admin pre-approval', () => {
+      it('a pre-approved response enrolls automatically with no code, saves auth, and navigates home', () => {
+        authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'already approved', devCode: null, preApproved: true }));
+        authServiceSpy.enrollPreApprovedDevice.and.returnValue(of({ ...authResponse, role: 'admin' }));
+        authServiceSpy.getDefaultRouteForRole.and.returnValue('/admin');
+        spyOn(router, 'navigateByUrl');
+
+        const { fixture } = blockedOnDevice();
+
+        expect(fixture.componentInstance.devicePreApproved).toBeTrue();
+        expect(authServiceSpy.enrollPreApprovedDevice).toHaveBeenCalledWith({
+          email: 'admin@x.com',
+          password: '123456',
+        });
+        expect(authServiceSpy.saveAuth).toHaveBeenCalled();
+        expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+      });
+
+      it('surfaces the server error and drops back to preApproved:false if it fails', () => {
+        authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'already approved', devCode: null, preApproved: true }));
+        authServiceSpy.enrollPreApprovedDevice.and.returnValue(
+          throwError(() => ({ status: 400, error: { message: 'That approval is no longer valid.' } })),
+        );
+
+        const { fixture } = blockedOnDevice();
+
+        expect(fixture.componentInstance.deviceError).toBe('That approval is no longer valid.');
+        expect(fixture.componentInstance.devicePreApproved).toBeFalse();
+        expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+      });
     });
   });
 

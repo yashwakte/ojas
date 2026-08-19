@@ -107,6 +107,7 @@ export class AdminDashboard implements OnInit {
   readonly staffDevices = signal<Record<string, StaffDeviceResponse[]>>({});
   readonly revokingDeviceFor = signal<string | null>(null);
   readonly resendingInviteFor = signal<string | null>(null);
+  readonly approvingDeviceFor = signal<string | null>(null);
 
   // Populated only outside Production, where the API hands the invite token back instead of
   // relying on a real email. Without this the local flow dead-ends: no mail is sent, so there
@@ -359,6 +360,27 @@ export class AdminDashboard implements OnInit {
       error: () => {
         this.revokingDeviceFor.set(null);
         this.staffError.set('Could not unbind that device. Please try again.');
+      },
+    });
+  }
+
+  // Lets this staff member's next device enroll on password alone, with no OTP email - the
+  // break-glass path for when email delivery itself is down.
+  approveNextDevice(partner: StaffUserResponse): void {
+    this.approvingDeviceFor.set(partner.id);
+    this.authService.approveNextDevice(partner.id).subscribe({
+      next: (res) => {
+        this.approvingDeviceFor.set(null);
+        this.deliveryPartners.update((partners) =>
+          partners.map((p) =>
+            p.id === partner.id ? { ...p, pendingDeviceApprovalExpiresAt: res.expiresAt } : p,
+          ),
+        );
+        this.showSuccess(`${partner.fullName}'s next device will be approved automatically`);
+      },
+      error: () => {
+        this.approvingDeviceFor.set(null);
+        this.staffError.set('Could not approve a device for that account. Please try again.');
       },
     });
   }

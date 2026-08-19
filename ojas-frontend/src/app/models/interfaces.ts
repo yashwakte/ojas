@@ -229,6 +229,9 @@ export interface StaffUserResponse {
   role: UserRole;
   /** True while the account still has no password - the invite was sent but never accepted. */
   invitePending?: boolean;
+  /** Set while an admin-approved device enrollment is standing by, so this account's next
+   * device can enroll on password alone with no OTP email. Null once consumed or expired. */
+  pendingDeviceApprovalExpiresAt?: string | null;
 }
 
 /** No password: the account is created dormant and the staff member sets their own via the
@@ -271,6 +274,9 @@ export interface DeviceOtpResponse {
   message: string;
   /** Populated outside Production only, so the flow can be tested without real email set up. */
   devCode?: string | null;
+  /** True when an admin already cleared this account's next device ahead of time - no code was
+   * sent, and the caller should go straight to PreApprovedEnrollRequest instead. */
+  preApproved?: boolean;
 }
 
 /** Step two: redeeming the code binds the calling browser as the account's one trusted device. */
@@ -278,6 +284,13 @@ export interface EnrollDeviceRequest {
   email: string;
   password: string;
   code: string;
+}
+
+/** Alternative to EnrollDeviceRequest for an account with a standing admin approval - no code,
+ * since the trust comes from the admin's own action rather than proof of email control. */
+export interface PreApprovedEnrollRequest {
+  email: string;
+  password: string;
 }
 
 export interface ForgotPasswordRequest {
