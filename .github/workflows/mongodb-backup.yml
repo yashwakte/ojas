@@ -48,10 +48,14 @@ jobs:
       - name: Verify the dump restores cleanly
         run: |
           mongorestore --uri="mongodb://localhost:27017" --archive=ojas-backup.archive --gzip --nsInclude="OjasDb.*" 2>&1 | tee restore.log
-          RESTORED_USERS=$(grep -oP "finished restoring OjasDb\.users \(\K[0-9]+" restore.log || echo 0)
-          echo "Restored users collection document count: $RESTORED_USERS"
-          if [ "$RESTORED_USERS" -lt 1 ]; then
-            echo "::error::Restore verification failed - 0 documents restored into OjasDb.users."
+          # mongorestore only prints one aggregate summary line at the end (not a per-collection
+          # one, despite what an earlier version of this check assumed) - e.g.
+          # "81 document(s) restored successfully. 0 document(s) failed to restore."
+          RESTORED=$(grep -oP '\d+(?= document\(s\) restored successfully)' restore.log | tail -1)
+          FAILED=$(grep -oP '\d+(?= document\(s\) failed to restore)' restore.log | tail -1)
+          echo "Restored: ${RESTORED:-0}, Failed: ${FAILED:-0}"
+          if [ "${RESTORED:-0}" -lt 1 ] || [ "${FAILED:-0}" -ne 0 ]; then
+            echo "::error::Restore verification failed - restored=${RESTORED:-0} failed=${FAILED:-0}"
             exit 1
           fi
 
