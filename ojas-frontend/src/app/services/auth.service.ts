@@ -16,6 +16,9 @@ import {
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   LoginRequest,
+  PhoneLoginRequest,
+  PhoneLoginResponse,
+  PhoneLoginVerifyRequest,
   ResetPasswordRequest,
   RegisterPendingResponse,
   RegisterRequest,
@@ -92,6 +95,16 @@ export class AuthService {
   // means passing the device check.
   resetPassword(request: ResetPasswordRequest) {
     return this.http.post<{ message: string }>(`${this.apiUrl}/reset-password`, request);
+  }
+
+  // Customer-only: sign in with a phone number instead of email+password. 503s until MSG91 is
+  // configured server-side.
+  sendPhoneLoginOtp(request: PhoneLoginRequest) {
+    return this.http.post<PhoneLoginResponse>(`${this.apiUrl}/phone-login/send-otp`, request);
+  }
+
+  verifyPhoneLogin(request: PhoneLoginVerifyRequest) {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/phone-login/verify`, request);
   }
 
   // Staff accounts are restricted to a single device. When login comes back 403 with

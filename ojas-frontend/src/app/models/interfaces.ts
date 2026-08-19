@@ -294,6 +294,24 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
+/** Customer-only: signing in with a phone number instead of email+password. 503s until MSG91 is
+ * configured. */
+export interface PhoneLoginRequest {
+  phone: string;
+  turnstileToken: string;
+}
+
+export interface PhoneLoginResponse {
+  message: string;
+  /** Populated outside Production only, so the flow can be tested without real MSG91 set up. */
+  devCode?: string | null;
+}
+
+export interface PhoneLoginVerifyRequest {
+  phone: string;
+  code: string;
+}
+
 export interface StaffDeviceResponse {
   label: string;
   enrolledVia: string;

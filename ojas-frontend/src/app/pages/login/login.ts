@@ -62,6 +62,18 @@ export class Login implements OnDestroy {
   enrolling = false;
   resendingDeviceCode = false;
 
+  // Phone-number sign-in - a second, customer-only login method alongside email+password.
+  // 'enter' collects the number, 'code' takes the OTP; both live on this card like the
+  // reset/device flows above. Inert (503) until MSG91 is configured server-side.
+  loginMode: 'email' | 'phone' = 'email';
+  phoneStage: 'enter' | 'code' = 'enter';
+  phoneNumber = '';
+  phoneCode = '';
+  phoneDevCode: string | null = null;
+  phoneError = '';
+  phoneBusy = false;
+  phoneUnavailable = false;
+
   constructor(
     private fb: FormBuilder,
     private auth: AuthService,
@@ -304,6 +316,86 @@ export class Login implements OnDestroy {
     this.deviceCode = '';
     this.deviceError = '';
     this.deviceDevCode = null;
+  }
+
+  switchToPhoneLogin() {
+    this.loginMode = 'phone';
+    this.phoneStage = 'enter';
+    this.phoneNumber = '';
+    this.phoneCode = '';
+    this.phoneError = '';
+    this.phoneDevCode = null;
+    this.phoneUnavailable = false;
+  }
+
+  switchToEmailLogin() {
+    this.loginMode = 'email';
+    this.phoneError = '';
+    this.phoneUnavailable = false;
+  }
+
+  sendPhoneLoginCode() {
+    if (!this.phoneNumber.trim() || !this.turnstileToken) return;
+
+    this.phoneBusy = true;
+    this.phoneError = '';
+
+    this.auth
+      .sendPhoneLoginOtp({ phone: this.phoneNumber.trim(), turnstileToken: this.turnstileToken })
+      .subscribe({
+        next: (res) => {
+          this.phoneBusy = false;
+          this.phoneDevCode = res.devCode ?? null;
+          this.phoneStage = 'code';
+          this.turnstileToken = null;
+          this.turnstileWidget()?.reset();
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.phoneBusy = false;
+          this.turnstileToken = null;
+          this.turnstileWidget()?.reset();
+          if (err.status === 503) {
+            this.phoneUnavailable = true;
+          } else {
+            this.phoneError =
+              err.status === 429
+                ? 'Too many attempts. Please wait a minute.'
+                : (err.error?.message ?? 'Something went wrong. Please try again.');
+          }
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  verifyPhoneLoginCode() {
+    if (this.phoneCode.trim().length !== 6) return;
+
+    this.phoneBusy = true;
+    this.phoneError = '';
+
+    this.auth
+      .verifyPhoneLogin({ phone: this.phoneNumber.trim(), code: this.phoneCode.trim() })
+      .subscribe({
+        next: (res) => {
+          this.phoneBusy = false;
+          this.cdr.detectChanges();
+          this.auth.saveAuth(res);
+          this.welcome.celebrate('login', res.fullName);
+
+          const redirect = this.route.snapshot.queryParamMap.get('redirect');
+          const target =
+            redirect && res.role === 'customer'
+              ? redirect
+              : this.auth.getDefaultRouteForRole(res.role);
+          this.router.navigateByUrl(target);
+        },
+        error: (err) => {
+          this.phoneBusy = false;
+          this.phoneError = err.error?.message ?? 'That code is invalid or has expired.';
+          this.cdr.detectChanges();
+        },
+      });
   }
 
   private clearSlowTimer() {

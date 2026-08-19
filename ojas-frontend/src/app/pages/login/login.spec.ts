@@ -27,6 +27,8 @@ describe('Login', () => {
       'enrollDevice',
       'forgotPassword',
       'resetPassword',
+      'sendPhoneLoginOtp',
+      'verifyPhoneLogin',
     ]);
     authServiceSpy.getDefaultRouteForRole.and.returnValue('/');
     authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'sent', devCode: null }));
@@ -397,6 +399,120 @@ describe('Login', () => {
       fixture.componentInstance.cancelPasswordReset();
 
       expect(fixture.componentInstance.resetStage).toBe('none');
+    });
+  });
+
+  describe('phone login', () => {
+    it('switching to phone mode resets the sub-flow to entering a number', () => {
+      const { fixture } = create();
+
+      fixture.componentInstance.switchToPhoneLogin();
+
+      expect(fixture.componentInstance.loginMode).toBe('phone');
+      expect(fixture.componentInstance.phoneStage).toBe('enter');
+    });
+
+    it('will not send a code without a solved Turnstile', () => {
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '9123456789';
+      fixture.componentInstance.turnstileToken = null;
+
+      fixture.componentInstance.sendPhoneLoginCode();
+
+      expect(authServiceSpy.sendPhoneLoginOtp).not.toHaveBeenCalled();
+    });
+
+    it('sending a code advances to the code stage and spends the Turnstile token', () => {
+      authServiceSpy.sendPhoneLoginOtp.and.returnValue(of({ message: 'sent', devCode: null }));
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '9123456789';
+
+      fixture.componentInstance.sendPhoneLoginCode();
+
+      expect(authServiceSpy.sendPhoneLoginOtp).toHaveBeenCalledWith({
+        phone: '9123456789',
+        turnstileToken: 'test-turnstile-token',
+      });
+      expect(fixture.componentInstance.phoneStage).toBe('code');
+      expect(fixture.componentInstance.turnstileToken).toBeNull();
+    });
+
+    it('surfaces the dev-mode code when the backend returns one', () => {
+      authServiceSpy.sendPhoneLoginOtp.and.returnValue(of({ message: 'sent', devCode: '135790' }));
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '9123456789';
+
+      fixture.componentInstance.sendPhoneLoginCode();
+
+      expect(fixture.componentInstance.phoneDevCode).toBe('135790');
+    });
+
+    it('a 503 shows the "not available yet" message rather than a generic error', () => {
+      authServiceSpy.sendPhoneLoginOtp.and.returnValue(throwError(() => ({ status: 503 })));
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '9123456789';
+
+      fixture.componentInstance.sendPhoneLoginCode();
+
+      expect(fixture.componentInstance.phoneUnavailable).toBeTrue();
+      expect(fixture.componentInstance.phoneError).toBe('');
+    });
+
+    it('verifyPhoneLoginCode does nothing until a full 6-digit code is entered', () => {
+      const { fixture } = create();
+      fixture.componentInstance.phoneCode = '123';
+
+      fixture.componentInstance.verifyPhoneLoginCode();
+
+      expect(authServiceSpy.verifyPhoneLogin).not.toHaveBeenCalled();
+    });
+
+    it('a valid code signs in, saves auth, and navigates to the role home', () => {
+      authServiceSpy.verifyPhoneLogin.and.returnValue(of(authResponse));
+      spyOn(router, 'navigateByUrl');
+      const { fixture } = create();
+      fixture.componentInstance.phoneNumber = '9123456789';
+      fixture.componentInstance.phoneCode = '246810';
+
+      fixture.componentInstance.verifyPhoneLoginCode();
+
+      expect(authServiceSpy.verifyPhoneLogin).toHaveBeenCalledWith({
+        phone: '9123456789',
+        code: '246810',
+      });
+      expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/');
+    });
+
+    it('shows the server message and stays put when the code is wrong', () => {
+      authServiceSpy.verifyPhoneLogin.and.returnValue(
+        throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
+      );
+      const { fixture } = create();
+      fixture.componentInstance.phoneNumber = '9123456789';
+      fixture.componentInstance.phoneCode = '000000';
+
+      fixture.componentInstance.verifyPhoneLoginCode();
+
+      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    });
+
+    it('switching back to email login clears phone errors', () => {
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneError = 'stale error';
+      fixture.componentInstance.phoneUnavailable = true;
+
+      fixture.componentInstance.switchToEmailLogin();
+
+      expect(fixture.componentInstance.loginMode).toBe('email');
+      expect(fixture.componentInstance.phoneError).toBe('');
+      expect(fixture.componentInstance.phoneUnavailable).toBeFalse();
     });
   });
 
