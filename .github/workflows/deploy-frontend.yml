@@ -38,25 +38,29 @@ jobs:
       # From here on: Vercel's own documented GitHub Actions recipe. Git-based auto-deploy is
       # disconnected in the Vercel dashboard, so nothing else can put a build into production -
       # this workflow is the only path, and only after the test step above has succeeded.
+      #
+      # Deliberately no working-directory here, unlike the steps above. The Vercel project's own
+      # Root Directory setting is "ojas-frontend" (vercel.json lives there), and the CLI applies
+      # that itself once it knows the project - running these three from the repo root is what
+      # actually resolves correctly. Pointing working-directory at ojas-frontend here applies the
+      # root directory twice, and the build silently produces its output in a location the
+      # deploy step then can't find.
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Pull Vercel project settings
-        working-directory: ./ojas-frontend
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Build via Vercel
-        working-directory: ./ojas-frontend
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy prebuilt output
-        working-directory: ./ojas-frontend
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
