@@ -255,6 +255,27 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task SendPhoneLoginOtp_WhenMsg91IsNotConfigured_Returns503()
+    {
+        // The mock's default (set in the constructor) matches the real, currently-unconfigured
+        // Msg91PhoneOtpSender - this is production's actual behaviour today, not a hypothetical.
+        var result = await _sut.SendPhoneLoginOtp(new PhoneLoginRequest("9123456789", "test-turnstile-token"));
+
+        var objectResult = result.ShouldBeOfType<ObjectResult>();
+        objectResult.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task SendPhoneLoginOtp_TurnstileFails_ReturnsBadRequest_BeforeCheckingConfiguration()
+    {
+        _turnstileVerifierMock.Setup(v => v.VerifyAsync(It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
+
+        var result = await _sut.SendPhoneLoginOtp(new PhoneLoginRequest("9123456789", "bad-token"));
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
     public async Task Login_InvalidCredentials_ReturnsUnauthorized()
     {
         _usersMock.SetupFind(new List<User>());

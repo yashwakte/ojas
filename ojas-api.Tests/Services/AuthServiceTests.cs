@@ -218,6 +218,53 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task IsLoginablePhoneAsync_ReturnsTrue_ForAVerifiedCustomer()
+    {
+        var user = MakeUser(phone: "9123456789", role: UserRoles.Customer, isEmailVerified: true);
+        _usersMock.SetupFind(new List<User> { user });
+
+        (await _sut.IsLoginablePhoneAsync("9123456789")).ShouldBeTrue();
+    }
+
+    // The staff-exclusion and unverified-account exclusion both live in the Find(...) filter
+    // itself, which SetupFind can't evaluate (it returns the full seeded list regardless of the
+    // predicate - see MongoCollectionMockExtensions' own doc comment). Those two branches are
+    // covered by the Mongo2Go-backed integration suite instead, where the filter genuinely runs.
+
+    [Fact]
+    public async Task IsLoginablePhoneAsync_ReturnsFalse_WhenNoUserHasThatNumber()
+    {
+        _usersMock.SetupFind(new List<User>());
+
+        (await _sut.IsLoginablePhoneAsync("9123456789")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task PhoneLoginAsync_IssuesASession_ForTheMatchingCustomer()
+    {
+        var user = MakeUser(phone: "9123456789", role: UserRoles.Customer);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.PhoneLoginAsync("9123456789");
+
+        result.ShouldNotBeNull();
+        result!.User.Phone.ShouldBe("9123456789");
+        result.Token.ShouldNotBeNullOrWhiteSpace();
+        // Not device-restricted - only staff sessions carry a bound device.
+        result.RawDeviceId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task PhoneLoginAsync_ReturnsNull_WhenNoCustomerHasThatNumber()
+    {
+        _usersMock.SetupFind(new List<User>());
+
+        var result = await _sut.PhoneLoginAsync("9123456789");
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task CreateStaffAsync_HappyPath_ForAdminRole_InsertsUser()
     {
         _usersMock.SetupFind(new List<User>());

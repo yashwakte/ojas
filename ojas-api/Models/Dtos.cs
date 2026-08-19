@@ -73,6 +73,17 @@ public record StaffDeviceResponse(
 	DateTime CreatedAt,
 	DateTime LastSeenAt);
 
+/// <summary>Customer-only: signing in with a phone number instead of email+password. Requires
+/// Turnstile since, unlike device/reset flows, nothing here already proves the caller controls
+/// a password - this is the sole anonymous entry point into the flow.</summary>
+public record PhoneLoginRequest(
+	[Required, MinLength(10), MaxLength(20)] string Phone,
+	[Required] string TurnstileToken);
+
+public record PhoneLoginVerifyRequest(
+	[Required, MinLength(10), MaxLength(20)] string Phone,
+	[Required, RegularExpression(@"^\d{6}$")] string Code);
+
 /// <summary>Returned by /register while the account is awaiting OTP verification - deliberately
 /// not an AuthResponse, since no session exists until the code is verified.</summary>
 public record RegisterPendingResponse(string Email, string Message, string? DevCode = null);

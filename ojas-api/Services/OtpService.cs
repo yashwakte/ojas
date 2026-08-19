@@ -113,6 +113,20 @@ public class OtpService
         return code;
     }
 
+    /// <summary>Same mechanism as SendPhoneOtpAsync but on its own channel (OtpChannels.PhoneLogin
+    /// vs Phone), so a code issued to sign in can't also verify the profile phone number, or the
+    /// reverse.</summary>
+    public async Task<string> SendPhoneLoginOtpAsync(string phone)
+    {
+        if (!_phoneOtpSender.IsConfigured)
+            throw new InvalidOperationException("Phone login is not available yet.");
+
+        var code = GenerateCode();
+        await StoreCodeAsync(phone, OtpChannels.PhoneLogin, code);
+        await _phoneOtpSender.SendAsync(phone, code);
+        return code;
+    }
+
     public async Task<bool> VerifyAsync(string target, string channel, string code)
     {
         var normalizedTarget = Normalize(target);

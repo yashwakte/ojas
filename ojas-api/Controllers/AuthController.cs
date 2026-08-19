@@ -514,6 +514,44 @@ public class AuthController : ControllerBase
         return Ok(IssueSession(result));
     }
 
+    /// <summary>Step one of signing in by phone instead of email+password - customers only, see
+    /// AuthService.IsLoginablePhoneAsync. 503s until MSG91 is configured; Turnstile-gated since,
+    /// unlike device/send-otp, nothing here already proves the caller controls anything.</summary>
+    [HttpPost("phone-login/send-otp")]
+    public async Task<IActionResult> SendPhoneLoginOtp([FromBody] PhoneLoginRequest request)
+    {
+        if (!await VerifyTurnstileAsync(request.TurnstileToken))
+            return BadRequest(new { message = "Verification failed. Please try again." });
+
+        if (!_otpService.IsPhoneOtpConfigured)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Phone login isn't available yet." });
+
+        string? devCode = null;
+        if (await _authService.IsLoginablePhoneAsync(request.Phone))
+        {
+            var code = await _otpService.SendPhoneLoginOtpAsync(request.Phone);
+            devCode = _env.IsProduction() ? null : code;
+        }
+
+        return Ok(new { message = "If that number is registered, we've sent a code.", devCode });
+    }
+
+    /// <summary>Step two: a correct code signs the customer in directly - no password, no device
+    /// concept, since phone login only ever applies to customers.</summary>
+    [HttpPost("phone-login/verify")]
+    public async Task<ActionResult<AuthResponse>> VerifyPhoneLogin([FromBody] PhoneLoginVerifyRequest request)
+    {
+        var isValid = await _otpService.VerifyAsync(request.Phone, OtpChannels.PhoneLogin, request.Code);
+        if (!isValid)
+            return BadRequest(new { message = "That code is invalid or has expired." });
+
+        var result = await _authService.PhoneLoginAsync(request.Phone);
+        if (result == null)
+            return BadRequest(new { message = "That code is invalid or has expired." });
+
+        return Ok(IssueSession(result));
+    }
+
     [HttpGet("staff/{userId}/devices")]
     [Authorize(Roles = UserRoles.Admin)]
     [DisableRateLimiting]

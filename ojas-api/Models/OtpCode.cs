@@ -42,4 +42,9 @@ public static class OtpChannels
     /// <summary>Password reset. Separate channel again, so requesting a reset never invalidates
     /// a device-approval code the same person is midway through using.</summary>
     public const string PasswordReset = "password-reset";
+
+    /// <summary>Signing in with a phone number instead of email+password. Kept separate from
+    /// Phone (profile verification while already logged in) so a login code can't be replayed
+    /// to verify a phone number, or vice versa.</summary>
+    public const string PhoneLogin = "phone-login";
 }

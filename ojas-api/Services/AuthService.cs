@@ -138,6 +138,37 @@ public class AuthService
         return user;
     }
 
+    /// <summary>Whether SendPhoneLoginOtpAsync should actually be triggered for this number.
+    /// Deliberately staff-excluded: phone login has no device concept, so allowing it for
+    /// admin/delivery would let anyone with the phone bypass the single-device restriction
+    /// entirely from any browser. Also gated on IsEmailVerified so a code can't hand a session
+    /// to an account that never finished registration.</summary>
+    public async Task<bool> IsLoginablePhoneAsync(string phone)
+    {
+        var normalizedPhone = NormalizePhone(phone);
+        return await _db.Users
+            .Find(u => u.Phone == normalizedPhone && u.Role == UserRoles.Customer && u.IsEmailVerified)
+            .AnyAsync();
+    }
+
+    /// <summary>Issues a session for the customer owning this phone number. Assumes a
+    /// SendPhoneLoginOtpAsync code has already been verified for it - this method itself does
+    /// not re-check eligibility, since a code could only ever have been issued to an eligible
+    /// number in the first place.</summary>
+    public async Task<AuthResult?> PhoneLoginAsync(string phone)
+    {
+        var normalizedPhone = NormalizePhone(phone);
+        var user = await _db.Users
+            .Find(u => u.Phone == normalizedPhone && u.Role == UserRoles.Customer)
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+            return null;
+
+        // Not device-restricted - only staff are.
+        return await IssueSessionAsync(user, null);
+    }
+
     /// <summary>Binds the calling device to a staff account and issues a session on it. Because
     /// the cap is one device, this replaces whatever was bound before and logs that device out.</summary>
     public async Task<AuthResult> EnrollDeviceAndIssueSessionAsync(

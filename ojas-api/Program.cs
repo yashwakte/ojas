@@ -292,7 +292,8 @@ app.Use(async (context, next) =>
         path.StartsWithSegments("/api/auth/reset-password") ||
         path.StartsWithSegments("/api/auth/device/send-otp") ||
         path.StartsWithSegments("/api/auth/device/enroll") ||
-        path.StartsWithSegments("/api/auth/accept-invite");
+        path.StartsWithSegments("/api/auth/accept-invite") ||
+        path.StartsWithSegments("/api/auth/phone-login");
 
     if (!isAuthBootstrapEndpoint &&
         context.User.Identity?.IsAuthenticated == true &&
