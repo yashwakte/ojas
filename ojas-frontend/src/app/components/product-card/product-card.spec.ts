@@ -112,14 +112,16 @@ describe('ProductCard', () => {
     expect(fixture.nativeElement.querySelector('.pstock-veil').textContent).toContain('Out of stock');
   });
 
-  it('warns how many are left when stock is low but not gone', () => {
+  it('stays purchasable when stock is low but not gone, without showing the exact count', () => {
+    // The low-stock count is detail-page information, not something a browsing card needs to
+    // surface - it stays purchasable here, and there's nothing "plow-stock" left to query.
     const fixture = create();
     fixture.componentRef.setInput('product', { ...product, stockQuantity: 2, lowStockThreshold: 5 });
     fixture.detectChanges();
 
     const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.home-add-cart-btn');
     expect(addBtn.disabled).toBeFalse();
-    expect(fixture.nativeElement.querySelector('.plow-stock').textContent).toContain('Only 2 left');
+    expect(fixture.nativeElement.querySelector('.plow-stock')).toBeNull();
   });
 
   it('is not purchasable when the admin has disabled it, whatever the stock', () => {

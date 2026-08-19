@@ -9,7 +9,7 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
-import { Product, isLowStock, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import { Product, isOutOfStock, isPurchasable } from '../../models/interfaces';
 import { DecimalPipe } from '@angular/common';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
@@ -22,7 +22,6 @@ import { OrderPickingBanner } from '../../components/order-picking-banner/order-
 })
 export class Products {
   readonly isOutOfStock = isOutOfStock;
-  readonly isLowStock = isLowStock;
   readonly isPurchasable = isPurchasable;
 
   private readonly orderEditDraft = inject(OrderEditDraftService);

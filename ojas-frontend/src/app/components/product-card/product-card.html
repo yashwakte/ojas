@@ -12,8 +12,6 @@
     <span class="pcat">{{ product().category }}</span>
     @if (outOfStock()) {
       <span class="pstock-veil"><span>Out of stock</span></span>
-    } @else if (lowStock()) {
-      <span class="plow-stock">Only {{ product().stockQuantity }} left</span>
     }
   </div>
   <div class="pbody-top">

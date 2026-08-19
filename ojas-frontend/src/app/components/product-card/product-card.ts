@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe } from '@angular/common';
-import { Product, isLowStock, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import { Product, isOutOfStock, isPurchasable } from '../../models/interfaces';
 
 @Component({
   selector: 'app-product-card',
@@ -24,7 +24,6 @@ export class ProductCard {
 
   readonly purchasable = computed(() => isPurchasable(this.product()));
   readonly outOfStock = computed(() => isOutOfStock(this.product()));
-  readonly lowStock = computed(() => isLowStock(this.product()));
 
   onImgError(event: Event): void {
     const img = event.target as HTMLImageElement;

@@ -48,8 +48,6 @@
               </div>
               @if (isOutOfStock(product)) {
                 <span class="stock-veil"><span>Out of Stock</span></span>
-              } @else if (isLowStock(product)) {
-                <span class="low-stock-tag">Only {{ product.stockQuantity }} left</span>
               }
             </div>
 <div class="product-info-top">
