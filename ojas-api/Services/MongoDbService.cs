@@ -35,6 +35,16 @@ public class MongoDbService : IMongoDbService
     {
         try
         {
+            // Serves GetByCategoryAsync, which every category-filtered storefront request
+            // hits. No index existed on Products at all before this - harmless at today's
+            // ~13 products, but a full collection scan on every category browse is exactly
+            // the kind of thing that stops being harmless once the catalog actually grows.
+            var productCategoryIndex = new CreateIndexModel<Product>(
+                Builders<Product>.IndexKeys.Ascending(p => p.Category),
+                new CreateIndexOptions { Name = "product_category" }
+            );
+            Products.Indexes.CreateOne(productCategoryIndex);
+
             var emailIndex = new CreateIndexModel<User>(
                 Builders<User>.IndexKeys.Ascending(u => u.Email),
                 new CreateIndexOptions { Unique = true, Name = "unique_email" }
