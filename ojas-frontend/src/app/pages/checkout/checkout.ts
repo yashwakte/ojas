@@ -200,6 +200,10 @@ export class Checkout implements OnInit {
         this.loading.set(false);
         this.orderId.set(res.id);
         this.orderPlaced.set(true);
+        // The success view replaces the whole page via @if, but the browser stays at whatever
+        // scroll position the "Place Order" button was at - usually deep in a long form, so
+        // without this the confirmation renders off-screen and the footer shows instead.
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         this.checkoutService
           .items()
           .forEach((item) => this.cartService.removeFromCart(item.product.id));

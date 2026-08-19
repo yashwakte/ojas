@@ -229,6 +229,19 @@ describe('Checkout', () => {
     expect(productServiceSpy.loadProducts).toHaveBeenCalled();
   });
 
+  it('placeOrder scrolls to top on success, so the confirmation is visible rather than the footer', () => {
+    orderServiceSpy.placeOrder.and.returnValue(of(order));
+    // window.scrollTo is overloaded ((x,y) vs (options)), which makes toHaveBeenCalledWith's
+    // inferred signature fight the typing - asserting on the captured call args directly
+    // sidesteps that instead.
+    const scrollToSpy = spyOn(window, 'scrollTo').and.stub();
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+
+    expect(scrollToSpy.calls.mostRecent().args[0]).toEqual({ top: 0, behavior: 'smooth' });
+  });
+
   it('placeOrder saves a new address when opted in and none is currently selected', () => {
     orderServiceSpy.placeOrder.and.returnValue(of(order));
     userServiceSpy.saveAddress.and.returnValue(of({}));
