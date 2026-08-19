@@ -1,14 +1,16 @@
-name: Build Backend
+name: Test and Deploy Backend
 
 on:
   push:
     branches: [main]
     paths:
       - "ojas-api/**"
+      - "ojas-api.Tests/**"
+      - "Ojas.sln"
   workflow_dispatch:
 
 jobs:
-  build:
+  test-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,8 +20,16 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Build
+      # Runs the whole solution's test suite (Mongo2Go spins up its own embedded mongod, no
+      # external database needed). Nothing downstream runs if this fails.
+      - name: Run tests
+        run: dotnet test Ojas.sln
+
+      - name: Build (Release, as a build-health check independent of the test config)
         working-directory: ./ojas-api
         run: dotnet publish -c Release -o ./publish
 
-      # Deployment is handled automatically by Render on push to main
+      # Render builds and deploys on its own once pinged - Auto-Deploy is off in its dashboard,
+      # so this hook is now the only way a deploy happens.
+      - name: Trigger Render deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
