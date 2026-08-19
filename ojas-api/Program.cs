@@ -11,6 +11,23 @@ using OjasApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Inert until a DSN exists, same posture as Brevo/MSG91 - nothing here needs to happen before
+// the rest of the app works, and there's no external account to wait on to keep building.
+// Create a free Sentry account, make a project, and set Sentry:Dsn to switch this on.
+var sentryDsn = builder.Configuration["Sentry:Dsn"];
+if (!string.IsNullOrWhiteSpace(sentryDsn))
+{
+    builder.WebHost.UseSentry(options =>
+    {
+        options.Dsn = sentryDsn;
+        options.Environment = builder.Environment.EnvironmentName;
+        // Traces are billed per-event on Sentry's free tier; errors are what actually matter
+        // here, so this stays off rather than defaulting to a sample rate that quietly burns
+        // quota the same way the earlier per-order email notification would have.
+        options.TracesSampleRate = 0.0;
+    });
+}
+
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
     throw new InvalidOperationException("Jwt:Key must be set and at least 32 characters.");
@@ -56,6 +73,7 @@ builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<StaffInviteService>();
+builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // Real mail is only worth sending in Production. Everywhere else the OTP already comes back in
 // the response as devCode and is shown in the UI, so a real send would just spend free-tier
 // quota - set Email:SendInDevelopment=true to opt back in when deliverability itself is what
@@ -202,9 +220,6 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
-
 // Seed products (non-blocking)
 _ = Task.Run(async () =>
 {
@@ -317,6 +332,10 @@ app.Use(async (context, next) =>
 
 app.UseAuthorization();
 app.MapControllers();
+
+// Deliberately outside [Authorize]/rate-limiting - Render (or any external monitor) needs to
+// reach this anonymously and frequently to know whether to restart the service.
+app.MapHealthChecks("/health");
 
 app.Run();
 
