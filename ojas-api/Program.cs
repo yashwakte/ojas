@@ -337,6 +337,13 @@ app.MapControllers();
 // reach this anonymously and frequently to know whether to restart the service.
 app.MapHealthChecks("/health");
 
+// TEMPORARY - proves the Sentry wiring above actually delivers events end to end. Hit once,
+// confirm it in the Sentry dashboard, then remove this endpoint in the very next commit.
+app.MapGet("/api/debug/sentry-test", () =>
+{
+    throw new Exception("Sentry verification test - safe to ignore.");
+});
+
 app.Run();
 
 // Exposed so WebApplicationFactory<Program> in the test project can bootstrap this app in-memory.
