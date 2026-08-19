@@ -1,0 +1,65 @@
+name: MongoDB Backup
+
+on:
+  schedule:
+    # 20:30 UTC = ~2:00 AM IST, off-peak for Ojas's customer base.
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-22.04
+    services:
+      # A throwaway target to restore into and count documents against, proving the dump this
+      # run just took is actually restorable - not just that mongodump exited 0.
+      mongo-verify:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+
+    steps:
+      # Pinned to ubuntu-22.04 (rather than ubuntu-latest) so this apt repo, keyed to a specific
+      # Ubuntu codename, doesn't silently break the next time GitHub bumps what "latest" points to.
+      - name: Install MongoDB Database Tools
+        run: |
+          wget -qO - https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
+          echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-database-tools
+
+      - name: Wait for the verification MongoDB container to accept connections
+        run: |
+          for i in $(seq 1 30); do
+            nc -z localhost 27017 && exit 0
+            sleep 1
+          done
+          echo "::error::mongo-verify service did not become ready in time"
+          exit 1
+
+      # Uses the read-only backup-reader Atlas user (MONGODB_BACKUP_URI), never the API's own
+      # read/write connection string - a leaked backup secret should never be able to write or
+      # delete anything.
+      - name: Dump OjasDb
+        run: mongodump --uri="${{ secrets.MONGODB_BACKUP_URI }}" --archive=ojas-backup.archive --gzip
+
+      # Restores into the disposable service container (never anything real) purely to prove
+      # this specific archive is restorable, then checks a real document count came back - a
+      # restore that "succeeds" into an empty database would otherwise pass silently.
+      - name: Verify the dump restores cleanly
+        run: |
+          mongorestore --uri="mongodb://localhost:27017" --archive=ojas-backup.archive --gzip --nsInclude="OjasDb.*" 2>&1 | tee restore.log
+          RESTORED_USERS=$(grep -oP "finished restoring OjasDb\.users \(\K[0-9]+" restore.log || echo 0)
+          echo "Restored users collection document count: $RESTORED_USERS"
+          if [ "$RESTORED_USERS" -lt 1 ]; then
+            echo "::error::Restore verification failed - 0 documents restored into OjasDb.users."
+            exit 1
+          fi
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ojas-mongodb-backup-${{ github.run_id }}
+          path: ojas-backup.archive
+          # GitHub's own cap either way - this just makes the intended retention explicit rather
+          # than relying on whatever the account-level default happens to be.
+          retention-days: 30
