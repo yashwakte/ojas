@@ -375,11 +375,9 @@ export interface UserProfileResponse {
   savedAddresses: SavedAddress[];
 }
 
-/** Topic, when set, comes from clicking a quick-reply button (or the widget remembering "we're
- * mid-lookup", e.g. after asking which product to check) and is trusted directly by the backend
- * rather than re-guessed from Message. */
+/** Topic always comes from a quick-reply button the widget rendered - there is no free-text
+ * input. Undefined means "show the greeting and main menu" (the very first request). */
 export interface ChatbotRequest {
-  message?: string;
   topic?: string;
 }
 
@@ -388,10 +386,8 @@ export interface ChatbotQuickReply {
   topic: string;
 }
 
-/** An empty quickReplies list means the bot is still waiting on more input for the current
- * topic (e.g. "which product?") - the widget keeps sending that topic with the next message
- * until quickReplies comes back non-empty. Escalate is a display hint (surface the contact
- * details more prominently), not a separate channel - reply already contains everything. */
+/** Escalate is a display hint (surface the contact details more prominently), not a separate
+ * channel - reply already contains everything the bot has to say. */
 export interface ChatbotResponse {
   reply: string;
   escalate: boolean;

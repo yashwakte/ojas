@@ -2,30 +2,39 @@ import { Injectable, signal } from '@angular/core';
 
 export interface ChatbotBubblePosition {
   /** Distance from the right/bottom viewport edges, in px - anchoring to edges (rather than
-   * raw x/y from the top-left) keeps a dragged position sane after the viewport itself resizes
-   * (e.g. rotating a phone), instead of the bubble ending up stranded off-screen. */
+   * raw x/y from the top-left) keeps a dragged position sane if the viewport itself resizes
+   * mid-session (e.g. rotating a phone), instead of the bubble ending up stranded off-screen. */
   right: number;
   bottom: number;
 }
 
 const REMOVED_KEY = 'ojas_chatbot_removed';
-const POSITION_KEY = 'ojas_chatbot_position';
-// Clear of the mobile bottom nav by default, with visible breathing room above it - a user can
-// always drag it wherever they actually want, this just governs where it starts out.
-const DEFAULT_POSITION: ChatbotBubblePosition = { right: 20, bottom: 180 };
+
+// Matches header.scss's .mobile-bottom-nav breakpoint - below this width there's a fixed,
+// full-width bottom nav bar the bubble needs real clearance above; at or above it there's no
+// nav to clear, so it can sit close to the corner.
+const MOBILE_BREAKPOINT_PX = 900;
+
+function defaultPosition(): ChatbotBubblePosition {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT_PX;
+  return isMobile ? { right: 20, bottom: 180 } : { right: 20, bottom: 20 };
+}
 
 /**
  * Shared state for the single, app-wide chatbot widget instance (declared once in app.html) -
  * lets other entry points (the hamburger menu, a "need help?" link on My Orders) open the same
- * widget rather than each embedding their own copy. Position and the "removed" flag persist
- * across page loads via localStorage; the open/closed state deliberately does not, so the panel
- * doesn't reappear unexpectedly on a fresh visit.
+ * widget rather than each embedding their own copy.
+ *
+ * Only "removed" persists across page loads (via localStorage) - deliberately hiding the bubble
+ * is a real choice worth remembering. Position is session-only: a drag lasts until the next full
+ * page reload, then resets to the viewport-appropriate default, rather than a stale drag from a
+ * different screen size (or an accidental one-off drag) sticking around forever.
  */
 @Injectable({ providedIn: 'root' })
 export class ChatbotUiService {
   private readonly _removed = signal(this.loadRemoved());
   private readonly _open = signal(false);
-  private readonly _position = signal<ChatbotBubblePosition>(this.loadPosition());
+  private readonly _position = signal<ChatbotBubblePosition>(defaultPosition());
 
   readonly removed = this._removed.asReadonly();
   readonly open = this._open.asReadonly();
@@ -49,12 +58,16 @@ export class ChatbotUiService {
 
   setPosition(position: ChatbotBubblePosition): void {
     this._position.set(position);
-    this.trySet(POSITION_KEY, JSON.stringify(position));
   }
 
   private setRemoved(removed: boolean): void {
     this._removed.set(removed);
-    this.trySet(REMOVED_KEY, removed ? '1' : '0');
+    try {
+      localStorage.setItem(REMOVED_KEY, removed ? '1' : '0');
+    } catch {
+      // Storage can be unavailable (private browsing, quota exceeded) - non-fatal, it just
+      // won't be remembered next visit.
+    }
   }
 
   private loadRemoved(): boolean {
@@ -62,28 +75,6 @@ export class ChatbotUiService {
       return localStorage.getItem(REMOVED_KEY) === '1';
     } catch {
       return false;
-    }
-  }
-
-  private loadPosition(): ChatbotBubblePosition {
-    try {
-      const raw = localStorage.getItem(POSITION_KEY);
-      if (!raw) return DEFAULT_POSITION;
-      const parsed = JSON.parse(raw);
-      if (typeof parsed?.right === 'number' && typeof parsed?.bottom === 'number') return parsed;
-    } catch {
-      // Corrupt/unavailable storage - fall through to the default rather than throwing.
-    }
-    return DEFAULT_POSITION;
-  }
-
-  // Storage can be unavailable (private browsing, quota exceeded) - persistence failing silently
-  // just means the position/removed state resets next visit, never something to crash over.
-  private trySet(key: string, value: string): void {
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      /* non-fatal */
     }
   }
 }

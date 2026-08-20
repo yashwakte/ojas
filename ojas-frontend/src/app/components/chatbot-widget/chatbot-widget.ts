@@ -8,16 +8,18 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { ChatbotService } from '../../services/chatbot.service';
 import { ChatbotUiService } from '../../services/chatbot-ui.service';
 import { ChatbotQuickReply } from '../../models/interfaces';
 
 const CLOSE_MS = 260;
 const DRAG_THRESHOLD_PX = 6;
-const LONG_PRESS_MS = 550;
 const BUBBLE_SIZE = 58;
 const EDGE_MARGIN = 4;
+const REMOVE_DROP_RADIUS_PX = 55;
 
 interface ChatMessage {
   from: 'bot' | 'user';
@@ -28,47 +30,58 @@ interface ChatMessage {
 
 /**
  * A scripted (not LLM) support widget: every reply comes straight from the backend, which only
- * ever answers from live data or fixed, business-approved text. The widget itself just tracks
- * "are we still gathering info for the last topic" - an empty quickReplies list from the backend
- * means yes, keep sending that topic; a non-empty one means the branch resolved, back to the menu.
+ * ever answers from live data or fixed, business-approved text. There is no free-text input -
+ * the bot can only ever say things it's actually prepared to answer, so every turn is a
+ * quick-reply button the backend itself generated.
  *
  * Open/removed/position state lives in ChatbotUiService, shared with other entry points (the
  * hamburger menu, My Orders) - this component is the one place in the app it's rendered.
  */
 @Component({
   selector: 'app-chatbot-widget',
-  imports: [FormsModule],
+  imports: [],
   templateUrl: './chatbot-widget.html',
   styleUrl: './chatbot-widget.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChatbotWidget {
   private readonly chatbot = inject(ChatbotService);
+  private readonly router = inject(Router);
   readonly ui = inject(ChatbotUiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
+  private readonly removeTargetEl = viewChild<ElementRef<HTMLDivElement>>('removeTargetEl');
 
   readonly closing = signal(false);
   readonly messages = signal<ChatMessage[]>([]);
-  readonly inputValue = signal('');
   readonly busy = signal(false);
-  readonly showRemoveHint = signal(false);
+  readonly showRemoveTarget = signal(false);
+  readonly nearRemoveTarget = signal(false);
+  // A few auth/onboarding screens are meant to be distraction-free - the bubble hides there
+  // entirely, panel included, rather than floating over the Turnstile widget or the form.
+  readonly hiddenOnRoute = signal(this.isHiddenRoute(this.router.url));
 
   private hasStarted = false;
-  private lastTopic: string | null = null;
   private readonly timers: ReturnType<typeof setTimeout>[] = [];
 
   private dragStart: { pointerX: number; pointerY: number; right: number; bottom: number } | null = null;
   private dragMoved = false;
-  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastPointer = { x: 0, y: 0 };
 
   constructor() {
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((event) => this.hiddenOnRoute.set(this.isHiddenRoute(event.urlAfterRedirects)));
+
     // Whatever opened the panel - the bubble itself, the hamburger menu, or My Orders - this is
     // where the very first greeting gets requested, exactly once per page session.
     effect(() => {
       if (!this.ui.open() || this.hasStarted) return;
       this.hasStarted = true;
-      this.request({});
+      this.request(undefined);
     });
 
     // Scroll to the newest message whenever the thread changes.
@@ -96,46 +109,32 @@ export class ChatbotWidget {
   sendQuickReply(reply: ChatbotQuickReply): void {
     if (this.busy()) return;
     this.messages.update((all) => [...all, { from: 'user', text: reply.label }]);
-    this.request({ topic: reply.topic });
+    this.request(reply.topic);
   }
 
-  sendTyped(): void {
-    const text = this.inputValue().trim();
-    if (!text || this.busy()) return;
-
-    this.inputValue.set('');
-    this.messages.update((all) => [...all, { from: 'user', text }]);
-    this.request({ message: text, topic: this.lastTopic ?? undefined });
-  }
-
-  // --- Drag-to-reposition + long-press-to-remove, unified over pointer events (mouse and touch
+  // --- Drag-to-reposition + drag-to-remove, unified over pointer events (mouse and touch
   // alike). A short tap with negligible movement opens/closes the panel; movement past the
-  // threshold is a drag; holding still past LONG_PRESS_MS surfaces the remove option instead. ---
+  // threshold is a drag, which immediately surfaces a drop-to-remove target at the bottom
+  // center of the screen for as long as the drag continues. ---
 
   onBubblePointerDown(event: PointerEvent): void {
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
     const pos = this.ui.position();
     this.dragStart = { pointerX: event.clientX, pointerY: event.clientY, right: pos.right, bottom: pos.bottom };
     this.dragMoved = false;
-
-    this.longPressTimer = setTimeout(() => {
-      if (!this.dragMoved) this.showRemoveHint.set(true);
-    }, LONG_PRESS_MS);
+    this.lastPointer = { x: event.clientX, y: event.clientY };
   }
 
   onBubblePointerMove(event: PointerEvent): void {
     if (!this.dragStart) return;
+    this.lastPointer = { x: event.clientX, y: event.clientY };
 
     const dx = event.clientX - this.dragStart.pointerX;
     const dy = event.clientY - this.dragStart.pointerY;
 
     if (!this.dragMoved && Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
       this.dragMoved = true;
-      this.showRemoveHint.set(false);
-      if (this.longPressTimer) {
-        clearTimeout(this.longPressTimer);
-        this.longPressTimer = null;
-      }
+      this.showRemoveTarget.set(true);
     }
 
     if (this.dragMoved) {
@@ -145,21 +144,23 @@ export class ChatbotWidget {
         right: clamp(this.dragStart.right - dx, EDGE_MARGIN, maxRight),
         bottom: clamp(this.dragStart.bottom - dy, EDGE_MARGIN, maxBottom),
       });
+      this.nearRemoveTarget.set(this.isOverRemoveTarget());
     }
   }
 
   onBubblePointerUp(): void {
-    if (this.longPressTimer) {
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
-    }
-
     const wasDrag = this.dragMoved;
-    const wasLongPress = this.showRemoveHint();
+    const dropOnRemove = wasDrag && this.isOverRemoveTarget();
     this.dragStart = null;
     this.dragMoved = false;
+    this.showRemoveTarget.set(false);
+    this.nearRemoveTarget.set(false);
 
-    if (wasDrag || wasLongPress) return; // position already applied live, or the hint is showing
+    if (dropOnRemove) {
+      this.ui.remove();
+      return;
+    }
+    if (wasDrag) return; // position already applied live during the move
 
     // A plain tap.
     if (this.ui.open()) {
@@ -169,26 +170,28 @@ export class ChatbotWidget {
     }
   }
 
-  confirmRemove(): void {
-    this.showRemoveHint.set(false);
-    this.ui.remove();
+  private isOverRemoveTarget(): boolean {
+    const target = this.removeTargetEl()?.nativeElement;
+    if (!target) return false;
+    const rect = target.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    return Math.hypot(this.lastPointer.x - cx, this.lastPointer.y - cy) <= REMOVE_DROP_RADIUS_PX;
   }
 
-  dismissRemoveHint(): void {
-    this.showRemoveHint.set(false);
+  private isHiddenRoute(url: string): boolean {
+    return url.startsWith('/login') || url.startsWith('/register');
   }
 
-  private request(payload: { message?: string; topic?: string }): void {
+  private request(topic: string | undefined): void {
     this.busy.set(true);
-    this.chatbot.ask(payload).subscribe({
+    this.chatbot.ask({ topic }).subscribe({
       next: (res) => {
         this.busy.set(false);
         this.messages.update((all) => [
           ...all,
           { from: 'bot', text: res.reply, quickReplies: res.quickReplies, escalate: res.escalate },
         ]);
-        // Empty quickReplies == the bot is still waiting on more input for this topic.
-        this.lastTopic = res.quickReplies.length === 0 ? (payload.topic ?? this.lastTopic) : null;
       },
       error: () => {
         this.busy.set(false);

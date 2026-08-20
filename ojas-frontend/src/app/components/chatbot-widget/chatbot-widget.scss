@@ -58,45 +58,39 @@
   }
 }
 
-.cw-remove-backdrop {
+// Appears at the bottom-center of the screen the instant a drag crosses the movement threshold
+// (see chatbot-widget.ts) and stays for the duration of the drag - drop the bubble on it to
+// remove. Grows and turns solid red once the bubble is actually within drop range, the same
+// "you're about to let go of this" feedback pattern as a phone's home-screen uninstall target.
+.cw-remove-target {
   position: fixed;
-  inset: 0;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
   z-index: 1002;
-  background: transparent;
-}
-
-.cw-remove-hint {
-  position: fixed;
-  z-index: 1003;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  animation: cwMsgIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.cw-remove-btn {
-  border: none;
-  border-radius: 100px;
-  padding: 9px 16px;
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 700;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
   color: var(--ojas-white, #fff);
-  background: linear-gradient(150deg, #d64545, #b32d2d);
-  box-shadow: 0 10px 26px rgba(179, 45, 45, 0.35);
-  cursor: pointer;
-  white-space: nowrap;
-}
+  background: rgba(179, 45, 45, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 10px 30px rgba(179, 45, 45, 0.3);
+  animation: cwRemoveTargetIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition:
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.18s ease;
 
-.cw-remove-note {
-  font-size: 0.7rem;
-  color: var(--ojas-text-light, #6b6b6b);
-  background: var(--ojas-white, #fff);
-  padding: 4px 10px;
-  border-radius: 100px;
-  box-shadow: var(--ojas-shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.06));
-  white-space: nowrap;
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  &--active {
+    background: linear-gradient(150deg, #d64545, #b32d2d);
+    transform: translateX(-50%) scale(1.25);
+  }
 }
 
 .cw-panel {
@@ -157,7 +151,7 @@
 .cw-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 16px 6px;
+  padding: 16px 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -243,63 +237,6 @@
   }
 }
 
-.cw-input-row {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border-top: 1px solid var(--ojas-border, #e0e0e0);
-  background: var(--ojas-white, #fff);
-}
-
-.cw-input {
-  flex: 1;
-  border: 1px solid var(--ojas-border, #e0e0e0);
-  border-radius: 100px;
-  padding: 9px 15px;
-  font: inherit;
-  font-size: 0.86rem;
-  color: var(--ojas-text, #2d2d2d);
-  background: var(--ojas-orange-bg, #fff8f6);
-  transition: border-color 0.2s ease;
-
-  &:focus {
-    outline: none;
-    border-color: var(--ojas-orange, #f25a1a);
-  }
-}
-
-.cw-send {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: none;
-  display: grid;
-  place-items: center;
-  color: var(--ojas-white, #fff);
-  background: linear-gradient(150deg, var(--ojas-orange, #f25a1a), var(--ojas-orange-dark, #d14500));
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    opacity 0.2s ease;
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  &:not(:disabled):hover {
-    transform: scale(1.06);
-  }
-}
-
 @keyframes cwIn {
   from {
     opacity: 0;
@@ -319,6 +256,17 @@
   to {
     opacity: 0;
     transform: translateY(10px) scale(0.96);
+  }
+}
+
+@keyframes cwRemoveTargetIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
   }
 }
 
@@ -351,7 +299,7 @@
   .cw-panel,
   .cw-bubble-msg,
   .cw-chip,
-  .cw-send {
+  .cw-remove-target {
     animation: none !important;
     transition: none !important;
   }

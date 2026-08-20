@@ -1,13 +1,21 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { of, throwError, Subject } from 'rxjs';
 import { ChatbotWidget } from './chatbot-widget';
 import { ChatbotService } from '../../services/chatbot.service';
 import { ChatbotUiService } from '../../services/chatbot-ui.service';
 import { ChatbotResponse } from '../../models/interfaces';
 
+// A trivial routed stub - the router just needs something to navigate to so NavigationEnd
+// actually fires and router.url actually updates, which an empty route table wouldn't do.
+@Component({ template: '' })
+class BlankStubPage {}
+
 describe('ChatbotWidget', () => {
   let chatbotServiceSpy: jasmine.SpyObj<ChatbotService>;
   let chatbotUi: ChatbotUiService;
+  let router: Router;
 
   const greeting: ChatbotResponse = {
     reply: 'Hi! I can help with orders, delivery, stock, or cancellations.',
@@ -38,9 +46,17 @@ describe('ChatbotWidget', () => {
 
     TestBed.configureTestingModule({
       imports: [ChatbotWidget],
-      providers: [{ provide: ChatbotService, useValue: chatbotServiceSpy }],
+      providers: [
+        { provide: ChatbotService, useValue: chatbotServiceSpy },
+        provideRouter([
+          { path: 'login', component: BlankStubPage },
+          { path: 'register', component: BlankStubPage },
+          { path: 'products', component: BlankStubPage },
+        ]),
+      ],
     });
     chatbotUi = TestBed.inject(ChatbotUiService);
+    router = TestBed.inject(Router);
   });
 
   afterEach(() => localStorage.clear());
@@ -57,12 +73,12 @@ describe('ChatbotWidget', () => {
   }
 
   it('starts closed with no messages sent', () => {
-    const fixture = create();
+    create();
     expect(chatbotUi.open()).toBeFalse();
     expect(chatbotServiceSpy.ask).not.toHaveBeenCalled();
   });
 
-  it('a plain tap on the bubble opens the panel and requests the greeting', () => {
+  it('a plain tap on the bubble opens the panel and requests the greeting with no topic', () => {
     const fixture = create();
     const widget = fixture.componentInstance;
 
@@ -71,7 +87,7 @@ describe('ChatbotWidget', () => {
     flush(fixture);
 
     expect(chatbotUi.open()).toBeTrue();
-    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({});
+    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({ topic: undefined });
     expect(widget.messages()).toEqual([jasmine.objectContaining({ from: 'bot', text: greeting.reply })]);
   });
 
@@ -83,7 +99,7 @@ describe('ChatbotWidget', () => {
     widget.onBubblePointerUp();
     flush(fixture);
 
-    widget.close(); // starts the closing animation
+    widget.close();
     chatbotServiceSpy.ask.calls.reset();
     chatbotUi.openChat();
     flush(fixture);
@@ -113,13 +129,17 @@ describe('ChatbotWidget', () => {
     }
   });
 
-  it('dragging past the threshold moves the bubble instead of opening it', () => {
+  it('dragging past the threshold moves the bubble, shows the remove target, and does not open the panel', () => {
     const fixture = create();
     const widget = fixture.componentInstance;
     const startPos = chatbotUi.position();
 
     widget.onBubblePointerDown(pointerEvent(300, 700));
     widget.onBubblePointerMove(pointerEvent(280, 650)); // moved 20px left, 50px up - past threshold
+    flush(fixture);
+
+    expect(widget.showRemoveTarget()).toBeTrue();
+
     widget.onBubblePointerUp();
     flush(fixture);
 
@@ -128,6 +148,7 @@ describe('ChatbotWidget', () => {
     // Moved left -> further from the right edge; moved up -> further from the bottom edge.
     expect(chatbotUi.position().right).toBeGreaterThan(startPos.right);
     expect(chatbotUi.position().bottom).toBeGreaterThan(startPos.bottom);
+    expect(widget.showRemoveTarget()).toBeFalse(); // hidden again once the drag ends
   });
 
   it('a tiny movement under the drag threshold still counts as a tap', () => {
@@ -140,62 +161,62 @@ describe('ChatbotWidget', () => {
     flush(fixture);
 
     expect(chatbotUi.open()).toBeTrue();
+    expect(widget.showRemoveTarget()).toBeFalse();
   });
 
-  it('holding still past the long-press delay surfaces the remove hint instead of opening', () => {
-    jasmine.clock().install();
-    try {
-      const fixture = create();
-      const widget = fixture.componentInstance;
-
-      widget.onBubblePointerDown(pointerEvent(300, 700));
-      jasmine.clock().tick(600);
-      widget.onBubblePointerUp();
-
-      expect(widget.showRemoveHint()).toBeTrue();
-      expect(chatbotUi.open()).toBeFalse();
-    } finally {
-      jasmine.clock().uninstall();
-    }
-  });
-
-  it('moving during a long-press cancels the remove hint (it becomes a drag instead)', () => {
-    jasmine.clock().install();
-    try {
-      const fixture = create();
-      const widget = fixture.componentInstance;
-
-      widget.onBubblePointerDown(pointerEvent(300, 700));
-      jasmine.clock().tick(300);
-      widget.onBubblePointerMove(pointerEvent(340, 700));
-      jasmine.clock().tick(400);
-
-      expect(widget.showRemoveHint()).toBeFalse();
-    } finally {
-      jasmine.clock().uninstall();
-    }
-  });
-
-  it('confirmRemove hides the bubble via the shared UI service', () => {
+  it('dropping on the remove target removes the bubble instead of just repositioning it', () => {
     const fixture = create();
     const widget = fixture.componentInstance;
-    widget.showRemoveHint.set(true);
+    // The real geometry (does the pointer's last position actually land on the rendered
+    // target?) is covered separately below - this test is about the control flow once that
+    // check comes back true.
+    spyOn(widget as unknown as { isOverRemoveTarget(): boolean }, 'isOverRemoveTarget').and.returnValue(true);
 
-    widget.confirmRemove();
+    widget.onBubblePointerDown(pointerEvent(300, 700));
+    widget.onBubblePointerMove(pointerEvent(200, 500));
+    widget.onBubblePointerUp();
+    flush(fixture);
 
     expect(chatbotUi.removed()).toBeTrue();
-    expect(widget.showRemoveHint()).toBeFalse();
+    expect(chatbotUi.open()).toBeFalse();
   });
 
-  it('dismissRemoveHint hides the hint without removing the bubble', () => {
+  it('dropping away from the remove target just finalizes the dragged position', () => {
     const fixture = create();
     const widget = fixture.componentInstance;
-    widget.showRemoveHint.set(true);
+    spyOn(widget as unknown as { isOverRemoveTarget(): boolean }, 'isOverRemoveTarget').and.returnValue(false);
 
-    widget.dismissRemoveHint();
+    widget.onBubblePointerDown(pointerEvent(300, 700));
+    widget.onBubblePointerMove(pointerEvent(200, 500));
+    widget.onBubblePointerUp();
 
     expect(chatbotUi.removed()).toBeFalse();
-    expect(widget.showRemoveHint()).toBeFalse();
+  });
+
+  it('the remove target, once actually rendered, sits where a dropped pointer is detected as "on" it', () => {
+    const fixture = create();
+    const widget = fixture.componentInstance;
+    document.body.appendChild(fixture.nativeElement);
+
+    try {
+      widget.onBubblePointerDown(pointerEvent(300, 700));
+      widget.onBubblePointerMove(pointerEvent(300, 600)); // cross the drag threshold
+      flush(fixture);
+
+      const targetEl = document.querySelector('.cw-remove-target') as HTMLElement;
+      expect(targetEl).withContext('remove target should be rendered while dragging').not.toBeNull();
+      const rect = targetEl.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      widget.onBubblePointerMove(pointerEvent(centerX, centerY));
+      widget.onBubblePointerUp();
+      flush(fixture);
+
+      expect(chatbotUi.removed()).toBeTrue();
+    } finally {
+      document.body.removeChild(fixture.nativeElement);
+    }
   });
 
   it('openChat from outside the widget (e.g. the hamburger menu) also triggers the greeting', () => {
@@ -205,7 +226,7 @@ describe('ChatbotWidget', () => {
     chatbotUi.openChat();
     flush(fixture);
 
-    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({});
+    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({ topic: undefined });
     expect(widget.messages().length).toBe(1);
   });
 
@@ -228,65 +249,23 @@ describe('ChatbotWidget', () => {
     );
   });
 
-  it('typing and sending a message asks with the typed text and clears the input', () => {
+  it('a quick reply is ignored while a request is in flight', () => {
+    const pending = new Subject<ChatbotResponse>();
+    chatbotServiceSpy.ask.and.returnValue(pending.asObservable());
     const fixture = create();
     const widget = fixture.componentInstance;
-    chatbotUi.openChat();
+
+    chatbotUi.openChat(); // kicks off the (still-pending) greeting request
     flush(fixture);
+    expect(widget.busy()).toBeTrue();
+
     chatbotServiceSpy.ask.calls.reset();
-    widget.inputValue.set('Is Jowar Flour in stock?');
-
-    widget.sendTyped();
-
-    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({ message: 'Is Jowar Flour in stock?', topic: undefined });
-    expect(widget.inputValue()).toBe('');
-  });
-
-  it('does nothing when sendTyped is called with only whitespace', () => {
-    const fixture = create();
-    const widget = fixture.componentInstance;
-    chatbotUi.openChat();
-    flush(fixture);
-    chatbotServiceSpy.ask.calls.reset();
-    widget.inputValue.set('   ');
-
-    widget.sendTyped();
+    widget.sendQuickReply({ label: 'Track my order', topic: 'order-status' });
 
     expect(chatbotServiceSpy.ask).not.toHaveBeenCalled();
-  });
 
-  it('an empty quickReplies response keeps the topic active for the next typed message', () => {
-    const fixture = create();
-    const widget = fixture.componentInstance;
-    chatbotUi.openChat();
-    flush(fixture);
-    chatbotServiceSpy.ask.and.returnValue(
-      of({ reply: 'Which product would you like me to check?', escalate: false, quickReplies: [] }),
-    );
-
-    widget.sendQuickReply({ label: 'Check product stock', topic: 'stock' });
-
-    chatbotServiceSpy.ask.calls.reset();
-    chatbotServiceSpy.ask.and.returnValue(
-      of({ reply: 'Jowar Flour is in stock (7 left).', escalate: false, quickReplies: greeting.quickReplies }),
-    );
-    widget.inputValue.set('Jowar Flour');
-    widget.sendTyped();
-
-    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({ message: 'Jowar Flour', topic: 'stock' });
-  });
-
-  it('a resolved answer (non-empty quickReplies) does not carry the topic into the next message', () => {
-    const fixture = create();
-    const widget = fixture.componentInstance;
-    chatbotUi.openChat();
-    flush(fixture); // greeting response has non-empty quickReplies already
-
-    chatbotServiceSpy.ask.calls.reset();
-    widget.inputValue.set('something else entirely');
-    widget.sendTyped();
-
-    expect(chatbotServiceSpy.ask).toHaveBeenCalledWith({ message: 'something else entirely', topic: undefined });
+    pending.next(greeting);
+    pending.complete();
   });
 
   it('a failed request shows a fallback message with the support number', () => {
@@ -302,24 +281,32 @@ describe('ChatbotWidget', () => {
     expect(messages[0].escalate).toBeTrue();
   });
 
-  it('quick replies and typed input are ignored while a request is in flight', () => {
-    const pending = new Subject<ChatbotResponse>();
-    chatbotServiceSpy.ask.and.returnValue(pending.asObservable());
-    const fixture = create();
-    const widget = fixture.componentInstance;
+  describe('hidden on auth routes', () => {
+    it('is hidden when created directly on /login', async () => {
+      await router.navigateByUrl('/login');
+      const fixture = create();
 
-    chatbotUi.openChat(); // kicks off the (still-pending) greeting request
-    flush(fixture);
-    expect(widget.busy()).toBeTrue();
+      expect(fixture.componentInstance.hiddenOnRoute()).toBeTrue();
+    });
 
-    chatbotServiceSpy.ask.calls.reset();
-    widget.sendQuickReply({ label: 'Track my order', topic: 'order-status' });
-    widget.inputValue.set('hello');
-    widget.sendTyped();
+    it('is visible on an ordinary route', async () => {
+      await router.navigateByUrl('/products');
+      const fixture = create();
 
-    expect(chatbotServiceSpy.ask).not.toHaveBeenCalled();
+      expect(fixture.componentInstance.hiddenOnRoute()).toBeFalse();
+    });
 
-    pending.next(greeting);
-    pending.complete();
+    it('hides itself when navigating to /register mid-session, and reappears after navigating away', async () => {
+      const fixture = create();
+      expect(fixture.componentInstance.hiddenOnRoute()).toBeFalse();
+
+      await router.navigateByUrl('/register');
+      flush(fixture);
+      expect(fixture.componentInstance.hiddenOnRoute()).toBeTrue();
+
+      await router.navigateByUrl('/products');
+      flush(fixture);
+      expect(fixture.componentInstance.hiddenOnRoute()).toBeFalse();
+    });
   });
 });

@@ -4,6 +4,12 @@ import { ChatbotUiService } from './chatbot-ui.service';
 describe('ChatbotUiService', () => {
   let service: ChatbotUiService;
 
+  // Karma's headless browser window may or may not be "mobile width" - assert against whichever
+  // branch is actually true here rather than hardcoding one, so this test isn't coupled to a
+  // specific test-runner viewport size.
+  const expectedDefaultPosition = () =>
+    window.innerWidth <= 900 ? { right: 20, bottom: 180 } : { right: 20, bottom: 20 };
+
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({});
@@ -12,10 +18,10 @@ describe('ChatbotUiService', () => {
 
   afterEach(() => localStorage.clear());
 
-  it('starts closed, not removed, at the default bottom-right position', () => {
+  it('starts closed, not removed, at the viewport-appropriate default position', () => {
     expect(service.open()).toBeFalse();
     expect(service.removed()).toBeFalse();
-    expect(service.position()).toEqual({ right: 20, bottom: 180 });
+    expect(service.position()).toEqual(expectedDefaultPosition());
   });
 
   it('openChat opens the panel', () => {
@@ -58,20 +64,17 @@ describe('ChatbotUiService', () => {
     expect(reloaded.removed()).toBeTrue();
   });
 
-  it('setPosition updates and persists the dragged position', () => {
+  it('setPosition updates the live position', () => {
     service.setPosition({ right: 140, bottom: 260 });
 
     expect(service.position()).toEqual({ right: 140, bottom: 260 });
-
-    const reloaded = new ChatbotUiService();
-    expect(reloaded.position()).toEqual({ right: 140, bottom: 260 });
   });
 
-  it('falls back to the default position when localStorage holds malformed data', () => {
-    localStorage.setItem('ojas_chatbot_position', 'not json');
+  it('a dragged position does NOT carry over to a fresh service instance (a real page refresh)', () => {
+    service.setPosition({ right: 140, bottom: 260 });
 
     const reloaded = new ChatbotUiService();
 
-    expect(reloaded.position()).toEqual({ right: 20, bottom: 180 });
+    expect(reloaded.position()).toEqual(expectedDefaultPosition());
   });
 });
