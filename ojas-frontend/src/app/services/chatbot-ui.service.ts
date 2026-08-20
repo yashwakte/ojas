@@ -11,13 +11,14 @@ export interface ChatbotBubblePosition {
 const REMOVED_KEY = 'ojas_chatbot_removed';
 
 // Matches header.scss's .mobile-bottom-nav breakpoint - below this width there's a fixed,
-// full-width bottom nav bar the bubble needs real clearance above; at or above it there's no
-// nav to clear, so it can sit close to the corner.
+// full-width bottom nav bar. The mobile default below is the user's own dragged position,
+// read directly from DevTools and pinned as the starting point rather than estimated from a
+// screenshot; at or above this width there's no nav, so it can sit close to the corner instead.
 const MOBILE_BREAKPOINT_PX = 900;
 
 function defaultPosition(): ChatbotBubblePosition {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT_PX;
-  return isMobile ? { right: 20, bottom: 180 } : { right: 20, bottom: 20 };
+  return isMobile ? { right: 8, bottom: 70 } : { right: 20, bottom: 20 };
 }
 
 /**

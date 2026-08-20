@@ -8,7 +8,7 @@ describe('ChatbotUiService', () => {
   // branch is actually true here rather than hardcoding one, so this test isn't coupled to a
   // specific test-runner viewport size.
   const expectedDefaultPosition = () =>
-    window.innerWidth <= 900 ? { right: 20, bottom: 180 } : { right: 20, bottom: 20 };
+    window.innerWidth <= 900 ? { right: 8, bottom: 70 } : { right: 20, bottom: 20 };
 
   beforeEach(() => {
     localStorage.clear();
