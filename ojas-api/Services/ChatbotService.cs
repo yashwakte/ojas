@@ -8,6 +8,10 @@ namespace OjasApi.Services;
 /// the existing read-only service methods, or from a small set of fixed, human-approved strings
 /// for things like the cancellation policy. Nothing here writes anything - the bot can look things
 /// up and hand off to a human, never take an action on someone's behalf.
+///
+/// Every request names a fixed topic directly, from a quick-reply the frontend rendered - there
+/// is no free-text input and nothing here is ever guessed from typed text, so a request can never
+/// name something the bot isn't actually prepared to answer.
 /// </summary>
 public class ChatbotService
 {
@@ -36,45 +40,24 @@ public class ChatbotService
 
     public async Task<ChatbotResponse> AnswerAsync(ChatbotRequest request, ClaimsPrincipal user)
     {
-        var topic = string.IsNullOrWhiteSpace(request.Topic) ? DetectTopic(request.Message) : request.Topic;
+        var topic = request.Topic;
+
+        if (string.IsNullOrWhiteSpace(topic))
+            return AnswerGreeting();
+
+        if (topic.StartsWith(ChatbotTopics.StockProductPrefix, StringComparison.Ordinal))
+            return await AnswerStockForProductAsync(topic[ChatbotTopics.StockProductPrefix.Length..]);
 
         return topic switch
         {
             ChatbotTopics.OrderStatus => await AnswerOrderStatusAsync(user),
             ChatbotTopics.DeliveryCharge => await AnswerDeliveryChargeAsync(),
-            ChatbotTopics.Stock => await AnswerStockAsync(request.Message),
+            ChatbotTopics.Stock => await AnswerStockMenuAsync(),
             ChatbotTopics.Policy => AnswerPolicy(),
             ChatbotTopics.Human => AnswerHuman(),
             ChatbotTopics.Greeting => AnswerGreeting(),
             _ => AnswerFallback(),
         };
-    }
-
-    /// <summary>Keyword matching, not NLU - good enough for a first-pass scripted bot, and
-    /// deliberately checked in an order where the more specific/urgent intents (cancellations,
-    /// wanting a person) win over broader ones.</summary>
-    private static string DetectTopic(string? message)
-    {
-        var text = (message ?? string.Empty).Trim().ToLowerInvariant();
-        if (text.Length == 0)
-            return ChatbotTopics.Greeting;
-
-        bool Has(params string[] keywords) => keywords.Any(text.Contains);
-
-        if (Has("cancel", "refund", "damaged", "wrong item", "return", "broke", "broken"))
-            return ChatbotTopics.Policy;
-        if (Has("human", "agent", "real person", "help me", "talk to someone"))
-            return ChatbotTopics.Human;
-        if (Has("delivery charge", "delivery fee", "delivery cost", "shipping cost", "shipping fee"))
-            return ChatbotTopics.DeliveryCharge;
-        if (Has("track", "where is my order", "order status", "my order"))
-            return ChatbotTopics.OrderStatus;
-        if (Has("stock", "available", "do you have", "in stock"))
-            return ChatbotTopics.Stock;
-        if (Has("hi", "hello", "hey", "help"))
-            return ChatbotTopics.Greeting;
-
-        return ChatbotTopics.Unknown;
     }
 
     private async Task<ChatbotResponse> AnswerOrderStatusAsync(ClaimsPrincipal user)
@@ -123,40 +106,46 @@ public class ChatbotService
         return new ChatbotResponse(reply, Escalate: false, MainMenu);
     }
 
-    private async Task<ChatbotResponse> AnswerStockAsync(string? message)
+    /// <summary>Lists every product as its own quick-reply rather than asking the customer to
+    /// type a name - the whole point of a button-only bot is that every next step is something
+    /// it's actually prepared to answer.</summary>
+    private async Task<ChatbotResponse> AnswerStockMenuAsync()
     {
-        var text = (message ?? string.Empty).Trim();
-
-        // A bare "stock" click (topic set with no product named yet) lands here too - ask rather
-        // than guess.
-        if (text.Length < 2 || text.Equals("stock", StringComparison.OrdinalIgnoreCase))
+        var products = await _products.GetAllAsync();
+        if (products.Count == 0)
         {
             return new ChatbotResponse(
-                "Sure - which product would you like me to check? Just type its name.",
+                "We don't have any products listed right now - please check back soon.",
                 Escalate: false,
-                []);
+                MainMenu);
         }
 
-        var products = await _products.GetAllAsync();
-        var match = products.FirstOrDefault(p =>
-            text.Contains(p.Name, StringComparison.OrdinalIgnoreCase) ||
-            p.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
+        var quickReplies = products
+            .OrderBy(p => p.Name)
+            .Select(p => new ChatbotQuickReply(p.Name, $"{ChatbotTopics.StockProductPrefix}{p.Id}"))
+            .ToList();
 
-        if (match == null)
+        return new ChatbotResponse("Which product would you like me to check?", Escalate: false, quickReplies);
+    }
+
+    private async Task<ChatbotResponse> AnswerStockForProductAsync(string productId)
+    {
+        var product = await _products.GetByIdAsync(productId);
+        if (product == null)
         {
             return new ChatbotResponse(
-                $"I couldn't find a product matching \"{text}\" - try the exact product name, or browse the full catalog on the Products page.",
+                "That product isn't listed anymore. Here's what else I can help with:",
                 Escalate: false,
                 MainMenu);
         }
 
         string reply;
-        if (!match.IsAvailable)
-            reply = $"{match.Name} is currently unavailable.";
-        else if (match.StockQuantity is int qty)
-            reply = qty > 0 ? $"{match.Name} is in stock ({qty} left)." : $"{match.Name} is currently out of stock.";
+        if (!product.IsAvailable)
+            reply = $"{product.Name} is currently unavailable.";
+        else if (product.StockQuantity is int qty)
+            reply = qty > 0 ? $"{product.Name} is in stock ({qty} left)." : $"{product.Name} is currently out of stock.";
         else
-            reply = $"{match.Name} is in stock.";
+            reply = $"{product.Name} is in stock.";
 
         return new ChatbotResponse(reply, Escalate: false, MainMenu);
     }

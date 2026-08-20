@@ -162,11 +162,10 @@ public record DeliveryChargeCalculationResponse(
 	bool IsServiceable,
 	double MaxRadiusKm);
 
-/// <summary>Topic, when set, comes from the frontend's quick-reply buttons (or from it
-/// remembering "we're mid-lookup" client-side, e.g. after asking which product to check) and is
-/// trusted directly rather than re-guessed. Message is only interpreted with keyword matching
-/// when Topic is absent - see ChatbotService.DetectTopic.</summary>
-public record ChatbotRequest(string? Message, string? Topic);
+/// <summary>Topic always comes from a quick-reply button the frontend rendered - there is no
+/// free-text input, so nothing here is ever guessed from typed text. Null/absent means "show the
+/// greeting and main menu" (the very first request when the widget opens).</summary>
+public record ChatbotRequest(string? Topic);
 
 public record ChatbotQuickReply(string Label, string Topic);
 

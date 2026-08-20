@@ -1,9 +1,9 @@
 namespace OjasApi.Models;
 
 /// <summary>
-/// The fixed set of things the scripted support bot can answer. A request either names one of
-/// these directly (the frontend's quick-reply buttons do this, so a click is never ambiguous) or
-/// leaves it for keyword matching on free text to guess - see ChatbotService.DetectTopic.
+/// The fixed set of things the scripted support bot can answer. Every request names one of these
+/// directly - the frontend is quick-reply-button-driven only, no free text, so there's never a
+/// topic to guess at.
 /// </summary>
 public static class ChatbotTopics
 {
@@ -13,5 +13,8 @@ public static class ChatbotTopics
     public const string Stock = "stock";
     public const string Policy = "policy";
     public const string Human = "human";
-    public const string Unknown = "unknown";
+
+    /// <summary>Prefix for a specific product's stock check, e.g. "stock:&lt;productId&gt;" -
+    /// the id comes from a quick-reply generated per product, never typed.</summary>
+    public const string StockProductPrefix = "stock:";
 }

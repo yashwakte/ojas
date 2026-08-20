@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using MongoDB.Driver;
 using OjasApi.Models;
 using Shouldly;
 
@@ -8,7 +9,8 @@ namespace OjasApi.Tests.Integration;
 /// <summary>
 /// The scripted support bot: every answer comes from live data (orders, products, delivery
 /// charges) or a small set of fixed, business-approved strings - never from an LLM, and never
-/// from anything the bot can't actually back up.
+/// from anything the bot can't actually back up. Every request names a topic directly (as a
+/// quick-reply click would), since there's no free-text input to guess a topic from.
 /// </summary>
 [Collection(MongoCollectionFixture.Name)]
 public class ChatbotTests : IDisposable
@@ -24,12 +26,11 @@ public class ChatbotTests : IDisposable
 
     // A logged-in client must attach the CSRF header on this POST like any other - only
     // anonymous requests skip that check (see Program.cs's CSRF middleware).
-    private static async Task<HttpResponseMessage> AskAsync(
-        HttpClient client, string? message = null, string? topic = null, string? csrf = null)
+    private static async Task<HttpResponseMessage> AskAsync(HttpClient client, string? topic = null, string? csrf = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/chatbot/ask")
         {
-            Content = JsonContent.Create(new ChatbotRequest(message, topic)),
+            Content = JsonContent.Create(new ChatbotRequest(topic)),
         };
         if (csrf != null) request.AttachCsrf(csrf);
         return await client.SendAsync(request);
@@ -47,11 +48,11 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task EmptyMessage_ReturnsAGreeting_WithTheMainMenu()
+    public async Task NoTopic_ReturnsAGreeting_WithTheMainMenu()
     {
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, message: "");
+        var response = await AskAsync(client);
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("Ojas assistant");
@@ -59,10 +60,8 @@ public class ChatbotTests : IDisposable
         body.Escalate.ShouldBeFalse();
     }
 
-    [Theory]
-    [InlineData("What's the delivery fee?")]
-    [InlineData("What's your delivery charge?")]
-    public async Task DeliveryChargeQuestion_AnswersFromTheLiveConfig(string message)
+    [Fact]
+    public async Task DeliveryChargeTopic_AnswersFromTheLiveConfig()
     {
         await _factory.SeedAsync(async db => await db.DeliveryCharges.InsertOneAsync(new DeliveryCharges
         {
@@ -76,7 +75,7 @@ public class ChatbotTests : IDisposable
         }));
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, message: message);
+        var response = await AskAsync(client, topic: ChatbotTopics.DeliveryCharge);
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("free within 5");
@@ -85,7 +84,7 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task DeliveryChargeQuestion_WithNoConfig_EscalatesInsteadOfGuessing()
+    public async Task DeliveryChargeTopic_WithNoConfig_EscalatesInsteadOfGuessing()
     {
         using var client = _factory.CreateClient();
 
@@ -96,31 +95,46 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task StockQuestion_WithNoProductNamed_AsksWhichOne()
+    public async Task StockTopic_ListsEveryProductAsItsOwnQuickReply()
     {
+        await _factory.SeedAsync(async db =>
+        {
+            await db.Products.InsertOneAsync(new Product
+            {
+                Name = "Jowar Flour", Description = "Test", Category = "Flour", Weight = "1kg", IsAvailable = true,
+            });
+            await db.Products.InsertOneAsync(new Product
+            {
+                Name = "Ragi Flour", Description = "Test", Category = "Flour", Weight = "1kg", IsAvailable = true,
+            });
+        });
         using var client = _factory.CreateClient();
 
         var response = await AskAsync(client, topic: ChatbotTopics.Stock);
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
-        body!.Reply.ShouldContain("which product");
+        body!.Reply.ShouldContain("Which product");
+        body.QuickReplies.ShouldContain(qr => qr.Label == "Jowar Flour" && qr.Topic.StartsWith("stock:"));
+        body.QuickReplies.ShouldContain(qr => qr.Label == "Ragi Flour" && qr.Topic.StartsWith("stock:"));
     }
 
     [Fact]
-    public async Task StockQuestion_ForATrackedProduct_ReportsTheRealCount()
+    public async Task StockTopic_ForATrackedProduct_ReportsTheRealCount()
     {
-        await _factory.SeedAsync(async db => await db.Products.InsertOneAsync(new Product
+        string? productId = null;
+        await _factory.SeedAsync(async db =>
         {
-            Name = "Jowar Flour",
-            Description = "Test product",
-            Category = "Flour",
-            Weight = "1kg",
-            IsAvailable = true,
-            StockQuantity = 7,
-        }));
+            var product = new Product
+            {
+                Name = "Jowar Flour", Description = "Test", Category = "Flour", Weight = "1kg",
+                IsAvailable = true, StockQuantity = 7,
+            };
+            await db.Products.InsertOneAsync(product);
+            productId = product.Id;
+        });
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, topic: ChatbotTopics.Stock, message: "Jowar Flour");
+        var response = await AskAsync(client, topic: $"stock:{productId}");
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("Jowar Flour");
@@ -128,37 +142,40 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task StockQuestion_ForAnUntrackedOutOfStockProduct_SaysUnavailable()
+    public async Task StockTopic_ForAnUnavailableProduct_SaysUnavailable()
     {
-        await _factory.SeedAsync(async db => await db.Products.InsertOneAsync(new Product
+        string? productId = null;
+        await _factory.SeedAsync(async db =>
         {
-            Name = "Ragi Flour",
-            Description = "Test product",
-            Category = "Flour",
-            Weight = "1kg",
-            IsAvailable = false,
-        }));
+            var product = new Product
+            {
+                Name = "Ragi Flour", Description = "Test", Category = "Flour", Weight = "1kg", IsAvailable = false,
+            };
+            await db.Products.InsertOneAsync(product);
+            productId = product.Id;
+        });
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, topic: ChatbotTopics.Stock, message: "Ragi Flour");
+        var response = await AskAsync(client, topic: $"stock:{productId}");
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("unavailable");
     }
 
     [Fact]
-    public async Task StockQuestion_ForAnUnknownProduct_DoesNotClaimAnAnswer()
+    public async Task StockTopic_ForADeletedProduct_FallsBackToTheMenuInsteadOfCrashing()
     {
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, topic: ChatbotTopics.Stock, message: "Definitely Not A Real Product");
+        var response = await AskAsync(client, topic: "stock:000000000000000000000000");
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
-        body!.Reply.ShouldContain("couldn't find");
+        body!.Reply.ShouldContain("isn't listed anymore");
+        body.QuickReplies.ShouldNotBeEmpty();
     }
 
     [Fact]
-    public async Task OrderStatusQuestion_WhenLoggedOut_AsksToLogInRatherThanGuessing()
+    public async Task OrderStatusTopic_WhenLoggedOut_AsksToLogInRatherThanGuessing()
     {
         using var client = _factory.CreateClient();
 
@@ -169,7 +186,7 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task OrderStatusQuestion_ForALoggedInCustomerWithNoOrders_SaysSo()
+    public async Task OrderStatusTopic_ForALoggedInCustomerWithNoOrders_SaysSo()
     {
         using var client = _factory.CreateClient();
         var (_, csrf) = await client.RegisterAsync();
@@ -181,7 +198,7 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task OrderStatusQuestion_ReturnsTheMostRecentOrdersStatus()
+    public async Task OrderStatusTopic_ReturnsTheMostRecentOrdersStatus()
     {
         await _factory.SeedAsync(async db => await db.DeliveryCharges.InsertOneAsync(new DeliveryCharges
         {
@@ -207,15 +224,12 @@ public class ChatbotTests : IDisposable
         body!.Reply.ShouldContain("Pending");
     }
 
-    [Theory]
-    [InlineData("I need to cancel my order")]
-    [InlineData("My item arrived damaged")]
-    [InlineData("Can I get a refund?")]
-    public async Task CancellationOrDamageQuestions_StateTheConfirmedPolicy(string message)
+    [Fact]
+    public async Task PolicyTopic_StatesTheConfirmedPolicy()
     {
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, message: message);
+        var response = await AskAsync(client, topic: ChatbotTopics.Policy);
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("before it's packed");
@@ -224,11 +238,11 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task HumanHandoffRequest_ReturnsRealContactDetails_AndEscalates()
+    public async Task HumanTopic_ReturnsRealContactDetails_AndEscalates()
     {
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, message: "I want to talk to a real person");
+        var response = await AskAsync(client, topic: ChatbotTopics.Human);
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("8657781526");
@@ -237,27 +251,14 @@ public class ChatbotTests : IDisposable
     }
 
     [Fact]
-    public async Task UnrecognisedMessage_FallsBackToTheMenuInsteadOfGuessingAnAnswer()
+    public async Task AnUnrecognisedTopic_FallsBackToTheMenu()
     {
         using var client = _factory.CreateClient();
 
-        var response = await AskAsync(client, message: "asdkjfhaslkdjfhqwoeiruqwoe");
+        var response = await AskAsync(client, topic: "not-a-real-topic");
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Escalate.ShouldBeTrue();
         body.QuickReplies.ShouldNotBeEmpty();
-    }
-
-    [Fact]
-    public async Task AnExplicitTopic_IsTrustedDirectly_WithoutReDetectingFromMessage()
-    {
-        using var client = _factory.CreateClient();
-
-        // The message text alone wouldn't match any keyword, but an explicit Topic (as a
-        // quick-reply click would send) must still win.
-        var response = await AskAsync(client, topic: ChatbotTopics.Human, message: "xyz");
-        var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
-
-        body!.Reply.ShouldContain("8657781526");
     }
 }
