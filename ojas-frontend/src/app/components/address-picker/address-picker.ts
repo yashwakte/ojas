@@ -41,6 +41,10 @@ export class AddressPicker {
 
   protected readonly serviceableStates = SERVICEABLE_STATES;
   protected label = 'Home';
+  /** Defaults to the account phone when the form opens, so most addresses
+   * need no extra typing - a customer only edits it for a different contact
+   * (e.g. an office address someone else answers calls at). */
+  protected phone = '';
   protected houseNo = '';
   protected area = '';
   protected city = DEFAULT_CITY;
@@ -54,6 +58,7 @@ export class AddressPicker {
   protected readonly canSaveNew = computed(
     () =>
       !!this.pinned() &&
+      this.phone.trim().length >= 10 &&
       this.houseNo.trim().length > 0 &&
       this.area.trim().length > 0 &&
       isValidPunePincode(this.pincode.trim()),
@@ -82,6 +87,7 @@ export class AddressPicker {
   protected startAddingNew(): void {
     this.addingNew.set(true);
     this.saveError.set('');
+    this.phone = this.auth.user()?.phone ?? '';
   }
 
   protected onPinned(location: { lat: number; lng: number; address?: string }): void {
@@ -113,6 +119,7 @@ export class AddressPicker {
 
     const address: SavedAddress = {
       label: this.label.trim() || 'Home',
+      phone: this.phone.trim(),
       fullAddress,
       latitude: pin.lat,
       longitude: pin.lng,
@@ -146,6 +153,7 @@ export class AddressPicker {
       this.users
         .saveAddress({
           label: address.label,
+          phone: address.phone,
           fullAddress: address.fullAddress,
           latitude: address.latitude,
           longitude: address.longitude,
@@ -166,6 +174,7 @@ export class AddressPicker {
     this.area = '';
     this.pincode = '';
     this.label = 'Home';
+    this.phone = '';
   }
 
   private loadSaved(): void {
@@ -175,12 +184,12 @@ export class AddressPicker {
         this.saved.set(profile.savedAddresses ?? []);
         this.loadingSaved.set(false);
         // Nothing to choose from — go straight to pinning a new one.
-        if (!this.saved().length) this.addingNew.set(true);
+        if (!this.saved().length) this.startAddingNew();
       },
       error: () => {
         this.saved.set([]);
         this.loadingSaved.set(false);
-        this.addingNew.set(true);
+        this.startAddingNew();
       },
     });
   }

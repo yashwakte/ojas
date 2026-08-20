@@ -738,6 +738,99 @@
   color: var(--ojas-text);
 }
 
+.coupon-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  margin: 4px 0 8px;
+  background: #fff;
+  border: 1.5px dashed var(--ojas-ink-border);
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:hover {
+    border-color: var(--ojas-orange);
+    background: var(--ojas-orange-bg);
+  }
+}
+
+.coupon-trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+
+  mat-icon {
+    flex-shrink: 0;
+    color: var(--ojas-orange);
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.coupon-trigger-label {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ojas-text);
+
+  &--applied {
+    color: var(--ojas-orange-dark, #b45309);
+  }
+}
+
+.coupon-trigger-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.coupon-trigger-hint {
+  font-size: 0.8rem;
+}
+
+.coupon-trigger-savings {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ojas-orange);
+}
+
+.reward-nudge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: #fff8f0;
+  border: 1px solid #ffdcb0;
+  border-radius: 10px;
+  color: var(--ojas-orange-dark, #b45309);
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 17px;
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+  }
+}
+
 .summary-totals {
   border-top: 1px solid #f0ede9;
   padding-top: 16px;

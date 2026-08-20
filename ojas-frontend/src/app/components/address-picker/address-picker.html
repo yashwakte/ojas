@@ -42,6 +42,17 @@
           </div>
 
           <div class="ap-row">
+            <label for="apPhone">Phone Number *</label>
+            <input
+              id="apPhone"
+              type="tel"
+              [(ngModel)]="phone"
+              placeholder="10-digit mobile number"
+              pattern="[0-9]{10}"
+            />
+          </div>
+
+          <div class="ap-row">
             <label for="apHouse">Flat / House no. *</label>
             <input id="apHouse" type="text" [(ngModel)]="houseNo" placeholder="e.g. B-402" />
           </div>

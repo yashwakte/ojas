@@ -117,13 +117,17 @@ public record StaffUserResponse(
 	bool InvitePending = false,
 	DateTime? PendingDeviceApprovalExpiresAt = null);
 
-public record SavedAddressDto(string Label, string FullAddress, double Latitude, double Longitude, string? MapLink, bool IsDefault);
-public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault);
+public record SavedAddressDto(string Label, string FullAddress, double Latitude, double Longitude, string? MapLink, bool IsDefault, string Phone);
+/// <summary>Each saved address carries its own delivery contact number - a customer may
+/// want a different person reached at their office address than at home.</summary>
+public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault, [Required, MinLength(10), MaxLength(20)] string Phone);
 public record UpdateProfileRequest(string FullName, string Email, string Phone);
 public record UserProfileResponse(string Id, string FullName, string Email, string Phone, DateTime CreatedAt, List<SavedAddressDto> SavedAddresses);
 
 public record OrderItemDto(string ProductId, string ProductName, decimal Price, string Weight, int Quantity);
-public record PlaceOrderRequest(string FullName, string Phone, string Address, [Required] double? Latitude, [Required] double? Longitude, string Notes, List<OrderItemDto> Items);
+/// <summary>CouponCode is a customer pick, not a price - like everything else here it is
+/// re-validated server-side against the current subtotal, never trusted for its discount.</summary>
+public record PlaceOrderRequest(string FullName, string Phone, string Address, [Required] double? Latitude, [Required] double? Longitude, string Notes, List<OrderItemDto> Items, string? CouponCode = null);
 public record UpdateOrderStatusRequest([Required] string Status);
 public record UpdateMyOrderRequest(
 	string FullName,
@@ -132,7 +136,8 @@ public record UpdateMyOrderRequest(
 	[Required] double? Latitude,
 	[Required] double? Longitude,
 	string Notes,
-	List<OrderItemDto> Items);
+	List<OrderItemDto> Items,
+	string? CouponCode = null);
 public record AssignDeliveryPartnerRequest([Required] string DeliveryPartnerId);
 public record OrderResponse(
 	string Id,
@@ -144,6 +149,10 @@ public record OrderResponse(
 	string? AddressMapLink,
 	string Notes,
 	List<OrderItemDto> Items,
+	decimal Subtotal,
+	string? CouponCode,
+	decimal DiscountPercentage,
+	decimal DiscountAmount,
 	decimal DeliveryCharge,
 	double DeliveryDistanceKm,
 	decimal TotalAmount,

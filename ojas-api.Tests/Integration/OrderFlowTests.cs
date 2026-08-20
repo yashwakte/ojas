@@ -114,6 +114,65 @@ public class OrderFlowTests : IDisposable
         assignedOrders!.ShouldContain(o => o.Id == placedOrder.Id && o.Status == "Delivered");
     }
 
+    /// <summary>Proves an explicitly-picked coupon and the cart-value free-delivery threshold
+    /// are applied server-side on the real place-order path, not just in the pricing unit tests -
+    /// including that a cart well past the free-delivery threshold waives what would otherwise be
+    /// a large distance-based charge.</summary>
+    [Fact]
+    public async Task PlaceOrder_AppliesPickedCouponAndWaivesDeliveryAboveThreshold()
+    {
+        await SeedDeliveryChargesAsync();
+
+        var (_, customerCsrf) = await _customerClient.RegisterAsync(fullName: "Discount Customer");
+
+        var items = new List<OrderItemDto> { new("p1", "Product One", 2000, "1kg", 1) };
+        // Same far-away point used above, which would otherwise price delivery at ₹1061.95.
+        var placeRequest = new PlaceOrderRequest("Discount Customer", "9123456789", "123 Main St", 19.0, 73.0, "", items, CouponCode: "SAVE10");
+        var placeHttpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/orders") { Content = JsonContent.Create(placeRequest) };
+        placeHttpRequest.AttachCsrf(customerCsrf);
+
+        var placeResponse = await _customerClient.SendAsync(placeHttpRequest);
+        placeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var placedOrder = await placeResponse.Content.ReadFromJsonAsync<OrderResponse>();
+
+        placedOrder.ShouldNotBeNull();
+        placedOrder!.Subtotal.ShouldBe(2000m);
+        placedOrder.CouponCode.ShouldBe("SAVE10");
+        placedOrder.DiscountPercentage.ShouldBe(10m);
+        placedOrder.DiscountAmount.ShouldBe(200m);
+        placedOrder.DeliveryCharge.ShouldBe(0m);
+        placedOrder.TotalAmount.ShouldBe(1800m);
+    }
+
+    /// <summary>A coupon code is never trusted for its discount even when it's a real code -
+    /// if the cart doesn't (or no longer) meets that coupon's own minimum, the order is priced
+    /// as if no coupon were sent at all rather than silently falling back to a lower tier.</summary>
+    [Fact]
+    public async Task PlaceOrder_IgnoresCouponWhenCartDoesNotMeetItsMinimum()
+    {
+        await SeedDeliveryChargesAsync();
+
+        var (_, customerCsrf) = await _customerClient.RegisterAsync(fullName: "Ineligible Coupon Customer");
+
+        var items = new List<OrderItemDto> { new("p1", "Product One", 1200, "1kg", 1) };
+        var placeRequest = new PlaceOrderRequest("Ineligible Coupon Customer", "9123456789", "123 Main St", 19.0, 73.0, "", items, CouponCode: "SAVE10");
+        var placeHttpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/orders") { Content = JsonContent.Create(placeRequest) };
+        placeHttpRequest.AttachCsrf(customerCsrf);
+
+        var placeResponse = await _customerClient.SendAsync(placeHttpRequest);
+        placeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var placedOrder = await placeResponse.Content.ReadFromJsonAsync<OrderResponse>();
+
+        placedOrder.ShouldNotBeNull();
+        placedOrder!.CouponCode.ShouldBeNull();
+        placedOrder.DiscountPercentage.ShouldBe(0m);
+        placedOrder.DiscountAmount.ShouldBe(0m);
+        // Free delivery is a separate, unconditional rule (cart >= ₹500) - it still applies
+        // here even though the coupon itself was rejected for not meeting its own minimum.
+        placedOrder.DeliveryCharge.ShouldBe(0m);
+        placedOrder.TotalAmount.ShouldBe(1200m);
+    }
+
     /// <summary>Payment collection is tracked separately from delivery status - a partner can
     /// hand over the goods without successfully collecting cash, so the two must be settable
     /// independently rather than one implying the other.</summary>

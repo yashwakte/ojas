@@ -1,0 +1,42 @@
+<div class="cp-backdrop" (click)="closed.emit()"></div>
+
+<div class="cp-sheet" role="dialog" aria-modal="true" aria-labelledby="cpTitle">
+  <div class="cp-head">
+    <div>
+      <h2 id="cpTitle">Coupons &amp; Offers</h2>
+      <p>Apply a coupon to save on this order</p>
+    </div>
+    <button type="button" class="cp-close" (click)="closed.emit()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="cp-body">
+    @for (coupon of coupons(); track coupon.code) {
+      <button
+        type="button"
+        class="cp-coupon"
+        [class.cp-coupon--applied]="appliedCode() === coupon.code"
+        [disabled]="!isEligible(coupon)"
+        [attr.aria-pressed]="appliedCode() === coupon.code"
+        (click)="choose(coupon)"
+      >
+        <div class="cp-badge">{{ coupon.discountPercentage }}%<span>OFF</span></div>
+        <div class="cp-info">
+          <span class="cp-code">{{ coupon.code }}</span>
+          <span class="cp-desc">{{ coupon.title }} on orders above ₹{{ coupon.minCartValue }}</span>
+          @if (!isEligible(coupon)) {
+            <span class="cp-lock">Add ₹{{ coupon.minCartValue - subtotal() }} more to unlock</span>
+          }
+        </div>
+        <div class="cp-action">
+          @if (appliedCode() === coupon.code) {
+            <span class="cp-remove">Remove</span>
+          } @else {
+            <span class="cp-apply">Apply</span>
+          }
+        </div>
+      </button>
+    }
+  </div>
+</div>

@@ -26,6 +26,7 @@ describe('Profile', () => {
     savedAddresses: [
       {
         label: 'Home',
+        phone: '9888877766',
         fullAddress: '12, Main St, Area, Near Landmark, Pune, Maharashtra - 411001',
         latitude: 18.5,
         longitude: 73.8,
@@ -162,6 +163,7 @@ describe('Profile', () => {
     expect(fixture.componentInstance.isNewAddressValid).toBeFalse();
 
     fixture.componentInstance.newLabel = 'Home';
+    fixture.componentInstance.newPhone = '9876543210';
     fixture.componentInstance.newHouseNo = '1';
     fixture.componentInstance.newStreet = 'St';
     fixture.componentInstance.newArea = 'Area';
@@ -184,6 +186,7 @@ describe('Profile', () => {
     userServiceSpy.saveAddress.and.returnValue(of({}));
     const fixture = create();
     fixture.componentInstance.newLabel = 'Home';
+    fixture.componentInstance.newPhone = '9876543210';
     fixture.componentInstance.newHouseNo = '1';
     fixture.componentInstance.newStreet = 'St';
     fixture.componentInstance.newArea = 'Area';
@@ -196,7 +199,7 @@ describe('Profile', () => {
     fixture.componentInstance.addAddress();
 
     expect(userServiceSpy.saveAddress).toHaveBeenCalledWith(
-      jasmine.objectContaining({ label: 'Home', latitude: 18.5, longitude: 73.8 }),
+      jasmine.objectContaining({ label: 'Home', phone: '9876543210', latitude: 18.5, longitude: 73.8 }),
     );
     expect(fixture.componentInstance.showAddressForm()).toBeFalse();
     expect(fixture.componentInstance.savingAddress()).toBeFalse();
@@ -205,14 +208,23 @@ describe('Profile', () => {
   it('cancelAddAddress resets all the new-address fields', () => {
     const fixture = create();
     fixture.componentInstance.newLabel = 'X';
+    fixture.componentInstance.newPhone = '9876543210';
     fixture.componentInstance.newLat = 1;
     fixture.componentInstance.showAddressForm.set(true);
 
     fixture.componentInstance.cancelAddAddress();
 
     expect(fixture.componentInstance.newLabel).toBe('');
+    expect(fixture.componentInstance.newPhone).toBe('');
     expect(fixture.componentInstance.newLat).toBeNull();
     expect(fixture.componentInstance.showAddressForm()).toBeFalse();
+  });
+
+  it('openAddAddressForm defaults the phone to the account phone and opens the form', () => {
+    const fixture = create();
+    fixture.componentInstance.openAddAddressForm();
+    expect(fixture.componentInstance.newPhone).toBe('9999999999');
+    expect(fixture.componentInstance.showAddressForm()).toBeTrue();
   });
 
   it('deleteAddress calls the service and reloads the profile', () => {
@@ -231,6 +243,7 @@ describe('Profile', () => {
     fixture.componentInstance.startEditAddress(0);
 
     expect(fixture.componentInstance.editLabel).toBe('Home');
+    expect(fixture.componentInstance.editAddressPhone).toBe('9888877766');
     expect(fixture.componentInstance.editCity).toBe('Pune');
     expect(fixture.componentInstance.editState).toBe('Maharashtra');
     expect(fixture.componentInstance.editPincode).toBe('411001');
@@ -246,6 +259,7 @@ describe('Profile', () => {
 
     expect(fixture.componentInstance.editingAddressIndex()).toBeNull();
     expect(fixture.componentInstance.editLabel).toBe('');
+    expect(fixture.componentInstance.editAddressPhone).toBe('');
   });
 
   it('saveEditAddress deletes the old entry, re-saves, and reloads on success', () => {

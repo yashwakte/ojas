@@ -65,6 +65,11 @@ public class SavedAddress
     [BsonElement("label")]
     public string Label { get; set; } = string.Empty;
 
+    /// <summary>Empty for addresses saved before this field existed - falls back to the
+    /// account phone on the frontend rather than forcing a backfill.</summary>
+    [BsonElement("phone")]
+    public string Phone { get; set; } = string.Empty;
+
     [BsonElement("fullAddress")]
     public string FullAddress { get; set; } = string.Empty;
 

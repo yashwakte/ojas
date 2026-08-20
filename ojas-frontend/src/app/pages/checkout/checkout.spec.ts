@@ -49,6 +49,7 @@ describe('Checkout', () => {
 
   const defaultAddress: SavedAddress = {
     label: 'Home',
+    phone: '9888877766',
     fullAddress: '123 Main St',
     latitude: 18.5,
     longitude: 73.8,
@@ -73,6 +74,9 @@ describe('Checkout', () => {
     longitude: 73.8,
     notes: '',
     items: [],
+    subtotal: 100,
+    discountPercentage: 0,
+    discountAmount: 0,
     deliveryCharge: 0,
     deliveryDistanceKm: 3,
     totalAmount: 100,
@@ -131,6 +135,8 @@ describe('Checkout', () => {
   }
 
   it('should create and pre-fill fullName/phone from the logged-in user', () => {
+    // No saved addresses here, so nothing overrides the account phone.
+    userServiceSpy.getProfile.and.returnValue(of({ ...profile, savedAddresses: [] }));
     const fixture = create();
     expect(fixture.componentInstance.fullName).toBe('Jane Doe');
     expect(fixture.componentInstance.phone).toBe('9999999999');
@@ -143,6 +149,33 @@ describe('Checkout', () => {
     expect(deliveryChargesServiceSpy.previewCharge).toHaveBeenCalledWith(18.5, 73.8);
     expect(fixture.componentInstance.deliveryCharge()).toBe(20);
     expect(fixture.componentInstance.deliveryDistanceKm()).toBe(3);
+    // The pre-selected address's own phone wins over the account's.
+    expect(fixture.componentInstance.phone).toBe('9888877766');
+  });
+
+  it('selectAddress fills the phone field from the address, falling back to the account phone for one with none', () => {
+    const fixture = create();
+    const officeNoPhone = { ...defaultAddress, label: 'Office', phone: '' };
+
+    fixture.componentInstance.selectAddress(officeNoPhone);
+    expect(fixture.componentInstance.phone).toBe('9999999999'); // account phone fallback
+
+    fixture.componentInstance.selectAddress(defaultAddress);
+    expect(fixture.componentInstance.phone).toBe('9888877766'); // the address's own phone
+  });
+
+  it('deselecting a saved address and useNewAddress both revert the phone to the account phone', () => {
+    const fixture = create();
+    expect(fixture.componentInstance.phone).toBe('9888877766');
+
+    fixture.componentInstance.selectAddress(defaultAddress); // toggles it off
+    expect(fixture.componentInstance.phone).toBe('9999999999');
+
+    fixture.componentInstance.selectAddress(defaultAddress); // back on
+    expect(fixture.componentInstance.phone).toBe('9888877766');
+
+    fixture.componentInstance.useNewAddress();
+    expect(fixture.componentInstance.phone).toBe('9999999999');
   });
 
   it('redirects to /products when there is nothing to check out', () => {
@@ -156,6 +189,69 @@ describe('Checkout', () => {
     const fixture = create();
     expect(fixture.componentInstance.totalAmount()).toBe(200); // 100 * 2
     expect(fixture.componentInstance.grandTotal()).toBe(220); // + 20 delivery
+  });
+
+  it('applies no discount automatically, even once the cart clears a coupon threshold', () => {
+    items.set([{ product, quantity: 25 }]); // 2500, well past both coupon minimums
+    const fixture = create();
+    expect(fixture.componentInstance.discount()).toEqual({ percentage: 0, amount: 0 });
+    expect(fixture.componentInstance.appliedCouponCode()).toBeNull();
+  });
+
+  it('free delivery is still automatic and independent of any coupon', () => {
+    items.set([{ product, quantity: 6 }]); // 600, past the ₹500 free-delivery threshold
+    const fixture = create();
+    expect(fixture.componentInstance.effectiveDeliveryCharge()).toBe(0);
+  });
+
+  it('nudges toward free delivery only, since coupons show their own unlock progress', () => {
+    items.set([{ product, quantity: 3 }]); // 300, below the ₹500 free-delivery threshold
+    let fixture = create();
+    expect(fixture.componentInstance.freeDeliveryNudge()).toBe('Add ₹200 more to get FREE delivery');
+
+    items.set([{ product, quantity: 6 }]); // 600, past free delivery
+    fixture = create();
+    expect(fixture.componentInstance.freeDeliveryNudge()).toBeNull();
+  });
+
+  it('couponPickerOpen starts closed and opens on request; the popup reports the pick back', () => {
+    items.set([{ product, quantity: 11 }]); // 1100
+    const fixture = create();
+    expect(fixture.componentInstance.couponPickerOpen()).toBeFalse();
+
+    fixture.componentInstance.couponPickerOpen.set(true);
+    expect(fixture.componentInstance.couponPickerOpen()).toBeTrue();
+
+    // The picker component owns eligibility/toggle logic itself (see coupon-picker.spec.ts) -
+    // checkout only needs to react to whatever code it reports back.
+    fixture.componentInstance.appliedCouponCode.set('SAVE5');
+    expect(fixture.componentInstance.discount()).toEqual({ percentage: 5, amount: 55 });
+    expect(fixture.componentInstance.grandTotal()).toBe(1045); // 1100 - 55 + 0 (free delivery)
+  });
+
+  it('switching the applied coupon code replaces the discount', () => {
+    items.set([{ product, quantity: 21 }]); // 2100, clears both minimums
+    const fixture = create();
+
+    fixture.componentInstance.appliedCouponCode.set('SAVE5');
+    expect(fixture.componentInstance.discount()).toEqual({ percentage: 5, amount: 105 });
+
+    fixture.componentInstance.appliedCouponCode.set('SAVE10');
+    expect(fixture.componentInstance.discount()).toEqual({ percentage: 10, amount: 210 });
+  });
+
+  it('drops the applied coupon once the cart falls back below its minimum', () => {
+    items.set([{ product, quantity: 11 }]); // 1100, clears SAVE5's minimum
+    const fixture = create();
+    fixture.componentInstance.appliedCouponCode.set('SAVE5');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.discount()).toEqual({ percentage: 5, amount: 55 });
+
+    items.set([{ product, quantity: 3 }]); // 300, back below ₹1000
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.appliedCouponCode()).toBeNull();
+    expect(fixture.componentInstance.discount()).toEqual({ percentage: 0, amount: 0 });
   });
 
   it('isAddressValid is true when a saved address is selected', () => {
@@ -215,10 +311,12 @@ describe('Checkout', () => {
     expect(orderServiceSpy.placeOrder).toHaveBeenCalledWith(
       jasmine.objectContaining({
         fullName: 'Jane Doe',
-        phone: '9999999999',
+        // The selected saved address's own phone, not the account's.
+        phone: '9888877766',
         address: '123 Main St',
         latitude: 18.5,
         longitude: 73.8,
+        couponCode: null,
       }),
     );
     expect(fixture.componentInstance.orderPlaced()).toBeTrue();
@@ -227,6 +325,19 @@ describe('Checkout', () => {
     expect(checkoutServiceSpy.clear).toHaveBeenCalled();
     // Stock changed server-side; the cached product list must be refreshed.
     expect(productServiceSpy.loadProducts).toHaveBeenCalled();
+  });
+
+  it('placeOrder sends the applied coupon code', () => {
+    items.set([{ product, quantity: 11 }]); // 1100, clears SAVE5's minimum
+    orderServiceSpy.placeOrder.and.returnValue(of(order));
+    const fixture = create();
+    fixture.componentInstance.appliedCouponCode.set('SAVE5');
+
+    fixture.componentInstance.placeOrder();
+
+    expect(orderServiceSpy.placeOrder).toHaveBeenCalledWith(
+      jasmine.objectContaining({ couponCode: 'SAVE5' }),
+    );
   });
 
   it('placeOrder scrolls to top on success, so the confirmation is visible rather than the footer', () => {
@@ -261,7 +372,7 @@ describe('Checkout', () => {
     fixture.componentInstance.placeOrder();
 
     expect(userServiceSpy.saveAddress).toHaveBeenCalledWith(
-      jasmine.objectContaining({ label: 'Office', isDefault: false }),
+      jasmine.objectContaining({ label: 'Office', phone: '9999999999', isDefault: false }),
     );
   });
 

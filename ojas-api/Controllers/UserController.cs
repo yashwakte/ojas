@@ -33,7 +33,7 @@ public class UserController : ControllerBase
         var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
         if (user == null) return NotFound();
 
-        var addresses = (user.SavedAddresses ?? []).Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault)).ToList();
+        var addresses = (user.SavedAddresses ?? []).Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault, a.Phone)).ToList();
         return Ok(new UserProfileResponse(user.Id!, user.FullName, user.Email, user.Phone, user.CreatedAt, addresses));
     }
 
@@ -90,7 +90,7 @@ public class UserController : ControllerBase
         var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
         if (user == null) return NotFound();
 
-        return Ok(user.SavedAddresses.Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault)).ToList());
+        return Ok(user.SavedAddresses.Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault, a.Phone)).ToList());
     }
 
     // POST /api/user/addresses
@@ -118,6 +118,7 @@ public class UserController : ControllerBase
         var newAddress = new SavedAddress
         {
             Label = request.Label,
+            Phone = request.Phone,
             FullAddress = request.FullAddress,
             Latitude = request.Latitude.Value,
             Longitude = request.Longitude.Value,

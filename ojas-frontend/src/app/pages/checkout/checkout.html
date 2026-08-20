@@ -259,6 +259,26 @@
             ></textarea>
           </div>
 
+          <!-- Coupons & Offers -->
+          <button type="button" class="coupon-trigger" (click)="couponPickerOpen.set(true)">
+            <div class="coupon-trigger-left">
+              <mat-icon>local_offer</mat-icon>
+              @if (appliedCoupon(); as coupon) {
+                <span class="coupon-trigger-label coupon-trigger-label--applied">{{ coupon.code }} applied</span>
+              } @else {
+                <span class="coupon-trigger-label">Apply Coupon</span>
+              }
+            </div>
+            <div class="coupon-trigger-right">
+              @if (appliedCoupon()) {
+                <span class="coupon-trigger-savings">−₹{{ discount().amount }}</span>
+              } @else {
+                <span class="coupon-trigger-hint">{{ coupons.length }} offers</span>
+              }
+              <mat-icon>chevron_right</mat-icon>
+            </div>
+          </button>
+
           @if (errorMsg()) {
             <div class="error-banner">
               <mat-icon>error_outline</mat-icon>
@@ -342,21 +362,34 @@
             }
           </div>
 
+          @if (freeDeliveryNudge()) {
+            <div class="reward-nudge">
+              <mat-icon inline="true">local_shipping</mat-icon>
+              <span>{{ freeDeliveryNudge() }}</span>
+            </div>
+          }
+
           <div class="summary-totals">
             <div class="total-row">
               <span>Subtotal</span>
               <span>₹{{ totalAmount() }}</span>
             </div>
+            @if (appliedCoupon(); as coupon) {
+              <div class="total-row discount-row">
+                <span>Coupon ({{ coupon.code }})</span>
+                <span class="free">−₹{{ discount().amount }}</span>
+              </div>
+            }
             <div class="total-row">
               <span>Delivery</span>
               @if (deliveryLoading()) {
                 <span class="delivery-status">Calculating…</span>
               } @else if (deliveryDistanceKm() === null) {
                 <span class="delivery-status">Pin address to calculate</span>
-              } @else if (deliveryCharge() === 0) {
+              } @else if (effectiveDeliveryCharge() === 0) {
                 <span class="free">FREE</span>
               } @else {
-                <span>₹{{ deliveryCharge() }}</span>
+                <span>₹{{ effectiveDeliveryCharge() }}</span>
               }
             </div>
             @if (deliveryDistanceKm() !== null && !deliveryLoading()) {
@@ -374,5 +407,15 @@
         </div>
       </div>
     </div>
+
+    @if (couponPickerOpen()) {
+      <app-coupon-picker
+        [coupons]="coupons"
+        [subtotal]="totalAmount()"
+        [appliedCode]="appliedCouponCode()"
+        (picked)="appliedCouponCode.set($event)"
+        (closed)="couponPickerOpen.set(false)"
+      />
+    }
   }
 </section>

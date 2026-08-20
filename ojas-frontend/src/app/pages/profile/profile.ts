@@ -53,6 +53,7 @@ export class Profile implements OnInit {
   // Add address
   showAddressForm = signal(false);
   newLabel = '';
+  newPhone = '';
   newHouseNo = '';
   newStreet = '';
   newArea = '';
@@ -69,6 +70,7 @@ export class Profile implements OnInit {
   // Edit address
   editingAddressIndex = signal<number | null>(null);
   editLabel = '';
+  editAddressPhone = '';
   editHouseNo = '';
   editStreet = '';
   editArea = '';
@@ -165,9 +167,17 @@ export class Profile implements OnInit {
     }
   }
 
+  /** Opens the add-address form, defaulting the phone to the account's own -
+   * most addresses share it, so this saves retyping for the common case. */
+  openAddAddressForm(): void {
+    this.newPhone = this.profile()?.phone ?? '';
+    this.showAddressForm.set(true);
+  }
+
   get isNewAddressValid(): boolean {
     return !!(
       this.newLabel.trim() &&
+      this.newPhone.trim().length >= 10 &&
       this.newHouseNo.trim() &&
       this.newStreet.trim() &&
       this.newArea.trim() &&
@@ -195,6 +205,7 @@ export class Profile implements OnInit {
 
     const req: SaveAddressRequest = {
       label: this.newLabel.trim(),
+      phone: this.newPhone.trim(),
       fullAddress,
       latitude: this.newLat!,
       longitude: this.newLng!,
@@ -213,6 +224,7 @@ export class Profile implements OnInit {
   cancelAddAddress(): void {
     this.showAddressForm.set(false);
     this.newLabel = '';
+    this.newPhone = '';
     this.newHouseNo = '';
     this.newStreet = '';
     this.newArea = '';
@@ -235,6 +247,7 @@ export class Profile implements OnInit {
   get isEditAddressValid(): boolean {
     return !!(
       this.editLabel.trim() &&
+      this.editAddressPhone.trim().length >= 10 &&
       this.editHouseNo.trim() &&
       this.editStreet.trim() &&
       this.editArea.trim() &&
@@ -250,6 +263,7 @@ export class Profile implements OnInit {
     const addr = this.profile()?.savedAddresses?.[index];
     if (!addr) return;
     this.editLabel = addr.label;
+    this.editAddressPhone = addr.phone;
     this.editLat = addr.latitude || addr.longitude ? addr.latitude : null;
     this.editLng = addr.latitude || addr.longitude ? addr.longitude : null;
     this.editIsDefault = addr.isDefault;
@@ -301,6 +315,7 @@ export class Profile implements OnInit {
   cancelEditAddress(): void {
     this.editingAddressIndex.set(null);
     this.editLabel = '';
+    this.editAddressPhone = '';
     this.editHouseNo = '';
     this.editStreet = '';
     this.editArea = '';
@@ -334,6 +349,7 @@ export class Profile implements OnInit {
       next: () => {
         const req: SaveAddressRequest = {
           label: this.editLabel.trim(),
+          phone: this.editAddressPhone.trim(),
           fullAddress,
           latitude: this.editLat!,
           longitude: this.editLng!,

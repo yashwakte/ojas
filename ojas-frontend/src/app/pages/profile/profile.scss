@@ -342,6 +342,23 @@
   text-transform: uppercase;
 }
 
+.address-phone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding-left: 24px;
+  font-size: 0.82rem;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    font-size: 0.95rem;
+    width: 0.95rem;
+    height: 0.95rem;
+    color: var(--ojas-ink-soft);
+  }
+}
+
 .address-text {
   margin: 0;
   font-size: 0.85rem;

@@ -53,6 +53,10 @@ public class OrderService(IMongoDbService db)
         double longitude,
         string? addressMapLink,
         string notes,
+        decimal subtotal,
+        string? couponCode,
+        decimal discountPercentage,
+        decimal discountAmount,
         decimal deliveryCharge,
         double deliveryDistanceKm,
         decimal totalAmount)
@@ -66,6 +70,10 @@ public class OrderService(IMongoDbService db)
             .Set(o => o.Longitude, longitude)
             .Set(o => o.AddressMapLink, addressMapLink)
             .Set(o => o.Notes, notes)
+            .Set(o => o.Subtotal, subtotal)
+            .Set(o => o.CouponCode, couponCode)
+            .Set(o => o.DiscountPercentage, discountPercentage)
+            .Set(o => o.DiscountAmount, discountAmount)
             .Set(o => o.DeliveryCharge, deliveryCharge)
             .Set(o => o.DeliveryDistanceKm, deliveryDistanceKm)
             .Set(o => o.TotalAmount, totalAmount)

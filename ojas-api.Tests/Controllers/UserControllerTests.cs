@@ -149,7 +149,7 @@ public class UserControllerTests
     [Fact]
     public async Task AddAddress_ReturnsBadRequest_WhenLatLngMissing()
     {
-        var request = new SaveAddressRequest("Home", "123 Main St", null, null, false);
+        var request = new SaveAddressRequest("Home", "123 Main St", null, null, false, "9123456780");
 
         var result = await _sut.AddAddress(request);
 
@@ -159,7 +159,7 @@ public class UserControllerTests
     [Fact]
     public async Task AddAddress_IssuesThreeUpdates_WhenMarkedDefault_ToClearOtherDefaultsFirst()
     {
-        var request = new SaveAddressRequest("Home", "123 Main St", 18.5, 73.8, true);
+        var request = new SaveAddressRequest("Home", "123 Main St", 18.5, 73.8, true, "9123456780");
 
         var result = await _sut.AddAddress(request);
 
@@ -172,7 +172,7 @@ public class UserControllerTests
     [Fact]
     public async Task AddAddress_IssuesTwoUpdates_WhenNotDefault()
     {
-        var request = new SaveAddressRequest("Work", "456 Side St", 18.6, 73.9, false);
+        var request = new SaveAddressRequest("Work", "456 Side St", 18.6, 73.9, false, "9123456781");
 
         var result = await _sut.AddAddress(request);
 

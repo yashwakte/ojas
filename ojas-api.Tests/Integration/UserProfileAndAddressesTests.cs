@@ -84,11 +84,11 @@ public class UserProfileAndAddressesTests : IDisposable
         using var client = _factory.CreateClient();
         var (_, csrf) = await client.RegisterAsync();
 
-        var firstAddress = new SaveAddressRequest("Home", "123 Main St", 18.5, 73.8, true);
+        var firstAddress = new SaveAddressRequest("Home", "123 Main St", 18.5, 73.8, true, "9123456780");
         var firstResponse = await client.SendAsync(Json(HttpMethod.Post, "/api/user/addresses", firstAddress, csrf));
         firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var secondAddress = new SaveAddressRequest("Work", "456 Side St", 18.6, 73.9, true);
+        var secondAddress = new SaveAddressRequest("Work", "456 Side St", 18.6, 73.9, true, "9123456781");
         var secondResponse = await client.SendAsync(Json(HttpMethod.Post, "/api/user/addresses", secondAddress, csrf));
         secondResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -118,7 +118,7 @@ public class UserProfileAndAddressesTests : IDisposable
         using var client = _factory.CreateClient();
         var (_, csrf) = await client.RegisterAsync();
 
-        var request = new SaveAddressRequest("Home", "123 Main St", null, null, false);
+        var request = new SaveAddressRequest("Home", "123 Main St", null, null, false, "9123456780");
 
         var response = await client.SendAsync(Json(HttpMethod.Post, "/api/user/addresses", request, csrf));
 

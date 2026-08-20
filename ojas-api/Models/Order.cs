@@ -54,6 +54,19 @@ public class Order
     [BsonElement("items")]
     public List<OrderItem> Items { get; set; } = [];
 
+    [BsonElement("subtotal")]
+    public decimal Subtotal { get; set; }
+
+    /// <summary>Null when no coupon was applied (or the one requested didn't validate).</summary>
+    [BsonElement("couponCode")]
+    public string? CouponCode { get; set; }
+
+    [BsonElement("discountPercentage")]
+    public decimal DiscountPercentage { get; set; }
+
+    [BsonElement("discountAmount")]
+    public decimal DiscountAmount { get; set; }
+
     [BsonElement("deliveryCharge")]
     public decimal DeliveryCharge { get; set; }
 

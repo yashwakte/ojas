@@ -70,6 +70,7 @@ export class DeliveryAddressService {
         this.users
           .saveAddress({
             label: guestAddress.label,
+            phone: guestAddress.phone,
             fullAddress: guestAddress.fullAddress,
             latitude: guestAddress.latitude,
             longitude: guestAddress.longitude,

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, signal, computed, effect } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -13,6 +13,7 @@ import { DeliveryChargesService } from '../../services/delivery-charges.service'
 import { DeliveryAddressService } from '../../services/delivery-address.service';
 import { PlaceOrderRequest, SaveAddressRequest, SavedAddress } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
+import { CouponPicker } from '../../components/coupon-picker/coupon-picker';
 import {
   DEFAULT_CITY,
   DEFAULT_STATE,
@@ -20,10 +21,17 @@ import {
   citiesForState,
   isValidPunePincode,
 } from '../../constants/serviceable-locations';
+import {
+  calculateCouponDiscount,
+  qualifiesForFreeDelivery,
+  COUPONS,
+  Coupon,
+  FREE_DELIVERY_CART_THRESHOLD,
+} from '../../constants/pricing';
 
 @Component({
   selector: 'app-checkout',
-  imports: [RouterLink, FormsModule, MatIconModule, MapPicker, DecimalPipe],
+  imports: [RouterLink, FormsModule, MatIconModule, MapPicker, CouponPicker, DecimalPipe],
   templateUrl: './checkout.html',
   styleUrl: './checkout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -82,7 +90,36 @@ export class Checkout implements OnInit {
     this.checkoutService.items().reduce((sum, i) => sum + i.product.price * i.quantity, 0),
   );
 
-  readonly grandTotal = computed(() => this.totalAmount() + this.deliveryCharge());
+  readonly coupons = COUPONS;
+  /** The coupon code the customer picked from the popup below — never auto-applied. */
+  appliedCouponCode = signal<string | null>(null);
+  couponPickerOpen = signal(false);
+
+  readonly appliedCoupon = computed<Coupon | null>(
+    () => this.coupons.find((c) => c.code === this.appliedCouponCode()) ?? null,
+  );
+
+  readonly discount = computed(() =>
+    calculateCouponDiscount(this.appliedCoupon(), this.totalAmount()),
+  );
+
+  /** The distance-based quote from the server, overridden to free once the cart
+   * clears the free-delivery threshold — automatic, unlike the coupon discount above. */
+  readonly effectiveDeliveryCharge = computed(() =>
+    qualifiesForFreeDelivery(this.totalAmount()) ? 0 : this.deliveryCharge(),
+  );
+
+  readonly grandTotal = computed(
+    () => this.totalAmount() - this.discount().amount + this.effectiveDeliveryCharge(),
+  );
+
+  /** Nudges the customer toward free delivery — the one reward that's automatic rather
+   * than picked. Each coupon tile shows its own unlock progress. */
+  readonly freeDeliveryNudge = computed(() => {
+    const subtotal = this.totalAmount();
+    if (subtotal === 0 || subtotal >= FREE_DELIVERY_CART_THRESHOLD) return null;
+    return `Add ₹${FREE_DELIVERY_CART_THRESHOLD - subtotal} more to get FREE delivery`;
+  });
 
   constructor(
     private cartService: CartService,
@@ -94,13 +131,25 @@ export class Checkout implements OnInit {
     private deliveryChargesService: DeliveryChargesService,
     private deliveryAddress: DeliveryAddressService,
     private router: Router,
-  ) {}
+  ) {
+    // If items are removed after a coupon was applied and the cart falls back below
+    // that coupon's minimum, drop it rather than leaving a stale "Remove" state showing.
+    effect(() => {
+      const coupon = this.appliedCoupon();
+      if (coupon && this.totalAmount() < coupon.minCartValue) {
+        this.appliedCouponCode.set(null);
+      }
+    });
+  }
 
   ngOnInit(): void {
     const user = this.auth.user();
 
-    // Pre-fill from logged-in user
+    // Pre-fill from logged-in user - set before the saved-addresses lookup below
+    // so a match's own phone (once that response lands) overrides this default,
+    // rather than risk this unconditional assignment running after it.
     this.fullName = user?.fullName ?? '';
+    this.phone = user?.phone ?? '';
 
     // Load saved addresses, preferring whatever they were already shopping
     // against so the charge quoted on the product page is the one they pay.
@@ -115,14 +164,14 @@ export class Checkout implements OnInit {
 
         if (match) {
           this.selectedSavedAddress.set(match);
+          // Falls back to the account phone for addresses saved before this field
+          // existed, rather than leaving the field blank.
+          this.phone = match.phone || user?.phone || '';
           this.updateDeliveryEstimate();
         }
       },
       error: () => {},
     });
-
-    // Phone: use profile info from persisted user state
-    this.phone = user?.phone ?? '';
 
     // Redirect if nothing to checkout
     if (this.checkoutService.items().length === 0) {
@@ -192,6 +241,7 @@ export class Checkout implements OnInit {
         weight: i.product.weight,
         quantity: i.quantity,
       })),
+      couponCode: this.appliedCouponCode(),
     };
 
     this.loading.set(true);
@@ -218,6 +268,7 @@ export class Checkout implements OnInit {
         ) {
           const req: SaveAddressRequest = {
             label: this.saveNewAddressLabel.trim(),
+            phone: this.phone,
             fullAddress: deliveryAddress,
             latitude,
             longitude,
@@ -253,14 +304,18 @@ export class Checkout implements OnInit {
   selectAddress(addr: SavedAddress): void {
     if (this.selectedSavedAddress()?.label === addr.label) {
       this.selectedSavedAddress.set(null);
+      this.phone = this.auth.user()?.phone ?? '';
     } else {
       this.selectedSavedAddress.set(addr);
+      // Falls back to the account phone for addresses saved before this field existed.
+      this.phone = addr.phone || this.auth.user()?.phone || '';
     }
     this.updateDeliveryEstimate();
   }
 
   useNewAddress(): void {
     this.selectedSavedAddress.set(null);
+    this.phone = this.auth.user()?.phone ?? '';
     this.updateDeliveryEstimate();
   }
 

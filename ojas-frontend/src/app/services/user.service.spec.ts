@@ -47,6 +47,7 @@ describe('UserService', () => {
   it('saveAddress() posts to /user/addresses', () => {
     const request: SaveAddressRequest = {
       label: 'Home',
+      phone: '9888877766',
       fullAddress: '123 Street',
       latitude: 18.5,
       longitude: 73.8,

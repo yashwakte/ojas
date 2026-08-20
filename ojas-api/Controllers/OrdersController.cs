@@ -68,6 +68,10 @@ public class OrdersController : ControllerBase
             order.AddressMapLink,
             order.Notes,
             order.Items.Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.Price, i.Weight, i.Quantity)).ToList(),
+            order.Subtotal,
+            order.CouponCode,
+            order.DiscountPercentage,
+            order.DiscountAmount,
             order.DeliveryCharge,
             order.DeliveryDistanceKm,
             order.TotalAmount,
@@ -105,6 +109,7 @@ public class OrdersController : ControllerBase
         }).ToList();
 
         var itemsTotal = items.Sum(i => i.Price * i.Quantity);
+        var (discountPercentage, discountAmount, appliedCouponCode) = OrderPricing.ApplyCoupon(request.CouponCode, itemsTotal);
 
         // Delivery charge is always computed server-side from the warehouse config, never trusted from the client.
         var quote = await _deliveryChargesService.CalculateDeliveryChargeAsync(request.Latitude.Value, request.Longitude.Value);
@@ -140,7 +145,9 @@ public class OrdersController : ControllerBase
             });
         }
 
-        var deliveryCharge = quote.Charge;
+        // A cart above the free-delivery threshold waives the distance-based charge entirely,
+        // independent of the discount tiers above.
+        var deliveryCharge = OrderPricing.QualifiesForFreeDelivery(itemsTotal) ? 0m : quote.Charge;
         var distanceKm = quote.DistanceKm;
 
         var order = new Order
@@ -154,9 +161,13 @@ public class OrdersController : ControllerBase
             AddressMapLink = UserController.BuildMapLink(request.Latitude.Value, request.Longitude.Value),
             Notes = request.Notes ?? string.Empty,
             Items = items,
+            Subtotal = itemsTotal,
+            CouponCode = appliedCouponCode,
+            DiscountPercentage = discountPercentage,
+            DiscountAmount = discountAmount,
             DeliveryCharge = deliveryCharge,
             DeliveryDistanceKm = distanceKm,
-            TotalAmount = Math.Round(itemsTotal + deliveryCharge, 2, MidpointRounding.AwayFromZero),
+            TotalAmount = Math.Round(itemsTotal - discountAmount + deliveryCharge, 2, MidpointRounding.AwayFromZero),
         };
 
         var created = await _orderService.CreateOrderAsync(order);
@@ -254,6 +265,8 @@ public class OrdersController : ControllerBase
         await _productService.RestoreStockAsync(decreases);
 
         var itemsTotal = items.Sum(i => i.Price * i.Quantity);
+        var (discountPercentage, discountAmount, appliedCouponCode) = OrderPricing.ApplyCoupon(request.CouponCode, itemsTotal);
+        var deliveryCharge = OrderPricing.QualifiesForFreeDelivery(itemsTotal) ? 0m : quote.Charge;
 
         var updated = await _orderService.UpdateOrderContentsAsync(
             orderId,
@@ -265,9 +278,13 @@ public class OrdersController : ControllerBase
             request.Longitude.Value,
             UserController.BuildMapLink(request.Latitude.Value, request.Longitude.Value),
             request.Notes ?? string.Empty,
-            quote.Charge,
+            itemsTotal,
+            appliedCouponCode,
+            discountPercentage,
+            discountAmount,
+            deliveryCharge,
             quote.DistanceKm,
-            Math.Round(itemsTotal + quote.Charge, 2, MidpointRounding.AwayFromZero));
+            Math.Round(itemsTotal - discountAmount + deliveryCharge, 2, MidpointRounding.AwayFromZero));
 
         if (!updated)
             return NotFound(new { message = "Order not found." });

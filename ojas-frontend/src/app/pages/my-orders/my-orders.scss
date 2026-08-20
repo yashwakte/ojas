@@ -304,13 +304,20 @@
   flex-wrap: wrap;
 }
 
+.delivery-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
 .delivery-info {
   display: flex;
   align-items: center;
   gap: 6px;
   color: var(--ojas-text-light);
   font-size: 0.82rem;
-  flex: 1;
 
   mat-icon {
     font-size: 1rem;

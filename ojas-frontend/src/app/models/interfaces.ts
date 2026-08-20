@@ -186,6 +186,8 @@ export interface PlaceOrderRequest {
   longitude: number;
   notes: string;
   items: OrderItem[];
+  /** Set only when the customer explicitly picked one from the Coupons & Offers list. */
+  couponCode?: string | null;
 }
 
 /** Same shape as placing an order — the server recomputes totals either way. */
@@ -208,6 +210,10 @@ export interface OrderResponse {
   addressMapLink?: string | null;
   notes: string;
   items: OrderItem[];
+  subtotal: number;
+  couponCode?: string | null;
+  discountPercentage: number;
+  discountAmount: number;
   deliveryCharge: number;
   deliveryDistanceKm: number;
   totalAmount: number;
@@ -345,6 +351,8 @@ export interface AssignDeliveryPartnerRequest {
 
 export interface SavedAddress {
   label: string;
+  /** Empty for addresses saved before this field existed. */
+  phone: string;
   fullAddress: string;
   latitude: number;
   longitude: number;
@@ -354,6 +362,7 @@ export interface SavedAddress {
 
 export interface SaveAddressRequest {
   label: string;
+  phone: string;
   fullAddress: string;
   latitude: number;
   longitude: number;

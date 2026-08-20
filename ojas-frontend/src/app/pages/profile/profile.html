@@ -107,7 +107,7 @@
         <h3>Saved Addresses</h3>
         <button
           mat-icon-button
-          (click)="showAddressForm.set(true)"
+          (click)="openAddAddressForm()"
           class="edit-btn"
           aria-label="Add address"
         >
@@ -128,6 +128,10 @@
                 <mat-form-field appearance="outline" class="full-width">
                   <mat-label>Label (e.g. Home, Work)</mat-label>
                   <input matInput [(ngModel)]="editLabel" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Phone Number *</mat-label>
+                  <input matInput type="tel" [(ngModel)]="editAddressPhone" placeholder="10-digit mobile number" />
                 </mat-form-field>
                 <div class="addr-grid">
                   <mat-form-field appearance="outline">
@@ -228,6 +232,9 @@
                     <span class="default-badge">Default</span>
                   }
                 </div>
+                @if (addr.phone) {
+                  <p class="address-phone"><mat-icon inline="true">call</mat-icon> {{ addr.phone }}</p>
+                }
                 <p class="address-text">{{ addr.fullAddress }}</p>
                 @if (addr.mapLink) {
                   <a class="address-map-link" [href]="addr.mapLink" target="_blank" rel="noopener noreferrer">
@@ -264,6 +271,11 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Label (e.g. Home, Work)</mat-label>
             <input matInput [(ngModel)]="newLabel" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Phone Number *</mat-label>
+            <input matInput type="tel" [(ngModel)]="newPhone" placeholder="10-digit mobile number" />
           </mat-form-field>
 
           <div class="addr-grid">
