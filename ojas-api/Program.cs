@@ -81,12 +81,13 @@ builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // you're testing.
 if (builder.Environment.IsProduction() || builder.Configuration.GetValue<bool>("Email:SendInDevelopment"))
 {
-    // Hostinger SMTP for wecare@ojasaata.com, replacing Brevo. BrevoEmailSender is deliberately
-    // still in the codebase (not deleted) as a same-day rollback until real SMTP delivery from
-    // Render is confirmed live - some hosts block outbound SMTP ports, which is exactly why
-    // Brevo's HTTP API was chosen in the first place. Switch this registration back to
-    // AddHttpClient<IEmailSender, BrevoEmailSender>() if SMTP turns out not to get through.
-    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+    // Still Brevo for now, deliberately. SmtpEmailSender (Hostinger, for wecare@ojasaata.com) is
+    // built and ready to replace it, but flipping this before Smtp:* is actually configured on
+    // Render - and before a real send from Render is confirmed to get through outbound SMTP
+    // ports at all - would silently break every OTP/invite/reset email in production the moment
+    // this deploys. Switch to AddSingleton<IEmailSender, SmtpEmailSender>() only once Smtp:Host/
+    // Username/Password/SenderEmail are set on Render and a live test send has been verified.
+    builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
 }
 else
 {
