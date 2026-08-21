@@ -81,10 +81,12 @@ builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // you're testing.
 if (builder.Environment.IsProduction() || builder.Configuration.GetValue<bool>("Email:SendInDevelopment"))
 {
-    // Hostinger SMTP for wecare@ojasaata.com, replacing Brevo (suspended, unrecoverable - there
-    // was no working service left to roll back to, so BrevoEmailSender was removed rather than
-    // kept around as dead weight).
-    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+    // NotConfiguredEmailSender, not SmtpEmailSender, until a real HTTP-API-based provider
+    // replaces it - confirmed live on Render that outbound SMTP is blocked on both 465 and 587
+    // (both time out rather than fail fast), so SmtpEmailSender would just make every affected
+    // request hang for MailKit's ~100s default timeout instead of failing immediately. Brevo is
+    // suspended and unrecoverable, so there is currently no working email delivery at all.
+    builder.Services.AddSingleton<IEmailSender, NotConfiguredEmailSender>();
 }
 else
 {
@@ -340,62 +342,6 @@ app.MapControllers();
 // Deliberately outside [Authorize]/rate-limiting - Render (or any external monitor) needs to
 // reach this anonymously and frequently to know whether to restart the service.
 app.MapHealthChecks("/health");
-
-// TEMPORARY - proves the new Hostinger SMTP sender actually delivers from Render, not just that
-// it compiles. Sends to wecare@ojasaata.com itself (self-verifying, no arbitrary recipient) and
-// reports success/failure directly in the response rather than requiring a log/inbox check.
-// Hit once, confirm the inbox actually received it, then remove this endpoint in the next commit.
-app.MapGet("/api/debug/smtp-test", async (IEmailSender emailSender) =>
-{
-    try
-    {
-        await emailSender.SendAsync(
-            "wecare@ojasaata.com",
-            "Ojas SMTP test",
-            "<p>This is a one-off delivery test for the Hostinger SMTP sender - safe to ignore.</p>");
-        return Results.Ok(new { sent = true });
-    }
-    catch (Exception ex)
-    {
-        return Results.Ok(new { sent = false, error = ex.Message });
-    }
-});
-
-// TEMPORARY - port 465 timed out from Render, which reads as a blocked outbound port rather
-// than a credentials problem (that would fail fast, not hang). This tries 587/STARTTLS directly,
-// bypassing the configured SmtpEmailSender, so the alternative port/security mode can be proven
-// before asking anyone to change Render env vars back and forth.
-app.MapGet("/api/debug/smtp-test-587", async (IConfiguration config) =>
-{
-    try
-    {
-        var host = config["Smtp:Host"] ?? "smtp.hostinger.com";
-        var username = config["Smtp:Username"];
-        var password = config["Smtp:Password"];
-        var senderEmail = config["Smtp:SenderEmail"] ?? username;
-
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-            return Results.Ok(new { sent = false, port = 587, error = "Smtp:Username/Password missing." });
-
-        var message = new MimeKit.MimeMessage();
-        message.From.Add(new MimeKit.MailboxAddress("Ojas", senderEmail));
-        message.To.Add(MimeKit.MailboxAddress.Parse("wecare@ojasaata.com"));
-        message.Subject = "Ojas SMTP test (port 587)";
-        message.Body = new MimeKit.BodyBuilder { HtmlBody = "<p>Port 587/STARTTLS delivery test - safe to ignore.</p>" }.ToMessageBody();
-
-        using var client = new MailKit.Net.Smtp.SmtpClient();
-        client.Timeout = 15000;
-        await client.ConnectAsync(host, 587, MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(username, password);
-        await client.SendAsync(message);
-        await client.DisconnectAsync(true);
-        return Results.Ok(new { sent = true, port = 587 });
-    }
-    catch (Exception ex)
-    {
-        return Results.Ok(new { sent = false, port = 587, error = ex.Message });
-    }
-});
 
 app.Run();
 

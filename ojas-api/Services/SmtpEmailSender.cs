@@ -5,12 +5,13 @@ using MimeKit;
 namespace OjasApi.Services;
 
 /// <summary>
-/// Sends transactional email via Hostinger's SMTP relay for wecare@ojasaata.com, replacing
-/// Brevo (suspended, unrecoverable). This makes a real SMTP connection rather than an HTTP API
-/// call - some hosts block outbound SMTP ports, which is why the /api/debug/smtp-test endpoint
-/// existed briefly to prove this actually gets through from Render before relying on it. Port
-/// and TLS mode are both configurable (confirmed for this mailbox: 465/implicit-TLS) since which
-/// combination works isn't guaranteed the same for every provider.
+/// Sends transactional email via raw SMTP - kept in the codebase for a host that actually allows
+/// outbound SMTP, but NOT currently registered as the live IEmailSender (see Program.cs).
+/// Confirmed live 2026-08-21 with Hostinger's relay for wecare@ojasaata.com: Render blocks
+/// outbound SMTP entirely, both port 465 (implicit TLS) and 587 (STARTTLS) time out rather than
+/// connect - this is exactly the failure mode Brevo's original HTTP API was chosen to avoid. An
+/// explicit short connect timeout means that if this is ever re-enabled somewhere SMTP genuinely
+/// works, a real failure still surfaces in seconds rather than MailKit's ~100s default.
 /// </summary>
 public class SmtpEmailSender : IEmailSender
 {
@@ -50,7 +51,7 @@ public class SmtpEmailSender : IEmailSender
         message.Subject = subject;
         message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
 
-        using var client = new SmtpClient();
+        using var client = new SmtpClient { Timeout = 15000 };
         var secureSocketOptions = useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
         await client.ConnectAsync(host, port, secureSocketOptions);
         await client.AuthenticateAsync(username, password);
