@@ -246,7 +246,7 @@ public class ChatbotTests : IDisposable
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("8657781526");
-        body.Reply.ShouldContain("ashamarketingpune@gmail.com");
+        body.Reply.ShouldContain("wecare@ojasaata.com");
         body.Escalate.ShouldBeTrue();
     }
 

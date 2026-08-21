@@ -16,7 +16,7 @@ namespace OjasApi.Services;
 public class ChatbotService
 {
     private const string SupportPhone = "+91 8657781526";
-    private const string SupportEmail = "ashamarketingpune@gmail.com";
+    private const string SupportEmail = "wecare@ojasaata.com";
 
     private readonly OrderService _orders;
     private readonly ProductService _products;
