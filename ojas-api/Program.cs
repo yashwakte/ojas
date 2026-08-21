@@ -361,6 +361,42 @@ app.MapGet("/api/debug/smtp-test", async (IEmailSender emailSender) =>
     }
 });
 
+// TEMPORARY - port 465 timed out from Render, which reads as a blocked outbound port rather
+// than a credentials problem (that would fail fast, not hang). This tries 587/STARTTLS directly,
+// bypassing the configured SmtpEmailSender, so the alternative port/security mode can be proven
+// before asking anyone to change Render env vars back and forth.
+app.MapGet("/api/debug/smtp-test-587", async (IConfiguration config) =>
+{
+    try
+    {
+        var host = config["Smtp:Host"] ?? "smtp.hostinger.com";
+        var username = config["Smtp:Username"];
+        var password = config["Smtp:Password"];
+        var senderEmail = config["Smtp:SenderEmail"] ?? username;
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            return Results.Ok(new { sent = false, port = 587, error = "Smtp:Username/Password missing." });
+
+        var message = new MimeKit.MimeMessage();
+        message.From.Add(new MimeKit.MailboxAddress("Ojas", senderEmail));
+        message.To.Add(MimeKit.MailboxAddress.Parse("wecare@ojasaata.com"));
+        message.Subject = "Ojas SMTP test (port 587)";
+        message.Body = new MimeKit.BodyBuilder { HtmlBody = "<p>Port 587/STARTTLS delivery test - safe to ignore.</p>" }.ToMessageBody();
+
+        using var client = new MailKit.Net.Smtp.SmtpClient();
+        client.Timeout = 15000;
+        await client.ConnectAsync(host, 587, MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(username, password);
+        await client.SendAsync(message);
+        await client.DisconnectAsync(true);
+        return Results.Ok(new { sent = true, port = 587 });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { sent = false, port = 587, error = ex.Message });
+    }
+});
+
 app.Run();
 
 // Exposed so WebApplicationFactory<Program> in the test project can bootstrap this app in-memory.
