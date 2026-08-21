@@ -81,7 +81,12 @@ builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // you're testing.
 if (builder.Environment.IsProduction() || builder.Configuration.GetValue<bool>("Email:SendInDevelopment"))
 {
-    builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
+    // Hostinger SMTP for wecare@ojasaata.com, replacing Brevo. BrevoEmailSender is deliberately
+    // still in the codebase (not deleted) as a same-day rollback until real SMTP delivery from
+    // Render is confirmed live - some hosts block outbound SMTP ports, which is exactly why
+    // Brevo's HTTP API was chosen in the first place. Switch this registration back to
+    // AddHttpClient<IEmailSender, BrevoEmailSender>() if SMTP turns out not to get through.
+    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 }
 else
 {
