@@ -5,14 +5,12 @@ using MimeKit;
 namespace OjasApi.Services;
 
 /// <summary>
-/// Sends transactional email via Hostinger's SMTP relay for wecare@ojasaata.com, replacing Brevo.
-///
-/// Unlike Brevo's HTTP API (chosen originally specifically to sidestep hosts blocking outbound
-/// SMTP ports), this makes a real SMTP connection - Render's free/starter tiers are known to
-/// block some outbound SMTP ports, so this must be proven working live on Render before Brevo is
-/// fully decommissioned. Port and TLS mode are both configurable (587/STARTTLS is Hostinger's
-/// documented default, 465/implicit-TLS is the fallback) precisely because which one actually
-/// gets through from a given host isn't guaranteed in advance.
+/// Sends transactional email via Hostinger's SMTP relay for wecare@ojasaata.com, replacing
+/// Brevo (suspended, unrecoverable). This makes a real SMTP connection rather than an HTTP API
+/// call - some hosts block outbound SMTP ports, which is why the /api/debug/smtp-test endpoint
+/// existed briefly to prove this actually gets through from Render before relying on it. Port
+/// and TLS mode are both configurable (confirmed for this mailbox: 465/implicit-TLS) since which
+/// combination works isn't guaranteed the same for every provider.
 /// </summary>
 public class SmtpEmailSender : IEmailSender
 {

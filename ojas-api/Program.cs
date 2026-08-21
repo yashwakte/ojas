@@ -81,13 +81,10 @@ builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // you're testing.
 if (builder.Environment.IsProduction() || builder.Configuration.GetValue<bool>("Email:SendInDevelopment"))
 {
-    // Still Brevo for now, deliberately. SmtpEmailSender (Hostinger, for wecare@ojasaata.com) is
-    // built and ready to replace it, but flipping this before Smtp:* is actually configured on
-    // Render - and before a real send from Render is confirmed to get through outbound SMTP
-    // ports at all - would silently break every OTP/invite/reset email in production the moment
-    // this deploys. Switch to AddSingleton<IEmailSender, SmtpEmailSender>() only once Smtp:Host/
-    // Username/Password/SenderEmail are set on Render and a live test send has been verified.
-    builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>();
+    // Hostinger SMTP for wecare@ojasaata.com, replacing Brevo (suspended, unrecoverable - there
+    // was no working service left to roll back to, so BrevoEmailSender was removed rather than
+    // kept around as dead weight).
+    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 }
 else
 {
@@ -343,6 +340,26 @@ app.MapControllers();
 // Deliberately outside [Authorize]/rate-limiting - Render (or any external monitor) needs to
 // reach this anonymously and frequently to know whether to restart the service.
 app.MapHealthChecks("/health");
+
+// TEMPORARY - proves the new Hostinger SMTP sender actually delivers from Render, not just that
+// it compiles. Sends to wecare@ojasaata.com itself (self-verifying, no arbitrary recipient) and
+// reports success/failure directly in the response rather than requiring a log/inbox check.
+// Hit once, confirm the inbox actually received it, then remove this endpoint in the next commit.
+app.MapGet("/api/debug/smtp-test", async (IEmailSender emailSender) =>
+{
+    try
+    {
+        await emailSender.SendAsync(
+            "wecare@ojasaata.com",
+            "Ojas SMTP test",
+            "<p>This is a one-off delivery test for the Hostinger SMTP sender - safe to ignore.</p>");
+        return Results.Ok(new { sent = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { sent = false, error = ex.Message });
+    }
+});
 
 app.Run();
 

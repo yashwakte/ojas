@@ -1,3 +1,8 @@
+// Reference only - copy the keys you need into appsettings.Development.json (gitignored, never
+// committed) or set them as environment variables in Render, using double underscores in place
+// of colons (e.g. Smtp__Host). This file is never loaded by the app itself, which is why it can
+// hold comments and placeholder values despite the .jsonc extension not being a real ASP.NET
+// Core config source.
 {
   "Logging": {
     "LogLevel": {
@@ -15,24 +20,15 @@
     "Issuer": "OjasApi",
     "Audience": "OjasApp"
   },
-  // Hostinger SMTP for wecare@ojasaata.com, the live sender (SmtpEmailSender). Port 587 with
-  // UseSsl false is STARTTLS (Hostinger's documented default); if that doesn't get through from
-  // wherever this is hosted, try port 465 with UseSsl true (implicit TLS) instead.
+  // Hostinger SMTP for wecare@ojasaata.com, the live sender (SmtpEmailSender). Confirmed via
+  // Hostinger's own mailbox settings: port 465 with UseSsl true (implicit TLS).
   "Smtp": {
     "Host": "smtp.hostinger.com",
-    "Port": 587,
-    "UseSsl": false,
+    "Port": 465,
+    "UseSsl": true,
     "Username": "wecare@ojasaata.com",
     "Password": "<hostinger-mailbox-password>",
     "SenderEmail": "wecare@ojasaata.com",
-    "SenderName": "Ojas"
-  },
-  // Legacy - BrevoEmailSender is still in the codebase as a same-day rollback (see Program.cs)
-  // until Smtp delivery is confirmed working live. Only needed if you switch the IEmailSender
-  // registration back to BrevoEmailSender.
-  "Brevo": {
-    "ApiKey": "<brevo-api-key>",
-    "SenderEmail": "<verified-sender-email>",
     "SenderName": "Ojas"
   },
   // Where staff invite links point. Must be the real site origin in Production, or the emailed
@@ -51,8 +47,10 @@
     "TemplateId": "<dlt-approved-template-id>",
     "SenderId": "<dlt-approved-sender-id>"
   },
+  // For local dev, use Cloudflare's dummy pair (works on any domain): secret
+  // 1x0000000000000000000000000000000AA, paired with site key 1x00000000000000000000AA in the
+  // frontend. Use real keys from your Cloudflare Turnstile dashboard in production.
   "Turnstile": {
-    "// SecretKey": "For local dev, use Cloudflare's dummy pair (works on any domain): secret 1x0000000000000000000000000000000AA, paired with site key 1x00000000000000000000AA in the frontend. Use real keys from your Cloudflare Turnstile dashboard in production.",
     "SecretKey": "<turnstile-secret-key>"
   },
   "Cors": {

@@ -5,7 +5,7 @@ namespace OjasApi.Services;
 
 /// <summary>
 /// Verifies a Turnstile widget token server-side via Cloudflare's siteverify endpoint.
-/// Turnstile:SecretKey is required at startup (see Program.cs) - unlike Brevo/MSG91, a
+/// Turnstile:SecretKey is required at startup (see Program.cs) - unlike Smtp/MSG91, a
 /// missing CAPTCHA secret isn't something safe to silently degrade past, since that would
 /// mean shipping with no bot protection at all and no signal that it happened.
 /// </summary>
