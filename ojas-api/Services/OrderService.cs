@@ -30,7 +30,9 @@ public class OrderService(IMongoDbService db)
     public static bool IsCustomerEditable(string status) =>
         CustomerEditableStatuses.Contains(NormalizeStatus(status) ?? string.Empty);
 
-    public static readonly HashSet<string> AllowedPaymentStatuses = ["Pending", "Collected"];
+    // "Collected" stays specific to COD cash-in-hand; "Paid"/"Failed" are the Cashfree outcomes,
+    // driven by the webhook - never by the customer-facing redirect.
+    public static readonly HashSet<string> AllowedPaymentStatuses = ["Pending", "Collected", "Paid", "Failed"];
 
     public async Task<Order> CreateOrderAsync(Order order)
     {
@@ -128,6 +130,39 @@ public class OrderService(IMongoDbService db)
     {
         var update = Builders<Order>.Update
             .Set(o => o.PaymentStatus, "Collected")
+            .Set(o => o.UpdatedAt, DateTime.UtcNow);
+
+        var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+        return result.MatchedCount > 0;
+    }
+
+    public async Task<bool> SetPaymentSessionAsync(string orderId, string paymentSessionId)
+    {
+        var update = Builders<Order>.Update
+            .Set(o => o.PaymentSessionId, paymentSessionId)
+            .Set(o => o.UpdatedAt, DateTime.UtcNow);
+
+        var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+        return result.MatchedCount > 0;
+    }
+
+    /// <summary>Driven only by a verified Cashfree webhook - never by the customer's browser
+    /// redirect, which proves nothing about whether the bank actually approved the charge.</summary>
+    public async Task<bool> MarkPaymentPaidAsync(string orderId, string cfPaymentId)
+    {
+        var update = Builders<Order>.Update
+            .Set(o => o.PaymentStatus, "Paid")
+            .Set(o => o.CfPaymentId, cfPaymentId)
+            .Set(o => o.UpdatedAt, DateTime.UtcNow);
+
+        var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+        return result.MatchedCount > 0;
+    }
+
+    public async Task<bool> MarkPaymentFailedAsync(string orderId)
+    {
+        var update = Builders<Order>.Update
+            .Set(o => o.PaymentStatus, "Failed")
             .Set(o => o.UpdatedAt, DateTime.UtcNow);
 
         var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);

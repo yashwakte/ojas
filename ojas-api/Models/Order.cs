@@ -79,13 +79,23 @@ public class Order
     [BsonElement("status")]
     public string Status { get; set; } = "Pending";
 
-    /// <summary>Only "COD" today. Kept as a field rather than hardcoded everywhere so an
-    /// online method (Razorpay) can slot in later without touching the order shape again.</summary>
+    /// <summary>"COD" or "Cashfree". Kept as a field rather than hardcoded everywhere so
+    /// another gateway could slot in later without touching the order shape again.</summary>
     [BsonElement("paymentMethod")]
     public string PaymentMethod { get; set; } = "COD";
 
     [BsonElement("paymentStatus")]
     public string PaymentStatus { get; set; } = "Pending";
+
+    /// <summary>Cashfree's payment_session_id for this order - the frontend's checkout SDK
+    /// needs it to open the hosted payment page. Null for COD orders.</summary>
+    [BsonElement("paymentSessionId")]
+    public string? PaymentSessionId { get; set; }
+
+    /// <summary>Cashfree's own payment identifier, recorded once a PAYMENT_SUCCESS_WEBHOOK
+    /// confirms the charge - kept for reconciliation and as the audit trail behind a refund.</summary>
+    [BsonElement("cfPaymentId")]
+    public string? CfPaymentId { get; set; }
 
     [BsonElement("deliveryPartnerId")]
     public string? DeliveryPartnerId { get; set; }

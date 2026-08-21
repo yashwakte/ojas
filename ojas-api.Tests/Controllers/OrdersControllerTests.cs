@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using MongoDB.Driver;
 using OjasApi.Controllers;
@@ -45,7 +47,10 @@ public class OrdersControllerTests
         var orderService = new OrderService(_dbMock.Object);
         var deliveryChargesService = new DeliveryChargesService(_dbMock.Object);
         var productService = new ProductService(_dbMock.Object);
-        _sut = new OrdersController(orderService, _dbMock.Object, deliveryChargesService, productService);
+        var cashfreeService = new CashfreeService(new HttpClient(), new ConfigurationBuilder().Build());
+        _sut = new OrdersController(
+            orderService, _dbMock.Object, deliveryChargesService, productService,
+            cashfreeService, NullLogger<OrdersController>.Instance);
 
         SetUser("user-1");
     }
@@ -146,6 +151,32 @@ public class OrdersControllerTests
         order.DeliveryCharge.ShouldBe(1061.95m);
         order.TotalAmount.ShouldBe(250m + 1061.95m);
         _ordersMock.Verify(c => c.InsertOneAsync(It.IsAny<Order>(), null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlaceOrder_ReturnsBadRequest_ForInvalidPaymentMethod()
+    {
+        var items = new List<OrderItemDto> { new("p1", "Product", 10, "1kg", 1) };
+        var request = new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items, null, "Bitcoin");
+
+        var result = await _sut.PlaceOrder(request);
+
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task PlaceOrder_ReturnsServiceUnavailable_WhenCashfreeNotConfigured()
+    {
+        // The controller's own CashfreeService is built from an empty IConfiguration in this test
+        // fixture, so IsConfigured is false - exactly the state production is in before the user's
+        // Cashfree KYC clears and Render env vars are set.
+        var items = new List<OrderItemDto> { new("p1", "Product", 10, "1kg", 1) };
+        var request = new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items, null, "Cashfree");
+
+        var result = await _sut.PlaceOrder(request);
+
+        var statusResult = result.Result.ShouldBeOfType<ObjectResult>();
+        statusResult.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
     }
 
     // ---------- GetMyOrders / admin / delivery listings ----------
@@ -312,6 +343,92 @@ public class OrdersControllerTests
         var result = await _sut.AssignDeliveryPartner("507f1f77bcf86cd799439011", new AssignDeliveryPartnerRequest(partner.Id!));
 
         result.ShouldBeOfType<NotFoundObjectResult>();
+    }
+
+    // ---------- RefundOrder ----------
+
+    [Fact]
+    public async Task RefundOrder_ReturnsNotFound_WhenOrderMissing()
+    {
+        _ordersMock.SetupFind(new List<Order>());
+
+        var result = await _sut.RefundOrder("507f1f77bcf86cd799439011", new RefundOrderRequest(100m));
+
+        result.ShouldBeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task RefundOrder_ReturnsBadRequest_ForCodOrder()
+    {
+        var order = MakeOrder();
+        order.PaymentMethod = "COD";
+        order.PaymentStatus = "Collected";
+        order.TotalAmount = 200m;
+        _ordersMock.SetupFind(new List<Order> { order });
+
+        var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(100m));
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task RefundOrder_ReturnsBadRequest_WhenCashfreeOrderNotYetPaid()
+    {
+        var order = MakeOrder();
+        order.PaymentMethod = "Cashfree";
+        order.PaymentStatus = "Pending";
+        order.TotalAmount = 200m;
+        _ordersMock.SetupFind(new List<Order> { order });
+
+        var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(100m));
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task RefundOrder_ReturnsBadRequest_WhenAmountExceedsOrderTotal()
+    {
+        var order = MakeOrder();
+        order.PaymentMethod = "Cashfree";
+        order.PaymentStatus = "Paid";
+        order.TotalAmount = 200m;
+        _ordersMock.SetupFind(new List<Order> { order });
+
+        var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(250m));
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task RefundOrder_ReturnsBadRequest_WhenAmountIsZeroOrNegative()
+    {
+        var order = MakeOrder();
+        order.PaymentMethod = "Cashfree";
+        order.PaymentStatus = "Paid";
+        order.TotalAmount = 200m;
+        _ordersMock.SetupFind(new List<Order> { order });
+
+        var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(0m));
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task RefundOrder_ReturnsBadGateway_WhenCashfreeNotConfigured()
+    {
+        // Same reasoning as PlaceOrder_ReturnsServiceUnavailable_WhenCashfreeNotConfigured - the
+        // fixture's CashfreeService has no ClientId/ClientSecret, so any real API call it attempts
+        // reports failure rather than succeeding, and the controller surfaces that as a 502.
+        var order = MakeOrder();
+        order.PaymentMethod = "Cashfree";
+        order.PaymentStatus = "Paid";
+        order.TotalAmount = 200m;
+        _ordersMock.SetupFind(new List<Order> { order });
+
+        var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(100m));
+
+        var statusResult = result.ShouldBeOfType<ObjectResult>();
+        statusResult.StatusCode.ShouldBe(StatusCodes.Status502BadGateway);
     }
 
     // ---------- MarkDeliveredByDeliveryPartner ----------

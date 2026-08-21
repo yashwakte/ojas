@@ -47,6 +47,15 @@
     "TemplateId": "<dlt-approved-template-id>",
     "SenderId": "<dlt-approved-sender-id>"
   },
+  // Cashfree Payment Gateway - inert (returns 503 on checkout) until ClientId/ClientSecret are
+  // set. Sandbox and production use separate, distinct credential pairs from Cashfree's
+  // dashboard - Environment picks the base URL, but you must also swap the credentials
+  // themselves when going live, not just this value.
+  "Cashfree": {
+    "Environment": "sandbox",
+    "ClientId": "<cashfree-client-id>",
+    "ClientSecret": "<cashfree-client-secret>"
+  },
   // For local dev, use Cloudflare's dummy pair (works on any domain): secret
   // 1x0000000000000000000000000000000AA, paired with site key 1x00000000000000000000AA in the
   // frontend. Use real keys from your Cloudflare Turnstile dashboard in production.

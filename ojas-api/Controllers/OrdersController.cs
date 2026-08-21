@@ -18,17 +18,25 @@ public class OrdersController : ControllerBase
     private readonly IMongoDbService _db;
     private readonly DeliveryChargesService _deliveryChargesService;
     private readonly ProductService _productService;
+    private readonly CashfreeService _cashfreeService;
+    private readonly ILogger<OrdersController> _logger;
+
+    private static readonly HashSet<string> AllowedPaymentMethods = ["COD", "Cashfree"];
 
     public OrdersController(
         OrderService orderService,
         IMongoDbService db,
         DeliveryChargesService deliveryChargesService,
-        ProductService productService)
+        ProductService productService,
+        CashfreeService cashfreeService,
+        ILogger<OrdersController> logger)
     {
         _orderService = orderService;
         _db = db;
         _deliveryChargesService = deliveryChargesService;
         _productService = productService;
+        _cashfreeService = cashfreeService;
+        _logger = logger;
     }
 
     /// <summary>Net stock change per product between two versions of an order.</summary>
@@ -81,7 +89,8 @@ public class OrdersController : ControllerBase
             order.CreatedAt,
             order.DeliveryPartnerId,
             order.DeliveryPartnerName,
-            order.UpdatedAt
+            order.UpdatedAt,
+            order.PaymentSessionId
         );
     }
 
@@ -89,6 +98,13 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<OrderResponse>> PlaceOrder([FromBody] PlaceOrderRequest request)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var paymentMethod = string.IsNullOrWhiteSpace(request.PaymentMethod) ? "COD" : request.PaymentMethod.Trim();
+        if (!AllowedPaymentMethods.Contains(paymentMethod))
+            return BadRequest(new { message = "Invalid payment method." });
+
+        if (paymentMethod == "Cashfree" && !_cashfreeService.IsConfigured)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Online payment isn't available right now. Please choose Cash on Delivery." });
 
         if (request.Items == null || request.Items.Count == 0)
             return BadRequest(new { message = "Order must contain at least one item." });
@@ -168,9 +184,29 @@ public class OrdersController : ControllerBase
             DeliveryCharge = deliveryCharge,
             DeliveryDistanceKm = distanceKm,
             TotalAmount = Math.Round(itemsTotal - discountAmount + deliveryCharge, 2, MidpointRounding.AwayFromZero),
+            PaymentMethod = paymentMethod,
         };
 
         var created = await _orderService.CreateOrderAsync(order);
+
+        if (paymentMethod == "Cashfree")
+        {
+            try
+            {
+                var session = await _cashfreeService.CreateOrderAsync(created);
+                await _orderService.SetPaymentSessionAsync(created.Id!, session.PaymentSessionId);
+                created.PaymentSessionId = session.PaymentSessionId;
+            }
+            catch (Exception ex)
+            {
+                // We already took stock and created our own order record - roll both back
+                // rather than leaving a stuck order the customer can never actually pay for.
+                await _productService.RestoreStockAsync(items.Select(i => (i.ProductId, i.Quantity)));
+                await _orderService.UpdateOrderStatusAsync(created.Id!, "Cancelled");
+                _logger.LogError(ex, "Cashfree order creation failed for order {OrderId}", created.Id);
+                return StatusCode(StatusCodes.Status502BadGateway, new { message = "We couldn't start the payment. Please try again." });
+            }
+        }
 
         return Ok(ToResponse(created));
     }
@@ -385,6 +421,35 @@ public class OrdersController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>Server-side, admin-only, audited refund - the amount is re-validated against
+    /// what this order actually captured on every call, never trusted from the request alone.</summary>
+    [HttpPost("admin/{orderId}/refund")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> RefundOrder(string orderId, [FromBody] RefundOrderRequest request)
+    {
+        var order = await _orderService.GetOrderByIdAsync(orderId);
+        if (order == null)
+            return NotFound(new { message = "Order not found." });
+
+        if (order.PaymentMethod != "Cashfree" || order.PaymentStatus != "Paid")
+            return BadRequest(new { message = "This order has no captured online payment to refund." });
+
+        if (request.RefundAmount <= 0 || request.RefundAmount > order.TotalAmount)
+            return BadRequest(new { message = "Refund amount must be positive and cannot exceed the order total." });
+
+        var refundId = $"refund_{orderId}_{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+        var result = await _cashfreeService.CreateRefundAsync(orderId, request.RefundAmount, refundId, request.Note);
+
+        if (!result.Success)
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = result.Error });
+
+        _logger.LogInformation(
+            "Admin {AdminId} refunded {Amount} for order {OrderId} ({RefundId}), Cashfree status {Status}",
+            User.FindFirstValue(ClaimTypes.NameIdentifier), request.RefundAmount, orderId, refundId, result.RefundStatus);
+
+        return Ok(new { refundStatus = result.RefundStatus });
     }
 
     [HttpPatch("admin/{orderId}/assign")]

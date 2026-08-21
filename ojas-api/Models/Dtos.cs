@@ -127,7 +127,7 @@ public record UserProfileResponse(string Id, string FullName, string Email, stri
 public record OrderItemDto(string ProductId, string ProductName, decimal Price, string Weight, int Quantity);
 /// <summary>CouponCode is a customer pick, not a price - like everything else here it is
 /// re-validated server-side against the current subtotal, never trusted for its discount.</summary>
-public record PlaceOrderRequest(string FullName, string Phone, string Address, [Required] double? Latitude, [Required] double? Longitude, string Notes, List<OrderItemDto> Items, string? CouponCode = null);
+public record PlaceOrderRequest(string FullName, string Phone, string Address, [Required] double? Latitude, [Required] double? Longitude, string Notes, List<OrderItemDto> Items, string? CouponCode = null, string PaymentMethod = "COD");
 public record UpdateOrderStatusRequest([Required] string Status);
 public record UpdateMyOrderRequest(
 	string FullName,
@@ -162,7 +162,12 @@ public record OrderResponse(
 	DateTime CreatedAt,
 	string? DeliveryPartnerId,
 	string? DeliveryPartnerName,
-	DateTime? UpdatedAt);
+	DateTime? UpdatedAt,
+	string? PaymentSessionId = null);
+
+/// <summary>RefundAmount is still capped server-side against what the order actually captured -
+/// this is only the admin's requested amount, not the final authority.</summary>
+public record RefundOrderRequest([Required] decimal RefundAmount, string? Note = null);
 
 public record DeliveryChargeCalculationResponse(
 	double DistanceKm,
