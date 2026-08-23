@@ -1,0 +1,73 @@
+<div class="wallet-page">
+  <div class="page-header">
+    <a routerLink="/profile" class="back-link">
+      <mat-icon>arrow_back</mat-icon>
+    </a>
+    <div class="page-header-titles">
+      <h1>Your Wallet</h1>
+      <p class="subtitle">Credit from refunds, spendable on your next order</p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-icon class="spin">autorenew</mat-icon>
+      <p>Loading your wallet...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+    </div>
+  } @else {
+    <div class="balance-card">
+      <span class="balance-label">Available balance</span>
+      <span class="balance-amount">{{ balance() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
+      <p class="balance-note">
+        <mat-icon inline="true">info</mat-icon>
+        Applied automatically at checkout. Wallet credit can be spent on Ojas orders and can't be
+        transferred to a bank account.
+      </p>
+    </div>
+
+    @if (transactions().length === 0) {
+      <div class="empty-state">
+        <mat-icon>receipt_long</mat-icon>
+        <h3>Nothing here yet</h3>
+        <p>Refunds from changed or cancelled orders will show up here.</p>
+        <a routerLink="/products" class="shop-link">Start shopping</a>
+      </div>
+    } @else {
+      <h2 class="statement-heading">Statement</h2>
+      <div class="statement">
+        @for (entry of transactions(); track $index) {
+          <div class="statement-row">
+            <div class="statement-icon" [class.statement-icon--debit]="entry.amount < 0">
+              <mat-icon>{{ entry.amount < 0 ? 'shopping_bag' : 'add' }}</mat-icon>
+            </div>
+            <div class="statement-body">
+              <span class="statement-reason">{{ reasonLabel(entry.reason) }}</span>
+              <span class="statement-date">{{
+                entry.createdAt | date: 'dd MMM yyyy, h:mm a'
+              }}</span>
+              @if (entry.orderId) {
+                <span class="statement-order"
+                  >Order #{{ entry.orderId.slice(-8).toUpperCase() }}</span
+                >
+              }
+            </div>
+            <div class="statement-amounts">
+              <span class="statement-amount" [class.statement-amount--debit]="entry.amount < 0">
+                {{ entry.amount > 0 ? '+' : ''
+                }}{{ entry.amount | currency: 'INR' : 'symbol' : '1.2-2' }}
+              </span>
+              <span class="statement-balance">
+                Balance {{ entry.balanceAfter | currency: 'INR' : 'symbol' : '1.2-2' }}
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

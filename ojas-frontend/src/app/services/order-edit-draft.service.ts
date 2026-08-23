@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { OrderItem, Product } from '../models/interfaces';
+import { OrderItem, Product, effectivePrice } from '../models/interfaces';
 
 export interface OrderEditDraft {
   orderId: string;
@@ -31,8 +31,8 @@ export class OrderEditDraftService {
   addProduct(product: Product, quantity = 1): void {
     this._draft.update((d) => {
       if (!d) return d;
-      const price =
-        product.discount > 0 ? product.price - (product.price * product.discount) / 100 : product.price;
+      // The shared definition, so this agrees with the cart, checkout and the server.
+      const price = effectivePrice(product);
       const existing = d.items.find((i) => i.productId === product.id);
       const items = existing
         ? d.items.map((i) =>

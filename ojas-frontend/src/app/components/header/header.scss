@@ -476,6 +476,24 @@
   font-family: 'Poppins', sans-serif;
 }
 
+// Pushed to the far edge of the menu row so the balance reads as a value against the label,
+// not as part of it.
+.menu-wallet-balance {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ojas-orange-dark);
+  font-family: 'Poppins', sans-serif;
+}
+
+.mobile-wallet-balance {
+  margin-left: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ojas-orange-dark);
+}
+
 .logout-item {
   color: #dc2626 !important;
   mat-icon {

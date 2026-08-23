@@ -9,7 +9,16 @@ import { AuthService } from '../../services/auth.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { DeliveryAddressService } from '../../services/delivery-address.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
-import { Product, isLowStock, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import {
+  Product,
+  deliveryDaysLabel,
+  deliveryPromiseByDate,
+  deliveryPromiseLabel,
+  effectivePrice,
+  isLowStock,
+  isOutOfStock,
+  isPurchasable,
+} from '../../models/interfaces';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
 
 @Component({
@@ -65,13 +74,29 @@ export class ProductDetail {
 
   product = computed(() => this.productService.getProduct(this.id()));
 
+  /** The shared definition, so this page advertises exactly what the cart will charge. */
+  readonly effectivePrice = effectivePrice;
+
+  /** The delivery promise for an order placed now. Computed per render rather than cached so the
+   * date is still right for a tab left open across midnight, and shared with the orders page so
+   * the promise made here is the one shown against the order afterwards. */
+  deliveryPromise(): string {
+    return deliveryPromiseLabel();
+  }
+
+  /** The outer edge of that window, so the promise is checkable rather than vague. */
+  deliveryPromiseBy(): string {
+    return deliveryPromiseByDate();
+  }
+
+  /** For the spec card, whose "Estimated Delivery" heading already supplies the verb. */
+  deliveryDays(): string {
+    return deliveryDaysLabel();
+  }
+
   discountedPrice = computed(() => {
     const p = this.product();
-    if (!p) return 0;
-    if (p.discount && p.discount > 0) {
-      return p.price - (p.price * p.discount) / 100;
-    }
-    return p.price;
+    return p ? effectivePrice(p) : 0;
   });
 
   galleryImages = computed(() => {

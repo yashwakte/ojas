@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe } from '@angular/common';
-import { Product, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../models/interfaces';
 
 @Component({
   selector: 'app-product-card',
@@ -15,6 +15,10 @@ import { Product, isOutOfStock, isPurchasable } from '../../models/interfaces';
   },
 })
 export class ProductCard {
+  /** The shared definition, so the tile advertises exactly what the cart will charge. It used to
+   * do its own arithmetic and round to whole rupees, which could differ by a few paise. */
+  effectivePrice = effectivePrice;
+
   product = input.required<Product>();
   badge = input<string | null>(null);
   justAdded = input(false);

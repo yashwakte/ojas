@@ -6,10 +6,12 @@ import { Checkout } from './checkout';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService, CheckoutItem } from '../../services/checkout.service';
 import { OrderService } from '../../services/order.service';
+import { CashfreeCheckoutService } from '../../services/cashfree-checkout.service';
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
+import { WalletService } from '../../services/wallet.service';
 import {
   AuthResponse,
   OrderResponse,
@@ -50,7 +52,7 @@ describe('Checkout', () => {
   const defaultAddress: SavedAddress = {
     label: 'Home',
     phone: '9888877766',
-    fullAddress: '123 Main St',
+    fullAddress: '123 Main St, Kharadi, Pune - 411014',
     latitude: 18.5,
     longitude: 73.8,
     isDefault: true,
@@ -81,8 +83,11 @@ describe('Checkout', () => {
     deliveryDistanceKm: 3,
     totalAmount: 100,
     status: 'Pending',
-    paymentMethod: 'COD',
+    paymentMethod: 'Cashfree',
     paymentStatus: 'Pending',
+    amountPaid: 0,
+    walletAmountApplied: 0,
+    paymentSessionId: 'session_abc',
     createdAt: '2024-01-01',
   };
 
@@ -90,19 +95,28 @@ describe('Checkout', () => {
   let cartServiceSpy: jasmine.SpyObj<CartService>;
   let checkoutServiceSpy: any;
   let orderServiceSpy: jasmine.SpyObj<OrderService>;
+  let cashfreeCheckoutServiceSpy: jasmine.SpyObj<CashfreeCheckoutService>;
   let productServiceSpy: jasmine.SpyObj<ProductService>;
   let authServiceSpy: any;
   let userServiceSpy: jasmine.SpyObj<UserService>;
   let deliveryChargesServiceSpy: jasmine.SpyObj<DeliveryChargesService>;
+  let walletServiceSpy: jasmine.SpyObj<WalletService>;
+  let walletBalance: ReturnType<typeof signal<number>>;
   let router: Router;
 
   beforeEach(() => {
     items = signal<CheckoutItem[]>([{ product, quantity: 2 }]);
     cartServiceSpy = jasmine.createSpyObj('CartService', ['removeFromCart']);
-    checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['updateQuantity', 'removeItem', 'clear', 'addItem', 'mergeItems'], {
-      items,
-    });
+    checkoutServiceSpy = jasmine.createSpyObj(
+      'CheckoutService',
+      ['updateQuantity', 'removeItem', 'clear', 'addItem', 'mergeItems'],
+      {
+        items,
+      },
+    );
     orderServiceSpy = jasmine.createSpyObj('OrderService', ['placeOrder']);
+    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', ['checkout']);
+    cashfreeCheckoutServiceSpy.checkout.and.returnValue(Promise.resolve());
     productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts']);
     authServiceSpy = { user: signal<AuthResponse | null>(authUser) };
     userServiceSpy = jasmine.createSpyObj('UserService', ['getProfile', 'saveAddress']);
@@ -111,14 +125,21 @@ describe('Checkout', () => {
     deliveryChargesServiceSpy.previewCharge.and.returnValue(
       of({ distanceKm: 3, charge: 20, isFree: false, isServiceable: true, maxRadiusKm: 25 }),
     );
+    walletBalance = signal(0);
+    walletServiceSpy = jasmine.createSpyObj('WalletService', ['load'], {
+      balance: walletBalance,
+    });
+    walletServiceSpy.load.and.returnValue(of({ balance: walletBalance(), transactions: [] }));
 
     TestBed.configureTestingModule({
       imports: [Checkout],
       providers: [
         provideRouter([]),
+        { provide: WalletService, useValue: walletServiceSpy },
         { provide: CartService, useValue: cartServiceSpy },
         { provide: CheckoutService, useValue: checkoutServiceSpy },
         { provide: OrderService, useValue: orderServiceSpy },
+        { provide: CashfreeCheckoutService, useValue: cashfreeCheckoutServiceSpy },
         { provide: ProductService, useValue: productServiceSpy },
         { provide: AuthService, useValue: authServiceSpy },
         { provide: UserService, useValue: userServiceSpy },
@@ -146,7 +167,8 @@ describe('Checkout', () => {
     const fixture = create();
     expect(fixture.componentInstance.savedAddresses()).toEqual([defaultAddress]);
     expect(fixture.componentInstance.selectedSavedAddress()).toEqual(defaultAddress);
-    expect(deliveryChargesServiceSpy.previewCharge).toHaveBeenCalledWith(18.5, 73.8);
+    // The pincode goes along with the pin, because that is what the server actually prices from.
+    expect(deliveryChargesServiceSpy.previewCharge).toHaveBeenCalledWith(18.5, 73.8, '411014');
     expect(fixture.componentInstance.deliveryCharge()).toBe(20);
     expect(fixture.componentInstance.deliveryDistanceKm()).toBe(3);
     // The pre-selected address's own phone wins over the account's.
@@ -207,7 +229,9 @@ describe('Checkout', () => {
   it('nudges toward free delivery only, since coupons show their own unlock progress', () => {
     items.set([{ product, quantity: 3 }]); // 300, below the ₹500 free-delivery threshold
     let fixture = create();
-    expect(fixture.componentInstance.freeDeliveryNudge()).toBe('Add ₹200 more to get FREE delivery');
+    expect(fixture.componentInstance.freeDeliveryNudge()).toBe(
+      'Add ₹200.00 more to get FREE delivery',
+    );
 
     items.set([{ product, quantity: 6 }]); // 600, past free delivery
     fixture = create();
@@ -299,10 +323,11 @@ describe('Checkout', () => {
     expect(fixture.componentInstance.manualLat).toBe(19);
     expect(fixture.componentInstance.manualLng).toBe(74);
     expect(fixture.componentInstance.showManualMapPicker()).toBeFalse();
-    expect(deliveryChargesServiceSpy.previewCharge).toHaveBeenCalledWith(19, 74);
+    // A brand-new address, whose pincode comes from the form's own pincode field.
+    expect(deliveryChargesServiceSpy.previewCharge).toHaveBeenCalledWith(19, 74, null);
   });
 
-  it('placeOrder submits using the selected saved address and clears cart/checkout on success', () => {
+  it('placeOrder submits using the selected saved address', () => {
     orderServiceSpy.placeOrder.and.returnValue(of(order));
     const fixture = create();
 
@@ -313,16 +338,12 @@ describe('Checkout', () => {
         fullName: 'Jane Doe',
         // The selected saved address's own phone, not the account's.
         phone: '9888877766',
-        address: '123 Main St',
+        address: '123 Main St, Kharadi, Pune - 411014',
         latitude: 18.5,
         longitude: 73.8,
         couponCode: null,
       }),
     );
-    expect(fixture.componentInstance.orderPlaced()).toBeTrue();
-    expect(fixture.componentInstance.orderId()).toBe('o1');
-    expect(cartServiceSpy.removeFromCart).toHaveBeenCalledWith('p1');
-    expect(checkoutServiceSpy.clear).toHaveBeenCalled();
     // Stock changed server-side; the cached product list must be refreshed.
     expect(productServiceSpy.loadProducts).toHaveBeenCalled();
   });
@@ -340,17 +361,15 @@ describe('Checkout', () => {
     );
   });
 
-  it('placeOrder scrolls to top on success, so the confirmation is visible rather than the footer', () => {
+  it('placeOrder hands every order off to the hosted payment page, since COD was retired', () => {
     orderServiceSpy.placeOrder.and.returnValue(of(order));
-    // window.scrollTo is overloaded ((x,y) vs (options)), which makes toHaveBeenCalledWith's
-    // inferred signature fight the typing - asserting on the captured call args directly
-    // sidesteps that instead.
-    const scrollToSpy = spyOn(window, 'scrollTo').and.stub();
     const fixture = create();
 
     fixture.componentInstance.placeOrder();
 
-    expect(scrollToSpy.calls.mostRecent().args[0]).toEqual({ top: 0, behavior: 'smooth' });
+    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_abc');
+    // The redirect takes over from here, so the spinner deliberately stays up.
+    expect(fixture.componentInstance.loading()).toBeTrue();
   });
 
   it('placeOrder saves a new address when opted in and none is currently selected', () => {
@@ -393,6 +412,163 @@ describe('Checkout', () => {
     fixture.componentInstance.placeOrder();
 
     expect(fixture.componentInstance.errorMsg()).toBe('Failed to place order. Please try again.');
+  });
+
+  it('placeOrder surfaces the server message when Cashfree is not configured (503)', () => {
+    orderServiceSpy.placeOrder.and.returnValue(
+      throwError(() => ({ status: 503, error: { message: 'Online payment is unavailable.' } })),
+    );
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+
+    expect(fixture.componentInstance.errorMsg()).toBe('Online payment is unavailable.');
+  });
+
+  it('keeps the cart while handing off to payment, so a declined card leaves it to retry from', async () => {
+    orderServiceSpy.placeOrder.and.returnValue(of(order));
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+    await fixture.whenStable();
+
+    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_abc');
+    // Emptying the basket here is what used to leave a customer whose payment failed with
+    // nothing to try again from. My Orders clears it once the payment is actually confirmed.
+    expect(checkoutServiceSpy.clear).not.toHaveBeenCalled();
+    expect(cartServiceSpy.removeFromCart).not.toHaveBeenCalled();
+  });
+
+  it('tells the customer nothing was charged if the payment page never opens', async () => {
+    orderServiceSpy.placeOrder.and.returnValue(of(order));
+    cashfreeCheckoutServiceSpy.checkout.and.returnValue(Promise.reject(new Error('sdk failed')));
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.loading()).toBeFalse();
+    expect(fixture.componentInstance.errorMsg()).toContain('nothing was charged');
+  });
+
+  // ---------- wallet ----------
+
+  // ---------- money never shows more than two decimals ----------
+
+  it('caps the free-delivery nudge at two decimals instead of leaking float noise', () => {
+    // 3 x 158.57 = 475.71 in decimal, but 475.70999999999998 in binary floating point, so the
+    // shortfall used to render as "Add ₹24.29000000000002 more".
+    const odd: Product = { ...product, price: 158.57, discount: 0 };
+    items.set([{ product: odd, quantity: 3 }]);
+    const fixture = create();
+
+    const nudge = fixture.componentInstance.freeDeliveryNudge();
+
+    expect(nudge).toBe('Add ₹24.29 more to get FREE delivery');
+  });
+
+  it('rounds the cart total to the paise rather than carrying float noise into it', () => {
+    const odd: Product = { ...product, price: 158.57, discount: 0 };
+    items.set([{ product: odd, quantity: 3 }]);
+    const fixture = create();
+
+    expect(fixture.componentInstance.totalAmount()).toBe(475.71);
+    expect(fixture.componentInstance.grandTotal().toString()).not.toContain('0000');
+  });
+
+  it('applies no wallet credit when the balance is empty', () => {
+    const fixture = create();
+
+    expect(fixture.componentInstance.walletApplied()).toBe(0);
+    expect(fixture.componentInstance.amountDueOnline()).toBe(
+      fixture.componentInstance.grandTotal(),
+    );
+  });
+
+  it('spends only up to the order total, leaving the rest of the balance alone', () => {
+    walletBalance.set(1000);
+    const fixture = create();
+
+    // Cart is 200 + 20 delivery = 220, well under the balance.
+    expect(fixture.componentInstance.grandTotal()).toBe(220);
+    expect(fixture.componentInstance.walletApplied()).toBe(220);
+    expect(fixture.componentInstance.amountDueOnline()).toBe(0);
+  });
+
+  it('covers part of the order and leaves the remainder for the gateway', () => {
+    walletBalance.set(100);
+    const fixture = create();
+
+    expect(fixture.componentInstance.walletApplied()).toBe(100);
+    expect(fixture.componentInstance.amountDueOnline()).toBe(120);
+  });
+
+  it('never labels the outstanding figure as the amount the wallet covered', () => {
+    // The two are different numbers, and pairing one's label with the other's value produced a
+    // summary reading "Covered by wallet  ₹0.00" on an order the wallet had covered in full.
+    walletBalance.set(1000);
+    const fixture = create();
+    fixture.detectChanges();
+
+    const text: string = fixture.nativeElement.textContent;
+    expect(fixture.componentInstance.amountDueOnline()).toBe(0);
+    expect(text).toContain('To pay online');
+    expect(text).not.toContain('Covered by wallet');
+    // The amount the wallet actually took is shown on its own row, as a deduction.
+    expect(text).toContain('220.00');
+  });
+
+  it('unticking the wallet leaves the balance unspent', () => {
+    walletBalance.set(1000);
+    const fixture = create();
+
+    fixture.componentInstance.useWallet.set(false);
+
+    expect(fixture.componentInstance.walletApplied()).toBe(0);
+    expect(fixture.componentInstance.amountDueOnline()).toBe(220);
+  });
+
+  it('sends the wallet preference with the order', () => {
+    orderServiceSpy.placeOrder.and.returnValue(of(order));
+    const fixture = create();
+    fixture.componentInstance.useWallet.set(false);
+
+    fixture.componentInstance.placeOrder();
+
+    expect(orderServiceSpy.placeOrder).toHaveBeenCalledWith(
+      jasmine.objectContaining({ useWallet: false }),
+    );
+  });
+
+  it('goes straight to My Orders when the wallet covered the whole total', async () => {
+    // No payment session because there was nothing left to charge.
+    orderServiceSpy.placeOrder.and.returnValue(
+      of({ ...order, paymentMethod: 'Wallet', paymentStatus: 'Paid', paymentSessionId: null }),
+    );
+    spyOn(router, 'navigate');
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+    await fixture.whenStable();
+
+    expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/my-orders']);
+    expect(fixture.componentInstance.errorMsg()).toBe('');
+    // Nothing was left to pay, so there is no payment that could still fail - this is the one
+    // path where emptying the basket at once is right.
+    expect(cartServiceSpy.removeFromCart).toHaveBeenCalledWith('p1');
+    expect(checkoutServiceSpy.clear).toHaveBeenCalled();
+  });
+
+  it('surfaces a clear error when the order comes back with no payment session at all', async () => {
+    orderServiceSpy.placeOrder.and.returnValue(of({ ...order, paymentSessionId: null }));
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+    await fixture.whenStable();
+
+    expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.errorMsg()).toContain("couldn't start the payment");
   });
 
   it('incrementCartQty / decrementCartQty delegate to checkoutService.updateQuantity', () => {

@@ -66,6 +66,8 @@ export class DeliveryChargesManagement implements OnInit {
     freeDeliveryUpToKm: 7,
     perKmChargeAfterFree: 10,
     maxDeliveryRadiusKm: 25,
+    serviceableAreas: [],
+    defaultDeliveryCharge: 40,
     isActive: true,
   });
 
@@ -84,6 +86,8 @@ export class DeliveryChargesManagement implements OnInit {
           freeDeliveryUpToKm: cfg.freeDeliveryUpToKm,
           perKmChargeAfterFree: cfg.perKmChargeAfterFree,
           maxDeliveryRadiusKm: cfg.maxDeliveryRadiusKm,
+          serviceableAreas: (cfg.serviceableAreas ?? []).map((a) => ({ ...a })),
+          defaultDeliveryCharge: cfg.defaultDeliveryCharge ?? 0,
           isActive: cfg.isActive,
         });
       }
@@ -92,6 +96,60 @@ export class DeliveryChargesManagement implements OnInit {
 
   ngOnInit(): void {
     this.deliveryChargesService.loadConfig();
+  }
+
+  // ---------- serviceable pincodes ----------
+
+  /** New pincode being typed into the "add" row. */
+  readonly newPincode = signal('');
+  readonly newPincodeLabel = signal('');
+  readonly newPincodeCharge = signal<number | null>(null);
+  readonly pincodeError = signal('');
+
+  /** True once delivery is priced from this list rather than from the customer's map pin. Until
+   * then the older distance rules apply, and those trust a coordinate the browser sends. */
+  readonly pricesByPincode = computed(
+    () => (this.formData().serviceableAreas?.length ?? 0) > 0,
+  );
+
+  addServiceableArea(): void {
+    const pincode = this.newPincode().trim();
+    if (!/^\d{6}$/.test(pincode)) {
+      this.pincodeError.set('A pincode is exactly six digits.');
+      return;
+    }
+
+    const existing = this.formData().serviceableAreas ?? [];
+    if (existing.some((a) => a.pincode === pincode)) {
+      this.pincodeError.set(`${pincode} is already on the list.`);
+      return;
+    }
+
+    const charge = this.newPincodeCharge();
+    this.formData.update((form) => ({
+      ...form,
+      serviceableAreas: [
+        ...existing,
+        {
+          pincode,
+          label: this.newPincodeLabel().trim() || null,
+          // Null means "use the default", which keeps the common case to one number.
+          charge: charge === null || charge < 0 ? null : charge,
+        },
+      ],
+    }));
+
+    this.newPincode.set('');
+    this.newPincodeLabel.set('');
+    this.newPincodeCharge.set(null);
+    this.pincodeError.set('');
+  }
+
+  removeServiceableArea(pincode: string): void {
+    this.formData.update((form) => ({
+      ...form,
+      serviceableAreas: (form.serviceableAreas ?? []).filter((a) => a.pincode !== pincode),
+    }));
   }
 
   startEditing(): void {

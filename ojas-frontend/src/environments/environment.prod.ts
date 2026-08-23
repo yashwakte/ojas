@@ -11,4 +11,9 @@ export const environment = {
   // Real site key from the Cloudflare Turnstile dashboard - replace before going live. The
   // matching secret key lives in the API's config (Turnstile:SecretKey), never here.
   turnstileSiteKey: '0x4AAAAAAET1pPvaGYSRgVPd',
+  // Must match the API's Cashfree:Environment (Render env var) - a payment_session_id created
+  // against Cashfree's sandbox base URL only opens in the SDK's sandbox mode, and vice versa.
+  // Flip this to 'production' only in the same change that flips Cashfree:Environment and swaps
+  // in the live Client ID/Secret on Render - not before.
+  cashfreeMode: 'sandbox' as 'sandbox' | 'production',
 };

@@ -44,6 +44,13 @@ public class User
     [BsonElement("savedAddresses")]
     public List<SavedAddress> SavedAddresses { get; set; } = [];
 
+    /// <summary>Closed-loop store credit: spendable on Ojas, never withdrawable to a bank
+    /// account. That restriction is what keeps this outside RBI's Prepaid Payment Instrument
+    /// authorisation regime, so it must not be relaxed. A running total for cheap reads - the
+    /// WalletTransaction ledger is the actual record of how it got here.</summary>
+    [BsonElement("walletBalance")]
+    public decimal WalletBalance { get; set; }
+
     /// <summary>Set by an admin via "approve next device" so this staff member's next device
     /// enrollment can complete on password alone, with no email round-trip. Exists for the case
     /// where email delivery itself is down (the original break-glass gap: revoking a lost device

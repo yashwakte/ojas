@@ -59,11 +59,11 @@
               </span>
               <span class="product-price">
                 @if (product.discount && product.discount > 0) {
-                  <span class="original-price">₹{{ product.price }}</span>
-                  <span class="sale-price">₹{{ product.price - (product.price * product.discount / 100) | number:'1.0-0' }}</span>
+                  <span class="original-price">₹{{ product.price | number: '1.0-2' }}</span>
+                  <span class="sale-price">₹{{ effectivePrice(product) | number: '1.0-2' }}</span>
                   <span class="discount-badge">{{ product.discount }}% OFF</span>
                 } @else {
-                  ₹{{ product.price }}
+                  ₹{{ product.price | number: '1.0-2' }}
                 }
               </span>
             </div>

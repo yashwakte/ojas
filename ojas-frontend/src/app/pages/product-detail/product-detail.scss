@@ -438,6 +438,43 @@
   background: var(--ojas-orange-bg);
 }
 
+// Sits under the deliver-to card as a quieter line: the date is the point, the caveat is fine
+// print. Deliberately not another filled card, so it doesn't compete with the address block.
+.delivery-promise {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: -6px 0 16px;
+  padding: 0 4px;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1.15rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    color: #16a34a;
+  }
+}
+
+.delivery-promise-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+  }
+
+  small {
+    font-size: 0.74rem;
+    line-height: 1.45;
+    color: var(--ojas-text-light);
+  }
+}
+
 .deliver-to-pin {
   flex-shrink: 0;
   color: var(--ojas-orange);

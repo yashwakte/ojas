@@ -68,6 +68,7 @@ builder.Services.AddSingleton<IMongoDbService>(sp => sp.GetRequiredService<Mongo
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<OrderPaymentOutcomeService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
@@ -75,6 +76,7 @@ builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<StaffInviteService>();
 builder.Services.AddScoped<ChatbotService>();
 builder.Services.AddHttpClient<CashfreeService>();
+builder.Services.AddScoped<WalletService>();
 builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // Real mail is only worth sending in Production. Everywhere else the OTP already comes back in
 // the response as devCode and is shown in the UI, so a real send would just spend free-tier
@@ -317,7 +319,14 @@ app.Use(async (context, next) =>
         path.StartsWithSegments("/api/auth/accept-invite") ||
         path.StartsWithSegments("/api/auth/phone-login");
 
+    // Payment gateway callbacks are server-to-server and authenticated by the HMAC signature on
+    // the request itself, never by a session. They happen to carry no auth cookie today, so the
+    // check below would skip them anyway - but a webhook must not silently depend on that, and
+    // it must keep working if one ever arrives alongside a cookie.
+    var isGatewayWebhook = path.StartsWithSegments("/api/payments/cashfree/webhook");
+
     if (!isAuthBootstrapEndpoint &&
+        !isGatewayWebhook &&
         context.User.Identity?.IsAuthenticated == true &&
         (HttpMethods.IsPost(context.Request.Method) ||
          HttpMethods.IsPut(context.Request.Method) ||

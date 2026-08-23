@@ -28,6 +28,10 @@ import {
   StaffUserResponse,
   UpdateOrderStatusRequest,
   UserRole,
+  isPaymentOutstanding,
+  isPaymentSettled,
+  paymentIcon,
+  paymentLabel,
 } from '../../models/interfaces';
 
 type AdminTab = 'orders' | 'products' | 'delivery-partners' | 'delivery-charges' | 'campaign-banner';
@@ -59,6 +63,12 @@ type AdminTab = 'orders' | 'products' | 'delivery-partners' | 'delivery-charges'
   styleUrl: './admin-dashboard.scss',
 })
 export class AdminDashboard implements OnInit {
+  /** Shared with the customer and delivery views, so one order isn't described three ways. */
+  paymentLabel = paymentLabel;
+  paymentIcon = paymentIcon;
+  isPaymentSettled = isPaymentSettled;
+  isPaymentOutstanding = isPaymentOutstanding;
+
   private authService = inject(AuthService);
   private orderService = inject(OrderService);
   private productService = inject(ProductService);

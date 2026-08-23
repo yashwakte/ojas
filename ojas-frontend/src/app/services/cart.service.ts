@@ -1,5 +1,6 @@
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
-import { CartItem, Product } from '../models/interfaces';
+import { CartItem, Product, effectivePrice } from '../models/interfaces';
+import { roundMoney } from '../constants/pricing';
 import { AuthService } from './auth.service';
 
 const GUEST_KEY = 'ojas_cart_guest';
@@ -13,8 +14,9 @@ export class CartService {
 
   readonly totalCount = computed(() => this._items().reduce((sum, i) => sum + i.quantity, 0));
 
+  /** Priced at what the customer will actually be charged, discount included. */
   readonly totalAmount = computed(() =>
-    this._items().reduce((sum, i) => sum + i.product.price * i.quantity, 0),
+    roundMoney(this._items().reduce((sum, i) => sum + effectivePrice(i.product) * i.quantity, 0)),
   );
 
   constructor() {

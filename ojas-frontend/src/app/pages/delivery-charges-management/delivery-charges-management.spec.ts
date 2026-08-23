@@ -15,6 +15,8 @@ describe('DeliveryChargesManagement', () => {
     freeDeliveryUpToKm: 7,
     perKmChargeAfterFree: 10,
     maxDeliveryRadiusKm: 25,
+    serviceableAreas: [],
+    defaultDeliveryCharge: 0,
     isActive: true,
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -70,6 +72,8 @@ describe('DeliveryChargesManagement', () => {
       freeDeliveryUpToKm: config.freeDeliveryUpToKm,
       perKmChargeAfterFree: config.perKmChargeAfterFree,
       maxDeliveryRadiusKm: config.maxDeliveryRadiusKm,
+      serviceableAreas: [],
+      defaultDeliveryCharge: 0,
       isActive: config.isActive,
     });
   });

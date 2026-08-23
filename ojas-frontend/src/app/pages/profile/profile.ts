@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  inject,
+  signal,
+  computed,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -39,6 +46,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Profile implements OnInit {
+
   profile = signal<UserProfileResponse | null>(null);
   loading = signal(true);
   error = signal('');
@@ -134,7 +142,11 @@ export class Profile implements OnInit {
       .updateProfile({ fullName: this.editFullName, email: this.editEmail, phone: this.editPhone })
       .subscribe({
         next: () => {
-          this.auth.updateUserInfo({ fullName: this.editFullName, email: this.editEmail, phone: this.editPhone });
+          this.auth.updateUserInfo({
+            fullName: this.editFullName,
+            email: this.editEmail,
+            phone: this.editPhone,
+          });
           this.editingProfile.set(false);
           this.savingProfile.set(false);
           this.loadProfile();

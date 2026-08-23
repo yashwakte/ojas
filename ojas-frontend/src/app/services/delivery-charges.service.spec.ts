@@ -17,6 +17,8 @@ describe('DeliveryChargesService', () => {
     freeDeliveryUpToKm: 7,
     perKmChargeAfterFree: 10,
     maxDeliveryRadiusKm: 0,
+    serviceableAreas: [],
+    defaultDeliveryCharge: 0,
     isActive: true,
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',

@@ -14,6 +14,7 @@ import {
   OrderResponse,
   Product,
   StaffUserResponse,
+  paymentLabel,
 } from '../../models/interfaces';
 
 describe('AdminDashboard', () => {
@@ -35,6 +36,8 @@ describe('AdminDashboard', () => {
     status: 'Pending',
     paymentMethod: 'COD',
     paymentStatus: 'Pending',
+    amountPaid: 0,
+    walletAmountApplied: 0,
     createdAt: '2024-01-05',
   };
   const order2: OrderResponse = { ...order, id: 'o2', status: 'Delivered', totalAmount: 250, createdAt: '2024-01-01' };
@@ -540,5 +543,39 @@ describe('AdminDashboard', () => {
     const { fixture } = create();
     fixture.componentInstance.onTabChange({ index: 4 });
     expect(() => fixture.detectChanges()).not.toThrow();
+  });
+  // ---------- how the order says it was paid ----------
+
+  it('describes an online-paid order by how it was actually paid, not as COD', () => {
+    // COD was retired, so every current order is an online one — the pill used to read
+    // "COD · Pending" on all of them regardless of what really happened.
+    const onlinePaid: OrderResponse = {
+      ...order,
+      paymentMethod: 'Cashfree',
+      paymentStatus: 'Paid',
+      paymentInstrument: 'upi',
+      amountPaid: order.totalAmount,
+    };
+    orderServiceSpy.getAdminOrders.and.returnValue(of([onlinePaid]));
+    const { fixture } = create();
+
+    const rendered = fixture.nativeElement.textContent as string;
+    expect(paymentLabel(onlinePaid)).toBe('Paid via UPI');
+    expect(rendered).toContain('Paid via UPI');
+    expect(rendered).not.toContain('COD');
+  });
+
+  it('flags an order that still owes money rather than calling it pending', () => {
+    const partPaid: OrderResponse = {
+      ...order,
+      paymentMethod: 'Cashfree',
+      paymentStatus: 'PartiallyPaid',
+      amountPaid: 1,
+    };
+    orderServiceSpy.getAdminOrders.and.returnValue(of([partPaid]));
+    const { fixture } = create();
+
+    expect(fixture.componentInstance.isPaymentOutstanding(partPaid)).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('balance due');
   });
 });

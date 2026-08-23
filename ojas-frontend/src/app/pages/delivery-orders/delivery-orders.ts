@@ -2,7 +2,14 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { OrderResponse } from '../../models/interfaces';
+import {
+  OrderResponse,
+  isCashOnDelivery,
+  isPaymentOutstanding,
+  isPaymentSettled,
+  paymentIcon,
+  paymentLabel,
+} from '../../models/interfaces';
 import { OrderService } from '../../services/order.service';
 
 @Component({
@@ -12,6 +19,13 @@ import { OrderService } from '../../services/order.service';
   styleUrl: './delivery-orders.scss',
 })
 export class DeliveryOrders implements OnInit {
+  /** Shared with the customer and admin views, so one order isn't described three ways. */
+  paymentLabel = paymentLabel;
+  paymentIcon = paymentIcon;
+  isPaymentSettled = isPaymentSettled;
+  isPaymentOutstanding = isPaymentOutstanding;
+  isCashOnDelivery = isCashOnDelivery;
+
   readonly orders = signal<OrderResponse[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');

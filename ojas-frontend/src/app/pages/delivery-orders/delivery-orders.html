@@ -62,17 +62,24 @@
             @for (item of order.items; track item.productId) {
               <div>
                 <span>{{ item.productName }} x {{ item.quantity }}</span>
-                <strong>{{ item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+                <strong>{{ item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
               </div>
             }
           </div>
 
           <div class="payment-row">
-            <span class="payment-pill" [class.payment-pill--collected]="order.paymentStatus === 'Collected'">
-              <mat-icon>payments</mat-icon>
-              Cash on Delivery · {{ order.paymentStatus === 'Collected' ? 'Collected' : 'Payment Pending' }}
+            <span
+              class="payment-pill"
+              [class.payment-pill--collected]="isPaymentSettled(order)"
+              [class.payment-pill--unpaid]="isPaymentOutstanding(order)"
+            >
+              <mat-icon>{{ paymentIcon(order) }}</mat-icon>
+              {{ paymentLabel(order) }}
             </span>
-            @if (order.paymentStatus !== 'Collected') {
+            <!-- Only a legacy COD order has cash to collect at the door. Offering this on an
+                 order already paid online would let a real "Paid" state be overwritten with
+                 "Collected", losing what actually happened to the money. -->
+            @if (isCashOnDelivery(order) && order.paymentStatus !== 'Collected') {
               <button
                 mat-stroked-button
                 class="collect-btn"
@@ -85,7 +92,7 @@
           </div>
 
           <div class="footer-row">
-            <span class="total">{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+            <span class="total">{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
             <button
               mat-flat-button
               class="delivered-btn"

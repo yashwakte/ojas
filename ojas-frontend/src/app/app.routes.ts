@@ -63,6 +63,11 @@ export const routes: Routes = [
     canActivate: [authGuard, customerGuard],
   },
   {
+    path: 'wallet',
+    loadComponent: () => import('./pages/wallet/wallet').then((m) => m.Wallet),
+    canActivate: [authGuard, customerGuard],
+  },
+  {
     path: 'offers',
     loadComponent: () => import('./pages/offers/offers').then((m) => m.Offers),
     canActivate: [storefrontGuard],
@@ -74,7 +79,8 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    loadComponent: () => import('./pages/admin-dashboard/admin-dashboard').then((m) => m.AdminDashboard),
+    loadComponent: () =>
+      import('./pages/admin-dashboard/admin-dashboard').then((m) => m.AdminDashboard),
     canActivate: [adminGuard],
   },
   {

@@ -5,7 +5,7 @@ import { Cart } from './cart';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
-import { CartItem, Product } from '../../models/interfaces';
+import { CartItem, Product, effectivePrice } from '../../models/interfaces';
 
 describe('Cart', () => {
   const product: Product = {
@@ -144,5 +144,30 @@ describe('Cart', () => {
       { product: product2, quantity: 1 },
     ]);
     expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
+  });
+  // ---------- the advertised price is the one charged ----------
+
+  it('bills a discounted product at its discounted price, which is what the storefront shows', () => {
+    // The badge says "25% OFF" and the sale price is shown struck against ₹200. Charging the
+    // full ₹200 anyway is what this guards against.
+    const onOffer: Product = { ...product, price: 200, discount: 25 };
+
+    expect(effectivePrice(onOffer)).toBe(150);
+  });
+
+  it('leaves an undiscounted product at its list price', () => {
+    expect(effectivePrice(product)).toBe(100);
+  });
+
+  it('totals the cart at what the customer will actually be charged', () => {
+    const onOffer: Product = { ...product, price: 200, discount: 25 };
+    const lines: CartItem[] = [
+      { product: onOffer, quantity: 2 },
+      { product: product2, quantity: 1 },
+    ];
+
+    const total = lines.reduce((sum, i) => sum + effectivePrice(i.product) * i.quantity, 0);
+
+    expect(total).toBe(350); // 2 x 150 + 50, not 2 x 200 + 50
   });
 });

@@ -20,13 +20,11 @@
       <span>{{ product().weight }}</span>
       <span class="pprice">
         @if (product().discount && product().discount > 0) {
-          <span class="original-price">₹{{ product().price }}</span>
-          <span class="sale-price"
-            >₹{{ product().price - (product().price * product().discount) / 100 | number: '1.0-0' }}</span
-          >
+          <span class="original-price">₹{{ product().price | number: '1.0-2' }}</span>
+          <span class="sale-price">₹{{ effectivePrice(product()) | number: '1.0-2' }}</span>
           <span class="discount-badge">{{ product().discount }}% OFF</span>
         } @else {
-          <strong>₹{{ product().price }}</strong>
+          <strong>₹{{ product().price | number: '1.0-2' }}</strong>
         }
       </span>
     </div>

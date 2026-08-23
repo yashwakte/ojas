@@ -13,6 +13,47 @@
     </button>
   </div>
 
+  @if (cashfreePaymentStatus(); as status) {
+    <div
+      class="cashfree-banner"
+      [class.cashfree-banner--paid]="status === 'paid'"
+      [class.cashfree-banner--failed]="status === 'failed'"
+    >
+      @if (status === 'checking') {
+        <mat-icon class="spin">autorenew</mat-icon>
+        <span>Confirming your payment…</span>
+      } @else if (status === 'paid') {
+        <mat-icon>check_circle</mat-icon>
+        <span>Payment successful! Your order is confirmed.</span>
+      } @else if (status === 'failed') {
+        <mat-icon>error_outline</mat-icon>
+        <span>
+          {{ paymentFailureReason() ?? 'The payment was declined.' }}
+          Nothing was charged, and your items are still in your cart — you can try again whenever
+          you're ready.
+        </span>
+      } @else if (status === 'discarded') {
+        <mat-icon>undo</mat-icon>
+        <span>
+          You didn't complete the payment, so nothing was charged and your changes were discarded.
+          Your order is exactly as it was.
+        </span>
+      } @else {
+        <mat-icon class="spin">autorenew</mat-icon>
+        <span>
+          Your bank hasn't confirmed this payment yet. Nothing on your order has changed and
+          nothing extra has been charged — this page keeps checking and updates itself the moment
+          the payment lands, so there's no need to refresh or pay again.
+        </span>
+      }
+      @if (status !== 'checking') {
+        <button type="button" class="cashfree-banner-dismiss" (click)="dismissCashfreeBanner()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </div>
+  }
+
   @if (loading()) {
     <div class="loading-state">
       <mat-icon class="spin">autorenew</mat-icon>
@@ -53,9 +94,9 @@
             <!-- Edit mode: items, quantities and delivery details -->
             <div class="order-edit">
               <p class="edit-hint">
-                <mat-icon>edit</mat-icon>
-                Change what you ordered or where it goes. Delivery and totals are
-                recalculated when you save.
+                <mat-icon>add_shopping_cart</mat-icon>
+                Add more to this order, or change where it goes. Items already ordered can't be
+                removed — cancel the order instead if you no longer want it.
               </p>
 
               <div class="order-items">
@@ -65,18 +106,34 @@
                       <span class="item-name">{{ item.productName }}</span>
                       <span class="item-weight">{{ item.weight }}</span>
                     </div>
+                    <!-- Add-only: an order that has been placed can be topped up, never cut
+                         down. Taking things off meant an edit could owe money back, which is what
+                         dragged refunds and stock returns into what should be a one-way flow. -->
                     <div class="edit-qty">
-                      <button type="button" (click)="changeQty(i, -1)" [disabled]="item.quantity <= 1"
-                        aria-label="Decrease quantity">−</button>
+                      <button
+                        type="button"
+                        (click)="changeQty(i, -1)"
+                        [disabled]="item.quantity <= originalQuantityOf(item.productId)"
+                        [attr.aria-label]="'Decrease quantity of ' + item.productName"
+                        [title]="
+                          item.quantity <= originalQuantityOf(item.productId)
+                            ? 'Items already ordered cannot be removed. Cancel the order instead.'
+                            : 'Decrease quantity'
+                        "
+                      >
+                        −
+                      </button>
                       <span>{{ item.quantity }}</span>
-                      <button type="button" (click)="changeQty(i, 1)" aria-label="Increase quantity">+</button>
-                      <button type="button" class="edit-remove" (click)="removeItem(i)"
-                        aria-label="Remove item">
-                        <mat-icon>delete_outline</mat-icon>
+                      <button
+                        type="button"
+                        (click)="changeQty(i, 1)"
+                        [attr.aria-label]="'Increase quantity of ' + item.productName"
+                      >
+                        +
                       </button>
                     </div>
                     <span class="item-price">{{
-                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2'
                     }}</span>
                   </div>
                 }
@@ -121,11 +178,33 @@
 
               <!-- Priced against the existing order so the payment difference is
                    explicit before they commit. -->
+              @if (editRemovedCoupon(); as lost) {
+                <p class="edit-coupon-warning">
+                  <mat-icon>local_offer</mat-icon>
+                  Coupon <strong>{{ lost.code }}</strong> needs a cart of at least
+                  {{ lost.minCartValue | currency: 'INR' : 'symbol' : '1.2-2' }}. At this value it
+                  no longer applies, and the total below is priced without it.
+                </p>
+              }
+
+              @if (editFreeDeliveryNudge(); as nudge) {
+                <p class="edit-delivery-nudge">
+                  <mat-icon>local_shipping</mat-icon>
+                  {{ nudge }}
+                </p>
+              }
+
               <div class="edit-summary">
                 <div class="summary-line">
                   <span>Items</span>
-                  <span>{{ editItemsTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+                  <span>{{ editItemsTotal() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
                 </div>
+                @if (editCoupon(); as coupon) {
+                  <div class="summary-line summary-discount">
+                    <span>Coupon ({{ coupon.code }})</span>
+                    <span>−{{ editDiscount().amount | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
+                  </div>
+                }
                 <div class="summary-line">
                   <span>Delivery</span>
                   <span>
@@ -134,40 +213,57 @@
                     } @else if (editDeliveryCharge() === 0) {
                       Free
                     } @else {
-                      {{ editDeliveryCharge() | currency: 'INR' : 'symbol' : '1.0-0' }}
+                      {{ editDeliveryCharge() | currency: 'INR' : 'symbol' : '1.2-2' }}
                     }
                   </span>
                 </div>
                 <div class="summary-line summary-new-total">
                   <span>New total</span>
-                  <span>{{ newTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+                  <span>{{ newTotal() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
                 </div>
                 <div class="summary-line summary-was">
-                  <span>Originally paid</span>
-                  <span>{{ originalTotal() | currency: 'INR' : 'symbol' : '1.0-0' }}</span>
+                  <span>Already paid</span>
+                  <span>{{ originalAmountPaid() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
                 </div>
 
                 @if (amountDifference() > 0) {
                   <div class="summary-diff owe">
-                    <mat-icon>arrow_upward</mat-icon>
+                    <mat-icon>lock</mat-icon>
                     You'll pay
-                    <strong>{{ amountDifference() | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
-                    more
+                    <strong>{{ amountDifference() | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
+                    more online to confirm these changes
                   </div>
+                  <p class="refund-note">
+                    Your order stays exactly as it is until that payment goes through — if you
+                    change your mind on the payment page, nothing is charged and nothing changes.
+                  </p>
                 } @else if (amountDifference() < 0) {
                   <div class="summary-diff refund">
-                    <mat-icon>arrow_downward</mat-icon>
-                    <strong>{{ -amountDifference() | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
-                    will be refunded
+                    <mat-icon>account_balance_wallet</mat-icon>
+                    <strong>{{
+                      -amountDifference() | currency: 'INR' : 'symbol' : '1.2-2'
+                    }}</strong>
+                    goes to your Ojas wallet
                   </div>
+                  <p class="refund-note">
+                    Want it back on your original payment method instead? Cancel this order and
+                    place a fresh one — you'll get that choice there.
+                  </p>
                 } @else {
                   <div class="summary-diff same">No change to the amount</div>
                 }
               </div>
 
               <div class="edit-actions">
-                <button type="button" class="edit-cancel" (click)="cancelEdit()">Discard changes</button>
-                <button type="button" class="edit-save" [disabled]="saving()" (click)="saveEdit(order)">
+                <button type="button" class="edit-cancel" (click)="cancelEdit()">
+                  Discard changes
+                </button>
+                <button
+                  type="button"
+                  class="edit-save"
+                  [disabled]="saving()"
+                  (click)="saveEdit(order)"
+                >
                   {{ saving() ? 'Saving…' : 'Save changes' }}
                 </button>
               </div>
@@ -183,7 +279,7 @@
                   <div class="item-qty-price">
                     <span class="item-qty">× {{ item.quantity }}</span>
                     <span class="item-price">{{
-                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2'
                     }}</span>
                   </div>
                 </div>
@@ -200,27 +296,172 @@
                   <mat-icon>location_on</mat-icon>
                   <span>{{ order.address }}</span>
                 </div>
+                @if (deliveryEstimate(order); as eta) {
+                  <div
+                    class="delivery-info delivery-eta"
+                    [class.delivery-eta--delayed]="eta.delayed"
+                  >
+                    <mat-icon>{{ eta.delayed ? 'schedule' : 'local_shipping' }}</mat-icon>
+                    <span>{{ eta.label }}</span>
+                  </div>
+                }
               </div>
               <div class="order-total">
-                Total: <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+                Total:
+                <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
                 <span
                   class="payment-pill"
-                  [class.payment-pill--collected]="order.paymentStatus === 'Collected'"
+                  [class.payment-pill--collected]="
+                    order.paymentStatus === 'Collected' || order.paymentStatus === 'Paid'
+                  "
+                  [class.payment-pill--unpaid]="
+                    order.paymentStatus === 'Failed' || order.paymentStatus === 'PartiallyPaid'
+                  "
                 >
-                  <mat-icon>payments</mat-icon>
-                  {{ order.paymentStatus === 'Collected' ? 'Payment Collected' : 'Pay on Delivery' }}
+                  <mat-icon>{{ paymentIcon(order) }}</mat-icon>
+                  {{ paymentLabel(order) }}
                 </span>
               </div>
             </div>
+
+            <!-- A payment that never went through. Nothing was bought and nothing was charged,
+                 so this reads as something to retry rather than as a cancelled order — and it
+                 says what actually happened instead of leaving the customer to guess. -->
+            @if (isPaymentFailed(order)) {
+              <div class="payment-failed-note">
+                <p class="payment-failed-title">
+                  <mat-icon>credit_card_off</mat-icon>
+                  Payment didn't go through
+                </p>
+                <p class="payment-failed-reason">
+                  {{ order.paymentFailureReason ?? 'The payment was declined.' }}
+                </p>
+                <p class="payment-failed-hint">
+                  You weren't charged for this. Try again below, or find these items waiting in
+                  your cart.
+                </p>
+                <button
+                  type="button"
+                  class="payment-failed-retry"
+                  [disabled]="retryingPaymentId() === order.id"
+                  (click)="retryPayment(order)"
+                >
+                  <mat-icon>lock</mat-icon>
+                  {{ retryingPaymentId() === order.id ? 'Starting payment…' : 'Try payment again' }}
+                </button>
+              </div>
+            }
+
+            <!-- Changes that were priced but never paid for. The order above still shows what the
+                 customer actually bought; this is only what it would become. -->
+            @if (order.pendingAmendment; as amendment) {
+              <div class="amendment-pending">
+                <p class="amendment-title">
+                  <mat-icon>pending_actions</mat-icon>
+                  Changes waiting on payment
+                </p>
+                <p class="amendment-note">
+                  These aren't part of your order yet — your order above is unchanged and nothing
+                  extra has been charged.
+                </p>
+                <div class="amendment-items">
+                  @for (item of amendment.items; track item.productId) {
+                    <div class="amendment-item">
+                      <span>{{ item.productName }} ({{ item.weight }})</span>
+                      <span>× {{ item.quantity }}</span>
+                    </div>
+                  }
+                </div>
+                <div class="amendment-line">
+                  <span>New total</span>
+                  <span>{{ amendment.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
+                </div>
+                <div class="amendment-line amendment-due">
+                  <span>To pay</span>
+                  <span>{{ amendment.topUpAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
+                </div>
+                @if (paymentInFlightFor(order.id)) {
+                  <!-- A payment for these changes is with the bank. Offering "Pay" again here is
+                       how a customer ends up paying twice for the same thing, so it is withheld
+                       until we know the outcome. -->
+                  <p class="amendment-inflight">
+                    <mat-icon class="spin">autorenew</mat-icon>
+                    Waiting on your bank to confirm this payment. Nothing more is needed from you —
+                    this updates on its own.
+                  </p>
+                } @else {
+                  <div class="amendment-actions">
+                    <button
+                      type="button"
+                      class="amendment-discard"
+                      [disabled]="discardingAmendmentId() === order.id"
+                      (click)="discardAmendment(order)"
+                    >
+                      {{ discardingAmendmentId() === order.id ? 'Discarding…' : 'Discard changes' }}
+                    </button>
+                    <button type="button" class="amendment-pay" (click)="payForAmendment(order)">
+                      <mat-icon>lock</mat-icon>
+                      Pay {{ amendment.topUpAmount | currency: 'INR' : 'symbol' : '1.2-2' }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
 
             @if (canModify(order)) {
               @if (confirmingCancelId() === order.id) {
                 <div class="cancel-confirm">
                   <p>Cancel this order? This can't be undone.</p>
+
+                  @if (order.amountPaid > 0) {
+                    <div class="refund-choice">
+                      <p class="refund-choice-title">
+                        Where should we send your
+                        {{ order.amountPaid | currency: 'INR' : 'symbol' : '1.2-2' }}?
+                      </p>
+                      <label class="refund-option">
+                        <input
+                          type="radio"
+                          name="refund-{{ order.id }}"
+                          [checked]="cancelRefundDestination() === 'wallet'"
+                          (change)="cancelRefundDestination.set('wallet')"
+                        />
+                        <span>
+                          <strong>Ojas wallet</strong>
+                          <small>Added instantly, use it on your next order</small>
+                        </span>
+                      </label>
+                      <label class="refund-option">
+                        <input
+                          type="radio"
+                          name="refund-{{ order.id }}"
+                          [checked]="cancelRefundDestination() === 'source'"
+                          (change)="cancelRefundDestination.set('source')"
+                        />
+                        <span>
+                          <strong>Original payment method</strong>
+                          <small>Reaches your bank in 5–7 working days</small>
+                        </span>
+                      </label>
+                      @if (order.walletAmountApplied > 0) {
+                        <p class="refund-note">
+                          {{ order.walletAmountApplied | currency: 'INR' : 'symbol' : '1.2-2' }} of
+                          this order was paid from your wallet and always returns there.
+                        </p>
+                      }
+                    </div>
+                  }
+
                   <div class="cancel-confirm-actions">
-                    <button type="button" class="keep-btn" (click)="dismissCancel()">Keep order</button>
-                    <button type="button" class="cancel-yes" [disabled]="cancelling()"
-                      (click)="confirmCancel(order)">
+                    <button type="button" class="keep-btn" (click)="dismissCancel()">
+                      Keep order
+                    </button>
+                    <button
+                      type="button"
+                      class="cancel-yes"
+                      [disabled]="cancelling()"
+                      (click)="confirmCancel(order)"
+                    >
                       {{ cancelling() ? 'Cancelling…' : 'Yes, cancel it' }}
                     </button>
                   </div>
@@ -235,7 +476,9 @@
                   </button>
                 </div>
               }
-            } @else {
+            } @else if (!isPaymentFailed(order)) {
+              <!-- Skipped for a failed payment: the block above already explains that one, and
+                   "this order is cancelled" would be a confusing second story about it. -->
               <p class="locked-note">
                 <mat-icon>lock_outline</mat-icon>
                 This order is {{ order.status.toLowerCase() }} and can no longer be changed.

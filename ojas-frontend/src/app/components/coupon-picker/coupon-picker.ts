@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { Coupon } from '../../constants/pricing';
 
@@ -9,7 +10,7 @@ import { Coupon } from '../../constants/pricing';
  */
 @Component({
   selector: 'app-coupon-picker',
-  imports: [MatIconModule],
+  imports: [MatIconModule, DecimalPipe],
   templateUrl: './coupon-picker.html',
   styleUrl: './coupon-picker.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

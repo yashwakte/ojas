@@ -27,6 +27,8 @@ describe('OrderService', () => {
     status: 'Pending',
     paymentMethod: 'COD',
     paymentStatus: 'Pending',
+    amountPaid: 0,
+    walletAmountApplied: 0,
     createdAt: '2024-01-01',
   };
 

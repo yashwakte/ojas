@@ -20,6 +20,7 @@ public class OrdersControllerTests
     private readonly Mock<IMongoCollection<User>> _usersMock = new();
     private readonly Mock<IMongoCollection<DeliveryCharges>> _chargesMock = new();
     private readonly Mock<IMongoCollection<Product>> _productsMock = new();
+    private readonly FakeCashfreeHandler _cashfree = new();
     private readonly OrdersController _sut;
 
     public OrdersControllerTests()
@@ -39,20 +40,56 @@ public class OrdersControllerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
 
+        // No wallet balance by default — placing an order now reads the customer's credit, and an
+        // unmocked Users lookup returns a null cursor that NREs inside the driver.
+        _usersMock.SetupFind(new List<User>());
+
+        // Orders are priced from the catalog rather than from the request, so the catalog has to
+        // hold the products these tests order — an id the catalog doesn't know is refused.
+        _productsMock.SetupFind(new List<Product> { CatalogProductOne, CatalogProductTwo });
+
+        // Order writes succeed by default. Without this the driver returns a null UpdateResult and
+        // any post-insert write (recording the payment session, say) NREs inside a try/catch,
+        // which then looks like a gateway failure rather than the fixture gap it is.
+        _ordersMock
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<Order>>(),
+                It.IsAny<UpdateDefinition<Order>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
+
         _ordersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<Order>(), null, It.IsAny<CancellationToken>()))
             .Callback<Order, InsertOneOptions?, CancellationToken>((order, _, _) => order.Id ??= "507f1f77bcf86cd799439099")
             .Returns(Task.CompletedTask);
 
-        var orderService = new OrderService(_dbMock.Object);
-        var deliveryChargesService = new DeliveryChargesService(_dbMock.Object);
-        var productService = new ProductService(_dbMock.Object);
-        var cashfreeService = new CashfreeService(new HttpClient(), new ConfigurationBuilder().Build());
-        _sut = new OrdersController(
-            orderService, _dbMock.Object, deliveryChargesService, productService,
-            cashfreeService, NullLogger<OrdersController>.Instance);
+        _sut = BuildController(_cashfree.Service());
 
         SetUser("user-1");
+    }
+
+    private OrdersController BuildController(CashfreeService cashfreeService) => new(
+        new OrderService(_dbMock.Object),
+        _dbMock.Object,
+        new DeliveryChargesService(_dbMock.Object),
+        new ProductService(_dbMock.Object),
+        cashfreeService,
+        new WalletService(_dbMock.Object),
+        new OrderPaymentOutcomeService(
+            new OrderService(_dbMock.Object),
+            new ProductService(_dbMock.Object),
+            new WalletService(_dbMock.Object),
+            NullLogger<OrderPaymentOutcomeService>.Instance),
+        NullLogger<OrdersController>.Instance);
+
+    /// <summary>A controller whose Cashfree has no credentials — the state production sits in
+    /// before live keys are set, where online payment (and so all checkout) is unavailable.</summary>
+    private OrdersController BuildUnconfiguredController()
+    {
+        var controller = BuildController(new CashfreeService(new HttpClient(), new ConfigurationBuilder().Build()));
+        controller.ControllerContext = _sut.ControllerContext;
+        return controller;
     }
 
     private void SetUser(string userId, string role = UserRoles.Customer)
@@ -79,8 +116,33 @@ public class OrdersControllerTests
         Status = status,
     };
 
+    private const string ProductOneId = "507f1f77bcf86cd799439055";
+    private const string ProductTwoId = "507f1f77bcf86cd799439056";
+
+    /// <summary>The catalog these tests price against. Prices here — not the ones in the
+    /// request — are what an order is billed at.</summary>
+    private static Product CatalogProductOne => new()
+    {
+        Id = ProductOneId,
+        Name = "Product One",
+        Description = "",
+        Price = 100m,
+        Category = "Flour",
+        Weight = "1kg",
+    };
+
+    private static Product CatalogProductTwo => new()
+    {
+        Id = ProductTwoId,
+        Name = "Product Two",
+        Description = "",
+        Price = 50m,
+        Category = "Flour",
+        Weight = "500g",
+    };
+
     /// <summary>A real ObjectId, so stock filters serialize as they do in production.</summary>
-    private static OrderItem MakeOrderItem(string productId = "507f1f77bcf86cd799439055") => new()
+    private static OrderItem MakeOrderItem(string productId = ProductOneId) => new()
     {
         ProductId = productId,
         ProductName = "Bajra Flour",
@@ -114,7 +176,7 @@ public class OrdersControllerTests
     [Fact]
     public async Task PlaceOrder_ReturnsBadRequest_WhenLatLngMissing()
     {
-        var items = new List<OrderItemDto> { new("p1", "Product", 10, "1kg", 1) };
+        var items = new List<OrderItemDto> { new(ProductOneId, "Product", 10, "1kg", 1) };
         var request = new PlaceOrderRequest("Jane", "9123456789", "Addr", null, null, "", items);
 
         var result = await _sut.PlaceOrder(request);
@@ -138,8 +200,8 @@ public class OrdersControllerTests
 
         var items = new List<OrderItemDto>
         {
-            new("p1", "Product One", 100, "1kg", 2),
-            new("p2", "Product Two", 50, "500g", 1),
+            new(ProductOneId, "Product One", 100, "1kg", 2),
+            new(ProductTwoId, "Product Two", 50, "500g", 1),
         };
         // Delivery point exactly 1 degree latitude north of the warehouse => distance = 6371*(pi/180) ~= 111.1949km
         var request = new PlaceOrderRequest("Jane", "9123456789", "Addr", 19.0, 73.0, "Leave at door", items);
@@ -154,29 +216,49 @@ public class OrdersControllerTests
     }
 
     [Fact]
-    public async Task PlaceOrder_ReturnsBadRequest_ForInvalidPaymentMethod()
+    public async Task PlaceOrder_AlwaysCreatesAnOnlineOrder_SinceCodWasRetired()
     {
-        var items = new List<OrderItemDto> { new("p1", "Product", 10, "1kg", 1) };
-        var request = new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items, null, "Bitcoin");
+        _chargesMock.SetupFind(new List<DeliveryCharges>());
+        var items = new List<OrderItemDto> { new(ProductOneId, "Product", 10, "1kg", 1) };
 
-        var result = await _sut.PlaceOrder(request);
+        var result = await _sut.PlaceOrder(new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items));
 
-        result.Result.ShouldBeOfType<BadRequestObjectResult>();
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var order = okResult.Value.ShouldBeOfType<OrderResponse>();
+        order.PaymentMethod.ShouldBe("Cashfree");
+        order.PaymentSessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
     public async Task PlaceOrder_ReturnsServiceUnavailable_WhenCashfreeNotConfigured()
     {
-        // The controller's own CashfreeService is built from an empty IConfiguration in this test
-        // fixture, so IsConfigured is false - exactly the state production is in before the user's
-        // Cashfree KYC clears and Render env vars are set.
-        var items = new List<OrderItemDto> { new("p1", "Product", 10, "1kg", 1) };
-        var request = new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items, null, "Cashfree");
+        // With COD gone there is no fallback, so an unconfigured gateway means no checkout at all.
+        var items = new List<OrderItemDto> { new(ProductOneId, "Product", 10, "1kg", 1) };
 
-        var result = await _sut.PlaceOrder(request);
+        var result = await BuildUnconfiguredController()
+            .PlaceOrder(new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items));
 
         var statusResult = result.Result.ShouldBeOfType<ObjectResult>();
         statusResult.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task PlaceOrder_RollsBackStockAndCancels_WhenCashfreeRefusesTheOrder()
+    {
+        _chargesMock.SetupFind(new List<DeliveryCharges>());
+        _cashfree.FailOrderCreation = true;
+        var items = new List<OrderItemDto> { new(ProductOneId, "Product", 10, "1kg", 1) };
+
+        var result = await _sut.PlaceOrder(new PlaceOrderRequest("Jane", "9123456789", "Addr", 18.0, 73.0, "", items));
+
+        var statusResult = result.Result.ShouldBeOfType<ObjectResult>();
+        statusResult.StatusCode.ShouldBe(StatusCodes.Status502BadGateway);
+        // Stock was taken before the gateway call, so it must be handed back: one consume, one restore.
+        _productsMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Product>>(),
+            It.IsAny<UpdateDefinition<Product>>(),
+            It.IsAny<UpdateOptions>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     // ---------- GetMyOrders / admin / delivery listings ----------
@@ -357,8 +439,20 @@ public class OrdersControllerTests
         result.ShouldBeOfType<NotFoundObjectResult>();
     }
 
+    /// <summary>An order that actually captured money online, so a refund is possible.</summary>
+    private Order MakePaidOrder(decimal totalAmount = 200m, decimal amountPaid = 200m)
+    {
+        var order = MakeOrder();
+        order.PaymentMethod = "Cashfree";
+        order.PaymentStatus = "Paid";
+        order.TotalAmount = totalAmount;
+        order.AmountPaid = amountPaid;
+        _ordersMock.SetupFind(new List<Order> { order });
+        return order;
+    }
+
     [Fact]
-    public async Task RefundOrder_ReturnsBadRequest_ForCodOrder()
+    public async Task RefundOrder_ReturnsBadRequest_ForLegacyCodOrder()
     {
         var order = MakeOrder();
         order.PaymentMethod = "COD";
@@ -372,41 +466,25 @@ public class OrdersControllerTests
     }
 
     [Fact]
-    public async Task RefundOrder_ReturnsBadRequest_WhenCashfreeOrderNotYetPaid()
+    public async Task RefundOrder_ReturnsBadRequest_WhenNothingWasEverCaptured()
     {
-        var order = MakeOrder();
-        order.PaymentMethod = "Cashfree";
+        var order = MakePaidOrder(amountPaid: 0m);
         order.PaymentStatus = "Pending";
-        order.TotalAmount = 200m;
-        _ordersMock.SetupFind(new List<Order> { order });
 
         var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(100m));
 
         result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
-    [Fact]
-    public async Task RefundOrder_ReturnsBadRequest_WhenAmountExceedsOrderTotal()
-    {
-        var order = MakeOrder();
-        order.PaymentMethod = "Cashfree";
-        order.PaymentStatus = "Paid";
-        order.TotalAmount = 200m;
-        _ordersMock.SetupFind(new List<Order> { order });
-
-        var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(250m));
-
-        result.ShouldBeOfType<BadRequestObjectResult>();
-    }
+    // The cap on a refund now lives in the update's own filter, so two refunds issued at the same
+    // moment cannot each see the full balance and each pay out. A mocked collection answers every
+    // filter the same way and so cannot express that - RefundTests covers it against real
+    // MongoDB instead, including the concurrent case that motivated the change.
 
     [Fact]
     public async Task RefundOrder_ReturnsBadRequest_WhenAmountIsZeroOrNegative()
     {
-        var order = MakeOrder();
-        order.PaymentMethod = "Cashfree";
-        order.PaymentStatus = "Paid";
-        order.TotalAmount = 200m;
-        _ordersMock.SetupFind(new List<Order> { order });
+        var order = MakePaidOrder();
 
         var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(0m));
 
@@ -414,18 +492,30 @@ public class OrdersControllerTests
     }
 
     [Fact]
-    public async Task RefundOrder_ReturnsBadGateway_WhenCashfreeNotConfigured()
+    public async Task RefundOrder_SucceedsAndClearsThePendingRefundFlag()
     {
-        // Same reasoning as PlaceOrder_ReturnsServiceUnavailable_WhenCashfreeNotConfigured - the
-        // fixture's CashfreeService has no ClientId/ClientSecret, so any real API call it attempts
-        // reports failure rather than succeeding, and the controller surfaces that as a 502.
-        var order = MakeOrder();
-        order.PaymentMethod = "Cashfree";
-        order.PaymentStatus = "Paid";
-        order.TotalAmount = 200m;
-        _ordersMock.SetupFind(new List<Order> { order });
+        var order = MakePaidOrder();
+        order.RefundPendingAmount = 100m;
+        _ordersMock
+            .Setup(c => c.UpdateOneAsync(It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
 
         var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(100m));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        // Three writes once the money is on its way back: the queued reminder is discharged, the
+        // refund is recorded against the order, and the paid figure is re-derived from both.
+        _ordersMock.Verify(c => c.UpdateOneAsync(
+            It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(),
+            It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task RefundOrder_ReturnsBadGateway_WhenCashfreeNotConfigured()
+    {
+        var order = MakePaidOrder();
+
+        var result = await BuildUnconfiguredController().RefundOrder(order.Id!, new RefundOrderRequest(100m));
 
         var statusResult = result.ShouldBeOfType<ObjectResult>();
         statusResult.StatusCode.ShouldBe(StatusCodes.Status502BadGateway);

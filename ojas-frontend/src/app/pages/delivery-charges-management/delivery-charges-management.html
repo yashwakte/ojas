@@ -274,6 +274,105 @@
                 </mat-form-field>
               </div>
 
+              <!-- Serviceable pincodes. These decide both where we deliver and what it costs;
+                   the customer's map pin is navigation only once any are listed, which is what
+                   stops a crafted order pricing its own delivery to zero. -->
+              <div class="pincode-section">
+                <h3 class="pincode-title">Serviceable pincodes</h3>
+                @if (pricesByPincode()) {
+                  <p class="pincode-note pincode-note--secure">
+                    Delivery is priced from this list. The customer's pinned location is used for
+                    navigation only, so it can't affect what they're charged.
+                  </p>
+                } @else {
+                  <p class="pincode-note pincode-note--warning">
+                    No pincodes listed, so delivery is still priced by distance from the
+                    customer's pinned location — which their browser supplies. Add your delivery
+                    pincodes here before going live.
+                  </p>
+                }
+
+                <div class="form-row">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Default delivery charge (₹)</mat-label>
+                    <input matInput type="number"
+                      name="defaultDeliveryCharge"
+                      [(ngModel)]="formData().defaultDeliveryCharge"
+                      (ngModelChange)="formData.update(d => ({...d, defaultDeliveryCharge: $event}))"
+                      min="0"
+                      step="1"
+                      placeholder="e.g., 40">
+                    <mat-hint>Used for any pincode below that doesn't set its own.</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                @if (formData().serviceableAreas?.length) {
+                  <table class="pincode-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Pincode</th>
+                        <th scope="col">Area</th>
+                        <th scope="col">Charge</th>
+                        <th scope="col"><span class="sr-only">Remove</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (area of formData().serviceableAreas; track area.pincode) {
+                        <tr>
+                          <td>{{ area.pincode }}</td>
+                          <td>{{ area.label || '—' }}</td>
+                          <td>
+                            {{
+                              area.charge === null || area.charge === undefined
+                                ? 'Default'
+                                : ('₹' + area.charge)
+                            }}
+                          </td>
+                          <td>
+                            <button type="button" class="pincode-remove"
+                              [attr.aria-label]="'Remove pincode ' + area.pincode"
+                              (click)="removeServiceableArea(area.pincode)">
+                              <mat-icon>close</mat-icon>
+                            </button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+
+                <div class="pincode-add">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Pincode</mat-label>
+                    <input matInput name="newPincode" inputmode="numeric" maxlength="6"
+                      [ngModel]="newPincode()"
+                      (ngModelChange)="newPincode.set($event)"
+                      placeholder="411014">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Area name (optional)</mat-label>
+                    <input matInput name="newPincodeLabel"
+                      [ngModel]="newPincodeLabel()"
+                      (ngModelChange)="newPincodeLabel.set($event)"
+                      placeholder="Kharadi">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Charge (optional)</mat-label>
+                    <input matInput type="number" name="newPincodeCharge" min="0"
+                      [ngModel]="newPincodeCharge()"
+                      (ngModelChange)="newPincodeCharge.set($event)"
+                      placeholder="Default">
+                  </mat-form-field>
+                  <button type="button" mat-stroked-button class="pincode-add-btn"
+                    (click)="addServiceableArea()">
+                    <mat-icon>add</mat-icon> Add
+                  </button>
+                </div>
+                @if (pincodeError()) {
+                  <p class="pincode-error">{{ pincodeError() }}</p>
+                }
+              </div>
+
               <div class="form-row checkbox-row">
                 <mat-slide-toggle
                   name="isActive"

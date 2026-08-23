@@ -246,6 +246,12 @@
     background: #ecfdf3;
     color: #157347;
   }
+
+  // Money still owed: a failed payment, or an edit that outran what was captured.
+  &.payment-pill--unpaid {
+    background: #fef2f2;
+    color: #b91c1c;
+  }
 }
 
 .collect-btn {

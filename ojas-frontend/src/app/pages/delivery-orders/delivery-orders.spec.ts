@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { DeliveryOrders } from './delivery-orders';
 import { OrderService } from '../../services/order.service';
-import { OrderResponse } from '../../models/interfaces';
+import { OrderResponse, paymentLabel } from '../../models/interfaces';
 
 describe('DeliveryOrders', () => {
   const order: OrderResponse = {
@@ -23,6 +23,8 @@ describe('DeliveryOrders', () => {
     status: 'Confirmed',
     paymentMethod: 'COD',
     paymentStatus: 'Pending',
+    amountPaid: 0,
+    walletAmountApplied: 0,
     createdAt: '2024-01-01',
   };
   const deliveredOrder: OrderResponse = { ...order, id: 'o2', status: 'Delivered' };
@@ -137,5 +139,43 @@ describe('DeliveryOrders', () => {
     expect(fixture.componentInstance.mapUrl('123 St')).toBe(
       'https://www.google.com/maps/search/?api=1&query=123%20St',
     );
+  });
+  // ---------- how the order says it was paid ----------
+
+  /** COD was retired, so this is what every current order looks like here. */
+  const onlinePaidOrder: OrderResponse = {
+    ...order,
+    id: 'o3',
+    paymentMethod: 'Cashfree',
+    paymentStatus: 'Paid',
+    paymentInstrument: 'upi',
+    amountPaid: 100,
+  };
+
+  it('describes an online-paid order by how it was actually paid, not as COD', () => {
+    orderServiceSpy.getDeliveryOrders.and.returnValue(of([onlinePaidOrder]));
+    const fixture = create();
+
+    const rendered = fixture.nativeElement.textContent as string;
+    expect(paymentLabel(onlinePaidOrder)).toBe('Paid via UPI');
+    expect(rendered).toContain('Paid via UPI');
+    expect(rendered).not.toContain('Cash on Delivery');
+  });
+
+  it('offers no cash collection on an order already paid online', () => {
+    orderServiceSpy.getDeliveryOrders.and.returnValue(of([onlinePaidOrder]));
+    const fixture = create();
+
+    // Marking this "Collected" would overwrite a real Paid state and lose what happened.
+    expect(fixture.componentInstance.isCashOnDelivery(onlinePaidOrder)).toBeFalse();
+    expect(fixture.nativeElement.textContent).not.toContain('Mark Payment Collected');
+  });
+
+  it('still offers cash collection on a legacy COD order', () => {
+    orderServiceSpy.getDeliveryOrders.and.returnValue(of([order]));
+    const fixture = create();
+
+    expect(fixture.componentInstance.isCashOnDelivery(order)).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('Mark Payment Collected');
   });
 });

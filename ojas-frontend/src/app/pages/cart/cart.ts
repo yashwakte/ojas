@@ -1,17 +1,23 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { DecimalPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
+import { effectivePrice } from '../../models/interfaces';
+import { roundMoney } from '../../constants/pricing';
 
 @Component({
   selector: 'app-cart',
-  imports: [RouterLink, MatIconModule],
+  imports: [RouterLink, MatIconModule, DecimalPipe],
   templateUrl: './cart.html',
   styleUrl: './cart.scss',
 })
 export class Cart implements OnInit {
+  /** Exposed to the template so each line shows what it will actually be billed at. */
+  effectivePrice = effectivePrice;
+
   selectedIds = signal<Set<string>>(new Set<string>());
 
   selectedCount = computed(
@@ -19,10 +25,12 @@ export class Cart implements OnInit {
   );
 
   selectedTotal = computed(() =>
-    this.cartService
-      .items()
-      .filter((i) => this.selectedIds().has(i.product.id))
-      .reduce((sum, i) => sum + i.product.price * i.quantity, 0),
+    roundMoney(
+      this.cartService
+        .items()
+        .filter((i) => this.selectedIds().has(i.product.id))
+        .reduce((sum, i) => sum + effectivePrice(i.product) * i.quantity, 0),
+    ),
   );
 
   allSelected = computed(
