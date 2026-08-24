@@ -212,7 +212,12 @@ public class ChatbotTests : IDisposable
         using var client = _factory.CreateClient();
         var (_, csrf) = await client.RegisterAsync();
 
-        var items = new List<OrderItemDto> { new("p1", "Product One", 100, "1kg", 1) };
+        // Priced from the catalog server-side, so the product has to actually be in it.
+        var product = await _factory.SeedProductAsync(price: 100m);
+        var items = new List<OrderItemDto>
+        {
+            new(product.Id!, product.Name, product.Price, product.Weight, 1),
+        };
         var placeRequest = new PlaceOrderRequest("Test Customer", "9123456789", "123 Main St", 18.01, 73.0, "", items);
         var placeHttpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/orders") { Content = JsonContent.Create(placeRequest) };
         placeHttpRequest.AttachCsrf(csrf);

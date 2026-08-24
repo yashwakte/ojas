@@ -30,6 +30,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
     public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
+    public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
 
     private void TryEnsureIndexes()
     {
@@ -72,6 +73,16 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Name = "refresh_token_user_id" }
             );
             RefreshTokens.Indexes.CreateMany([refreshTokenTtlIndex, refreshTokenUserIdIndex]);
+
+            // Every wallet statement reads one customer's rows newest-first, so index the pair
+            // rather than the user alone - this collection only ever grows.
+            var walletUserIndex = new CreateIndexModel<WalletTransaction>(
+                Builders<WalletTransaction>.IndexKeys
+                    .Ascending(w => w.UserId)
+                    .Descending(w => w.CreatedAt),
+                new CreateIndexOptions { Name = "wallet_user_created" }
+            );
+            WalletTransactions.Indexes.CreateOne(walletUserIndex);
 
             // userId leads the key so this one index serves both access patterns: "is this user
             // bound to this device" on every staff login and refresh, and "which device does

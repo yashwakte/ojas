@@ -96,6 +96,14 @@
               <mat-icon>receipt_long</mat-icon>
               <span>Your Orders</span>
             </a>
+            <!-- The balance is on the menu item itself, so checking it costs no navigation. -->
+            <a mat-menu-item routerLink="/wallet">
+              <mat-icon>account_balance_wallet</mat-icon>
+              <span>Wallet</span>
+              <span class="menu-wallet-balance">{{
+                wallet.balance() | currency: 'INR' : 'symbol' : '1.2-2'
+              }}</span>
+            </a>
           }
           @if (auth.isAdmin()) {
             <a mat-menu-item routerLink="/admin">
@@ -171,6 +179,15 @@
               >receipt_long</mat-icon
             >
             Your Orders
+          </a>
+          <a routerLink="/wallet" (click)="toggleMenu()">
+            <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+              >account_balance_wallet</mat-icon
+            >
+            Wallet
+            <span class="mobile-wallet-balance">{{
+              wallet.balance() | currency: 'INR' : 'symbol' : '1.2-2'
+            }}</span>
           </a>
         }
         @if (auth.isAdmin()) {

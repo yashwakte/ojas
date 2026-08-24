@@ -101,7 +101,7 @@ public class DeliveryChargesServiceTests
     {
         _chargesMock.SetupFind(new List<DeliveryCharges>());
 
-        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(18.0, 73.0);
+        var (distanceKm, charge, isFree, _, _, _) = await _sut.CalculateDeliveryChargeAsync(18.0, 73.0);
 
         distanceKm.ShouldBe(0);
         charge.ShouldBe(0);
@@ -114,7 +114,7 @@ public class DeliveryChargesServiceTests
         var config = MakeConfig(isActive: false);
         _chargesMock.SetupFind(new List<DeliveryCharges> { config });
 
-        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
+        var (distanceKm, charge, isFree, _, _, _) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
 
         distanceKm.ShouldBe(0);
         charge.ShouldBe(0);
@@ -128,7 +128,7 @@ public class DeliveryChargesServiceTests
         var config = MakeConfig(warehouseLat: 18.0, warehouseLon: 73.0, freeUpToKm: 5, perKmAfterFree: 10);
         _chargesMock.SetupFind(new List<DeliveryCharges> { config });
 
-        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(18.01, 73.0);
+        var (distanceKm, charge, isFree, _, _, _) = await _sut.CalculateDeliveryChargeAsync(18.01, 73.0);
 
         distanceKm.ShouldBeLessThan(5);
         charge.ShouldBe(0);
@@ -143,7 +143,7 @@ public class DeliveryChargesServiceTests
         var config = MakeConfig(warehouseLat: 18.0, warehouseLon: 73.0, freeUpToKm: 5, perKmAfterFree: 10);
         _chargesMock.SetupFind(new List<DeliveryCharges> { config });
 
-        var (distanceKm, charge, isFree, _, _) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
+        var (distanceKm, charge, isFree, _, _, _) = await _sut.CalculateDeliveryChargeAsync(19.0, 73.0);
 
         distanceKm.ShouldBe(111.1949, 0.001);
         // chargeableKm = 111.1949 - 5 = 106.1949; charge = round(106.1949 * 10, 2, AwayFromZero) = 1061.95

@@ -27,6 +27,34 @@ public class ProductService
     public async Task<Product?> GetByIdAsync(string id) =>
         await _db.Products.Find(p => p.Id == id).FirstOrDefaultAsync();
 
+    /// <summary>
+    /// What a product actually sells for: its list price less the discount advertised against it.
+    /// This is the single definition of a product's price — the storefront shows it, and orders
+    /// are charged it. They used to disagree, with the "20% OFF" badge shown to the customer
+    /// while the full list price was what they were billed.
+    /// </summary>
+    public static decimal EffectivePrice(Product product) =>
+        Math.Round(
+            product.Price - product.Price * product.Discount / 100m,
+            2,
+            MidpointRounding.AwayFromZero);
+
+    /// <summary>Looks up several products at once, keyed by id, so pricing an order is one query
+    /// rather than one per line. Ids that aren't well-formed are simply absent from the result —
+    /// the caller decides what an unknown product means.</summary>
+    public async Task<Dictionary<string, Product>> GetByIdsAsync(IEnumerable<string> productIds)
+    {
+        var ids = productIds.Where(id => ObjectId.TryParse(id, out _)).Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var products = await _db.Products
+            .Find(Builders<Product>.Filter.In(p => p.Id, ids))
+            .ToListAsync();
+
+        return products.ToDictionary(p => p.Id!, StringComparer.Ordinal);
+    }
+
     public async Task<List<Product>> GetByCategoryAsync(string category) =>
         await _db.Products.Find(p => p.Category == category).ToListAsync();
 

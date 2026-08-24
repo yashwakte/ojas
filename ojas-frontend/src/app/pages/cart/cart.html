@@ -42,7 +42,7 @@
               <div class="item-details">
                 <h4>{{ item.product.name }}</h4>
                 <span class="item-weight">{{ item.product.weight }}</span>
-                <span class="item-price">₹{{ item.product.price }} each</span>
+                <span class="item-price">₹{{ effectivePrice(item.product) | number: '1.2-2' }} each</span>
               </div>
             </a>
             <div class="qty-controls">
@@ -54,7 +54,7 @@
                 <mat-icon>add</mat-icon>
               </button>
             </div>
-            <div class="item-total">₹{{ item.product.price * item.quantity }}</div>
+            <div class="item-total">₹{{ effectivePrice(item.product) * item.quantity | number: '1.2-2' }}</div>
             <button class="remove-btn" (click)="removeItem(item.product.id)" aria-label="Remove">
               <mat-icon>delete_outline</mat-icon>
             </button>
@@ -68,12 +68,12 @@
           <h3>Order Summary</h3>
           <div class="summary-row">
             <span>Selected ({{ selectedCount() }})</span>
-            <span>₹{{ selectedTotal() }}</span>
+            <span>₹{{ selectedTotal() | number: '1.2-2' }}</span>
           </div>
           <div class="summary-divider"></div>
           <div class="summary-row total">
             <strong>Total</strong>
-            <strong class="total-amount">₹{{ selectedTotal() }}</strong>
+            <strong class="total-amount">₹{{ selectedTotal() | number: '1.2-2' }}</strong>
           </div>
           <button
             class="checkout-btn"

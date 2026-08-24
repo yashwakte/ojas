@@ -1,3 +1,5 @@
+import { roundMoney } from '../constants/pricing';
+
 export interface Product {
   id: string;
   name: string;
@@ -17,6 +19,17 @@ export interface Product {
   storageInfo: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * What a product actually sells for: its list price less the discount advertised against it.
+ * The single definition of a product's price on the client, mirroring `ProductService.EffectivePrice`
+ * on the server — which is the authority. The two used to disagree: the storefront showed a
+ * "20% OFF" sale price while the cart, checkout and the order itself all charged the full list
+ * price.
+ */
+export function effectivePrice(product: Product): number {
+  return roundMoney(product.price - (product.price * (product.discount ?? 0)) / 100);
 }
 
 /** Purchasable = admin has it enabled AND it isn't a tracked product at zero. */
@@ -57,6 +70,16 @@ export interface UpdateProductRequest extends Partial<CreateProductRequest> {
   id: string;
 }
 
+/** A pincode Ojas delivers to, and what delivery there costs. */
+export interface ServiceableArea {
+  /** Six digits, e.g. "411014". */
+  pincode: string;
+  /** Null falls back to `defaultDeliveryCharge`. */
+  charge?: number | null;
+  /** For the admin's own reference — "Kharadi", "Viman Nagar". */
+  label?: string | null;
+}
+
 export interface DeliveryChargesConfig {
   id: string;
   warehouseAddress: string;
@@ -64,8 +87,15 @@ export interface DeliveryChargesConfig {
   warehouseLongitude: number;
   freeDeliveryUpToKm: number;
   perKmChargeAfterFree: number;
-  /** Serviceable radius from the warehouse; 0 means no limit. */
+  /** Serviceable radius from the warehouse; 0 means no limit. Only used before pincodes are
+   * configured — see `serviceableAreas`. */
   maxDeliveryRadiusKm: number;
+  /** The pincodes Ojas delivers to. Once this has any entries it is the authority on both
+   * whether we deliver somewhere and what it costs, and the customer's map pin stops affecting
+   * the bill — which is what stops a crafted request pricing its own delivery to zero. */
+  serviceableAreas: ServiceableArea[];
+  /** What delivery costs for a serviceable pincode that doesn't name its own charge. */
+  defaultDeliveryCharge: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +108,8 @@ export interface UpdateDeliveryChargesRequest {
   freeDeliveryUpToKm?: number;
   perKmChargeAfterFree?: number;
   maxDeliveryRadiusKm?: number;
+  serviceableAreas?: ServiceableArea[];
+  defaultDeliveryCharge?: number;
   isActive?: boolean;
 }
 
@@ -85,9 +117,11 @@ export interface DeliveryChargeCalculation {
   distanceKm: number;
   charge: number;
   isFree: boolean;
-  /** False when the location sits outside the serviceable radius. */
+  /** False when we don't deliver to this address. */
   isServiceable: boolean;
   maxRadiusKm: number;
+  /** True when the charge came from the serviceable-pincode list rather than the map pin. */
+  pricedByPincode?: boolean;
 }
 
 export interface CampaignBannerConfig {
@@ -188,10 +222,57 @@ export interface PlaceOrderRequest {
   items: OrderItem[];
   /** Set only when the customer explicitly picked one from the Coupons & Offers list. */
   couponCode?: string | null;
+  /** Wallet balance is applied by default; false when the customer unticks it to save it. */
+  useWallet?: boolean;
+  /** Names a failed order this one replaces, so the dead attempt drops out of the customer's
+   * list once its replacement exists. The server only honours it for their own failed order. */
+  retryOfOrderId?: string | null;
 }
 
-/** Same shape as placing an order — the server recomputes totals either way. */
+/** Same shape as placing an order — the server recomputes totals either way. Sending
+ * `couponCode` matters here: omitting it makes the server fall back to the order's existing
+ * coupon rather than dropping the customer's discount. */
 export type UpdateMyOrderRequest = PlaceOrderRequest;
+
+/** An edit can move money, so it reports more than the updated order. */
+export interface UpdateMyOrderResponse {
+  order: OrderResponse;
+  /** Set when the new total exceeds what was already captured and the difference is owed. */
+  topUpAmount?: number | null;
+  /** Cashfree session for paying `topUpAmount`, when there is one. */
+  paymentSessionId?: string | null;
+  /** Set when the new total fell below what was paid; the money lands in the wallet. */
+  refundAmount?: number | null;
+  /** The coupon the edit invalidated, if the cart dropped under its minimum cart value. */
+  removedCouponCode?: string | null;
+  /** True when the changes cost more than the order holds, so they have NOT been made: they are
+   * parked as `order.pendingAmendment` and only paying `topUpAmount` makes them real. `order` is
+   * still the order as it stands, so the customer never sees goods they haven't paid for. */
+  pendingPayment?: boolean;
+}
+
+/** What became of one payment attempt. Mirrors `PaymentAttemptOutcomes` on the server. */
+export type PaymentAttemptOutcome = 'Paid' | 'Pending' | 'Failed' | 'Discarded';
+
+/** The server's verdict after asking the payment gateway directly. */
+export interface CashfreePaymentStatusResponse {
+  paymentStatus: string;
+  paymentInstrument?: string | null;
+  /** The customer left the payment page without paying, so the edit they were paying for has
+   * been dropped and their order is untouched. */
+  amendmentDiscarded?: boolean;
+  /** Why the payment failed, when it did. */
+  paymentFailureReason?: string | null;
+  /** What became of the payment the customer just came back from — which is a different question
+   * from how the order stands overall. A top-up left pending at the bank leaves the order itself
+   * fully paid for its current contents, so keying the banner off the order's status announced
+   * "payment successful" while the thing they had just tried to pay for sat unapplied below. */
+  outcome?: PaymentAttemptOutcome;
+  /** The order as it now stands. Confirming a payment moves the amount paid, the status, and —
+   * when a pending edit was what got paid for — the items and total too, so the whole order comes
+   * back rather than leaving the page to patch a field onto its pre-payment copy. */
+  order?: OrderResponse | null;
+}
 
 /** Statuses at which a customer may still edit or cancel; mirrors the API. */
 export const CUSTOMER_EDITABLE_STATUSES = ['Pending', 'Confirmed'];
@@ -218,13 +299,272 @@ export interface OrderResponse {
   deliveryDistanceKm: number;
   totalAmount: number;
   status: string;
-  /** Only "COD" today - a field rather than an assumption so an online method can slot in later. */
+  /** "Cashfree" for every new order. Orders placed before COD was retired still say "COD". */
   paymentMethod: string;
+  /** "Pending" | "Paid" | "PartiallyPaid" | "Failed", or legacy COD "Collected". */
   paymentStatus: string;
   createdAt: string;
   deliveryPartnerId?: string | null;
   deliveryPartnerName?: string | null;
   updatedAt?: string | null;
+  /** Cashfree's payment_session_id, needed to open the hosted checkout page via the JS SDK. */
+  paymentSessionId?: string | null;
+  /** How the customer actually paid, from Cashfree's payment_group — "upi", "credit_card",
+   * "net_banking", "wallet" and so on. Null until a payment succeeds. */
+  paymentInstrument?: string | null;
+  /** Cumulative amount actually captured, which an edit can leave short of the total. */
+  amountPaid: number;
+  /** Owed back to the customer's original payment method after they cancelled and asked for it
+   * there rather than as wallet credit; an admin issues it. */
+  refundPendingAmount?: number | null;
+  /** How much of this order was paid from wallet balance. */
+  walletAmountApplied: number;
+  /** An edit the customer priced but hasn't paid the difference for yet. Everything above still
+   * describes what was actually bought and paid for — this is only a proposal, and it disappears
+   * if the top-up goes unpaid. */
+  pendingAmendment?: PendingAmendment | null;
+  /** Why the payment failed, in the gateway's own words. Set only when `paymentStatus` is
+   * 'Failed'. Shown verbatim: a declined card and an abandoned page need different things done
+   * about them, so guessing between them is worse than saying nothing. */
+  paymentFailureReason?: string | null;
+}
+
+/** A priced-but-unpaid edit waiting on its top-up. */
+export interface PendingAmendment {
+  items: OrderItem[];
+  subtotal: number;
+  couponCode?: string | null;
+  discountAmount: number;
+  deliveryCharge: number;
+  /** What the order will total once the top-up is paid. */
+  totalAmount: number;
+  /** What has to be paid for these changes to take effect. */
+  topUpAmount: number;
+  /** Cashfree session for paying it — lets the customer resume without re-editing. */
+  paymentSessionId?: string | null;
+  /** After this the changes are dropped and the stock they held goes back. */
+  expiresAt: string;
+}
+
+/** Where a cancelling customer wants their money back. */
+export type RefundDestination = 'wallet' | 'source';
+
+export interface CancelOrderResponse {
+  walletCredited: number;
+  sourceRefundQueued: number;
+  /** The order as it now stands. Cancelling moves far more than the status — it discards any
+   * pending edit and returns wallet credit — so the whole order comes back rather than leaving
+   * the page to patch one field and keep the rest of its pre-cancellation copy. */
+  order?: OrderResponse | null;
+}
+
+export interface WalletTransactionResponse {
+  /** Signed: positive credits the customer, negative is balance spent. */
+  amount: number;
+  balanceAfter: number;
+  reason: string;
+  orderId?: string | null;
+  createdAt: string;
+}
+
+export interface WalletResponse {
+  balance: number;
+  transactions: WalletTransactionResponse[];
+}
+
+/** Ledger reason codes mapped to what a customer would recognise on a statement. */
+const WALLET_REASON_LABELS: Record<string, string> = {
+  OrderEditRefund: 'Refund from changing an order',
+  UnappliedTopUpReturned: 'Returned — payment arrived after the changes were dropped',
+  OrderCancellationRefund: 'Refund from a cancelled order',
+  WalletPortionReturned: 'Wallet amount returned from a cancelled order',
+  OrderPayment: 'Paid towards an order',
+  AdminAdjustment: 'Adjustment by Ojas',
+};
+
+export function walletReasonLabel(reason: string): string {
+  return WALLET_REASON_LABELS[reason] ?? reason;
+}
+
+/** Cashfree's payment_group values mapped to what a customer would recognise. */
+const PAYMENT_INSTRUMENT_LABELS: Record<string, string> = {
+  upi: 'Paid via UPI',
+  credit_card: 'Paid by Credit Card',
+  debit_card: 'Paid by Debit Card',
+  credit_card_emi: 'Paid by Credit Card EMI',
+  debit_card_emi: 'Paid by Debit Card EMI',
+  cardless_emi: 'Paid by EMI',
+  net_banking: 'Paid via Net Banking',
+  wallet: 'Paid by Wallet',
+  pay_later: 'Paid via Pay Later',
+  bank_transfer: 'Paid by Bank Transfer',
+  vba_transfer: 'Paid by Bank Transfer',
+};
+
+/** Short forms, for an order paid partly from wallet and partly at the gateway — saying only one
+ * of the two would misdescribe how the customer actually paid. */
+const PAYMENT_INSTRUMENT_SHORT: Record<string, string> = {
+  upi: 'UPI',
+  credit_card: 'card',
+  debit_card: 'card',
+  credit_card_emi: 'card EMI',
+  debit_card_emi: 'card EMI',
+  cardless_emi: 'EMI',
+  net_banking: 'net banking',
+  wallet: 'wallet',
+  pay_later: 'pay later',
+  bank_transfer: 'bank transfer',
+  vba_transfer: 'bank transfer',
+};
+
+/** What the payment pill on an order should read. Falls back to the payment status alone when
+ * the gateway hasn't told us the instrument (or for a legacy COD order, which has none). */
+export function paymentLabel(order: OrderResponse): string {
+  if (order.paymentMethod === 'COD') {
+    return order.paymentStatus === 'Collected' ? 'Payment Collected' : 'Pay on Delivery';
+  }
+
+  if (order.paymentMethod === 'Wallet') {
+    return 'Paid from Wallet';
+  }
+
+  switch (order.paymentStatus) {
+    case 'Paid': {
+      const instrument = order.paymentInstrument;
+      // Part wallet, part gateway — which is what an order paid from wallet and then topped up
+      // online looks like. Naming only the card would hide the credit they spent, and naming only
+      // the wallet would hide the money that actually left their bank.
+      if (order.walletAmountApplied > 0 && instrument) {
+        return `Paid — wallet + ${PAYMENT_INSTRUMENT_SHORT[instrument] ?? 'online'}`;
+      }
+      return (instrument && PAYMENT_INSTRUMENT_LABELS[instrument]) ?? 'Paid Online';
+    }
+    case 'PartiallyPaid':
+      return 'Part-paid — balance due';
+    case 'Failed':
+      return 'Payment Failed';
+    default:
+      return 'Payment Pending';
+  }
+}
+
+/** An order whose payment never went through. Deliberately its own idea rather than a shade of
+ * "cancelled": nothing was bought, nothing was charged, and the only thing the customer can
+ * usefully do is try again — so it is presented differently and can't be edited. */
+export function isPaymentFailed(order: OrderResponse): boolean {
+  return order.paymentStatus === 'Failed';
+}
+
+export interface DeliveryEstimate {
+  label: string;
+  /** True once the whole window has passed with the order still undelivered. */
+  delayed: boolean;
+}
+
+/** Local midnight, so "which day is it" comparisons don't turn on the time of day. */
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDay(date: Date): string {
+  return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** How long delivery takes, in days from the order being placed. */
+export const DELIVERY_DAYS_MIN = 1;
+export const DELIVERY_DAYS_MAX = 2;
+
+/**
+ * The span an order placed at `placedAt` is expected to arrive within: the day after, through the
+ * day after that. One definition, shared by the promise made on a product page before buying and
+ * the estimate shown against the order afterwards, so the two can't drift apart.
+ */
+export function deliveryWindow(placedAt = new Date()): { from: Date; to: Date } {
+  const from = startOfDay(placedAt);
+  from.setDate(from.getDate() + DELIVERY_DAYS_MIN);
+
+  const to = startOfDay(placedAt);
+  to.setDate(to.getDate() + DELIVERY_DAYS_MAX);
+
+  return { from, to };
+}
+
+/** Just the span: "1–2 days". For places whose own heading already says what it refers to. */
+export function deliveryDaysLabel(): string {
+  return `${DELIVERY_DAYS_MIN}–${DELIVERY_DAYS_MAX} days`;
+}
+
+/** The pre-purchase promise: "Arriving in 1–2 days". */
+export function deliveryPromiseLabel(): string {
+  return `Arriving in ${deliveryDaysLabel()}`;
+}
+
+/** The outer edge of that window as a date, so the promise is checkable rather than vague. */
+export function deliveryPromiseByDate(now = new Date()): string {
+  return formatDay(deliveryWindow(now).to);
+}
+
+/**
+ * When the customer should expect their order: within one to two days of placing it. Derived from
+ * the order's own `createdAt` rather than stored, so it stays right without anything having to
+ * keep it up to date, and it narrows on its own as the window closes — "in 1–2 days" the day it
+ * is placed, then "today or tomorrow", then "today".
+ *
+ * Once the window has passed with the order still undelivered, it says so rather than leaving a
+ * date that has already gone by on screen. Nothing is promised at all for an order that is
+ * finished, cancelled, or not yet paid for — there is no delivery to promise until there is a sale.
+ */
+export function deliveryEstimate(order: OrderResponse, now = new Date()): DeliveryEstimate | null {
+  const status = order.status.toLowerCase();
+  if (status === 'delivered' || status === 'cancelled') return null;
+  if (isPaymentFailed(order)) return null;
+  // Legacy COD orders are the one kind that is genuinely on its way while still unpaid.
+  if (order.amountPaid <= 0 && order.paymentMethod !== 'COD') return null;
+
+  const placed = new Date(order.createdAt);
+  if (Number.isNaN(placed.getTime())) return null;
+
+  const { from, to } = deliveryWindow(placed);
+  const today = startOfDay(now).getTime();
+
+  if (today > to.getTime()) {
+    return { label: "Delayed — we'll attempt delivery in the next 1–2 days", delayed: true };
+  }
+  if (today === to.getTime()) return { label: 'Arriving today', delayed: false };
+  if (today === from.getTime()) return { label: 'Arriving today or tomorrow', delayed: false };
+  return { label: `${deliveryPromiseLabel()}, by ${formatDay(to)}`, delayed: false };
+}
+
+/** Orders placed before Cash on Delivery was retired. No new order can be one, but these still
+ * exist and are still the only kind where money changes hands at the door. */
+export function isCashOnDelivery(order: OrderResponse): boolean {
+  return order.paymentMethod === 'COD';
+}
+
+/** The icon that goes with `paymentLabel`. Shared so the customer, admin and delivery views
+ * describe the same order the same way — they used to each hardcode their own guess. */
+export function paymentIcon(order: OrderResponse): string {
+  if (isCashOnDelivery(order)) return 'payments';
+  switch (order.paymentStatus) {
+    case 'Paid':
+      return 'verified';
+    case 'Failed':
+      return 'error_outline';
+    case 'PartiallyPaid':
+      return 'account_balance_wallet';
+    default:
+      return 'schedule';
+  }
+}
+
+/** True when the order is square: paid online, or cash taken at the door for a legacy COD one. */
+export function isPaymentSettled(order: OrderResponse): boolean {
+  return order.paymentStatus === 'Paid' || order.paymentStatus === 'Collected';
+}
+
+/** True when money is still owed — a failed payment, or an edit that outran what was captured. */
+export function isPaymentOutstanding(order: OrderResponse): boolean {
+  return order.paymentStatus === 'Failed' || order.paymentStatus === 'PartiallyPaid';
 }
 
 export interface StaffUserResponse {

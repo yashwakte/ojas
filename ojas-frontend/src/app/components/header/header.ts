@@ -1,4 +1,5 @@
 import { Component, HostListener, signal, effect } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,6 +11,7 @@ import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { ChatbotUiService } from '../../services/chatbot-ui.service';
+import { WalletService } from '../../services/wallet.service';
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
 import { HeaderAddressPicker } from '../header-address-picker/header-address-picker';
 
@@ -24,6 +26,7 @@ import { HeaderAddressPicker } from '../header-address-picker/header-address-pic
     MatMenuModule,
     MatBadgeModule,
     MatDividerModule,
+    CurrencyPipe,
     HeaderAddressPicker,
   ],
   templateUrl: './header.html',
@@ -44,14 +47,32 @@ export class Header {
   readonly categoryDetails = PRODUCT_CATEGORY_DETAILS;
 
   private _prevCount = 0;
+  private walletLoadedFor: string | null = null;
 
   constructor(
     public auth: AuthService,
     public cart: CartService,
     public checkoutService: CheckoutService,
     public chatbotUi: ChatbotUiService,
+    public wallet: WalletService,
     private router: Router,
   ) {
+    // The balance is shown in the account menu, which is on every page, so it has to be loaded
+    // once the customer is known rather than left to whichever page happens to need it. Keyed on
+    // the account so switching users re-reads it, and so it isn't re-fetched on every signal read.
+    effect(() => {
+      const user = this.auth.user();
+      const customerId = user?.role === 'customer' ? user.id : null;
+
+      if (!customerId) {
+        this.walletLoadedFor = null;
+        return;
+      }
+      if (this.walletLoadedFor === customerId) return;
+
+      this.walletLoadedFor = customerId;
+      this.wallet.load().subscribe({ error: () => {} });
+    });
     effect(() => {
       const count = this.cart.items().length;
       if (count > this._prevCount) {

@@ -32,7 +32,7 @@
     </article>
     <article class="kpi-card">
       <span class="kpi-label">Revenue (Delivered)</span>
-      <strong>{{ totalRevenue() | currency: 'INR' : 'symbol' : '1.0-0' }}</strong>
+      <strong>{{ totalRevenue() | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
     </article>
     <article class="kpi-card">
       <span class="kpi-label">Products</span>
@@ -162,20 +162,23 @@
                       <div>
                         <span>{{ item.productName }} x {{ item.quantity }}</span>
                         <strong>{{
-                          item.price * item.quantity | currency: 'INR' : 'symbol' : '1.0-0'
+                          item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2'
                         }}</strong>
                       </div>
                     }
                   </div>
 
                   <div class="order-total">
-                    Total: {{ order.totalAmount | currency: 'INR' : 'symbol' : '1.0-0' }}
+                    Total: {{ order.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}
+                    <!-- How this order was actually paid. It used to say "COD" on every order
+                         regardless, which stopped being true the moment COD was retired. -->
                     <span
                       class="payment-pill"
-                      [class.payment-pill--collected]="order.paymentStatus === 'Collected'"
+                      [class.payment-pill--collected]="isPaymentSettled(order)"
+                      [class.payment-pill--unpaid]="isPaymentOutstanding(order)"
                     >
-                      <mat-icon>payments</mat-icon>
-                      COD · {{ order.paymentStatus === 'Collected' ? 'Collected' : 'Pending' }}
+                      <mat-icon>{{ paymentIcon(order) }}</mat-icon>
+                      {{ paymentLabel(order) }}
                     </span>
                   </div>
 

@@ -9,7 +9,7 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
-import { Product, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../models/interfaces';
 import { DecimalPipe } from '@angular/common';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
@@ -21,6 +21,8 @@ import { OrderPickingBanner } from '../../components/order-picking-banner/order-
   styleUrl: './products.scss',
 })
 export class Products {
+  /** The shared definition, so a tile advertises exactly what the cart will charge. */
+  readonly effectivePrice = effectivePrice;
   readonly isOutOfStock = isOutOfStock;
   readonly isPurchasable = isPurchasable;
 

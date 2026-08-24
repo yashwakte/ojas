@@ -4,7 +4,8 @@
   "private": true,
   "description": "Playwright end-to-end tests for Ojas, run against the API and Angular dev servers on localhost.",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:security": "playwright test --config playwright.prod.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

@@ -49,10 +49,31 @@ export class DeliveryChargesService {
   }
 
   /** Server-computed charge for a real delivery location (used at checkout — always trust this over any client-side estimate). */
-  previewCharge(latitude: number, longitude: number): Observable<DeliveryChargeCalculation> {
-    return this.http.get<DeliveryChargeCalculation>(`${this.apiUrl}/calculate`, {
-      params: { latitude, longitude },
-    });
+  /**
+   * The estimate shown before an order is placed.
+   *
+   * The pincode matters more than the pin: once serviceable pincodes are configured the server
+   * prices from the pincode alone and ignores the coordinates, because the coordinates come from
+   * here and a crafted request can claim to be standing in the warehouse. Passing it means the
+   * preview matches what the order is actually charged.
+   */
+  previewCharge(
+    latitude: number,
+    longitude: number,
+    pincode?: string | null,
+  ): Observable<DeliveryChargeCalculation> {
+    const params: Record<string, string | number> = { latitude, longitude };
+    if (pincode) params['pincode'] = pincode;
+
+    return this.http.get<DeliveryChargeCalculation>(`${this.apiUrl}/calculate`, { params });
+  }
+
+  /** The six-digit pincode stated in a free-text address; mirrors the server's own reading of it,
+   * which takes the last standalone six-digit token so a phone number can't be mistaken for one. */
+  static pincodeFrom(address: string | null | undefined): string | null {
+    if (!address) return null;
+    const matches = address.match(/\b\d{6}\b/g);
+    return matches ? matches[matches.length - 1] : null;
   }
 
   /** Whether a location is inside the serviceable radius, per the saved config. */
@@ -107,7 +128,7 @@ export class DeliveryChargesService {
       charge,
       isFree: false,
       isServiceable: true,
-      breakdown: `${config.freeDeliveryUpToKm} km free + ${chargeableKm.toFixed(1)} km × ₹${config.perKmChargeAfterFree}/km = ₹${charge}`,
+      breakdown: `${config.freeDeliveryUpToKm} km free + ${chargeableKm.toFixed(1)} km × ₹${config.perKmChargeAfterFree}/km = ₹${charge.toFixed(2)}`,
     };
   }
 

@@ -62,7 +62,7 @@
             @if (p.discount && p.discount > 0) {
               <span class="detail-price discounted">
                 <span class="original-price">&#8377;{{ p.price }}</span>
-                <span class="sale-price">&#8377;{{ discountedPrice() | number:'1.0-0' }}</span>
+                <span class="sale-price">&#8377;{{ discountedPrice() | number: '1.0-2' }}</span>
               </span>
               <span class="price-note">(Inclusive of all taxes)</span>
               <span class="discount-tag">{{ p.discount }}% OFF</span>
@@ -165,7 +165,9 @@
           <!-- Trust Badges -->
           <div class="trust-badges">
             <span><mat-icon>lock</mat-icon> Secure Payments</span>
-            <span><mat-icon>payments</mat-icon> Cash on Delivery</span>
+            <!-- Was "Cash on Delivery", which stopped being on offer when COD was retired -
+                 promising it here is a promise checkout can't keep. -->
+            <span><mat-icon>bolt</mat-icon> Delivery in 1–2 Days</span>
             <span><mat-icon>verified</mat-icon> Quality Assured</span>
           </div>
 
@@ -215,7 +217,7 @@
                   } @else if (q.isFree) {
                     <span class="deliver-to-charge free">Free delivery</span>
                   } @else {
-                    <span class="deliver-to-charge">Delivery ₹{{ q.charge }}</span>
+                    <span class="deliver-to-charge">Delivery ₹{{ q.charge | number: '1.2-2' }}</span>
                   }
                 }
               </div>
@@ -232,6 +234,16 @@
               </button>
             }
           </div>
+
+          <!-- When it arrives. Sits outside the address branches above because the timing is the
+               same wherever inside our area it goes - only the charge varies. -->
+          <p class="delivery-promise">
+            <mat-icon>local_shipping</mat-icon>
+            <span class="delivery-promise-text">
+              <strong>{{ deliveryPromise() }}</strong>
+              <small>Order now and it reaches you by {{ deliveryPromiseBy() }}.</small>
+            </span>
+          </p>
 
           <!-- Action Buttons -->
           <div class="action-buttons">
@@ -282,7 +294,9 @@
               <mat-icon>schedule</mat-icon>
               <div>
                 <strong>Estimated Delivery</strong>
-                <span>3-5 business days</span>
+                <!-- Reads from the shared window rather than being written out here, which is how
+                     this card sat on "3-5 business days" long after the promise had changed. -->
+                <span>{{ deliveryDays() }}, by {{ deliveryPromiseBy() }}</span>
               </div>
             </div>
             <div class="delivery-item">
@@ -326,7 +340,7 @@
                     <strong class="similar-price">
                       @if (sp.discount && sp.discount > 0) {
                         <span class="original">&#8377;{{ sp.price }}</span>
-                        <span class="sale">&#8377;{{ sp.price - (sp.price * sp.discount / 100) | number:'1.0-0' }}</span>
+                        <span class="sale">&#8377;{{ effectivePrice(sp) | number: '1.0-2' }}</span>
                       } @else {
                         &#8377;{{ sp.price }}
                       }

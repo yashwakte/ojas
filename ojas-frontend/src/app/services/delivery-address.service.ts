@@ -116,7 +116,13 @@ export class DeliveryAddressService {
 
   private refreshQuote(address: SavedAddress): void {
     this._quoteLoading.set(true);
-    this.deliveryCharges.previewCharge(address.latitude, address.longitude).subscribe({
+    this.deliveryCharges
+      .previewCharge(
+        address.latitude,
+        address.longitude,
+        DeliveryChargesService.pincodeFrom(address.fullAddress),
+      )
+      .subscribe({
       next: (quote) => {
         this._quote.set(quote);
         this._quoteLoading.set(false);

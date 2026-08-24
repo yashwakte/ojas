@@ -7,7 +7,14 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
-import { Product, DeliveryChargesConfig } from '../../models/interfaces';
+import {
+  Product,
+  DeliveryChargesConfig,
+  deliveryDaysLabel,
+  deliveryPromiseByDate,
+  deliveryPromiseLabel,
+  deliveryWindow,
+} from '../../models/interfaces';
 
 describe('ProductDetail', () => {
   const product: Product = {
@@ -215,5 +222,43 @@ describe('ProductDetail', () => {
     const img = document.createElement('img');
     fixture.componentInstance.onImgError({ target: img } as unknown as Event);
     expect(img.src).toContain('/images/placeholder.svg');
+  });
+  // ---------- the delivery promise ----------
+
+  it('promises delivery in 1-2 days, with a date the customer can hold us to', () => {
+    const fixture = create();
+
+    const rendered = fixture.nativeElement.textContent as string;
+    expect(deliveryPromiseLabel()).toBe('Arriving in 1–2 days');
+    expect(rendered).toContain('Arriving in 1–2 days');
+    // Vague on its own, so the outer edge of the window is named as a real date too.
+    expect(rendered).toContain(deliveryPromiseByDate());
+  });
+
+  it('shows the promise whether or not a delivery address has been picked', () => {
+    // The charge depends on the address; the timing does not, so it must not hide with it.
+    const fixture = create();
+
+    expect(fixture.componentInstance.deliveryPromise()).toBe(deliveryPromiseLabel());
+  });
+
+  it('states the same window on the spec card, rather than its own hardcoded figure', () => {
+    // This card sat on "3-5 business days" long after the promise had changed, because the
+    // number was written into the template instead of being read from the shared window.
+    const fixture = create();
+
+    const rendered = fixture.nativeElement.textContent as string;
+    expect(rendered).toContain('Estimated Delivery');
+    expect(rendered).toContain(`${deliveryDaysLabel()}, by ${deliveryPromiseByDate()}`);
+    expect(rendered).not.toContain('business days');
+  });
+
+  it('spans tomorrow to the day after, and rolls correctly across a year boundary', () => {
+    const newYearsEve = new Date(2026, 11, 31, 22, 0, 0);
+
+    const { from, to } = deliveryWindow(newYearsEve);
+
+    expect([from.getFullYear(), from.getMonth(), from.getDate()]).toEqual([2027, 0, 1]);
+    expect([to.getFullYear(), to.getMonth(), to.getDate()]).toEqual([2027, 0, 2]);
   });
 });

@@ -52,9 +52,19 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
         // Program.cs throws at startup if this is unset, same as Jwt:Key/MongoDb:ConnectionString -
         // the value itself is never checked since ITurnstileVerifier is swapped for a fake below.
         Environment.SetEnvironmentVariable("Turnstile__SecretKey", "test-secret-key");
+        // Checkout is online-payment only since COD was retired, so an unconfigured Cashfree
+        // would 503 every order-placing test. The credentials are never really used - the HTTP
+        // transport is swapped for FakeCashfreeHandler below - but IsConfigured reads them.
+        Environment.SetEnvironmentVariable("Cashfree__ClientId", FakeCashfreeHandler.ClientId);
+        Environment.SetEnvironmentVariable("Cashfree__ClientSecret", FakeCashfreeHandler.ClientSecret);
+        Environment.SetEnvironmentVariable("Cashfree__Environment", "sandbox");
     }
 
     public string DatabaseName => _databaseName;
+
+    /// <summary>The stand-in gateway backing this factory's CashfreeService, so a test can
+    /// simulate the customer actually completing (or failing) a payment.</summary>
+    public FakeCashfreeHandler Cashfree { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -71,6 +81,10 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
         {
             services.AddScoped<ITurnstileVerifier, FakeTurnstileVerifier>();
             services.AddScoped<IPhoneOtpSender, FakePhoneOtpSender>();
+            // The real CashfreeService is kept (so its request building and response parsing are
+            // genuinely exercised) but pointed at a canned transport instead of the live gateway.
+            services.AddHttpClient<CashfreeService>()
+                .ConfigurePrimaryHttpMessageHandler(() => Cashfree);
         });
     }
 
@@ -82,5 +96,33 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IMongoDbService>();
         await seed(db);
+    }
+
+    /// <summary>
+    /// Puts a real product in the catalog and hands it back. Orders are priced from the catalog
+    /// server-side, so a test that places one needs a product that actually exists — an invented
+    /// id with a price attached is exactly the thing the API now refuses, and tests built on one
+    /// were only ever passing because the price came from the request.
+    /// </summary>
+    public async Task<Product> SeedProductAsync(
+        decimal price = 100m,
+        decimal discount = 0m,
+        int? stock = null,
+        string name = "Product One",
+        string weight = "1kg")
+    {
+        var product = new Product
+        {
+            Name = name,
+            Description = "Seeded for tests",
+            Price = price,
+            Discount = discount,
+            Category = "Flour",
+            Weight = weight,
+            StockQuantity = stock,
+        };
+
+        await SeedAsync(async db => await db.Products.InsertOneAsync(product));
+        return product;
     }
 }
