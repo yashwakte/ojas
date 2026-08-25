@@ -72,7 +72,14 @@ public class MongoDbService : IMongoDbService
                 Builders<RefreshToken>.IndexKeys.Ascending(r => r.UserId),
                 new CreateIndexOptions { Name = "refresh_token_user_id" }
             );
-            RefreshTokens.Indexes.CreateMany([refreshTokenTtlIndex, refreshTokenUserIdIndex]);
+            // Revoking a session deletes every token descended from one sign-in, which is a
+            // query by family rather than by id - without this it would scan the collection on
+            // every logout and on every detected token replay.
+            var refreshTokenFamilyIndex = new CreateIndexModel<RefreshToken>(
+                Builders<RefreshToken>.IndexKeys.Ascending(r => r.FamilyId),
+                new CreateIndexOptions { Name = "refresh_token_family" }
+            );
+            RefreshTokens.Indexes.CreateMany([refreshTokenTtlIndex, refreshTokenUserIdIndex, refreshTokenFamilyIndex]);
 
             // Every wallet statement reads one customer's rows newest-first, so index the pair
             // rather than the user alone - this collection only ever grows.

@@ -68,7 +68,14 @@ test('register, verify OTP, then the refresh token rotates the session and revok
   expect(authCookieAfterRefresh).not.toBe(authCookieBeforeRefresh);
   expect(refreshCookieAfterRefresh).not.toBe(refreshCookieBeforeRefresh);
 
-  // The rotated-away refresh token must be dead, not just superseded.
+  // Replaying the rotated-away token seconds later is the honest two-tab case: both tabs in a
+  // browser share one cookie jar, so when the access token expires they can both refresh with
+  // the same value, and signing the loser out for that would be a bug. It gets a working access
+  // token - and deliberately no refresh token, because the jar already holds the successor. That
+  // is what stops the session forking into two branches that rotate forever, which is the
+  // session a token thief would want. A replay after the grace window instead revokes the whole
+  // family; that path needs the clock moved on, so it lives in the API integration tests
+  // (AuthFlowTests.Refresh_ReplayingALongSpentToken_RevokesTheWholeSessionFamily).
   await page.context().addCookies([
     {
       name: 'ojas_refresh',
@@ -80,7 +87,13 @@ test('register, verify OTP, then the refresh token rotates the session and revok
     },
   ]);
   const replayResponse = await page.request.post(`${API_URL}/auth/refresh`);
-  expect(replayResponse.status()).toBe(401);
+  expect(replayResponse.ok()).toBeTruthy();
+
+  const cookiesAfterReplay = await page.context().cookies();
+  // The successor was not overwritten - the replay left the jar exactly as it found it.
+  expect(cookiesAfterReplay.find((c) => c.name === 'ojas_refresh')!.value).toBe(
+    refreshCookieBeforeRefresh,
+  );
 
   // Restore the real (rotated) cookie, then confirm logout revokes it server-side too.
   await page.context().addCookies([

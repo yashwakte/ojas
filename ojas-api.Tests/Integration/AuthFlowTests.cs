@@ -1,4 +1,5 @@
 using System.Net;
+using MongoDB.Driver;
 using System.Net.Http.Json;
 using OjasApi.Models;
 using Shouldly;
@@ -128,7 +129,96 @@ public class AuthFlowTests : IDisposable
     }
 
     [Fact]
-    public async Task Refresh_RotatesToken_ReplayingTheOldCookieFails()
+    public async Task Refresh_ReplayingAJustRotatedToken_RenewsAccessButIssuesNoRefreshToken()
+    {
+        // The honest two-tab case. Both tabs in one browser share a cookie jar, so when the
+        // access token expires they can both refresh with the same value; signing the loser out
+        // for that would be a bug. It gets a working access token - and deliberately no refresh
+        // token, because the jar already holds the successor the winner was issued. Handing it
+        // one would fork the family into two branches that rotate independently forever, which
+        // is precisely the session a token thief would want.
+        var originalRefreshToken = await RegisterAndGetRefreshTokenAsync();
+
+        var refreshResponse = await _client.PostAsync("/api/auth/refresh", null);
+        refreshResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // A fresh client with an empty cookie jar - reusing _client would have its own handler
+        // auto-attach the *current* (already-rotated) cookie instead of the stale one this test
+        // needs to send explicitly.
+        using var replayClient = _factory.CreateClient();
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        replayRequest.Headers.Add("Cookie", $"ojas_refresh={originalRefreshToken}");
+        var replayResponse = await replayClient.SendAsync(replayRequest);
+
+        replayResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var setCookies = replayResponse.Headers.TryGetValues("Set-Cookie", out var values)
+            ? values.ToList()
+            : [];
+        setCookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        setCookies.ShouldNotContain(c => c.StartsWith("ojas_refresh="));
+    }
+
+    [Fact]
+    public async Task Refresh_ReplayingALongSpentToken_RevokesTheWholeSessionFamily()
+    {
+        // Nobody's browser sits on a spent refresh token for minutes and then tries it. Someone
+        // else has a copy, and the thief's request can't be told apart from the owner's - so
+        // every token descended from that sign-in dies and the real user signs in again.
+        var originalRefreshToken = await RegisterAndGetRefreshTokenAsync();
+
+        var refreshResponse = await _client.PostAsync("/api/auth/refresh", null);
+        refreshResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var successorToken = ExtractCookieValue(refreshResponse, "ojas_refresh");
+
+        // Age the spent row past the grace window, which is the only thing separating an honest
+        // two-tab race from a replay.
+        await _factory.SeedAsync(async db =>
+        {
+            await db.RefreshTokens.UpdateManyAsync(
+                Builders<RefreshToken>.Filter.Ne(r => r.RotatedAt, null),
+                Builders<RefreshToken>.Update.Set(r => r.RotatedAt, DateTime.UtcNow.AddMinutes(-10)));
+        });
+
+        using var replayClient = _factory.CreateClient();
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        replayRequest.Headers.Add("Cookie", $"ojas_refresh={originalRefreshToken}");
+        var replayResponse = await replayClient.SendAsync(replayRequest);
+
+        replayResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        // And the legitimate successor is gone too - that is what revoking the family means, and
+        // it is the point: the real user is forced to sign in again rather than left sharing a
+        // session with whoever else is holding a token.
+        using var successorClient = _factory.CreateClient();
+        using var successorRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        successorRequest.Headers.Add("Cookie", $"ojas_refresh={successorToken}");
+        var successorResponse = await successorClient.SendAsync(successorRequest);
+
+        successorResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Logout_RevokesEveryTokenFromThatSignIn_IncludingAGraceWindowSibling()
+    {
+        var originalRefreshToken = await RegisterAndGetRefreshTokenAsync();
+
+        var refreshResponse = await _client.PostAsync("/api/auth/refresh", null);
+        var successorToken = ExtractCookieValue(refreshResponse, "ojas_refresh");
+
+        (await _client.PostAsync("/api/auth/logout", null)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        foreach (var token in new[] { originalRefreshToken, successorToken })
+        {
+            using var client = _factory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+            request.Headers.Add("Cookie", $"ojas_refresh={token}");
+            (await client.SendAsync(request)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        }
+    }
+
+    /// <summary>Registers a throwaway verified account on _client and returns the refresh token
+    /// its session was issued.</summary>
+    private async Task<string> RegisterAndGetRefreshTokenAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var registerRequest = new RegisterRequest(
@@ -138,23 +228,7 @@ public class AuthFlowTests : IDisposable
 
         var verifyResponse = await _client.PostAsJsonAsync(
             "/api/auth/verify-email-otp", new VerifyEmailOtpRequest(pending!.Email, pending.DevCode!));
-        var originalRefreshToken = ExtractCookieValue(verifyResponse, "ojas_refresh");
-
-        // First refresh succeeds and rotates - the client's own cookie jar now holds a new token.
-        var refreshResponse = await _client.PostAsync("/api/auth/refresh", null);
-        refreshResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        // Explicitly replaying the original (now-rotated-away) token must fail, proving rotation
-        // actually invalidates it rather than just issuing a redundant new one alongside it. Uses
-        // a fresh client with an empty cookie jar - reusing _client here would have its own
-        // handler auto-attach the *current* (already-rotated) cookie instead of the stale one
-        // this test needs to send explicitly.
-        using var replayClient = _factory.CreateClient();
-        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
-        replayRequest.Headers.Add("Cookie", $"ojas_refresh={originalRefreshToken}");
-        var replayResponse = await replayClient.SendAsync(replayRequest);
-
-        replayResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        return ExtractCookieValue(verifyResponse, "ojas_refresh");
     }
 
     private static string ExtractCookieValue(HttpResponseMessage response, string cookieName)

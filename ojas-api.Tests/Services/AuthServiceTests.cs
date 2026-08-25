@@ -351,36 +351,140 @@ public class AuthServiceTests
     public async Task RefreshAsync_ValidToken_RotatesAndReturnsNewSession()
     {
         var user = MakeUser();
-        _usersMock.SetupFind(new List<User> { user });
-        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        var token = new RefreshToken
         {
-            new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(10) },
-        });
+            TokenHash = "irrelevant",
+            UserId = user.Id!,
+            FamilyId = "family-1",
+            ExpiresAt = DateTime.UtcNow.AddDays(10),
+        };
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken> { token });
+        _refreshTokensMock.SetupRotationClaim(token);
 
         var result = await _sut.RefreshAsync("some-raw-refresh-token", null);
 
-        result.ShouldNotBeNull();
-        result!.User.Email.ShouldBe(user.Email);
-        result.Token.ShouldNotBeNullOrWhiteSpace();
-        result.RefreshToken.ShouldNotBeNullOrWhiteSpace();
+        result.Outcome.ShouldBe(RefreshOutcome.Success);
+        result.IsGraceReplay.ShouldBeFalse();
+        result.Auth.ShouldNotBeNull();
+        result.Auth!.User.Email.ShouldBe(user.Email);
+        result.Auth.Token.ShouldNotBeNullOrWhiteSpace();
+        result.Auth.RefreshToken.ShouldNotBeNullOrWhiteSpace();
+        // The spent token is marked, not deleted - keeping it on file is the only way a later
+        // replay of it can be told apart from an unknown token.
         _refreshTokensMock.Verify(c => c.DeleteOneAsync(
-            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Never);
         _refreshTokensMock.Verify(c => c.InsertOneAsync(
             It.IsAny<RefreshToken>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task RefreshAsync_ReturnsNull_WhenNoMatchingTokenExists()
+    public async Task RefreshAsync_RecentlyRotatedToken_RenewsAccessWithoutForkingTheFamily()
+    {
+        // Two tabs share one cookie jar, so when the access token expires they both refresh with
+        // the same value. The loser of that race must not be signed out for it - but it must not
+        // be handed its own refresh token either, or the session forks into two branches that
+        // each rotate forever and never trip reuse detection. That fork is exactly what a token
+        // thief would want, so the loser gets an access token and nothing else: the jar already
+        // holds the successor the winner was issued.
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new()
+            {
+                TokenHash = "irrelevant",
+                UserId = user.Id!,
+                FamilyId = "family-1",
+                RotatedAt = DateTime.UtcNow.AddSeconds(-2),
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+            },
+        });
+        // The conditional claim matches nothing, because the row is already stamped.
+        _refreshTokensMock.SetupRotationClaim<RefreshToken>(null);
+
+        var result = await _sut.RefreshAsync("just-rotated-token", null);
+
+        result.Outcome.ShouldBe(RefreshOutcome.Success);
+        result.IsGraceReplay.ShouldBeTrue();
+        result.Auth.ShouldNotBeNull();
+        result.Auth!.Token.ShouldNotBeNullOrWhiteSpace();
+        result.Auth.RefreshToken.ShouldBeEmpty();
+        _refreshTokensMock.Verify(c => c.InsertOneAsync(
+            It.IsAny<RefreshToken>(), null, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_TwoSimultaneousCallers_OnlyTheClaimWinnerMintsASuccessor()
+    {
+        // Both tabs read the same unrotated row before either wrote to it, so the decision
+        // cannot rest on that read - it rests on the conditional update, which exactly one of
+        // them wins.
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new()
+            {
+                TokenHash = "irrelevant",
+                UserId = user.Id!,
+                FamilyId = "family-1",
+                ExpiresAt = DateTime.UtcNow.AddDays(10),
+            },
+        });
+        _refreshTokensMock.SetupRotationClaim<RefreshToken>(null);
+
+        var result = await _sut.RefreshAsync("contended-token", null);
+
+        result.Outcome.ShouldBe(RefreshOutcome.Success);
+        result.IsGraceReplay.ShouldBeTrue();
+        result.Auth!.RefreshToken.ShouldBeEmpty();
+        _refreshTokensMock.Verify(c => c.InsertOneAsync(
+            It.IsAny<RefreshToken>(), null, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_LongSpentToken_RevokesTheWholeFamily()
+    {
+        // Nobody's browser sits on a spent token for an hour and then tries it. Someone else has
+        // a copy, and the owner can't be told apart from the thief - so the sign-in dies.
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new()
+            {
+                TokenHash = "irrelevant",
+                UserId = user.Id!,
+                FamilyId = "family-1",
+                RotatedAt = DateTime.UtcNow.AddHours(-1),
+                ExpiresAt = DateTime.UtcNow.AddDays(6),
+            },
+        });
+
+        var result = await _sut.RefreshAsync("replayed-token", null);
+
+        result.Outcome.ShouldBe(RefreshOutcome.ReuseDetected);
+        result.Auth.ShouldBeNull();
+        _refreshTokensMock.Verify(c => c.DeleteManyAsync(
+            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
+        _refreshTokensMock.Verify(c => c.InsertOneAsync(
+            It.IsAny<RefreshToken>(), null, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_IsInvalid_WhenNoMatchingTokenExists()
     {
         _refreshTokensMock.SetupFind(new List<RefreshToken>());
 
         var result = await _sut.RefreshAsync("unknown-token", null);
 
-        result.ShouldBeNull();
+        result.Outcome.ShouldBe(RefreshOutcome.Invalid);
+        result.Auth.ShouldBeNull();
     }
 
     [Fact]
-    public async Task RefreshAsync_ReturnsNull_WhenTokenIsExpired()
+    public async Task RefreshAsync_IsInvalid_WhenTokenIsExpired()
     {
         var user = MakeUser();
         _usersMock.SetupFind(new List<User> { user });
@@ -391,12 +495,38 @@ public class AuthServiceTests
 
         var result = await _sut.RefreshAsync("expired-token", null);
 
-        result.ShouldBeNull();
+        result.Outcome.ShouldBe(RefreshOutcome.Invalid);
+        result.Auth.ShouldBeNull();
     }
 
     [Fact]
-    public async Task RevokeRefreshTokenAsync_DeletesMatchingToken()
+    public async Task RevokeRefreshTokenAsync_DeletesTheWholeFamily_SoNoSiblingSurvivesLogout()
     {
+        // Rotation's grace window can leave a sibling successor alive in another tab. Deleting
+        // only the token that was handed in would leave that sibling minting access tokens
+        // after the user pressed Log out.
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new()
+            {
+                TokenHash = "irrelevant",
+                UserId = "user-1",
+                FamilyId = "family-1",
+                ExpiresAt = DateTime.UtcNow.AddDays(10),
+            },
+        });
+
+        await _sut.RevokeRefreshTokenAsync("some-token");
+
+        _refreshTokensMock.Verify(c => c.DeleteManyAsync(
+            It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevokeRefreshTokenAsync_StillDeletesByHash_WhenTheTokenIsUnknown()
+    {
+        _refreshTokensMock.SetupFind(new List<RefreshToken>());
+
         await _sut.RevokeRefreshTokenAsync("some-token");
 
         _refreshTokensMock.Verify(c => c.DeleteOneAsync(

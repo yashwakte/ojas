@@ -126,18 +126,72 @@ public class AuthController : ControllerBase
         return result.User with { CsrfToken = csrfToken };
     }
 
+    /// <summary>The grace-replay half of a refresh: a new access token, and deliberately nothing
+    /// else. No refresh cookie, because the browser's jar already holds the successor the other
+    /// tab was issued and overwriting it would fork the session family (see
+    /// AuthService.RefreshAsync); and no new CSRF token, because the two tabs share that cookie
+    /// too and rotating it here would leave whichever tab didn't make this call holding a value
+    /// the server no longer recognises.</summary>
+    private AuthResponse RenewAccessTokenOnly(AuthResult result)
+    {
+        Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
+
+        if (Request.Cookies.TryGetValue(CsrfCookieName, out var csrfToken) &&
+            !string.IsNullOrWhiteSpace(csrfToken))
+        {
+            return result.User with { CsrfToken = csrfToken };
+        }
+
+        // No CSRF cookie to preserve - issue one, otherwise this caller would be left unable to
+        // make any mutating request at all.
+        var freshCsrf = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        Response.Cookies.Append(CsrfCookieName, freshCsrf, BuildCsrfCookieOptions());
+        return result.User with { CsrfToken = freshCsrf };
+    }
+
     [HttpGet("ping")]
     [DisableRateLimiting]
     public IActionResult Ping() => Ok("pong");
 
-    // Lightweight check the frontend calls once on app load so a session that
-    // expired server-side (e.g. the browser was left open for days) is detected
-    // immediately, instead of only surfacing the next time the user happens to
+    // Who the cookie in this browser actually belongs to. The frontend caches the signed-in
+    // user in localStorage so the first paint isn't blank, but cookies and localStorage are
+    // shared by every tab in a browser profile - sign into a second account in one tab and the
+    // first tab's cache is describing someone the cookie no longer refers to. This is the
+    // answer that cache gets reconciled against, on load and whenever a tab is brought back to
+    // the foreground, so a stale cache can never be rendered over another account's data.
+    //
+    // It also still does the job it was originally added for: a session that expired
+    // server-side is detected on load rather than at whatever moment the user happens to
     // trigger an authenticated request.
     [HttpGet("session")]
     [Authorize]
     [DisableRateLimiting]
-    public IActionResult Session() => Ok();
+    public async Task<ActionResult<SessionResponse>> Session()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized();
+
+        var user = await _authService.FindByIdAsync(userId);
+        if (user == null)
+            return Unauthorized();
+
+        // The CSRF token comes back too, because a tab that discovers it was holding the wrong
+        // account is also holding that account's CSRF token, and every mutating request it makes
+        // from here would be rejected. This discloses nothing: ojas_csrf is deliberately not
+        // HttpOnly, so same-origin script can already read it, and a cross-site caller can
+        // neither read this response nor send the cookie that produced it. All this does is
+        // hand back the value the caller itself just presented.
+        Request.Cookies.TryGetValue(CsrfCookieName, out var csrfToken);
+
+        return Ok(new SessionResponse(
+            user.Id!,
+            user.FullName,
+            user.Email,
+            user.Phone,
+            user.Role,
+            csrfToken ?? string.Empty));
+    }
 
     [HttpGet("check-email")]
     [DisableRateLimiting]
@@ -255,14 +309,28 @@ public class AuthController : ControllerBase
             return Unauthorized();
 
         var result = await _authService.RefreshAsync(rawRefreshToken, RawDeviceId);
-        if (result == null)
+
+        if (result.Outcome != RefreshOutcome.Success)
         {
-            // Stale, expired, or already-rotated - clear it so the browser stops offering it.
+            if (result.Outcome == RefreshOutcome.ReuseDetected)
+            {
+                // Worth a loud log line: this is the one signal the system gets that a refresh
+                // token escaped the browser it was issued to. The family is already revoked by
+                // the time we're here; all that's left is to say so.
+                _logger.LogWarning(
+                    "Refresh token reuse detected from {Ip} - the session family has been revoked.",
+                    HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+            }
+
+            // Stale, expired, replayed, or no longer bound to its device - clear it so the
+            // browser stops offering it.
             Response.Cookies.Delete(RefreshCookieName, new CookieOptions { Path = "/api/auth", Secure = true, SameSite = SameSiteMode.None });
             return Unauthorized();
         }
 
-        return Ok(IssueSession(result));
+        return Ok(result.IsGraceReplay
+            ? RenewAccessTokenOnly(result.Auth!)
+            : IssueSession(result.Auth!));
     }
 
     [HttpPost("logout")]

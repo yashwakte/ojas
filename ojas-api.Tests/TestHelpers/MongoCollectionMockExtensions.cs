@@ -41,6 +41,29 @@ public static class MongoCollectionMockExtensions
     /// so mocking FindAsync is sufficient to make the whole chain return this data regardless of
     /// which fluent filtering/sorting/limiting methods were called along the way.
     /// </summary>
+    /// <summary>
+    /// Makes `collection.FindOneAndUpdateAsync(...)` return <paramref name="claimed"/> - the
+    /// document as it was *before* the update, which is what the driver returns by default, and
+    /// null when the conditional filter matched nothing.
+    ///
+    /// AuthService.RefreshAsync uses exactly that null/non-null answer to decide whether this
+    /// caller won the race to rotate a refresh token, so a mocked collection has to be told
+    /// which side of that race it is on. Left unset, Moq's loose default is null, which would
+    /// silently put every test on the "someone else rotated it" path.
+    /// </summary>
+    public static void SetupRotationClaim<TDocument>(
+        this Mock<IMongoCollection<TDocument>> mockCollection,
+        TDocument? claimed)
+    {
+        mockCollection
+            .Setup(c => c.FindOneAndUpdateAsync(
+                It.IsAny<FilterDefinition<TDocument>>(),
+                It.IsAny<UpdateDefinition<TDocument>>(),
+                It.IsAny<FindOneAndUpdateOptions<TDocument, TDocument>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(claimed!);
+    }
+
     public static void SetupFind<TDocument>(this Mock<IMongoCollection<TDocument>> mockCollection, List<TDocument> data)
     {
         // A cursor's MoveNext/MoveNextAsync sequence is single-use (it's consumed once as it's iterated),

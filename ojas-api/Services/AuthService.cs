@@ -17,6 +17,15 @@ public class AuthService
     private const int AccessTokenMinutes = 15;
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
 
+    // How long after a refresh token is spent a second presentation of it still reads as two
+    // tabs racing rather than as theft. Long enough to cover a slow request against a cold
+    // Render instance; far shorter than any window an attacker could rely on.
+    private static readonly TimeSpan RotationGrace = TimeSpan.FromSeconds(60);
+
+    // How long a spent token stays on file so that reuse remains detectable. Beyond this the
+    // TTL index removes it and a replay simply looks unknown, which is a 401 either way.
+    private static readonly TimeSpan ReuseDetectionWindow = TimeSpan.FromDays(7);
+
     private readonly IMongoDbService _db;
     private readonly IConfiguration _config;
     private readonly DeviceService _devices;
@@ -416,13 +425,18 @@ public class AuthService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private async Task<string> IssueRefreshTokenAsync(string userId, string? deviceIdHash = null)
+    private async Task<string> IssueRefreshTokenAsync(
+        string userId,
+        string? deviceIdHash = null,
+        string? familyId = null)
     {
         var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var record = new RefreshToken
         {
             TokenHash = HashToken(rawToken),
             UserId = userId,
+            // A fresh sign-in starts a new family; a rotation continues the one it came from.
+            FamilyId = familyId ?? Guid.NewGuid().ToString("N"),
             DeviceIdHash = deviceIdHash,
             ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime),
         };
@@ -430,19 +444,53 @@ public class AuthService
         return rawToken;
     }
 
-    /// <summary>Verifies the presented refresh token, then rotates it - the old one is deleted
-    /// and a new one issued alongside the new access token, so a stolen-but-unused refresh
-    /// token stops working the moment the legitimate owner's client refreshes again.</summary>
-    public async Task<AuthResult?> RefreshAsync(string rawRefreshToken, string? rawDeviceId)
+    /// <summary>Verifies the presented refresh token and rotates it: a successor is issued in
+    /// the same family alongside the new access token, so a stolen-but-unused refresh token
+    /// stops working the moment the legitimate owner's client refreshes again.
+    ///
+    /// The spent token is marked rather than deleted, which is what makes the three cases below
+    /// distinguishable at all.
+    ///
+    /// <para><b>Rotation.</b> The mark is claimed with a conditional update rather than written
+    /// after the earlier read, because two tabs can read the same unrotated row at the same
+    /// instant. Exactly one caller wins that update, and only the winner mints a successor.</para>
+    ///
+    /// <para><b>Grace replay.</b> Two tabs in one browser share a cookie jar, so when the access
+    /// token expires they both notice and both refresh with the same value. That is ordinary,
+    /// honest behaviour and must not sign anyone out. The loser gets a fresh access token and
+    /// deliberately <em>no</em> refresh token: the jar already holds the successor the winner was
+    /// issued, so the tabs converge on one token instead of forking into two independently
+    /// rotating branches. That distinction is the whole security of the grace window - a fork
+    /// would hand a token thief a session that renews itself forever and never trips the check
+    /// below, whereas this grants at most one more access token, which expires in minutes and
+    /// cannot be renewed.</para>
+    ///
+    /// <para><b>Reuse.</b> Presented again after the grace window, nobody's browser sits on a
+    /// spent token for a minute and then tries it. Someone else has a copy, and the thief's
+    /// request can't be told apart from the owner's, so the only safe move is to revoke the
+    /// entire family: every token descended from that sign-in dies and the real user signs in
+    /// again. Their other browsers and devices have their own families and are untouched.</para>
+    /// </summary>
+    public async Task<RefreshResult> RefreshAsync(string rawRefreshToken, string? rawDeviceId)
     {
         var tokenHash = HashToken(rawRefreshToken);
         var record = await _db.RefreshTokens.Find(r => r.TokenHash == tokenHash).FirstOrDefaultAsync();
         if (record == null || record.ExpiresAt < DateTime.UtcNow)
-            return null;
+            return new RefreshResult(RefreshOutcome.Invalid);
+
+        // Rows written before families existed have no family id; treat such a token as a
+        // family of one so revoking it still means something.
+        var familyId = record.FamilyId ?? record.TokenHash;
+
+        if (record.RotatedAt is { } rotatedAt && DateTime.UtcNow - rotatedAt > RotationGrace)
+        {
+            await RevokeFamilyAsync(familyId);
+            return new RefreshResult(RefreshOutcome.ReuseDetected);
+        }
 
         var user = await _db.Users.Find(u => u.Id == record.UserId).FirstOrDefaultAsync();
         if (user == null)
-            return null;
+            return new RefreshResult(RefreshOutcome.Invalid);
 
         // Without this, a refresh token lifted from a staff session would keep minting access
         // tokens on the attacker's machine for the next 30 days, silently bypassing the whole
@@ -454,26 +502,63 @@ public class AuthService
                 record.DeviceIdHash != DeviceService.HashDeviceId(rawDeviceId) ||
                 !await _devices.IsDeviceTrustedAsync(user.Id!, rawDeviceId))
             {
-                return null;
+                return new RefreshResult(RefreshOutcome.Invalid);
             }
         }
 
-        await _db.RefreshTokens.DeleteOneAsync(r => r.TokenHash == tokenHash);
+        var userResponse = new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role);
 
-        var newRefreshToken = await IssueRefreshTokenAsync(user.Id!, record.DeviceIdHash);
-        return new AuthResult(
-            GenerateToken(user),
-            new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role),
-            newRefreshToken);
+        // Claim the rotation. The row is marked rather than deleted so a later replay is still
+        // recognisable, and its own expiry is pulled in to ReuseDetectionWindow so the evidence
+        // self-cleans through the existing TTL index instead of lingering for the full 30 days.
+        var spentUntil = DateTime.UtcNow.Add(ReuseDetectionWindow);
+        var claimed = await _db.RefreshTokens.FindOneAndUpdateAsync(
+            Builders<RefreshToken>.Filter.And(
+                Builders<RefreshToken>.Filter.Eq(r => r.TokenHash, tokenHash),
+                Builders<RefreshToken>.Filter.Eq(r => r.RotatedAt, null)),
+            Builders<RefreshToken>.Update
+                .Set(r => r.RotatedAt, DateTime.UtcNow)
+                .Set(r => r.ExpiresAt, record.ExpiresAt < spentUntil ? record.ExpiresAt : spentUntil));
+
+        if (claimed == null)
+            return new RefreshResult(
+                RefreshOutcome.Success,
+                new AuthResult(GenerateToken(user), userResponse, string.Empty),
+                IsGraceReplay: true);
+
+        var newRefreshToken = await IssueRefreshTokenAsync(user.Id!, record.DeviceIdHash, familyId);
+        return new RefreshResult(
+            RefreshOutcome.Success,
+            new AuthResult(GenerateToken(user), userResponse, newRefreshToken));
     }
 
+    /// <summary>Signs this browser out. Revoking the whole family rather than the single
+    /// presented token matters because rotation's grace window can leave a sibling successor
+    /// alive in another tab - deleting only what was handed in would leave that sibling able to
+    /// keep minting access tokens after the user pressed Log out.</summary>
     public async Task RevokeRefreshTokenAsync(string rawRefreshToken)
     {
-        await _db.RefreshTokens.DeleteOneAsync(r => r.TokenHash == HashToken(rawRefreshToken));
+        var tokenHash = HashToken(rawRefreshToken);
+        var record = await _db.RefreshTokens.Find(r => r.TokenHash == tokenHash).FirstOrDefaultAsync();
+
+        if (record == null)
+        {
+            await _db.RefreshTokens.DeleteOneAsync(r => r.TokenHash == tokenHash);
+            return;
+        }
+
+        await RevokeFamilyAsync(record.FamilyId ?? record.TokenHash);
     }
 
-    /// <summary>Not called anywhere yet - available for a future "log out of all devices"
-    /// action or as a defensive measure on password change.</summary>
+    /// <summary>Deletes every token descended from one sign-in. Matches on the family id or on
+    /// the row's own hash, so a legacy row with no family id is still caught by its own id.</summary>
+    private async Task RevokeFamilyAsync(string familyId)
+    {
+        await _db.RefreshTokens.DeleteManyAsync(r => r.FamilyId == familyId || r.TokenHash == familyId);
+    }
+
+    /// <summary>Signs the user out everywhere, on every device. Used when a staff device binding
+    /// moves, and available as a defensive measure on password change.</summary>
     public async Task RevokeAllRefreshTokensForUserAsync(string userId)
     {
         await _db.RefreshTokens.DeleteManyAsync(r => r.UserId == userId);

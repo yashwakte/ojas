@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -131,6 +132,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+// Names the account a response was served for - see the middleware that writes it, further down.
+const string SessionIdentityHeader = "X-Ojas-User";
+
 // CORS for Angular frontend
 builder.Services.AddCors(options =>
 {
@@ -142,7 +146,8 @@ builder.Services.AddCors(options =>
               )
               .AllowAnyHeader()
                             .AllowAnyMethod()
-                            .AllowCredentials();
+                            .AllowCredentials()
+                            .WithExposedHeaders(SessionIdentityHeader);
     });
 
     options.AddPolicy("AllowProduction", policy =>
@@ -162,7 +167,8 @@ builder.Services.AddCors(options =>
         })
         .AllowAnyHeader()
         .AllowAnyMethod()
-        .AllowCredentials();
+        .AllowCredentials()
+        .WithExposedHeaders(SessionIdentityHeader);
     });
 });
 
@@ -292,6 +298,30 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 
 app.UseAuthentication();
+
+// Stamp every authenticated response with the account it was served for.
+//
+// Cookies belong to a browser profile, not to a tab. Sign into a second account in one tab and
+// every other tab's cached user is now describing someone the cookie no longer refers to - so
+// those tabs would happily render one person's name and menu above another person's orders,
+// addresses and wallet. That is a data leak with no attacker in it, just two tabs.
+//
+// The client compares this header against whoever it thinks is signed in and resynchronises the
+// moment they disagree, which means the mismatch is caught on the very first response rather
+// than on a poll or a refresh. It costs no extra round trip, and it discloses nothing: the only
+// id it ever names is the one belonging to the caller's own session.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrWhiteSpace(userId))
+            context.Response.Headers[SessionIdentityHeader] = userId;
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
 
 app.Use(async (context, next) =>
 {

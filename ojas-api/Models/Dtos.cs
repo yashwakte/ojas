@@ -47,6 +47,39 @@ public enum LoginOutcome
 
 public record LoginServiceResult(LoginOutcome Outcome, AuthResult? Auth = null);
 
+/// <summary>Who the session cookie currently belongs to, straight from the server. The browser
+/// keeps a cached copy of the signed-in user so the first paint isn't blank, but cookies are
+/// shared by every tab in a profile - so the cache can silently belong to a different account
+/// than the cookie does. This is the answer the frontend reconciles that cache against; it
+/// carries no CSRF token, because it never establishes a session, it only describes one.</summary>
+public record SessionResponse(
+	string Id,
+	string FullName,
+	string Email,
+	string Phone,
+	string Role,
+	string CsrfToken);
+
+public enum RefreshOutcome
+{
+	Success,
+	/// <summary>Unknown, expired, or no longer bound to the device it was issued to.</summary>
+	Invalid,
+	/// <summary>A refresh token that had already been spent was presented again, long enough
+	/// after the fact that it can't be an honest race between two tabs. Someone is holding a
+	/// copy they shouldn't, so the whole family from that sign-in has been revoked.</summary>
+	ReuseDetected,
+}
+
+/// <summary>IsGraceReplay marks the honest two-tab case: this token had already been exchanged
+/// moments earlier, so the caller gets a fresh access token but no new refresh token - the
+/// browser's cookie jar is shared and already holds the successor the other tab was issued.
+/// See AuthService.RefreshAsync for why not issuing one is the point.</summary>
+public record RefreshResult(
+	RefreshOutcome Outcome,
+	AuthResult? Auth = null,
+	bool IsGraceReplay = false);
+
 public record DeviceOtpRequest(
 	[Required, EmailAddress, MaxLength(120)] string Email,
 	[Required, MinLength(6), MaxLength(128)] string Password);

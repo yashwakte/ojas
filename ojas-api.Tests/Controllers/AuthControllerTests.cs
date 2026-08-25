@@ -89,10 +89,15 @@ public class AuthControllerTests
 
     /// <summary>Points _sut at a fresh context carrying the given cookie on the request, the way
     /// a browser would send ojas_refresh back on a /refresh or /logout call.</summary>
-    private void SetRequestCookie(string name, string value)
+    private void SetRequestCookie(string name, string value) =>
+        SetRequestCookies((name, value));
+
+    /// <summary>Sets several cookies on one request. They have to go on together: each call
+    /// builds a fresh HttpContext, so setting them one at a time would leave only the last.</summary>
+    private void SetRequestCookies(params (string Name, string Value)[] cookies)
     {
         var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers["Cookie"] = $"{name}={value}";
+        httpContext.Request.Headers["Cookie"] = string.Join("; ", cookies.Select(c => $"{c.Name}={c.Value}"));
         _sut.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
@@ -313,13 +318,25 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Logout_WithRefreshCookie_RevokesIt()
+    public async Task Logout_WithRefreshCookie_RevokesTheWholeSessionFamily()
     {
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new()
+            {
+                TokenHash = "irrelevant",
+                UserId = "u1",
+                FamilyId = "family-1",
+                ExpiresAt = DateTime.UtcNow.AddDays(10),
+            },
+        });
         SetRequestCookie("ojas_refresh", "some-raw-token");
 
         await _sut.Logout();
 
-        _refreshTokensMock.Verify(c => c.DeleteOneAsync(
+        // Not just the token handed in: rotation's grace window can leave a sibling successor
+        // alive in another tab, and that sibling must not outlive the user pressing Log out.
+        _refreshTokensMock.Verify(c => c.DeleteManyAsync(
             It.IsAny<FilterDefinition<RefreshToken>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -327,11 +344,16 @@ public class AuthControllerTests
     public async Task Refresh_ValidCookie_IssuesNewSessionAndCookies()
     {
         var user = MakeUser();
-        _usersMock.SetupFind(new List<User> { user });
-        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        var token = new RefreshToken
         {
-            new() { TokenHash = "irrelevant", UserId = user.Id!, ExpiresAt = DateTime.UtcNow.AddDays(10) },
-        });
+            TokenHash = "irrelevant",
+            UserId = user.Id!,
+            FamilyId = "family-1",
+            ExpiresAt = DateTime.UtcNow.AddDays(10),
+        };
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken> { token });
+        _refreshTokensMock.SetupRotationClaim(token);
         SetRequestCookie("ojas_refresh", "some-raw-token");
 
         var result = await _sut.Refresh();
@@ -344,6 +366,42 @@ public class AuthControllerTests
         cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
         cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
         cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
+    }
+
+    [Fact]
+    public async Task Refresh_LosingTheRotationRace_RenewsAccessButSetsNoRefreshCookie()
+    {
+        // The other tab already rotated this token and its successor is in the shared cookie
+        // jar. Writing a second refresh cookie here would replace that successor with a rival
+        // branch of the same family - see AuthController.RenewAccessTokenOnly.
+        var user = MakeUser();
+        _usersMock.SetupFind(new List<User> { user });
+        _refreshTokensMock.SetupFind(new List<RefreshToken>
+        {
+            new()
+            {
+                TokenHash = "irrelevant",
+                UserId = user.Id!,
+                FamilyId = "family-1",
+                RotatedAt = DateTime.UtcNow.AddSeconds(-2),
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+            },
+        });
+        _refreshTokensMock.SetupRotationClaim<RefreshToken>(null);
+        SetRequestCookies(("ojas_refresh", "some-raw-token"), ("ojas_csrf", "existing-csrf"));
+
+        var result = await _sut.Refresh();
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var response = okResult.Value.ShouldBeOfType<AuthResponse>();
+        // The CSRF token is preserved rather than rotated, so the tab that isn't making this
+        // call isn't left holding a value the server no longer recognises.
+        response.CsrfToken.ShouldBe("existing-csrf");
+
+        var cookies = SetCookieHeaders(_sut.ControllerContext);
+        cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
+        cookies.ShouldNotContain(c => c.StartsWith("ojas_refresh="));
+        cookies.ShouldNotContain(c => c.StartsWith("ojas_csrf="));
     }
 
     [Fact]
