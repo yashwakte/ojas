@@ -43,7 +43,6 @@ export class GuestWelcome {
       if (!this.shouldGreet()) return;
 
       this.scheduled = true;
-      this.welcome.markVisited();
       this.timers.push(setTimeout(() => this.reveal(), REVEAL_DELAY_MS));
     });
 
@@ -82,6 +81,14 @@ export class GuestWelcome {
   }
 
   private reveal(): void {
+    // Checked again here, not just when this was scheduled, because `router.url` is not
+    // reactive and the answer can have changed in between: the effect above runs on the auth
+    // signal, which flips during a sign-out while the navigation to /login is still pending, so
+    // the URL it read was the page being left. Without this, a modal dialog opens on top of the
+    // sign-in form and silently swallows every click on it.
+    if (!this.shouldGreet()) return;
+
+    this.welcome.markVisited();
     this.open.set(true);
     // The dialog element only exists once `open` flips, so show it next tick.
     this.timers.push(setTimeout(() => this.dialogRef()?.nativeElement.showModal(), 0));

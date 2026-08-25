@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { CheckoutService } from './checkout.service';
 import { AuthService } from './auth.service';
 import { Product } from '../models/interfaces';
@@ -9,6 +9,7 @@ import { Product } from '../models/interfaces';
 describe('CheckoutService', () => {
   let service: CheckoutService;
   let auth: AuthService;
+  let httpMock: HttpTestingController;
 
   const product: Product = {
     id: 'p1',
@@ -39,6 +40,7 @@ describe('CheckoutService', () => {
     });
     service = TestBed.inject(CheckoutService);
     auth = TestBed.inject(AuthService);
+    httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => localStorage.clear());
@@ -63,6 +65,8 @@ describe('CheckoutService', () => {
     login('u1');
     service.addItem(product);
     auth.logout();
+    // Logout completes only once the server has answered - see AuthService.logout.
+    httpMock.expectOne((r) => r.url.endsWith('/auth/logout')).flush('');
     TestBed.flushEffects();
     expect(service.items()).toEqual([]);
   });

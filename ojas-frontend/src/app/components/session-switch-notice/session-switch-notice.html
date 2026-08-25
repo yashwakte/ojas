@@ -1,0 +1,16 @@
+@if (change()) {
+  <div class="ssn" role="alert" aria-live="assertive">
+    <div class="ssn-veil"></div>
+
+    <div class="ssn-stage">
+      <span class="ssn-mark" aria-hidden="true">
+        <span class="ssn-ring"></span>
+        <span class="ssn-ring ssn-ring--late"></span>
+        <span class="ssn-glyph">ओ</span>
+      </span>
+
+      <h2 class="ssn-title">{{ title() }}</h2>
+      <p class="ssn-detail">{{ detail() }}</p>
+    </div>
+  </div>
+}

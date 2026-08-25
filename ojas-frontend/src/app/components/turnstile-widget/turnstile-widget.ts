@@ -5,6 +5,7 @@ import {
   ElementRef,
   OnDestroy,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import { environment } from '../../../environments/environment';
@@ -15,6 +16,11 @@ interface TurnstileRenderOptions {
   'expired-callback'?: () => void;
   'error-callback'?: () => void;
 }
+
+/** Polling interval and ceiling for the Cloudflare script arriving. Ten seconds is generous
+ * for a script tag that is already in index.html; past that it is not coming. */
+const SCRIPT_POLL_MS = 100;
+const SCRIPT_WAIT_LIMIT_MS = 10_000;
 
 declare global {
   interface Window {
@@ -34,7 +40,23 @@ declare global {
  */
 @Component({
   selector: 'app-turnstile-widget',
-  template: `<div #container></div>`,
+  template: `
+    <div #container></div>
+    @if (unavailable()) {
+      <p class="turnstile-unavailable" role="alert">
+        The security check couldn't load. It's usually a browser extension or a network that
+        blocks it — try disabling your ad blocker for this site, or use a different browser.
+      </p>
+    }
+  `,
+  styles: `
+    .turnstile-unavailable {
+      margin: 4px 0 0;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: #b3261e;
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TurnstileWidget implements AfterViewInit, OnDestroy {
@@ -45,8 +67,14 @@ export class TurnstileWidget implements AfterViewInit, OnDestroy {
    * held token is no longer good and submit should be disabled again. */
   readonly expired = output<void>();
 
+  /** Set once the script has been given long enough and still isn't there. Every form using
+   * this widget keeps its submit button disabled until a token arrives, so without something
+   * on screen a blocked script is indistinguishable from a button that just does nothing. */
+  protected readonly unavailable = signal(false);
+
   private widgetId: string | null = null;
   private pendingRetry: ReturnType<typeof setTimeout> | null = null;
+  private waitedMs = 0;
 
   ngAfterViewInit(): void {
     this.renderWidget();
@@ -70,10 +98,21 @@ export class TurnstileWidget implements AfterViewInit, OnDestroy {
 
   private renderWidget(): void {
     if (!window.turnstile) {
-      this.pendingRetry = setTimeout(() => this.renderWidget(), 100);
+      // Bounded, because this used to poll forever. When the script is blocked - an ad blocker,
+      // a corporate network, a domain missing from the Turnstile dashboard's allow-list - it
+      // never arrives, and a silent infinite poll leaves the sign-in button disabled with
+      // nothing to explain why.
+      if (this.waitedMs >= SCRIPT_WAIT_LIMIT_MS) {
+        this.unavailable.set(true);
+        return;
+      }
+
+      this.waitedMs += SCRIPT_POLL_MS;
+      this.pendingRetry = setTimeout(() => this.renderWidget(), SCRIPT_POLL_MS);
       return;
     }
 
+    this.unavailable.set(false);
     this.widgetId = window.turnstile.render(this.container().nativeElement, {
       sitekey: environment.turnstileSiteKey,
       callback: (token) => this.verified.emit(token),

@@ -1,0 +1,158 @@
+// Above every other overlay in the app - the intro curtain sits at 2000, and this one has to
+// win even if it lands mid-choreography, because what is underneath it may be another
+// account's data.
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  // The host is a full-screen fixed box whether or not anything is being shown inside it, so
+  // without this it is an invisible sheet over the entire app that swallows every click - the
+  // sign-in button included. Only the notice itself takes pointer events, and only while it is
+  // on screen. Same arrangement as SiteIntro, for the same reason.
+  pointer-events: none;
+}
+
+.ssn {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  // Deliberately opposite to the host: while the cover is up it *should* block everything
+  // underneath, because what is underneath may belong to a different account.
+  pointer-events: auto;
+  animation: ssnIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+// Opaque, not translucent: a blur would still leave the previous account's name and orders
+// legible underneath, which is the one thing this component exists to prevent.
+.ssn-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 85% at 50% 32%, #fffaf6 0%, #fdf3ec 46%, #f6e7dc 100%);
+}
+
+.ssn-stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 0 28px;
+  text-align: center;
+}
+
+.ssn-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 22px;
+}
+
+.ssn-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--ojas-orange, #f25a1a), var(--ojas-orange-dark, #d14500));
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  padding-bottom: 4px;
+  box-shadow: var(--ojas-shadow-orange, 0 8px 30px rgba(242, 90, 26, 0.2));
+  animation: ssnBreathe 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+// Two rings on the same path, the second a beat behind, so the wait reads as steady progress
+// rather than as a spinner.
+.ssn-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(242, 90, 26, 0.35);
+  animation: ssnPulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.ssn-ring--late {
+  animation-delay: 0.8s;
+}
+
+.ssn-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 4vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ojas-text, #2d2d2d);
+  animation: ssnRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.ssn-detail {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light, #6b6b6b);
+  animation: ssnRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+}
+
+@keyframes ssnIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ssnRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ssnBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes ssnPulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.62);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ssn,
+  .ssn-title,
+  .ssn-detail,
+  .ssn-glyph,
+  .ssn-ring {
+    animation: none;
+  }
+
+  .ssn-ring {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}

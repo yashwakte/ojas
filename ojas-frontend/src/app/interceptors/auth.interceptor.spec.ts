@@ -30,6 +30,44 @@ describe('authInterceptor', () => {
     localStorage.clear();
   });
 
+  it('reports the account a response was served for, so a swapped session is caught immediately', () => {
+    const signedIn = { id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer' as const, csrfToken: 't' };
+    auth.saveAuth(signedIn);
+    spyOn(auth, 'onServerIdentity');
+
+    http.get(`${environment.apiUrl}/orders/my`).subscribe();
+    httpMock
+      .expectOne(`${environment.apiUrl}/orders/my`)
+      .flush([], { headers: { 'X-Ojas-User': 'someone-else' } });
+
+    expect(auth.onServerIdentity).toHaveBeenCalledWith('someone-else');
+  });
+
+  it('does not report identity for /auth responses, which answer as the account being established', () => {
+    // Login answers as the new account a moment before the client has saved it - checking it
+    // would look like a mismatch on every single sign-in.
+    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 't' });
+    spyOn(auth, 'onServerIdentity');
+
+    http.post(`${environment.apiUrl}/auth/login`, {}).subscribe();
+    httpMock
+      .expectOne(`${environment.apiUrl}/auth/login`)
+      .flush({}, { headers: { 'X-Ojas-User': 'u2' } });
+
+    expect(auth.onServerIdentity).not.toHaveBeenCalled();
+  });
+
+  it('does not report identity for non-API responses', () => {
+    spyOn(auth, 'onServerIdentity');
+
+    http.get('https://other-domain.example.com/data').subscribe();
+    httpMock
+      .expectOne('https://other-domain.example.com/data')
+      .flush({}, { headers: { 'X-Ojas-User': 'u2' } });
+
+    expect(auth.onServerIdentity).not.toHaveBeenCalled();
+  });
+
   it('passes non-API requests through unchanged (no withCredentials, no CSRF header)', () => {
     http.get('https://other-domain.example.com/data').subscribe();
     const req = httpMock.expectOne('https://other-domain.example.com/data');

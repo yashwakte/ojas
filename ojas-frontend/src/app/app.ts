@@ -7,6 +7,7 @@ import { WelcomeCelebration } from './components/welcome-celebration/welcome-cel
 import { GuestWelcome } from './components/guest-welcome/guest-welcome';
 import { AddressPicker } from './components/address-picker/address-picker';
 import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
+import { SessionSwitchNotice } from './components/session-switch-notice/session-switch-notice';
 import { AuthService } from './services/auth.service';
 import { DeliveryAddressService } from './services/delivery-address.service';
 
@@ -24,6 +25,7 @@ const ADDRESS_PROMPT_DELAY_MS = 4200;
     GuestWelcome,
     AddressPicker,
     ChatbotWidget,
+    SessionSwitchNotice,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -57,8 +59,11 @@ export class App implements OnInit {
   ngOnInit() {
     this.auth.ping();
 
-    if (this.auth.isLoggedIn()) {
-      this.auth.validateSession().subscribe({ error: () => {} });
-    }
+    // Reconcile the cached user against whoever the cookie actually belongs to. This is what
+    // catches a tab that was left open while a different account signed in elsewhere in the
+    // browser, and it still does the job it was originally added for: a session that expired
+    // server-side is found now rather than at whatever moment the user next happens to trigger
+    // an authenticated request.
+    this.auth.syncSession(true);
   }
 }

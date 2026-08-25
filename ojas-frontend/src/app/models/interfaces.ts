@@ -160,6 +160,23 @@ export interface AuthResponse {
   csrfToken?: string;
 }
 
+/**
+ * Who the session cookie in this browser actually belongs to, straight from the server.
+ * Cookies and localStorage are shared by every tab in a browser profile, so the cached user
+ * can end up describing a different account than the cookie does - this is what that cache
+ * gets reconciled against. See AuthService.syncSession.
+ */
+export interface SessionResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  /** The session's own CSRF token, so a tab that resynchronises onto a different account can
+   * keep making mutating requests instead of silently failing every one of them. */
+  csrfToken: string;
+}
+
 export type UserRole = 'customer' | 'admin' | 'delivery';
 
 export interface RegisterRequest {
