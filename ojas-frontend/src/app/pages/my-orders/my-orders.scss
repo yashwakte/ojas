@@ -393,52 +393,95 @@
 }
 
 .order-items {
-  padding: 16px 20px;
+  padding: 14px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
+// Matches the cart and checkout row exactly, so an order reads as the basket it came from.
 .order-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+
+  & + .order-item {
+    border-top: 1px solid #f4f1ed;
+  }
+}
+
+.item-thumb {
+  flex-shrink: 0;
+  width: 52px;
+  height: 60px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #f7f5f3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  // Drawn for a product that has since been withdrawn, rather than a broken image.
+  mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+    color: #c9c2ba;
+  }
 }
 
 .item-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
 }
 
 .item-name {
+  font-family: 'Poppins', sans-serif;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  line-height: 1.3;
   color: var(--ojas-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
-.item-weight {
-  font-size: 0.78rem;
-  color: var(--ojas-text-light);
-}
-
-.item-qty-price {
+.item-meta {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.item-qty {
-  font-size: 0.85rem;
+.item-tag {
+  padding: 2px 8px;
+  border: 1px solid #e6e1db;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--ojas-text-light);
+  white-space: nowrap;
 }
 
 .item-price {
+  flex-shrink: 0;
+  font-family: 'Poppins', sans-serif;
   font-weight: 700;
   color: var(--ojas-ink);
   font-size: 0.95rem;
-  min-width: 70px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .order-footer {
@@ -476,6 +519,10 @@
   }
 
   span {
+    // min-width: 0 is what actually lets the ellipsis happen. Without it a nowrap flex item
+    // refuses to shrink below its own text, so a long address pushes out of the card instead of
+    // being trimmed - which only became visible once the footer stacked into a single column.
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -484,17 +531,30 @@
 
 .order-total {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
   font-size: 0.9rem;
   color: var(--ojas-text);
+}
+
+.order-total-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   white-space: nowrap;
 
   strong {
     color: var(--ojas-ink);
-    font-size: 1rem;
+    font-size: 1.05rem;
   }
+}
+
+.order-total-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .payment-pill {
@@ -529,6 +589,36 @@
 @media (max-width: 600px) {
   .orders-page {
     padding: 90px 16px 32px;
+  }
+
+  // Side by side, the address column and the total column each got about half a phone's width,
+  // which is what squeezed the delivery estimate down to an ellipsis. Stacked, the estimate has
+  // the full card to wrap into and the total sits under it on its own line.
+  .order-footer {
+    flex-direction: column;
+    align-items: stretch;
+    // Load-bearing, and the reason the address and the delivery estimate ran off the side of the
+    // card: the base rule wraps, and a *column* flex container that wraps sizes each line to its
+    // widest item rather than to the container. So `stretch` was stretching these rows to the
+    // width of the longest address, not to the width of the card, and no amount of ellipsis
+    // handling inside them could help.
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  // Stacked, the total gets the card's full width - the amount at the right edge where a total
+  // belongs, and the badges reading left-to-right underneath rather than staggering one per line.
+  .order-total {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .order-total-line {
+    justify-content: space-between;
+  }
+
+  .order-total-chips {
+    justify-content: flex-start;
   }
 }
 
@@ -720,9 +810,22 @@
 .delivery-eta {
   font-weight: 600;
   color: var(--ojas-text);
+  align-items: flex-start;
 
   mat-icon {
     color: #16a34a;
+    // Nudged onto the first line's baseline now that the text is allowed to run to a second one.
+    margin-top: 1px;
+  }
+
+  // A phone number and an address can be cut short - the customer already knows what they are.
+  // The delivery estimate is a *sentence*, and truncating it produced "Delayed --...", which
+  // tells them there is a problem and then withholds what it is. It wraps instead.
+  span {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.4;
   }
 }
 
@@ -892,42 +995,60 @@
   }
 }
 
+// Inherits the read-only row wholesale - thumb, name, pills, price - so the only visible
+// difference between viewing an order and editing it is that the quantity became tappable.
 .order-item.editable {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
+// .order-edit already insets everything by the card's own 20px, so the list adding another 20
+// each side cost 40px of a 360px screen - enough to push the quantity stepper onto its own line
+// under the weight tag instead of sitting beside it.
+.order-edit .order-items {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+// Sits in the pill row beside the weight tag and matches its height, so the two read as one
+// line of controls rather than a stepper floated off to the side.
 .edit-qty {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
+  border: 1px solid #e6e1db;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
 
   button {
     width: 26px;
-    height: 26px;
+    height: 24px;
     display: grid;
     place-items: center;
-    border: 1px solid var(--ojas-border);
-    border-radius: 7px;
-    background: #fff;
+    border: none;
+    background: transparent;
+    color: var(--ojas-text);
     font-size: 0.95rem;
     line-height: 1;
     cursor: pointer;
+    transition: background 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--ojas-orange-bg);
+      color: var(--ojas-orange-dark);
+    }
 
     &:disabled {
-      opacity: 0.4;
+      opacity: 0.35;
       cursor: not-allowed;
     }
   }
 
   span {
-    min-width: 22px;
+    min-width: 24px;
     text-align: center;
-    font-weight: 600;
-    font-size: 0.85rem;
+    font-weight: 700;
+    font-size: 0.78rem;
+    color: var(--ojas-text);
   }
 }
 
@@ -940,16 +1061,10 @@
 // below. This block must stay below the .edit-qty rule above — same
 // specificity, so source order is what lets it win at narrow widths.
 @media (max-width: 600px) {
-  .order-item.editable {
-    justify-content: space-between;
-  }
-
-  .item-info {
-    flex: 1 1 100%;
-  }
-
-  .edit-qty {
-    margin-left: 0;
+  // The row is a fixed three-column layout now (thumb / details / price) and holds its shape at
+  // phone width, so the old full-width reflow it needed here no longer applies.
+  .edit-summary {
+    font-size: 0.85rem;
   }
 }
 
@@ -1130,20 +1245,37 @@
   font-size: 0.8rem;
 }
 
+// A grid, not a flex row: two fixed tracks - the icon, then the whole sentence - so the text
+// wraps as one paragraph under a hanging icon instead of each fragment being laid out separately.
 .summary-diff {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
   margin-top: 8px;
-  padding: 9px 12px;
+  padding: 11px 13px;
   border-radius: 10px;
   font-size: 0.84rem;
   font-weight: 600;
+  line-height: 1.45;
 
   mat-icon {
     font-size: 1rem;
     width: 1rem;
     height: 1rem;
+    margin-top: 1px;
+  }
+
+  // The amount is the part the customer is deciding on, so it is allowed to stand out from the
+  // sentence it sits in rather than being one more word in the run.
+  strong {
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  // The `same` variant has no icon, so its single cell spans both tracks.
+  &.same span {
+    grid-column: 1 / -1;
   }
 
   &.owe {
@@ -1170,7 +1302,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: 10px;
+  // Spacing is the chip row's job now; a margin here pushed it out of line with the pill beside it.
   padding: 3px 10px;
   border-radius: 999px;
   background: #e8f5e9;
@@ -1183,5 +1315,105 @@
     font-size: 15px;
     width: 15px;
     height: 15px;
+  }
+}
+
+// ===== An order that is still waiting to be paid for =====
+// Amber, not red: nothing has gone wrong here, the customer simply hasn't finished. Red is
+// reserved for .payment-failed-note, where an attempt was actually made and refused - the two
+// need different things from the customer and must not look alike.
+.payment-due {
+  margin: 14px 20px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(217, 119, 6, 0.06);
+  border: 1px solid rgba(217, 119, 6, 0.22);
+}
+
+.payment-due-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #b45309;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1.05rem;
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+}
+
+.payment-due-note {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ojas-text);
+}
+
+.payment-due-pay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 11px 20px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--ojas-orange), var(--ojas-orange-dark));
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--ojas-shadow-orange);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  &:disabled {
+    background: rgba(45, 45, 45, 0.25);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+}
+
+.payment-due-inflight {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+// The one action on the card that must never be missed, so on a phone it takes the full width
+// rather than sitting as a small pill someone can skim past.
+@media (max-width: 600px) {
+  .payment-due,
+  .payment-failed-note,
+  .amendment-pending {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .payment-due-pay,
+  .payment-failed-retry {
+    width: 100%;
   }
 }

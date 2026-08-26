@@ -9,7 +9,13 @@ import { ChatbotUiService } from '../../services/chatbot-ui.service';
 import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
 import { CashfreeCheckoutService } from '../../services/cashfree-checkout.service';
-import { OrderResponse, deliveryEstimate, paymentLabel } from '../../models/interfaces';
+import {
+  OrderResponse,
+  amountOutstanding,
+  canPayOnline,
+  deliveryEstimate,
+  paymentLabel,
+} from '../../models/interfaces';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 
@@ -57,8 +63,12 @@ describe('MyOrders', () => {
       'cancelMyOrder',
       'discardAmendment',
       'placeOrder',
+      'resumePayment',
     ]);
-    productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts']);
+    productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts', 'getProduct']);
+    // Order lines resolve their pack shot from the live catalogue; an order for a product that
+    // has since been withdrawn simply gets no image, which is the default here.
+    productServiceSpy.getProduct.and.returnValue(undefined);
     cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', ['checkout']);
     // A handoff that takes navigates the browser away, so the promise never settles. Resolving it
     // instead would model the *failure* path — the component treats "came back" as "the page
@@ -922,4 +932,157 @@ describe('MyOrders', () => {
     expect(deliveryEstimate({ ...paidToday, amountPaid: 0, paymentStatus: 'Pending' }, now))
       .toBeNull();
   });
+
+  // An order that was placed and never paid for used to be a dead end: "Payment Pending", an Edit
+  // button, a Cancel button, and no way at all to hand over the money. These cover the way out,
+  // and - more importantly - the two answers that must never be turned into a Pay button.
+  describe('paying for an order that was never paid for', () => {
+    const unpaid: OrderResponse = {
+      ...order,
+      id: 'unpaid-1',
+      paymentMethod: 'Cashfree',
+      paymentStatus: 'Pending',
+      totalAmount: 575.7,
+      amountPaid: 0,
+    };
+
+    it('offers a way to pay for a live order that still owes money', () => {
+      expect(canPayOnline(unpaid)).toBeTrue();
+      expect(amountOutstanding(unpaid)).toBe(575.7);
+    });
+
+    it('counts a gateway offer as settled rather than as money still owed', () => {
+      // The customer used a bank offer on Cashfree's own page: less money arrived, but they owe
+      // nothing further. Measuring against amountPaid alone would keep demanding the difference.
+      const discounted = { ...unpaid, amountPaid: 500, gatewayDiscount: 75.7 };
+
+      expect(amountOutstanding(discounted)).toBe(0);
+      expect(canPayOnline(discounted)).toBeFalse();
+    });
+
+    it('withholds it where paying would risk a second payment for the same thing', () => {
+      // A failed payment stands the order down and puts the stock back, so it is re-placed
+      // rather than paid for; a pending edit has its own Pay button for its own amount.
+      expect(canPayOnline({ ...unpaid, paymentStatus: 'Failed', status: 'Cancelled' })).toBeFalse();
+      expect(canPayOnline({ ...unpaid, status: 'Cancelled' })).toBeFalse();
+      expect(canPayOnline({ ...unpaid, paymentMethod: 'COD' })).toBeFalse();
+      expect(
+        canPayOnline({
+          ...unpaid,
+          pendingAmendment: {
+            items: [],
+            subtotal: 0,
+            discountAmount: 0,
+            deliveryCharge: 0,
+            totalAmount: 700,
+            topUpAmount: 124.3,
+            expiresAt: '2026-08-27T00:00:00Z',
+          },
+        }),
+      ).toBeFalse();
+    });
+
+    it('sends the customer to the gateway when the server raises a payment', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([unpaid]));
+      orderServiceSpy.resumePayment.and.returnValue(
+        of({ order: unpaid, amountDue: 575.7, paymentSessionId: 'session-abc' }),
+      );
+
+      const fixture = create();
+      fixture.componentInstance.payNow(unpaid);
+
+      expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session-abc');
+    });
+
+    it('never opens a payment page when the money already arrived', () => {
+      // The server reconciled against the gateway and found a payment nobody had recorded. The
+      // customer must be told they are square, not sent to pay a second time.
+      const settled = { ...unpaid, paymentStatus: 'Paid', amountPaid: 575.7 };
+      userServiceSpy.getMyOrders.and.returnValue(of([unpaid]));
+      orderServiceSpy.resumePayment.and.returnValue(
+        of({ order: settled, amountDue: 0, alreadyPaid: true }),
+      );
+
+      const fixture = create();
+      fixture.componentInstance.payNow(unpaid);
+
+      expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+      // Swapped in whole, not patched: reconciliation moves more of the order than this handler
+      // knows about.
+      expect(fixture.componentInstance.orders()[0]).toEqual(settled);
+    });
+
+    it('never opens a payment page while the bank is still deciding', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([unpaid]));
+      orderServiceSpy.resumePayment.and.returnValue(
+        of({ order: unpaid, amountDue: 575.7, paymentInFlight: true }),
+      );
+
+      const fixture = create();
+      fixture.componentInstance.payNow(unpaid);
+
+      expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    });
+  });
+
+
+  // Reported from production: a customer paid in full using an offer on Cashfree's own payment
+  // page, then opened the order to add something and was told "You'll pay ₹200.00 more online to
+  // confirm these changes" before touching a thing. The order was settled; the missing ₹200 was
+  // the discount, not money owed.
+  describe('an order settled partly by an offer on the payment page', () => {
+    const discounted: OrderResponse = {
+      ...order,
+      id: 'offer-1',
+      paymentMethod: 'Cashfree',
+      paymentStatus: 'Paid',
+      totalAmount: 564.61,
+      // Charged ₹364.61 with a ₹200 offer applied on the gateway's own page: the order is settled
+      // in full even though that is all the money that arrived.
+      amountPaid: 364.61,
+      gatewayDiscount: 200,
+      items: [
+        { productId: 'p1', productName: 'Ragi Malt', price: 300, weight: '500g', quantity: 1 },
+        { productId: 'p2', productName: 'Shingada Flour', price: 264.61, weight: '250g', quantity: 1 },
+      ],
+      subtotal: 564.61,
+      // Over the free-delivery threshold, so adding to it can't move the delivery charge and
+      // the arithmetic under test stays about the offer alone.
+      deliveryCharge: 0,
+    };
+
+    it('owes nothing when the edit screen opens', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([discounted]));
+      const fixture = create();
+      fixture.componentInstance.startEdit(discounted);
+
+      expect(fixture.componentInstance.originalSettledAmount()).toBe(564.61);
+      expect(fixture.componentInstance.amountDifference()).toBe(0);
+    });
+
+    it('asks only for what the change itself costs', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([discounted]));
+      const fixture = create();
+      fixture.componentInstance.startEdit(discounted);
+
+      // Another ₹100 of goods: the customer owes ₹100, not ₹300.
+      fixture.componentInstance.editItems.update((items) => [
+        ...items,
+        { productId: 'p3', productName: 'Rice Flour', price: 100, weight: '500g', quantity: 1 },
+      ]);
+
+      expect(fixture.componentInstance.amountDifference()).toBe(100);
+    });
+
+    it('still treats a genuine shortfall as one', () => {
+      // No offer here - the order really is short, and must still say so.
+      const short = { ...discounted, gatewayDiscount: 0, paymentStatus: 'PartiallyPaid' };
+      userServiceSpy.getMyOrders.and.returnValue(of([short]));
+      const fixture = create();
+      fixture.componentInstance.startEdit(short);
+
+      expect(fixture.componentInstance.amountDifference()).toBe(200);
+    });
+  });
+
 });

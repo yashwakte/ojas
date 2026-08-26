@@ -30,3 +30,32 @@ test('a signed-out visitor can still navigate and reach a usable sign-in form', 
 
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([]);
 });
+
+// The SPA catch-all rewrite used to hand back index.html for *any* path that wasn't a real file,
+// build assets included. A tab left open across a deploy asks for a chunk whose hash no longer
+// exists; instead of a clean 404 it got 200 text/html, and the browser's dynamic import failed on
+// a MIME mismatch — the failure that leaves a header, a footer and blank space in between.
+// The rewrite now excludes .js/.mjs/.css/.map, and these two assertions are what prove it, since
+// getting the exclusion wrong in the other direction would break every deep link on the site.
+test('a missing build asset 404s instead of being answered with the app shell', async ({
+  request,
+}) => {
+  const response = await request.get('/chunk-THIS-HASH-DOES-NOT-EXIST.js');
+  expect(
+    response.status(),
+    'a gone chunk must fail honestly; answering it with index.html is what makes a stale tab silently blank',
+  ).toBe(404);
+  expect(response.headers()['content-type'] ?? '').not.toContain('text/html');
+});
+
+test('a deep link is still served the app shell', async ({ request }) => {
+  // The other half of the same rewrite. A 200 alone proves nothing here — the catch-all returns
+  // index.html for anything — so the content type is what is actually being checked.
+  for (const path of ['/products', '/my-orders', '/products/some-id']) {
+    const response = await request.get(path);
+    expect(response.status(), `${path} should serve the app`).toBe(200);
+    expect(response.headers()['content-type'] ?? '', `${path} should serve HTML`).toContain(
+      'text/html',
+    );
+  }
+});

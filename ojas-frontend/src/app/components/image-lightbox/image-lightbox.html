@@ -1,0 +1,95 @@
+<div class="lb" role="dialog" aria-modal="true" [attr.aria-label]="productName() + ' photos'">
+  <div class="lb-bar">
+    <span class="lb-counter">{{ index() + 1 }} / {{ images().length }}</span>
+    <span class="lb-name">{{ productName() }}</span>
+    <div class="lb-bar-actions">
+      <!-- Desktop affordance. On a phone the gesture is double-tap, which needs no button and
+           would only crowd the picture. -->
+      <button
+        type="button"
+        class="lb-icon-btn lb-zoom"
+        (click)="toggleZoom()"
+        [attr.aria-label]="zoomed() ? 'Zoom out' : 'Zoom in'"
+      >
+        <mat-icon>{{ zoomed() ? 'zoom_out' : 'zoom_in' }}</mat-icon>
+      </button>
+      <button type="button" class="lb-icon-btn" (click)="close()" aria-label="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- One element owns every gesture. touch-action: none is what stops the browser claiming the
+       horizontal drag for its own scrolling before we ever see it. -->
+  <div
+    #stage
+    class="lb-stage"
+    (pointerdown)="onPointerDown($event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp($event)"
+    (pointercancel)="onPointerUp($event)"
+    (wheel)="onWheel($event)"
+  >
+    <div class="lb-track" [class.settling]="animating()" [style.transform]="trackTransform()">
+      @for (image of images(); track image; let i = $index) {
+        <div class="lb-slide">
+          <img
+            [src]="image"
+            [alt]="productName() + ' photo ' + (i + 1)"
+            [style.transform]="i === index() ? imageTransform() : null"
+            [class.settling]="animating()"
+            [class.zoomed]="i === index() && zoomed()"
+            draggable="false"
+            decoding="async"
+          />
+        </div>
+      }
+    </div>
+
+    @if (images().length > 1 && !zoomed()) {
+      <button
+        type="button"
+        class="lb-nav prev"
+        [disabled]="index() === 0"
+        (click)="previous()"
+        aria-label="Previous photo"
+      >
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button
+        type="button"
+        class="lb-nav next"
+        [disabled]="index() === images().length - 1"
+        (click)="next()"
+        aria-label="Next photo"
+      >
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    }
+  </div>
+
+  @if (images().length > 1) {
+    <div class="lb-rail">
+      @for (image of images(); track image; let i = $index) {
+        <button
+          type="button"
+          class="lb-thumb"
+          [class.active]="i === index()"
+          (click)="go(i)"
+          [attr.aria-label]="'View photo ' + (i + 1)"
+          [attr.aria-current]="i === index()"
+        >
+          <img [src]="image" alt="" aria-hidden="true" decoding="async" />
+        </button>
+      }
+    </div>
+  }
+
+  <p class="lb-hint">
+    @if (zoomed()) {
+      Drag to move around · double-tap to fit
+    } @else {
+      Double-tap or pinch to zoom
+    }
+  </p>
+</div>

@@ -1,7 +1,18 @@
-import { Component, ChangeDetectionStrategy, input, computed, signal, effect, inject } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ElementRef,
+  input,
+  computed,
+  signal,
+  effect,
+  inject,
+  viewChild,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe } from '@angular/common';
+import { ImageLightbox } from '../../components/image-lightbox/image-lightbox';
 import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
@@ -23,7 +34,7 @@ import { OrderPickingBanner } from '../../components/order-picking-banner/order-
 
 @Component({
   selector: 'app-product-detail',
-  imports: [RouterLink, MatIconModule, DecimalPipe, OrderPickingBanner],
+  imports: [RouterLink, MatIconModule, DecimalPipe, OrderPickingBanner, ImageLightbox],
   templateUrl: './product-detail.html',
   styleUrl: './product-detail.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -138,8 +149,42 @@ export class ProductDetail {
     });
   }
 
+  /** The scrolling strip the photos live in. Scroll position is the source of truth for which
+   * photo is showing — the strip is a real scroller, so a swipe, a thumbnail and an arrow all
+   * end up saying the same thing rather than each keeping their own idea of it. */
+  private readonly galleryTrack = viewChild<ElementRef<HTMLElement>>('galleryTrack');
+
+  /** Open on this photo, or null when the full-screen viewer is closed. */
+  readonly lightboxIndex = signal<number | null>(null);
+
   selectImage(index: number): void {
     this.activeImageIndex.set(index);
+    const track = this.galleryTrack()?.nativeElement;
+    if (!track) return;
+    track.scrollTo({ left: index * track.clientWidth, behavior: 'smooth' });
+  }
+
+  /** Keeps the dots and thumbnails in step with a finger. Reading the scroll position rather than
+   * counting swipe gestures means a flick that carries through two photos is reported honestly. */
+  onGalleryScroll(): void {
+    const track = this.galleryTrack()?.nativeElement;
+    if (!track || track.clientWidth === 0) return;
+    const index = Math.round(track.scrollLeft / track.clientWidth);
+    if (index !== this.activeImageIndex()) this.activeImageIndex.set(index);
+  }
+
+  openLightbox(index: number): void {
+    this.lightboxIndex.set(index);
+  }
+
+  closeLightbox(): void {
+    this.lightboxIndex.set(null);
+  }
+
+  /** The viewer and the page keep one idea of which photo is current, so closing on photo 3
+   * leaves the strip on photo 3 rather than snapping back to where it was opened. */
+  onLightboxIndexChanged(index: number): void {
+    this.selectImage(index);
   }
 
   toggleSection(key: string): void {

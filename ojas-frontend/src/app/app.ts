@@ -1,5 +1,7 @@
 import { Component, OnInit, effect, inject } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
+import { MatIconModule } from '@angular/material/icon';
 import { Header } from './components/header/header';
 import { Footer } from './components/footer/footer';
 import { SiteIntro } from './components/site-intro/site-intro';
@@ -10,6 +12,7 @@ import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
 import { SessionSwitchNotice } from './components/session-switch-notice/session-switch-notice';
 import { AuthService } from './services/auth.service';
 import { DeliveryAddressService } from './services/delivery-address.service';
+import { AppRecoveryService } from './services/app-recovery.service';
 
 /** Let the login celebration finish before asking for an address. */
 const ADDRESS_PROMPT_DELAY_MS = 4200;
@@ -26,6 +29,7 @@ const ADDRESS_PROMPT_DELAY_MS = 4200;
     AddressPicker,
     ChatbotWidget,
     SessionSwitchNotice,
+    MatIconModule,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -33,9 +37,18 @@ const ADDRESS_PROMPT_DELAY_MS = 4200;
 export class App implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly deliveryAddress = inject(DeliveryAddressService);
+  private readonly router = inject(Router);
+  readonly recovery = inject(AppRecoveryService);
   private promptTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    // A route that actually rendered is the only proof the build is whole. Bootstrap resolving
+    // proves nothing - it happens before the first lazy chunk is even requested - so this, not
+    // bootstrap, is what clears the stale-build reload guard.
+    this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd))
+      .subscribe(() => this.recovery.onNavigationSucceeded());
+
     // Ask a signed-in customer where they want deliveries once, and only once —
     // dismissing it counts as an answer, and they can reopen it from any product.
     effect(() => {

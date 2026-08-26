@@ -1,8 +1,10 @@
 <section class="cart-page">
   <div class="page-heading">
     <h1>My Cart</h1>
+    <!-- Counted the same way the header badge and the Select All row count, so the page
+         doesn't state two different numbers for the same cart. -->
     <span class="item-count"
-      >{{ cartService.totalCount() }} item{{ cartService.totalCount() !== 1 ? 's' : '' }}</span
+      >{{ cartService.items().length }} item{{ cartService.items().length !== 1 ? 's' : '' }}</span
     >
   </div>
 
@@ -25,41 +27,103 @@
           <span class="select-all-label">Select All ({{ cartService.items().length }} items)</span>
         </div>
 
-        @for (item of cartService.items(); track item.product.id) {
-          <div class="cart-item" [class.cart-item--selected]="isSelected(item.product.id)">
-            <label class="item-check">
-              <input
-                type="checkbox"
-                [checked]="isSelected(item.product.id)"
-                (change)="toggleSelection(item.product.id, $event)"
-              />
-              <span class="check-custom"></span>
-            </label>
-            <a class="item-link" [routerLink]="['/products', item.product.id]">
-              <div class="item-img">
-                <img [src]="item.product.imageUrl" [alt]="item.product.name" loading="lazy" decoding="async" />
+        <!-- One card holding every line, divided by hairlines - rather than a stack of separate
+             cards, which is what made a four-item basket scroll like a long page. -->
+        <div class="cart-card">
+          @for (item of cartService.items(); track item.product.id) {
+            <div class="cart-item" [class.cart-item--selected]="isSelected(item.product.id)">
+              <div class="item-media">
+                <a class="item-img" [routerLink]="['/products', item.product.id]">
+                  <img
+                    [src]="item.product.imageUrl"
+                    [alt]="item.product.name"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                <label class="item-check item-check--overlay">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(item.product.id)"
+                    (change)="toggleSelection(item.product.id, $event)"
+                    [attr.aria-label]="'Include ' + item.product.name + ' in this order'"
+                  />
+                  <span class="check-custom"></span>
+                </label>
               </div>
-              <div class="item-details">
-                <h4>{{ item.product.name }}</h4>
-                <span class="item-weight">{{ item.product.weight }}</span>
-                <span class="item-price">₹{{ effectivePrice(item.product) | number: '1.2-2' }} each</span>
+
+              <div class="item-body">
+                <div class="item-head">
+                  <a class="item-name" [routerLink]="['/products', item.product.id]">{{
+                    item.product.name
+                  }}</a>
+                  <button
+                    class="remove-btn"
+                    (click)="removeItem(item.product.id)"
+                    [attr.aria-label]="'Remove ' + item.product.name"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <p class="item-desc">{{ item.product.description }}</p>
+
+                <div class="item-controls">
+                  <span class="item-pill item-pill--static">{{ item.product.weight }}</span>
+                  <!-- Opens our own sheet rather than the operating system's select menu, which
+                       rendered as a grey system list in the middle of a page that is otherwise
+                       entirely ours. -->
+                  <button
+                    type="button"
+                    class="item-pill item-pill--qty"
+                    [class.open]="quantitySheetFor() === item.product.id"
+                    (click)="openQuantitySheet(item.product.id)"
+                    [attr.aria-label]="
+                      'Change quantity of ' + item.product.name + ', currently ' + item.quantity
+                    "
+                    aria-haspopup="dialog"
+                  >
+                    Qty: <strong>{{ item.quantity }}</strong>
+                    <mat-icon>expand_more</mat-icon>
+                  </button>
+                </div>
+
+                <div class="item-pricing">
+                  <span class="item-price">₹{{ effectivePrice(item.product) | number: '1.2-2' }}</span>
+                  @if (savingOn(item.product); as saved) {
+                    <span class="item-was">₹{{ item.product.price | number: '1.2-2' }}</span>
+                    <span class="item-off">₹{{ saved | number: '1.2-2' }} Off</span>
+                  }
+                  @if (item.quantity > 1) {
+                    <span class="item-line-total"
+                      >₹{{ effectivePrice(item.product) * item.quantity | number: '1.2-2' }}</span
+                    >
+                  }
+                </div>
               </div>
-            </a>
-            <div class="qty-controls">
-              <button class="qty-btn" (click)="decreaseQty(item.product.id, item.quantity)">
-                <mat-icon>remove</mat-icon>
-              </button>
-              <span class="qty-value">{{ item.quantity }}</span>
-              <button class="qty-btn" (click)="increaseQty(item.product.id, item.quantity)">
-                <mat-icon>add</mat-icon>
-              </button>
             </div>
-            <div class="item-total">₹{{ effectivePrice(item.product) * item.quantity | number: '1.2-2' }}</div>
-            <button class="remove-btn" (click)="removeItem(item.product.id)" aria-label="Remove">
-              <mat-icon>delete_outline</mat-icon>
-            </button>
+          }
+
+          <!-- Stated once, not per line. Ojas ships a whole order together and one policy covers
+               all of it, so repeating both notes against every item only made the page longer.
+               The wording is the policy we actually operate: there is no returns window - you
+               check the order at the door and refuse anything you aren't happy with, and you can
+               cancel any time before it is packed. -->
+          <div class="cart-promise">
+            <p class="promise-note">
+              <mat-icon>local_shipping</mat-icon>
+              Delivery between <strong>{{ deliveryWindowLabel }}</strong>
+            </p>
+            <p class="promise-note">
+              <mat-icon>verified_user</mat-icon>
+              Check it at the door — refuse anything you're not happy with
+            </p>
+            <p class="promise-note">
+              <mat-icon>event_busy</mat-icon>
+              Cancel or add to your order any time before it's packed
+            </p>
           </div>
-        }
+        </div>
       </div>
 
       <!-- Summary Sidebar -->
@@ -98,6 +162,32 @@
           </a>
         </div>
       </div>
+    </div>
+
+    @if (quantitySheetItem(); as picking) {
+      <app-quantity-sheet
+        [productName]="picking.product.name"
+        [imageUrl]="picking.product.imageUrl"
+        [weight]="picking.product.weight"
+        [value]="picking.quantity"
+        [stock]="picking.product.stockQuantity"
+        (picked)="setQuantity(picking.product.id, $event)"
+        (closed)="closeQuantitySheet()"
+      />
+    }
+
+    <!-- Phone only. The sidebar's total and button sit below several screens of items there, so
+         the one action the page exists for is pinned where it can always be reached. -->
+    <div class="cart-bar">
+      <div class="cart-bar-summary">
+        <span class="cart-bar-count"
+          >{{ selectedCount() }} item{{ selectedCount() !== 1 ? 's' : '' }} selected</span
+        >
+        <strong class="cart-bar-total">₹{{ selectedTotal() | number: '1.2-2' }}</strong>
+      </div>
+      <button class="cart-bar-btn" (click)="proceedToCheckout()" [disabled]="selectedCount() === 0">
+        Proceed to Checkout
+      </button>
     </div>
   }
 </section>

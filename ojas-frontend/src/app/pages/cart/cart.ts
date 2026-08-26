@@ -2,21 +2,55 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { QuantitySheet } from '../../components/quantity-sheet/quantity-sheet';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
-import { effectivePrice } from '../../models/interfaces';
+import { Product, deliveryBetweenLabel, effectivePrice } from '../../models/interfaces';
 import { roundMoney } from '../../constants/pricing';
 
 @Component({
   selector: 'app-cart',
-  imports: [RouterLink, MatIconModule, DecimalPipe],
+  imports: [RouterLink, MatIconModule, DecimalPipe, QuantitySheet],
   templateUrl: './cart.html',
   styleUrl: './cart.scss',
 })
 export class Cart implements OnInit {
   /** Exposed to the template so each line shows what it will actually be billed at. */
   effectivePrice = effectivePrice;
+
+  /** Computed once per render rather than per line: every item in the basket ships together, so
+   * thirteen identical date strings would be thirteen identical calculations. */
+  readonly deliveryWindowLabel = deliveryBetweenLabel();
+
+  /** What the discount is worth in rupees, which is what a shopper actually compares. Null when
+   * there is no discount, so the line simply isn't drawn rather than showing "₹0 Off". */
+  savingOn(product: Product): number | null {
+    const saved = roundMoney(product.price - effectivePrice(product));
+    return saved > 0 ? saved : null;
+  }
+
+  /** The line whose quantity sheet is open, if any. Held by product id rather than by index so
+   * removing another line while it is open can't hand the sheet a different product. */
+  readonly quantitySheetFor = signal<string | null>(null);
+
+  readonly quantitySheetItem = computed(() => {
+    const id = this.quantitySheetFor();
+    return id ? (this.cartService.items().find((i) => i.product.id === id) ?? null) : null;
+  });
+
+  openQuantitySheet(productId: string): void {
+    this.quantitySheetFor.set(productId);
+  }
+
+  closeQuantitySheet(): void {
+    this.quantitySheetFor.set(null);
+  }
+
+  setQuantity(productId: string, quantity: number): void {
+    this.cartService.updateQuantity(productId, quantity);
+    this.closeQuantitySheet();
+  }
 
   selectedIds = signal<Set<string>>(new Set<string>());
 

@@ -18,14 +18,69 @@
       <div class="detail-layout">
         <!-- Image Section -->
         <div class="image-section">
+          <!-- A real horizontal scroller with scroll-snap, not a single swapped <img>. That gives
+               a swipe the browser's own momentum and rubber-banding for free, which no amount of
+               hand-written touch handling matches, and it keeps every photo in the DOM so moving
+               between them costs no network round trip. -->
           <div class="image-wrapper">
-            <img
-              [src]="galleryImages()[activeImageIndex()]"
-              [alt]="p.name"
-              fetchpriority="high"
-              decoding="async"
-              (error)="onImgError($event)"
-            />
+            <div
+              #galleryTrack
+              class="gallery-track"
+              (scroll)="onGalleryScroll()"
+              [attr.aria-label]="p.name + ' photos'"
+            >
+              @for (img of galleryImages(); track $index) {
+                <button
+                  type="button"
+                  class="gallery-slide"
+                  (click)="openLightbox($index)"
+                  [attr.aria-label]="'Open photo ' + ($index + 1) + ' of ' + p.name + ' full screen'"
+                >
+                  <img
+                    [src]="img"
+                    [alt]="p.name + ' photo ' + ($index + 1)"
+                    [attr.fetchpriority]="$index === 0 ? 'high' : null"
+                    [attr.loading]="$index === 0 ? null : 'lazy'"
+                    decoding="async"
+                    draggable="false"
+                    (error)="onImgError($event)"
+                  />
+                </button>
+              }
+            </div>
+
+            @if (galleryImages().length > 1) {
+              <!-- Pointer-only. A thumb swipes; arrows sitting on the picture would only be in
+                   the way of the gesture that is already the natural one. -->
+              <button
+                type="button"
+                class="gallery-arrow prev"
+                [disabled]="activeImageIndex() === 0"
+                (click)="selectImage(activeImageIndex() - 1)"
+                aria-label="Previous photo"
+              >
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <button
+                type="button"
+                class="gallery-arrow next"
+                [disabled]="activeImageIndex() === galleryImages().length - 1"
+                (click)="selectImage(activeImageIndex() + 1)"
+                aria-label="Next photo"
+              >
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+
+              <div class="gallery-dots" aria-hidden="true">
+                @for (img of galleryImages(); track $index) {
+                  <span class="gallery-dot" [class.active]="activeImageIndex() === $index"></span>
+                }
+              </div>
+            }
+
+            <span class="gallery-expand" aria-hidden="true">
+              <mat-icon>zoom_out_map</mat-icon>
+            </span>
           </div>
           @if (p.discount && p.discount > 0) {
             <div class="discount-badge">{{ p.discount }}% OFF</div>
@@ -360,6 +415,16 @@
         </section>
       }
     </div>
+
+    @if (lightboxIndex() !== null) {
+      <app-image-lightbox
+        [images]="galleryImages()"
+        [startIndex]="lightboxIndex()!"
+        [productName]="p.name"
+        (indexChanged)="onLightboxIndexChanged($event)"
+        (closed)="closeLightbox()"
+      />
+    }
   </section>
 } @else {
   <!-- Product Not Found -->

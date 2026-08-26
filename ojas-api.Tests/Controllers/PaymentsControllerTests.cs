@@ -48,6 +48,7 @@ public class PaymentsControllerTests
             orderService,
             productService,
             new WalletService(_dbMock.Object),
+            _cashfree.Service(),
             NullLogger<OrderPaymentOutcomeService>.Instance);
 
         _sut = new PaymentsController(

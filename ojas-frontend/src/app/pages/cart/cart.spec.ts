@@ -170,4 +170,46 @@ describe('Cart', () => {
 
     expect(total).toBe(350); // 2 x 150 + 50, not 2 x 200 + 50
   });
+
+  // The quantity picker is our own sheet rather than a native <select>, so the wiring around it
+  // is worth pinning down: the sheet has to follow the line it was opened for, and choosing has
+  // to both update the cart and put the sheet away.
+  describe('the quantity sheet', () => {
+    it('opens against the line it was asked for', () => {
+      const fixture = create();
+      fixture.componentInstance.openQuantitySheet('p1');
+
+      expect(fixture.componentInstance.quantitySheetItem()?.product.id).toBe('p1');
+    });
+
+    it('is closed to begin with, and closes again on demand', () => {
+      const fixture = create();
+      expect(fixture.componentInstance.quantitySheetItem()).toBeNull();
+
+      fixture.componentInstance.openQuantitySheet('p1');
+      fixture.componentInstance.closeQuantitySheet();
+
+      expect(fixture.componentInstance.quantitySheetItem()).toBeNull();
+    });
+
+    it('applies the chosen quantity and dismisses itself', () => {
+      const fixture = create();
+      fixture.componentInstance.openQuantitySheet('p1');
+      fixture.componentInstance.setQuantity('p1', 5);
+
+      expect(cartServiceSpy.updateQuantity).toHaveBeenCalledWith('p1', 5);
+      expect(fixture.componentInstance.quantitySheetItem()).toBeNull();
+    });
+
+    it('resolves to nothing if that line leaves the cart while the sheet is open', () => {
+      // Keyed by product id rather than by index on purpose: removing another line must never
+      // leave the sheet pointing at a different product than the one it was opened for.
+      const fixture = create();
+      fixture.componentInstance.openQuantitySheet('p1');
+      items.set(items().filter((i) => i.product.id !== 'p1'));
+
+      expect(fixture.componentInstance.quantitySheetItem()).toBeNull();
+    });
+  });
+
 });

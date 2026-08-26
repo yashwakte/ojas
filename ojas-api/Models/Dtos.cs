@@ -295,6 +295,29 @@ public record UpdateMyOrderResponse(
 	string? RemovedCouponCode,
 	bool PendingPayment = false);
 
+/// <summary>The answer to "I still owe money on this order — let me pay it."
+///
+/// Exactly one of three things is true, and the UI must be able to tell them apart, because the
+/// wrong one invites a customer to pay a second time for something already settled:
+///
+/// <list type="bullet">
+/// <item><description><c>PaymentSessionId</c> set — a fresh gateway order exists for
+/// <c>AmountDue</c> and the customer should be sent to the payment page.</description></item>
+/// <item><description><c>AlreadyPaid</c> — asking the gateway found money we hadn't recorded yet;
+/// there is nothing to pay and <c>Order</c> shows it settled.</description></item>
+/// <item><description><c>PaymentInFlight</c> — the bank is still deciding on a payment that has
+/// already been made. No new payment may be raised until that resolves.</description></item>
+/// </list>
+///
+/// Order is always the order as it now stands, so the page swaps it in whole rather than patching
+/// a field onto a copy that predates the reconciliation this endpoint just performed.</summary>
+public record ResumePaymentResponse(
+	OrderResponse Order,
+	decimal AmountDue,
+	string? PaymentSessionId = null,
+	bool AlreadyPaid = false,
+	bool PaymentInFlight = false);
+
 /// <summary>The server's verdict after asking the gateway directly. AmendmentDiscarded reports
 /// that the customer left the payment page without paying, so the edit they were paying for has
 /// been dropped and their order is untouched — the UI has to say so rather than leaving them

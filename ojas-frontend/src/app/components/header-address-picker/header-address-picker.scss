@@ -209,14 +209,30 @@
 }
 
 // ===== Mobile: icon-only trigger, top-left of the header =====
+// Desktop has room for the full "Deliver to / <label>" stack, so the short form stays out of it.
+.hap-short {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .hap-trigger {
-    padding: 8px;
+    padding: 6px 8px;
     max-width: none;
   }
 
   .hap-text {
     display: none;
+  }
+
+  .hap-short {
+    display: block;
+    max-width: 6ch;
+    overflow: hidden;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--ojas-text);
+    white-space: nowrap;
   }
 
   .hap-panel {

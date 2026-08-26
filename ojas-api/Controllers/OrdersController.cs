@@ -476,7 +476,12 @@ public class OrdersController : ControllerBase
         // free-delivery threshold starts being charged for delivery again.
         var deliveryCharge = OrderPricing.QualifiesForFreeDelivery(itemsTotal) ? 0m : quote.Charge;
         var newTotal = Math.Round(itemsTotal - discountAmount + deliveryCharge, 2, MidpointRounding.AwayFromZero);
-        var outstanding = Math.Round(newTotal - order.AmountPaid, 2, MidpointRounding.AwayFromZero);
+        // Settled, not received. A customer who used an offer on Cashfree's own payment page was
+        // charged less than the order was raised for and owes nothing further on it - measuring
+        // the edit against the money that actually arrived demanded the discount back from them,
+        // as a "you'll pay ₹200 more" on an order they had already paid in full.
+        var settled = order.SettledAmount;
+        var outstanding = Math.Round(newTotal - settled, 2, MidpointRounding.AwayFromZero);
 
         // Only the net change touches stock: adding 2 to an order that already had 3
         // takes 2 more, dropping to 1 puts 2 back.
@@ -506,7 +511,7 @@ public class OrdersController : ControllerBase
         // collected online. Cashfree can't amend an existing order's amount, so the difference is
         // charged as its own payment against a suffixed order id — and the edit itself waits: the
         // order keeps describing what the customer has actually paid for until that money lands.
-        if (order.AmountPaid > 0 && outstanding > 0)
+        if (settled > 0 && outstanding > 0)
         {
             var topUpOrderId = CashfreeService.TopUpOrderId(orderId);
             CashfreeOrderResult session;
@@ -588,9 +593,12 @@ public class OrdersController : ControllerBase
         // leaves the business - and a customer who wants the money back on their card instead is
         // told they can cancel and reorder, which is the path that offers that choice.
         decimal? refundAmount = null;
-        if (order.AmountPaid > 0 && outstanding < 0)
+        // Capped at money we actually received: a gateway offer settles the order without any
+        // cash changing hands, so it can never be handed back as wallet credit.
+        var refundable = Math.Min(-outstanding, order.AmountPaid);
+        if (order.AmountPaid > 0 && outstanding < 0 && refundable > 0)
         {
-            refundAmount = -outstanding;
+            refundAmount = refundable;
             await _walletService.CreditAsync(
                 userId, refundAmount.Value, WalletTransactionReasons.OrderEditRefund, orderId);
             // Recorded as money handed back rather than by rewriting what was captured, so the
@@ -631,6 +639,107 @@ public class OrdersController : ControllerBase
 
         var refreshed = await _orderService.GetOrderByIdAsync(orderId);
         return Ok(refreshed!.ToResponse());
+    }
+
+    /// <summary>
+    /// Pays what a live order still owes.
+    ///
+    /// This closes a hole that left customers stuck: an order whose payment was never completed
+    /// sat in their list saying "Payment Pending" with an Edit button, a Cancel button, and no way
+    /// whatsoever to pay for it. Nothing resolved it either, because the only thing that ever
+    /// asked the gateway what happened was the redirect back from the payment page — which is
+    /// precisely the step a customer who abandoned the payment never took.
+    ///
+    /// Two rules shape the order of what happens below:
+    ///
+    /// <para><em>Never invite a second payment for money that has already arrived.</em> Cashfree
+    /// is asked about every payment raised against this order <b>before</b> a new one is created,
+    /// so a payment that succeeded while the browser was closed is recorded and the customer is
+    /// told the order is settled rather than being sent to pay again. A payment the bank is still
+    /// deciding on blocks a new one for the same reason.</para>
+    ///
+    /// <para><em>The amount is computed here, never sent by the browser.</em> It is the order's
+    /// own total less everything already settled against it — captured payments and any discount
+    /// the gateway applied on its own page.</para>
+    ///
+    /// A fresh gateway order is raised rather than reusing the session the order was created with:
+    /// that one expires, and handing a customer an expired payment page is the same dead end in a
+    /// different costume.
+    /// </summary>
+    [HttpPost("my/{orderId}/pay")]
+    public async Task<ActionResult<ResumePaymentResponse>> ResumeMyOrderPayment(string orderId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return Unauthorized();
+
+        if (!_cashfreeService.IsConfigured)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Online payment is temporarily unavailable. Please try again shortly." });
+
+        var order = await _orderService.GetOrderByIdAsync(orderId);
+        if (order == null)
+            return NotFound(new { message = "Order not found." });
+
+        if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
+            return Forbid();
+
+        // Also covers an order stood down after its payment failed: standing one down cancels it,
+        // puts the stock back and returns any wallet credit, so there is nothing left to pay for.
+        // That order's route forward is "Try payment again", which places it afresh.
+        if (string.Equals(order.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "This order was cancelled, so there is nothing to pay." });
+
+        if (order.ReplacedByOrderId != null)
+            return BadRequest(new { message = "This attempt was replaced by a newer order. Please pay for that one instead." });
+
+        // A pending edit has its own gateway order for its own amount, and its own Pay button.
+        // Raising a second payment for the order's balance alongside it is how a customer ends up
+        // paying for the same change twice.
+        if (order.PendingAmendment != null)
+            return BadRequest(new
+            {
+                message = "There are changes on this order waiting on payment. Pay for those, or discard them, first.",
+                amendmentPending = true,
+            });
+
+        // Everything below hangs on this: what the gateway says, not what we last wrote down.
+        var reconciled = await _paymentOutcome.ReconcileWithGatewayAsync(orderId);
+        order = reconciled.Order;
+
+        var due = Math.Round(order.TotalAmount - order.SettledAmount, 2, MidpointRounding.AwayFromZero);
+
+        if (due <= 0)
+        {
+            _logger.LogInformation(
+                "Order {OrderId} was already settled when the customer asked to pay; nothing raised.", orderId);
+            return Ok(new ResumePaymentResponse(order.ToResponse(), 0m, AlreadyPaid: true));
+        }
+
+        if (reconciled.AnyInFlight)
+            return Ok(new ResumePaymentResponse(order.ToResponse(), due, PaymentInFlight: true));
+
+        // Its own gateway order id: Cashfree refuses a reused one, and every later status check
+        // has to be able to ask about this attempt specifically.
+        var gatewayOrderId = CashfreeService.TopUpOrderId(orderId);
+        CashfreeOrderResult session;
+        try
+        {
+            session = await _cashfreeService.CreateOrderAsync(order, due, gatewayOrderId);
+        }
+        catch (Exception ex)
+        {
+            // Nothing was written, so there is nothing to roll back — the order is exactly as it
+            // was and the customer can try again.
+            _logger.LogError(ex, "Cashfree order creation failed resuming payment for order {OrderId}", orderId);
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = "We couldn't start the payment. Your order is unchanged - please try again." });
+        }
+
+        // Without this the attempt is invisible to every later status check and to the
+        // reconciliation above, since it lives under an id the order doesn't otherwise know.
+        await _orderService.AddPaymentAttemptAsync(orderId, gatewayOrderId, due);
+        await _orderService.SetPaymentSessionAsync(orderId, session.PaymentSessionId);
+
+        var refreshed = await _orderService.GetOrderByIdAsync(orderId) ?? order;
+        return Ok(new ResumePaymentResponse(refreshed.ToResponse(), due, session.PaymentSessionId));
     }
 
     /// <summary>

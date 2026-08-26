@@ -19,6 +19,8 @@ import {
   OrderResponse,
   PaymentAttemptOutcome,
   RefundDestination,
+  amountOutstanding,
+  canPayOnline,
   deliveryEstimate,
   isOrderEditable,
   isPaymentFailed,
@@ -101,9 +103,25 @@ export class MyOrders implements OnInit, OnDestroy {
 
   /** Total of the order as it stands on the server, to price the change against. */
   originalTotal = signal(0);
-  /** What was actually captured — the difference is measured against this, not the total, since
-   * an unpaid order owes everything and a paid one only owes what changed. */
+  /** What was actually captured — money that really arrived, shown to the customer as such. */
   originalAmountPaid = signal(0);
+
+  /** What an offer on the gateway's own payment page knocked off. The customer was charged this
+   * much less and owes nothing further for it, so it counts towards settling the order even
+   * though no money changed hands. Shown as its own line so the arithmetic on screen adds up. */
+  originalGatewayDiscount = signal(0);
+
+  /**
+   * What the order is already settled for: money received plus anything the gateway discounted.
+   *
+   * This — not the captured figure — is what an edit is priced against. Measuring against money
+   * received alone demanded the offer back: an order paid in full with a ₹200 discount showed
+   * "You'll pay ₹200.00 more online to confirm these changes" the moment it was opened for
+   * editing, before the customer had changed a single thing.
+   */
+  readonly originalSettledAmount = computed(() =>
+    roundMoney(this.originalAmountPaid() + this.originalGatewayDiscount()),
+  );
   /** The distance-based quote for the pinned location, before the free-delivery rule. */
   editDeliveryQuote = signal(0);
   quotingDelivery = signal(false);
@@ -148,7 +166,7 @@ export class MyOrders implements OnInit, OnDestroy {
   /** Positive = customer owes more and must pay it online; negative = a refund is due. Rounded
    * because the sign is what decides between asking for money and handing it back: an unrounded
    * difference that should be exactly zero can land on 0.0000000001 and read as "you owe more". */
-  amountDifference = computed(() => roundMoney(this.newTotal() - this.originalAmountPaid()));
+  amountDifference = computed(() => roundMoney(this.newTotal() - this.originalSettledAmount()));
 
   /** Nudges toward getting free delivery back when an edit has just lost it. */
   readonly editFreeDeliveryNudge = computed(() => {
@@ -180,6 +198,9 @@ export class MyOrders implements OnInit, OnDestroy {
 
   /** Order being re-placed after a failed payment, so only that card shows a spinner. */
   retryingPaymentId = signal<string | null>(null);
+
+  /** Order whose outstanding balance is being taken to the gateway, so only that card waits. */
+  startingPaymentId = signal<string | null>(null);
 
   /**
    * True while the gateway says a payment for this order is still with the bank. Every route to
@@ -419,6 +440,7 @@ export class MyOrders implements OnInit, OnDestroy {
     this.editLng = order.longitude;
     this.originalTotal.set(order.totalAmount);
     this.originalAmountPaid.set(order.amountPaid ?? 0);
+    this.originalGatewayDiscount.set(order.gatewayDiscount ?? 0);
     this.editCouponCode.set(order.couponCode ?? null);
     this.editDeliveryQuote.set(order.deliveryCharge);
     // The stored charge is already post-free-delivery, so a cart that was over the threshold has
@@ -693,6 +715,85 @@ export class MyOrders implements OnInit, OnDestroy {
           if (err.error?.outOfStock) this.productService.loadProducts();
         },
       });
+  }
+
+  /**
+   * The pack shot for an order line, looked up in the live catalogue rather than stored on the
+   * order. Orders record what was bought and at what price — the photo is presentation, and
+   * copying it onto every line would freeze an image the catalogue has since improved.
+   *
+   * Null for a product that has since been withdrawn, which the template draws as a plain tile
+   * rather than a broken image.
+   */
+  itemImage(item: OrderItem): string | null {
+    return this.productService.getProduct(item.productId)?.imageUrl ?? null;
+  }
+
+  /** Exposed to the template: what an order still owes, and whether paying it is the next move. */
+  canPayOnline = canPayOnline;
+  amountOutstanding = amountOutstanding;
+
+  /**
+   * Pays an order that was placed but never paid for.
+   *
+   * This is the way out of what used to be a dead end. An order whose payment was abandoned sat
+   * in the list saying "Payment Pending" with Edit and Cancel buttons and no way to hand over the
+   * money — and nothing resolved it either, because the only thing that ever asked the gateway
+   * what had happened was the redirect back from the payment page, which is exactly the step
+   * that customer never took.
+   *
+   * The server reconciles against the gateway before it raises anything, so all three answers
+   * below are possible and each is reported for what it is. Announcing "pay now" over money that
+   * has already arrived, or over a payment the bank is still deciding on, is how a customer ends
+   * up paying twice.
+   */
+  payNow(order: OrderResponse): void {
+    if (this.startingPaymentId() || this.paymentInFlightFor(order.id)) return;
+    this.startingPaymentId.set(order.id);
+
+    this.orderService.resumePayment(order.id).subscribe({
+      next: (result) => {
+        this.startingPaymentId.set(null);
+        // Whole order in, always — it has just been reconciled against the gateway and can have
+        // moved in more ways than this handler knows about.
+        this.replaceOrder(result.order);
+
+        if (result.alreadyPaid) {
+          this.wallet.load().subscribe({ error: () => {} });
+          this.clearPurchasedItems(order.id);
+          this.showSuccess('Good news — this order is already paid for. Nothing more is due.');
+          return;
+        }
+
+        if (result.paymentInFlight) {
+          this.showError(
+            "A payment for this order is still with your bank. We'll update it as soon as they decide — please don't pay again yet.",
+          );
+          return;
+        }
+
+        if (!result.paymentSessionId) {
+          this.showError("We couldn't start the payment. Your order is unchanged - please try again.");
+          return;
+        }
+
+        const handoffDidNotTake = () => {
+          this.showError(
+            `We couldn't open the payment page for ₹${result.amountDue.toFixed(2)}. Your order is unchanged — please try again.`,
+          );
+        };
+        this.cashfreeCheckout
+          .checkout(result.paymentSessionId)
+          .then(handoffDidNotTake, handoffDidNotTake);
+      },
+      error: (err) => {
+        this.startingPaymentId.set(null);
+        this.showError(err.error?.message ?? "We couldn't start the payment. Please try again.");
+        // The refusal usually means the order has moved on server-side — it was cancelled, or an
+        // edit is now waiting on its own payment. Re-read rather than leaving a stale card up.
+        this.load();
+      },
+    });
   }
 
   askCancel(orderId: string): void {
