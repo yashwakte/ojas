@@ -15,4 +15,5 @@ public interface IMongoDbService
     IMongoCollection<StaffDevice> StaffDevices { get; }
     IMongoCollection<StaffInvite> StaffInvites { get; }
     IMongoCollection<WalletTransaction> WalletTransactions { get; }
+    IMongoCollection<MediaAsset> MediaAssets { get; }
 }

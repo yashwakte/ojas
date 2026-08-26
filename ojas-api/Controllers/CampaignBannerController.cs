@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using OjasApi.Filters;
 using OjasApi.Models;
 using OjasApi.Services;
 
@@ -18,7 +19,10 @@ public class CampaignBannerController : ControllerBase
         _campaignBannerService = campaignBannerService;
     }
 
+    // Banners change when a festival campaign is set up - a few times a month at most - and
+    // are fetched on every visit, so this is exactly the response a cache should be answering.
     [HttpGet]
+    [PublicCache(maxAgeSeconds: 300, staleWhileRevalidateSeconds: 3600)]
     public async Task<ActionResult<List<CampaignBanner>>> GetBanners()
     {
         var banners = await _campaignBannerService.GetAllAsync();

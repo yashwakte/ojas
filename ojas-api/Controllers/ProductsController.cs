@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using OjasApi.Filters;
 using OjasApi.Models;
 using OjasApi.Services;
 
@@ -19,6 +20,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
     public async Task<ActionResult<List<Product>>> GetAll()
     {
         var products = await _productService.GetAllAsync();
@@ -26,6 +28,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
     public async Task<ActionResult<Product>> GetById(string id)
     {
         var product = await _productService.GetByIdAsync(id);
@@ -34,6 +37,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("category/{category}")]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
     public async Task<ActionResult<List<Product>>> GetByCategory(string category)
     {
         var products = await _productService.GetByCategoryAsync(category);
@@ -41,6 +45,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("bestsellers")]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
     public async Task<ActionResult<List<Product>>> GetBestsellers([FromQuery] int limit = 6)
     {
         var clampedLimit = Math.Clamp(limit, 1, 24);

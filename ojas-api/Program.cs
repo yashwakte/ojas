@@ -78,6 +78,11 @@ builder.Services.AddScoped<StaffInviteService>();
 builder.Services.AddScoped<ChatbotService>();
 builder.Services.AddHttpClient<CashfreeService>();
 builder.Services.AddScoped<WalletService>();
+
+// Singletons: MediaService holds a byte-budgeted in-memory cache of the images the storefront
+// asks for, which is only worth having if it outlives a single request.
+builder.Services.AddSingleton<MediaService>();
+builder.Services.AddSingleton<MediaMigrationService>();
 builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // Real mail is only worth sending in Production. Everywhere else the OTP already comes back in
 // the response as devCode and is shown in the UI, so a real send would just spend free-tier
@@ -216,6 +221,13 @@ builder.Services.AddResponseCompression(options =>
     options.EnableForHttps = true;
     options.Providers.Add<BrotliCompressionProvider>();
     options.Providers.Add<GzipCompressionProvider>();
+    // The defaults would happily gzip a WebP. Already-compressed image bytes do not shrink;
+    // the only results are wasted CPU on every image request and a response a shade larger
+    // than the file itself. Compress the text, ship the pictures as they are.
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Except(
+    [
+        "image/webp", "image/png", "image/jpeg", "image/gif", "image/avif",
+    ]);
 });
 
 builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
@@ -264,6 +276,24 @@ _ = Task.Run(async () =>
     catch (Exception ex)
     {
         Console.WriteLine($"⚠️ Could not grandfather pre-existing users for email verification: {ex.Message}");
+    }
+});
+
+// Lift any image still stored as an inline base64 blob out into the media store (non-blocking).
+// Documents that already reference a URL are untouched, so this settles to a no-op after the
+// first run. Deliberately off the startup path: a slow pass over the catalog must not delay the
+// instance becoming ready, and the storefront renders correctly either way - an unmigrated
+// data: URL is still a perfectly valid image source, just a slow one.
+_ = Task.Run(async () =>
+{
+    try
+    {
+        var migration = app.Services.GetRequiredService<MediaMigrationService>();
+        await migration.RunAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Could not migrate inline images into the media store: {ex.Message}");
     }
 });
 

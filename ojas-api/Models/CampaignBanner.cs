@@ -9,8 +9,11 @@ public class CampaignBanner
     [BsonRepresentation(BsonType.ObjectId)]
     public string? Id { get; set; }
 
+    // Optional. Festival artwork generally carries its own headline, and overlaying a
+    // second one on the same picture reads as a mistake - so a campaign is allowed to be
+    // nothing but its image and its call to action.
     [BsonElement("title")]
-    public required string Title { get; set; }
+    public string Title { get; set; } = string.Empty;
 
     [BsonElement("subtitle")]
     public string Subtitle { get; set; } = string.Empty;

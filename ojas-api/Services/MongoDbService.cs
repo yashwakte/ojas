@@ -31,6 +31,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
     public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
     public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
+    public IMongoCollection<MediaAsset> MediaAssets => _database.GetCollection<MediaAsset>("media_assets");
 
     private void TryEnsureIndexes()
     {
@@ -90,6 +91,15 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Name = "wallet_user_created" }
             );
             WalletTransactions.Indexes.CreateOne(walletUserIndex);
+
+            // Every image request is a lookup by hash, and the uniqueness is what makes the
+            // store content-addressed: the same picture uploaded twice collapses to one row
+            // rather than quietly accumulating duplicates of a multi-megabyte blob.
+            var mediaHashIndex = new CreateIndexModel<MediaAsset>(
+                Builders<MediaAsset>.IndexKeys.Ascending(m => m.Hash),
+                new CreateIndexOptions { Unique = true, Name = "media_hash" }
+            );
+            MediaAssets.Indexes.CreateOne(mediaHashIndex);
 
             // userId leads the key so this one index serves both access patterns: "is this user
             // bound to this device" on every staff login and refresh, and "which device does
