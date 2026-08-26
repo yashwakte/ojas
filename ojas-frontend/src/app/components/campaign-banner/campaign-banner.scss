@@ -19,6 +19,16 @@
   // the page.
   &.has-bg-image {
     padding: 0;
+    // The orange gradient below is the backdrop for a banner with no artwork, where it is the
+    // whole design. Once there is artwork it becomes the margin either side of it on a wide
+    // screen, and a saturated orange frame around a festival photograph is far louder than the
+    // photograph. Soft cream instead - the same field the hero above sits on, so the two read as
+    // one band. Invisible on a phone, where the image fills the width and there is no margin.
+    background: linear-gradient(175deg, #fff8f4 0%, #ffe6db 100%);
+
+    .campaign-banner-media {
+      background: transparent;
+    }
 
     .campaign-banner-inner {
       position: absolute;
@@ -57,9 +67,16 @@
 }
 
 .campaign-banner-media {
+  // One custom property drives both the clipping box and the image's own ceiling. The image
+  // cannot use `max-height: 100%` to inherit it: the box is capped with max-height rather than
+  // given a height, so there is no definite parent height for a percentage to resolve against
+  // and the declaration is simply ignored - which let the artwork overflow its box by a few
+  // pixels at tablet widths and clip after all.
+  --banner-max-height: 260px;
+
   width: 100%;
   min-height: 140px;
-  max-height: 260px;
+  max-height: var(--banner-max-height);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -69,20 +86,51 @@
 }
 
 .campaign-banner-img {
-  width: 100%;
-  height: auto;
   display: block;
+  // Fit inside the media box rather than filling its width, so the whole picture is always
+  // visible whatever shape it is. Filling the width is fine on a phone, where a banner-shaped
+  // image is short enough to clear the height cap - but on a laptop a 2:1 image rendered at
+  // full viewport width is 700px+ tall, ran past the cap, and got centre-cropped, which is why
+  // the top and bottom of the artwork were being cut off on desktop.
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--banner-max-height);
+  object-fit: contain;
 }
 
+// Everything below is desktop-only on purpose. On a phone the image already fits inside the
+// height cap at full width, so the rules here change nothing about the mobile layout.
 @media (min-width: 640px) {
   .campaign-banner-media {
-    max-height: 340px;
+    --banner-max-height: 400px;
   }
 }
 
-@media (min-width: 960px) {
+@media (min-width: 901px) {
   .campaign-banner-media {
-    max-height: 420px;
+    // Matched to the hero above it (`min(92vw, 1020px)`), so the two read as one column rather
+    // than one full-bleed strip above a narrower one. A 2:1 banner lands at 1020x510 here.
+    --banner-max-height: 560px;
+    padding: 0 18px;
+  }
+
+  .campaign-banner-img {
+    max-width: min(92vw, 1020px);
+    border-radius: 18px;
+  }
+
+  // The scrim and the text sit over the picture, so they have to track the picture's own box
+  // rather than the full-bleed strip behind it - otherwise the gradient runs out past the
+  // artwork's rounded edges and the caption starts in the margin.
+  .campaign-banner.has-bg-image .campaign-banner-inner {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(92vw, 1020px);
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    overflow: hidden;
   }
 }
 
