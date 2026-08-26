@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "images:optimize": "node tools/optimize-images.mjs"
+    "images:optimize": "node tools/optimize-images.mjs",
+    "hero:build": "node tools/build-hero.mjs"
   },
   "prettier": {
     "printWidth": 100,
