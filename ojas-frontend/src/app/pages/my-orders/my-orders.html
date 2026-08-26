@@ -309,6 +309,15 @@
               <div class="order-total">
                 Total:
                 <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
+                @if (order.gatewayDiscount && order.gatewayDiscount > 0) {
+                  <!-- The customer was charged less than the total by an offer applied on the
+                       payment page. Saying so is the difference between an order that looks
+                       correctly settled and one that looks short of money. -->
+                  <span class="gateway-offer">
+                    <mat-icon>local_offer</mat-icon>
+                    {{ order.gatewayDiscount | currency: 'INR' : 'symbol' : '1.2-2' }} offer applied at payment
+                  </span>
+                }
                 <span
                   class="payment-pill"
                   [class.payment-pill--collected]="

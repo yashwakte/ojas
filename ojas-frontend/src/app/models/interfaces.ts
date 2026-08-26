@@ -336,6 +336,10 @@ export interface OrderResponse {
   refundPendingAmount?: number | null;
   /** How much of this order was paid from wallet balance. */
   walletAmountApplied: number;
+  /** What the payment gateway knocked off — a bank offer, or a code entered on its own page.
+   * The customer was charged this much less than the order total and owes nothing further, so
+   * without showing it the order reads as though money is missing. */
+  gatewayDiscount?: number;
   /** An edit the customer priced but hasn't paid the difference for yet. Everything above still
    * describes what was actually bought and paid for — this is only a proposal, and it disappears
    * if the top-up goes unpaid. */
