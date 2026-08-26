@@ -142,7 +142,7 @@ public static class SeedData
             ImageUrl = "/images/custard-vanilla-front.webp",
             GalleryImageUrls = ["/images/custard-vanilla-back.webp"],
             Ingredients = "Selected edible starches, common salt, permitted synthetic food colours (INS 102, 110, 122) and artificial flavour (vanilla).",
-            Benefits = "Take 30 g (2 tablespoons) of Ojas Custard Powder in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
+            Benefits = "Dessert for four in about ten minutes, with nothing to measure but milk and sugar. Take 30 g (2 tablespoons) in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
             StorageInfo = "Store in a cool, dry place. Once opened, keep in an airtight container."
         },
         new Product
@@ -155,7 +155,7 @@ public static class SeedData
             ImageUrl = "/images/custard-mango-front.webp",
             GalleryImageUrls = ["/images/custard-mango-back.webp"],
             Ingredients = "Selected edible starches, common salt, permitted synthetic food colours (INS 102, 110, 122) and artificial flavour (mango).",
-            Benefits = "Take 30 g (2 tablespoons) of Ojas Custard Powder in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
+            Benefits = "Dessert for four in about ten minutes, with nothing to measure but milk and sugar. Take 30 g (2 tablespoons) in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
             StorageInfo = "Store in a cool, dry place. Once opened, keep in an airtight container."
         },
         new Product
@@ -168,7 +168,7 @@ public static class SeedData
             ImageUrl = "/images/custard-strawberry-front.webp",
             GalleryImageUrls = ["/images/custard-strawberry-back.webp"],
             Ingredients = "Selected edible starches, common salt, permitted synthetic food colours (INS 102, 110, 122) and artificial flavour (strawberry).",
-            Benefits = "Take 30 g (2 tablespoons) of Ojas Custard Powder in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
+            Benefits = "Dessert for four in about ten minutes, with nothing to measure but milk and sugar. Take 30 g (2 tablespoons) in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
             StorageInfo = "Store in a cool, dry place. Once opened, keep in an airtight container."
         },
         new Product
@@ -181,7 +181,7 @@ public static class SeedData
             ImageUrl = "/images/custard-pineapple-front.webp",
             GalleryImageUrls = ["/images/custard-pineapple-back.webp"],
             Ingredients = "Selected edible starches, common salt, permitted synthetic food colours (INS 102, 110, 122) and artificial flavour (pineapple).",
-            Benefits = "Take 30 g (2 tablespoons) of Ojas Custard Powder in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
+            Benefits = "Dessert for four in about ten minutes, with nothing to measure but milk and sugar. Take 30 g (2 tablespoons) in a bowl. Add 125 ml milk from a 1/2 litre pouch and mix to a smooth paste. Boil the remaining 375 ml milk with 3/4 cup sugar, stir and remove from heat. Add the paste and cook 2-3 minutes, stirring continuously to avoid lumps. Cool, refrigerate 30-45 minutes, add chopped fruit and serve chilled.",
             StorageInfo = "Store in a cool, dry place. Once opened, keep in an airtight container."
         },
         new Product
@@ -194,7 +194,7 @@ public static class SeedData
             ImageUrl = "/images/corn-flour-front.webp",
             GalleryImageUrls = ["/images/corn-flour-back.webp"],
             Ingredients = "Corn (maize) flour. Manufactured in a facility that also handles wheat, milk, soy and nuts.",
-            Benefits = "To thicken 1 cup (250 ml) of soup or gravy, mix 1 heaped tablespoon (20 g) with a little cold water to a smooth slurry, stir out any lumps, then add it to the pan while stirring. Also used for puddings and creamy desserts, crisp marinades, and light, tender bakes.",
+            Benefits = "Thickens without clouding the flavour, and keeps bakes light and tender. For 1 cup (250 ml) of soup or gravy, mix 1 heaped tablespoon (20 g) with a little cold water to a smooth slurry, stir out any lumps, then add it to the pan while stirring. Also used for puddings and creamy desserts and for a crisp marinade coating.",
             StorageInfo = "Store in a cool, dry place. Once opened, keep in an airtight container."
         }
     ];
