@@ -124,7 +124,11 @@
               @if (hasError('imageUrl')) {
                 <span class="field-error">{{ getError('imageUrl') }}</span>
               }
-              <span class="field-hint">Use an image URL, a local /images path, or upload a file below. Uploads are resized and converted to WebP in your browser before saving.</span>
+              <span class="field-hint">
+                Use an image URL, a local /images path, or upload a file below. Upload the best-quality original
+                you have, up to 12MB — don't shrink or compress it first; that's done for you, and starting from
+                the full-quality file gives a sharper result.
+              </span>
             </label>
           </div>
 
