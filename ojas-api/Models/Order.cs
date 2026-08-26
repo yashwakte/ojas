@@ -60,6 +60,22 @@ public class OrderPayment
     public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>A discount the payment gateway applied to one gateway order — a bank offer, a
+/// promo code entered on Cashfree's own page, and so on. Keyed by the gateway order id for the
+/// same reason payments are keyed by payment id: reconciliation runs repeatedly and must be able
+/// to re-report the same offer without it accumulating.</summary>
+public class OrderGatewayDiscount
+{
+    [BsonElement("cashfreeOrderId")]
+    public required string CashfreeOrderId { get; set; }
+
+    [BsonElement("amount")]
+    public decimal Amount { get; set; }
+
+    [BsonElement("recordedAt")]
+    public DateTime RecordedAt { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>
 /// A customer's edit that has been priced and sent to the gateway but <em>not paid for yet</em>.
 /// It is deliberately held apart from the order's own fields: applying an edit before its top-up
@@ -236,6 +252,30 @@ public class Order
     /// webhook or a repeated status check can't record the same money twice.</summary>
     [BsonElement("payments")]
     public List<OrderPayment> Payments { get; set; } = [];
+
+    /// <summary>Discounts the gateway itself applied, keyed by the gateway order they belong to
+    /// so a repeated status check cannot count the same offer twice.
+    ///
+    /// A Cashfree offer is settled between the customer, the bank and Cashfree - the customer is
+    /// charged less than we asked for, and Cashfree still reports the gateway order as PAID.
+    /// Summing what the customer was charged therefore understates what the order is settled for,
+    /// which is why an order paid with an offer used to stick at "PartiallyPaid" forever, quietly
+    /// telling the customer they still owed the difference.</summary>
+    [BsonElement("gatewayDiscounts")]
+    public List<OrderGatewayDiscount> GatewayDiscounts { get; set; } = [];
+
+    /// <summary>Total discount the gateway applied across every attempt on this order.</summary>
+    public decimal GatewayDiscountTotal =>
+        Math.Round(GatewayDiscounts.Sum(d => d.Amount), 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// What the order is settled for: money we received, plus anything the gateway discounted on
+    /// our behalf. This - not <see cref="AmountPaid"/> - is what decides whether the customer
+    /// still owes anything, because a customer who used a gateway offer owes nothing further even
+    /// though less money changed hands.
+    /// </summary>
+    public decimal SettledAmount =>
+        Math.Round(AmountPaid + GatewayDiscountTotal, 2, MidpointRounding.AwayFromZero);
 
     /// <summary>Total handed back so far — wallet credits and refunds to the original payment
     /// method alike. Kept separate from the captured figure so neither has to be overwritten.</summary>

@@ -102,7 +102,21 @@ public class PaymentsController : ControllerBase
             var isAmendment = cashfreeOrderId == amendmentOrderId;
             var isLatest = cashfreeOrderId == latestAttempt;
 
-            foreach (var payment in await _cashfreeService.GetPaymentsAsync(cashfreeOrderId))
+            var payments = await _cashfreeService.GetPaymentsAsync(cashfreeOrderId);
+
+            // Ask Cashfree about the gateway order itself, not only the payments beneath it. When
+            // an offer applies, the customer is charged less than the order was raised for and
+            // Cashfree still reports it PAID - so the shortfall is a discount that settles the
+            // order, not an amount the customer still owes.
+            var gatewayOrder = await _cashfreeService.GetOrderStatusAsync(cashfreeOrderId);
+            if (gatewayOrder is { IsPaid: true })
+            {
+                var charged = payments.Where(p => p.IsSuccess).Sum(p => p.Amount);
+                anyRecorded |= await _orderService.TryRecordGatewayDiscountAsync(
+                    orderId, cashfreeOrderId, gatewayOrder.OrderAmount - charged);
+            }
+
+            foreach (var payment in payments)
             {
                 if (payment.IsSuccess)
                 {

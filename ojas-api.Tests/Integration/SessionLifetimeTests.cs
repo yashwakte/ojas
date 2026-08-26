@@ -42,27 +42,76 @@ public class SessionLifetimeTests : IDisposable
     }
 
     [Fact]
-    public async Task CustomerSession_LastsWeeks_BecauseNobodyIsSignedOutOfAShopTheyAreBrowsing()
+    public async Task CustomerSession_IdlesOutAfterADay()
     {
         using var client = _factory.CreateClient();
         var (auth, _) = await client.RegisterAsync();
 
         var token = await NewestTokenAsync(auth.Id);
 
-        (token.ExpiresAt - DateTime.UtcNow).TotalDays.ShouldBeInRange(29, 30);
+        (token.ExpiresAt - DateTime.UtcNow).TotalHours.ShouldBeInRange(23.5, 24);
         token.FamilyStartedAt.ShouldNotBeNull();
     }
 
     [Fact]
-    public async Task StaffSession_LastsOneShift()
+    public async Task StaffSession_IdlesOutAfterEightHours()
     {
         using var client = _factory.CreateClient();
         var (auth, _) = await _factory.SeedAndLoginAsStaffAsync(client, UserRoles.Admin);
 
         var token = await NewestTokenAsync(auth.Id);
 
-        // Eight hours from sign-in, not eight hours of inactivity: an admin session is a shift.
+        // Eight hours of inactivity, and it slides on every use - see the working-day test below.
         (token.ExpiresAt - DateTime.UtcNow).TotalHours.ShouldBeInRange(7.5, 8);
+    }
+
+    [Fact]
+    public async Task AnAdminStillWorkingLateIsNotThrownOutOnTheWallClock()
+    {
+        using var client = _factory.CreateClient();
+        var (auth, _) = await _factory.SeedAndLoginAsStaffAsync(client, UserRoles.Admin);
+        var signIn = await NewestTokenAsync(auth.Id);
+
+        // Signed in at noon; it is now 7:50pm and they are picking the work back up. Under the
+        // previous model - eight hours measured from sign-in, no matter what - they were thrown
+        // out at 8pm mid-task. The idle window has to slide instead.
+        var noon = DateTime.UtcNow.AddHours(-7.8);
+        await _factory.SeedAsync(async db =>
+        {
+            await db.RefreshTokens.UpdateOneAsync(
+                r => r.TokenHash == signIn.TokenHash,
+                Builders<RefreshToken>.Update.Set(r => r.FamilyStartedAt, noon));
+        });
+
+        var refreshed = await client.PostAsync("/api/auth/refresh", null);
+        refreshed.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var successor = await NewestTokenAsync(auth.Id);
+        // A fresh eight hours of headroom from now, not the twelve minutes left on the old clock.
+        (successor.ExpiresAt - DateTime.UtcNow).TotalHours.ShouldBeGreaterThan(7);
+        // But the sign-in it descends from is unchanged, so the day-long ceiling still applies.
+        successor.FamilyStartedAt!.Value.ShouldBe(noon, TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task AStaffSessionStillEndsAfterADayHoweverMuchItIsUsed()
+    {
+        using var client = _factory.CreateClient();
+        var (auth, _) = await _factory.SeedAndLoginAsStaffAsync(client, UserRoles.Admin);
+        var signIn = await NewestTokenAsync(auth.Id);
+
+        await _factory.SeedAsync(async db =>
+        {
+            await db.RefreshTokens.UpdateOneAsync(
+                r => r.TokenHash == signIn.TokenHash,
+                Builders<RefreshToken>.Update
+                    .Set(r => r.FamilyStartedAt, DateTime.UtcNow.AddHours(-25))
+                    .Set(r => r.ExpiresAt, DateTime.UtcNow.AddHours(5)));
+        });
+
+        // Constantly refreshed for a day and a night, the sliding window would happily continue.
+        // The ceiling is what stops it.
+        (await client.PostAsync("/api/auth/refresh", null)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -73,9 +122,9 @@ public class SessionLifetimeTests : IDisposable
 
         var original = await NewestTokenAsync(auth.Id);
 
-        // Pretend this sign-in happened 89 days ago. The rolling window would happily hand out
-        // another 30 days; the ceiling is what must win.
-        var signedInAt = DateTime.UtcNow.AddDays(-89);
+        // Pretend this sign-in happened six and a half days ago. The idle window would happily
+        // hand out another full day; the ceiling is what must win.
+        var signedInAt = DateTime.UtcNow.AddDays(-6.5);
         await _factory.SeedAsync(async db =>
         {
             await db.RefreshTokens.UpdateOneAsync(
@@ -88,8 +137,8 @@ public class SessionLifetimeTests : IDisposable
 
         var successor = await NewestTokenAsync(auth.Id);
         successor.FamilyStartedAt!.Value.ShouldBe(signedInAt, TimeSpan.FromSeconds(2));
-        // One day of headroom left out of ninety, not a fresh thirty.
-        (successor.ExpiresAt - DateTime.UtcNow).TotalDays.ShouldBeLessThan(2);
+        // Half a day of headroom left out of seven, not a fresh twenty-four hours.
+        (successor.ExpiresAt - DateTime.UtcNow).TotalHours.ShouldBeLessThan(13);
     }
 
     [Fact]
@@ -106,7 +155,7 @@ public class SessionLifetimeTests : IDisposable
             await db.RefreshTokens.UpdateOneAsync(
                 r => r.TokenHash == original.TokenHash,
                 Builders<RefreshToken>.Update
-                    .Set(r => r.FamilyStartedAt, DateTime.UtcNow.AddDays(-91))
+                    .Set(r => r.FamilyStartedAt, DateTime.UtcNow.AddDays(-8))
                     .Set(r => r.ExpiresAt, DateTime.UtcNow.AddDays(10)));
         });
 
@@ -129,7 +178,7 @@ public class SessionLifetimeTests : IDisposable
 
         // Signed in as an ordinary customer, so this session began with a 30-day window.
         var asCustomer = await NewestTokenAsync(auth.Id);
-        (asCustomer.ExpiresAt - DateTime.UtcNow).TotalDays.ShouldBeGreaterThan(29);
+        (asCustomer.ExpiresAt - DateTime.UtcNow).TotalHours.ShouldBeGreaterThan(23);
 
         await _factory.SeedAsync(async db =>
         {
@@ -169,6 +218,6 @@ public class SessionLifetimeTests : IDisposable
 
         var successor = await NewestTokenAsync(auth.Id);
         successor.FamilyStartedAt.ShouldNotBeNull();
-        (successor.ExpiresAt - DateTime.UtcNow).TotalDays.ShouldBeInRange(29, 30);
+        (successor.ExpiresAt - DateTime.UtcNow).TotalHours.ShouldBeInRange(23.5, 24);
     }
 }

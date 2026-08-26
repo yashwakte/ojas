@@ -41,7 +41,8 @@ public static class OrderMapping
             order.RefundPendingAmount,
             order.WalletAmountApplied,
             order.PendingAmendment.ToResponse(),
-            order.PaymentFailureReason);
+            order.PaymentFailureReason,
+            order.GatewayDiscountTotal);
 
     public static PendingAmendmentDto? ToResponse(this OrderAmendment? amendment) =>
         amendment == null

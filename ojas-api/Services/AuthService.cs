@@ -16,41 +16,38 @@ public class AuthService
     // which is the capability a bare long-lived JWT never had.
     private const int AccessTokenMinutes = 15;
 
-    // How long a session may live, by who it belongs to. Two different jobs, so two different
-    // answers rather than one compromise that serves neither.
+    // How long a session may live. Two clocks, not one, because they answer different questions.
     //
-    // **Customers** are not signed out of a shop they are browsing. Every large consumer
-    // delivery app keeps them signed in for weeks, and shortening it does not buy security worth
-    // having - a customer session can read that customer's own orders and nothing else - while
-    // it very much costs orders, because someone who has to log in before buying atta often
-    // simply doesn't.
+    // The **idle window** is how long a session survives without being used, and it slides: every
+    // refresh pushes it out again. This is the one that has to be generous enough to cover a
+    // working day, because expiring it against the wall clock rather than against use is simply
+    // wrong - an admin who signs in at noon and comes back to their desk at 7:50pm should not be
+    // thrown out at 8pm mid-task. They are actively working; the session is not abandoned.
     //
-    // **Staff** are the opposite. An admin session can read every customer's data and change
-    // prices; a delivery session can see addresses and phone numbers. Those live on phones that
-    // get shared, lost, and left unlocked, so a staff session is deliberately short and, unlike
-    // a customer's, cannot be extended by continuing to use it.
-    private static readonly TimeSpan CustomerRefreshTokenLifetime = TimeSpan.FromDays(30);
-    private static readonly TimeSpan StaffRefreshTokenLifetime = TimeSpan.FromHours(8);
+    // The **absolute ceiling** is the longest a single sign-in may live no matter how much it is
+    // used, and it does not slide. It is the half that actually constrains a thief: an idle window
+    // on its own renews forever as long as the stolen token keeps being used.
+    //
+    // Staff are tighter on both counts. An admin session reads every customer's data and can change
+    // prices; a delivery session sees addresses and phone numbers. Those live on phones that get
+    // shared, lost and left unlocked, so one sign-in covers a shift and a day at the outside.
+    private static readonly TimeSpan CustomerIdleWindow = TimeSpan.FromHours(24);
+    private static readonly TimeSpan CustomerAbsoluteSessionLifetime = TimeSpan.FromDays(7);
+    private static readonly TimeSpan StaffIdleWindow = TimeSpan.FromHours(8);
+    private static readonly TimeSpan StaffAbsoluteSessionLifetime = TimeSpan.FromHours(24);
 
-    // The ceiling on a whole sign-in, measured from when it happened rather than from the last
-    // request. This is the half that actually constrains an attacker: a rolling window alone
-    // renews forever as long as the token keeps being used, so a stolen token that is used stays
-    // alive indefinitely. Past this, everyone signs in again.
-    //
-    // Staff get no headroom at all beyond their rolling window - a staff session is simply
-    // "eight hours from sign-in", which is a shift.
-    private static readonly TimeSpan CustomerAbsoluteSessionLifetime = TimeSpan.FromDays(90);
-    private static readonly TimeSpan StaffAbsoluteSessionLifetime = StaffRefreshTokenLifetime;
+    /// <summary>The longest any session of this role can run, used for cookie expiry too.</summary>
+    public static TimeSpan MaxSessionLifetimeFor(string? role) => AbsoluteLifetimeFor(role);
 
     private static TimeSpan RollingLifetimeFor(string? role) =>
-        DeviceService.IsRestrictedRole(role) ? StaffRefreshTokenLifetime : CustomerRefreshTokenLifetime;
+        DeviceService.IsRestrictedRole(role) ? StaffIdleWindow : CustomerIdleWindow;
 
     private static TimeSpan AbsoluteLifetimeFor(string? role) =>
         DeviceService.IsRestrictedRole(role) ? StaffAbsoluteSessionLifetime : CustomerAbsoluteSessionLifetime;
 
     /// <summary>
-    /// When a token issued now to this role must expire: the rolling window, but never later
-    /// than the absolute ceiling measured from the original sign-in.
+    /// When a token issued now must expire: the idle window from this moment, but never later
+    /// than the absolute ceiling measured from the original sign-in. Whichever comes first.
     /// </summary>
     private static DateTime RefreshTokenExpiryFor(string? role, DateTime familyStartedAt)
     {

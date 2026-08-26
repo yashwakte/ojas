@@ -14,6 +14,14 @@ public record CashfreeRefundResult(bool Success, string? RefundStatus, string? E
 /// <paramref name="ErrorDescription"/> and <paramref name="PaymentMessage"/> are what the gateway
 /// says went wrong; between them they are the difference between telling a customer the actual
 /// reason their payment failed and guessing at one.</summary>
+/// <summary>Cashfree's own verdict on a gateway order: whether it considers it paid, and the
+/// amount it was raised for. Authoritative in a way the sum of its payments is not, because an
+/// offer can settle an order for less than the customer was charged.</summary>
+public record CashfreeOrderStatus(string Status, decimal OrderAmount, string CashfreeOrderId)
+{
+    public bool IsPaid => string.Equals(Status, "PAID", StringComparison.OrdinalIgnoreCase);
+}
+
 public record CashfreePaymentStatus(
 	string PaymentStatus,
 	string CfPaymentId,
@@ -137,6 +145,38 @@ public class CashfreeService
     /// webhook to arrive. The webhook is still the backstop for a customer who closes the tab,
     /// but polling our own database for it means the customer stares at a spinner until it
     /// lands - querying the gateway answers immediately when they get back from checkout.</summary>
+    /// <summary>
+    /// Asks Cashfree about the gateway order itself, rather than about the payments under it.
+    ///
+    /// The distinction matters whenever an offer is in play. <c>payment_amount</c> is what the
+    /// customer was charged; <c>order_amount</c> is what the order was raised for. A bank offer or
+    /// a promo code entered on Cashfree's page makes the first smaller than the second while
+    /// Cashfree still reports <c>order_status: PAID</c> - so summing payments understates what the
+    /// order is settled for, and the customer is told they still owe the difference. Cashfree is
+    /// the authority on whether the order it created was paid; this is how we ask it.
+    /// </summary>
+    public async Task<CashfreeOrderStatus?> GetOrderStatusAsync(string cashfreeOrderId)
+    {
+        if (!IsConfigured || string.IsNullOrWhiteSpace(cashfreeOrderId))
+            return null;
+
+        using var request = BuildRequest(HttpMethod.Get, $"/pg/orders/{cashfreeOrderId}", null);
+        using var response = await _http.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) return null;
+
+        return new CashfreeOrderStatus(
+            root.TryGetProperty("order_status", out var st) ? st.GetString() ?? "" : "",
+            root.TryGetProperty("order_amount", out var amt) && amt.TryGetDecimal(out var a) ? a : 0m,
+            cashfreeOrderId);
+    }
+
     public async Task<List<CashfreePaymentStatus>> GetPaymentsAsync(string cashfreeOrderId)
     {
         if (!IsConfigured)

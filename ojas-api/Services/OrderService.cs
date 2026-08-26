@@ -261,6 +261,38 @@ public class OrderService(IMongoDbService db)
         return result.ModifiedCount > 0;
     }
 
+    /// <summary>
+    /// Records a discount the gateway applied to one attempt, so the order stops looking underpaid.
+    ///
+    /// Idempotent on the gateway order id, for exactly the reason payments are idempotent on the
+    /// payment id: reconciliation runs on every status check and every webhook retry, and an offer
+    /// re-reported must not accumulate. A zero or negative difference records nothing - only a
+    /// genuine shortfall between what the order was raised for and what the customer was charged
+    /// is a discount.
+    /// </summary>
+    public async Task<bool> TryRecordGatewayDiscountAsync(string orderId, string cashfreeOrderId, decimal amount)
+    {
+        if (amount <= 0m || string.IsNullOrWhiteSpace(cashfreeOrderId))
+            return false;
+
+        var alreadyRecorded = Builders<Order>.Filter.ElemMatch(
+            o => o.GatewayDiscounts, d => d.CashfreeOrderId == cashfreeOrderId);
+
+        var result = await _orders.UpdateOneAsync(
+            Builders<Order>.Filter.And(
+                Builders<Order>.Filter.Eq(o => o.Id, orderId),
+                Builders<Order>.Filter.Not(alreadyRecorded)),
+            Builders<Order>.Update
+                .Push(o => o.GatewayDiscounts, new OrderGatewayDiscount
+                {
+                    CashfreeOrderId = cashfreeOrderId,
+                    Amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero),
+                })
+                .Set(o => o.UpdatedAt, DateTime.UtcNow));
+
+        return result.ModifiedCount > 0;
+    }
+
     /// <summary>Notes another gateway order the customer has been asked to pay, so a later status
     /// check knows to ask Cashfree about it. Without this a top-up is invisible: it lives under a
     /// different gateway order id than the one the order started with.</summary>
@@ -405,9 +437,14 @@ public class OrderService(IMongoDbService db)
         // money against it, or one still awaiting payment, is described in these terms.
         if (!string.Equals(status, "Failed", StringComparison.Ordinal))
         {
-            status = amountPaid >= order.TotalAmount && amountPaid > 0
+            // Settled, not received. A customer who used a gateway offer was charged less than
+            // the order was raised for and owes nothing further - comparing the money we received
+            // against the order total left those orders stuck at "PartiallyPaid" forever, telling
+            // the customer to pay a difference that had already been discounted away.
+            var settled = order.SettledAmount;
+            status = settled >= order.TotalAmount && settled > 0
                 ? "Paid"
-                : amountPaid > 0
+                : settled > 0
                     ? "PartiallyPaid"
                     : "Pending";
         }

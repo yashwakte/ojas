@@ -753,4 +753,69 @@ public class PaymentLifecycleTests : IDisposable
             System.Text.Encoding.UTF8.GetBytes(TestHelpers.FakeCashfreeHandler.ClientSecret));
         return Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload)));
     }
+    [Fact]
+    public async Task AnOfferAppliedOnTheGatewayPage_SettlesTheOrderInFull()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6)); // 600
+
+        // The customer applies an offer on Cashfree's own page and is charged 550, not 600.
+        // Cashfree still reports the gateway order PAID.
+        _factory.Cashfree.ApplyOfferToAllOutstanding(50m);
+        _factory.Cashfree.PayAllOutstanding();
+
+        // Summing what the customer was charged gives 550 against a 600 total, which used to
+        // leave the order at PartiallyPaid forever - telling them to pay a difference the offer
+        // had already covered.
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+
+        var settled = await GetOrderAsync(order.Id);
+        settled.AmountPaid.ShouldBe(550m);        // money that actually reached us
+        settled.GatewayDiscount.ShouldBe(50m);    // and what the gateway covered
+        settled.PaymentStatus.ShouldBe("Paid");
+    }
+
+    [Fact]
+    public async Task RecheckingAnOfferedOrder_DoesNotCountTheDiscountTwice()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6)); // 600
+        _factory.Cashfree.ApplyOfferToAllOutstanding(50m);
+        _factory.Cashfree.PayAllOutstanding();
+
+        // Reconciliation runs on every status check and on every webhook retry. An offer
+        // re-reported must land once, for the same reason a payment does.
+        await CheckPaymentStatusAsync(order.Id);
+        await CheckPaymentStatusAsync(order.Id);
+        await CheckPaymentStatusAsync(order.Id);
+
+        var settled = await GetOrderAsync(order.Id);
+        settled.GatewayDiscount.ShouldBe(50m);
+        settled.AmountPaid.ShouldBe(550m);
+    }
+
+    [Fact]
+    public async Task AnOfferOnATopUp_IsCountedAgainstTheTopUpToo()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6)); // 600
+        _factory.Cashfree.PayAllOutstanding();
+        await CheckPaymentStatusAsync(order.Id);
+
+        await EditOrderAsync(order.Id, Items(9)); // owes 300 more
+
+        // The top-up is its own gateway order, so it carries its own offer.
+        _factory.Cashfree.ApplyOfferToAllOutstanding(30m);
+        _factory.Cashfree.PayAllOutstanding();
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+
+        var settled = await GetOrderAsync(order.Id);
+        settled.GatewayDiscount.ShouldBe(30m);
+        // Money received falls short of the total by exactly the offer, and the two together
+        // settle it. Asserting the relationship rather than the arithmetic keeps this test about
+        // discounts instead of about the delivery-charge and coupon rules that set the total.
+        (settled.AmountPaid + settled.GatewayDiscount).ShouldBeGreaterThanOrEqualTo(settled.TotalAmount);
+        settled.AmountPaid.ShouldBe(settled.TotalAmount - 30m);
+    }
+
 }

@@ -28,11 +28,12 @@ public class AuthController : ControllerBase
     // that outlived its token would leave a phone carrying a credential the server stopped
     // honouring hours ago.
     private const int AccessTokenMinutes = 15;
-    private static readonly TimeSpan CustomerSessionCookieLifetime = TimeSpan.FromDays(30);
-    private static readonly TimeSpan StaffSessionCookieLifetime = TimeSpan.FromHours(8);
 
+    // The cookie has to outlast the token it carries, or the browser would drop a credential the
+    // server would still have honoured - so it tracks the *absolute* ceiling, not the sliding idle
+    // window. Taken straight from AuthService so the two cannot drift apart.
     private static TimeSpan SessionCookieLifetimeFor(string? role) =>
-        DeviceService.IsRestrictedRole(role) ? StaffSessionCookieLifetime : CustomerSessionCookieLifetime;
+        AuthService.MaxSessionLifetimeFor(role);
 
     private readonly AuthService _authService;
     private readonly OtpService _otpService;

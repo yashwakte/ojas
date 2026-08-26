@@ -25,6 +25,10 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
         public string? PaymentStatus { get; set; }
         public string PaymentGroup { get; set; } = "upi";
         public string CfPaymentId { get; } = $"cf_pay_{Guid.NewGuid():N}";
+
+        /// <summary>Knocked off by an offer on Cashfree's own page, so the customer is charged
+        /// less than the order was raised for while Cashfree still reports the order PAID.</summary>
+        public decimal Discount { get; set; }
     }
 
     private readonly ConcurrentDictionary<string, GatewayOrder> _orders = new();
@@ -71,6 +75,16 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
             order.PaymentStatus = succeeded ? "SUCCESS" : "FAILED";
     }
 
+    /// <summary>Simulates a Cashfree offer being applied at the payment page: the customer is
+    /// charged <paramref name="discount"/> less than the order was raised for, and Cashfree still
+    /// reports the gateway order as PAID. This is the case that used to leave an order stuck at
+    /// PartiallyPaid, telling the customer to pay a difference already discounted away.</summary>
+    public void ApplyOfferToAllOutstanding(decimal discount)
+    {
+        foreach (var order in _orders.Values.Where(o => o.PaymentStatus is null))
+            order.Discount = discount;
+    }
+
     /// <summary>Simulates the customer's payment being declined.</summary>
     public void FailAllOutstanding()
     {
@@ -88,10 +102,39 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
         if (path.EndsWith("/refunds", StringComparison.Ordinal))
             return Json(HttpStatusCode.OK, """{"refund_status":"SUCCESS"}""");
 
+        // Route on the method as well as the path, the way Cashfree actually does. Treating every
+        // unrecognised request as an order creation meant a GET of an order's status silently
+        // minted a brand new gateway order here - which is a fiction no real gateway would allow,
+        // and it made the double disagree with the thing it stands in for.
+        if (request.Method == HttpMethod.Get)
+            return OrderStatus(path);
+
         if (FailOrderCreation)
             return Json(HttpStatusCode.BadRequest, """{"message":"simulated failure"}""");
 
         return await CreateOrderAsync(request, cancellationToken);
+    }
+
+    /// <summary>GET /pg/orders/{id} - Cashfree's own verdict on the gateway order, which is
+    /// authoritative in a way the sum of its payments is not once an offer is involved.</summary>
+    private HttpResponseMessage OrderStatus(string path)
+    {
+        var id = path[(path.LastIndexOf('/') + 1)..];
+        if (!_orders.TryGetValue(id, out var order))
+            return Json(HttpStatusCode.NotFound, """{"message":"order not found"}""");
+
+        var status = order.PaymentStatus switch
+        {
+            "SUCCESS" => "PAID",
+            "PENDING" => "ACTIVE",
+            "FAILED" => "ACTIVE",
+            _ => "ACTIVE",
+        };
+
+        var amount = order.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Json(HttpStatusCode.OK, $$"""
+            {"order_id":"{{id}}","order_status":"{{status}}","order_amount":{{amount}}}
+            """);
     }
 
     private async Task<HttpResponseMessage> CreateOrderAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -122,8 +165,12 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
         if (!_orders.TryGetValue(cashfreeOrderId, out var order) || order.PaymentStatus is null)
             return Json(HttpStatusCode.OK, "[]");
 
+        // payment_amount is what the CUSTOMER was charged, which an offer makes smaller than the
+        // amount the order was raised for. That gap is the whole point of the discount handling.
+        var charged = order.Amount - order.Discount;
+
         return Json(HttpStatusCode.OK, $$"""
-            [{"cf_payment_id":"{{order.CfPaymentId}}","payment_status":"{{order.PaymentStatus}}","payment_group":"{{order.PaymentGroup}}","payment_amount":{{order.Amount}}}]
+            [{"cf_payment_id":"{{order.CfPaymentId}}","payment_status":"{{order.PaymentStatus}}","payment_group":"{{order.PaymentGroup}}","payment_amount":{{charged}}}]
             """);
     }
 

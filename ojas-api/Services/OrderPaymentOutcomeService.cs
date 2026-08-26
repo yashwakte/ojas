@@ -34,11 +34,21 @@ public class OrderPaymentOutcomeService(
         if (order?.PendingAmendment is not { } amendment)
             return false;
 
-        var paidForAmendment = order.Payments
+        // What the customer was charged for this top-up, PLUS anything the gateway discounted on
+        // it. An offer applied on the payment page makes the charge smaller than the top-up was
+        // raised for, and judging on the charge alone means the customer pays, Cashfree reports
+        // the order paid, and their edit silently never applies - they are billed and do not get
+        // the goods. Both halves are scoped to the amendment's own gateway order id, so unrelated
+        // money moving still cannot be mistaken for this top-up landing.
+        var chargedForAmendment = order.Payments
             .Where(p => string.Equals(p.CashfreeOrderId, amendment.CashfreeOrderId, StringComparison.Ordinal))
             .Sum(p => p.Amount);
 
-        if (paidForAmendment < amendment.TopUpAmount)
+        var discountedForAmendment = order.GatewayDiscounts
+            .Where(d => string.Equals(d.CashfreeOrderId, amendment.CashfreeOrderId, StringComparison.Ordinal))
+            .Sum(d => d.Amount);
+
+        if (chargedForAmendment + discountedForAmendment < amendment.TopUpAmount)
             return false;
 
         // Taken atomically: if a webhook and a status check both get this far, only one applies.

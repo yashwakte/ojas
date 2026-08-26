@@ -225,7 +225,11 @@ public record OrderResponse(
 	decimal? RefundPendingAmount = null,
 	decimal WalletAmountApplied = 0,
 	PendingAmendmentDto? PendingAmendment = null,
-	string? PaymentFailureReason = null);
+	string? PaymentFailureReason = null,
+	/// <summary>What the payment gateway knocked off - a bank offer or a code entered on its own
+	/// page. The customer was charged less than the order total by exactly this much, and owes
+	/// nothing further; without showing it, the order reads as though money is missing.</summary>
+	decimal GatewayDiscount = 0);
 
 /// <summary>An edit the customer priced but hasn't paid the difference for yet. The order's own
 /// fields above still describe what was actually bought and paid for — this is only a proposal,
