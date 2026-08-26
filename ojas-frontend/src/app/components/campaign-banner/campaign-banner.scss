@@ -20,21 +20,6 @@
   &.has-bg-image {
     padding: 0;
 
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background: linear-gradient(
-        180deg,
-        transparent 0%,
-        transparent 45%,
-        rgba(0, 0, 0, 0.5) 80%,
-        rgba(0, 0, 0, 0.78) 100%
-      );
-    }
-
     .campaign-banner-inner {
       position: absolute;
       left: 0;
@@ -42,6 +27,26 @@
       bottom: 0;
       z-index: 2;
       padding: 16px 18px;
+    }
+
+    // Only darken the artwork when there is text to keep readable. A campaign whose
+    // picture already carries its own headline gets no scrim at all - the button
+    // below carries its own shade instead.
+    //
+    // The scrim belongs to the text block rather than to the banner, so it is always
+    // exactly as tall as whatever is being written over the picture. It used to be a
+    // gradient over the whole banner that only started darkening at 45% of its height,
+    // which meant a two-line title reached up past the shade and sat unreadable on the
+    // bright part of the artwork - which is precisely how it looked in production.
+    &.has-overlay-text .campaign-banner-inner {
+      padding-top: 56px;
+      background: linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 0.45) 38%,
+        rgba(0, 0, 0, 0.72) 72%,
+        rgba(0, 0, 0, 0.82) 100%
+      );
     }
   }
 
@@ -116,7 +121,13 @@
   font-weight: 700;
   font-size: 0.92rem;
   text-decoration: none;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  // The picture underneath is whatever an admin uploaded, so the button cannot rely
+  // on the artwork for contrast. The solid white fill gives the label a guaranteed
+  // background of its own, and the wide soft shadow is a pool of shade that keeps
+  // the button's edge distinct even where it sits over a pale part of the photo.
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.12),
+    0 2px 18px rgba(0, 0, 0, 0.28);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 
   mat-icon {
@@ -128,10 +139,17 @@
 
   &:hover {
     transform: translateY(-3px);
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.18),
+      0 2px 18px rgba(0, 0, 0, 0.28);
 
     mat-icon {
       transform: translateX(4px);
     }
+  }
+
+  &:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
   }
 }

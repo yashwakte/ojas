@@ -19,7 +19,13 @@
         <!-- Image Section -->
         <div class="image-section">
           <div class="image-wrapper">
-            <img [src]="galleryImages()[activeImageIndex()]" [alt]="p.name" (error)="onImgError($event)" />
+            <img
+              [src]="galleryImages()[activeImageIndex()]"
+              [alt]="p.name"
+              fetchpriority="high"
+              decoding="async"
+              (error)="onImgError($event)"
+            />
           </div>
           @if (p.discount && p.discount > 0) {
             <div class="discount-badge">{{ p.discount }}% OFF</div>
@@ -327,6 +333,7 @@
                     [src]="sp.imageUrl"
                     [alt]="sp.name"
                     loading="lazy"
+                    decoding="async"
                     (error)="onImgError($event)"
                   />
                   @if (sp.discount && sp.discount > 0) {

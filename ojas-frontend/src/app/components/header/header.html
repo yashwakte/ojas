@@ -1,7 +1,15 @@
 <header class="header">
   <div class="header-container">
     <a [routerLink]="homeRoute()" class="logo">
-      <img src="/images/logo.png" alt="Ojas - शुद्ध आहार...शुद्ध विचार" class="logo-img" />
+      <img
+        src="/images/logo.png"
+        alt="Ojas - शुद्ध आहार...शुद्ध विचार"
+        class="logo-img"
+        width="330"
+        height="210"
+        fetchpriority="high"
+        decoding="async"
+      />
     </a>
 
     @if (isCustomerArea()) {

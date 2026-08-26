@@ -325,7 +325,7 @@
           @for (item of checkoutService.items(); track item.product.id; let i = $index) {
             <div class="summary-item">
               <div class="si-img">
-                <img [src]="item.product.imageUrl" [alt]="item.product.name" />
+                <img [src]="item.product.imageUrl" [alt]="item.product.name" loading="lazy" decoding="async" />
               </div>
               <div class="si-info">
                 <span class="si-name">{{ item.product.name }}</span>

@@ -37,7 +37,7 @@
             </label>
             <a class="item-link" [routerLink]="['/products', item.product.id]">
               <div class="item-img">
-                <img [src]="item.product.imageUrl" [alt]="item.product.name" />
+                <img [src]="item.product.imageUrl" [alt]="item.product.name" loading="lazy" decoding="async" />
               </div>
               <div class="item-details">
                 <h4>{{ item.product.name }}</h4>

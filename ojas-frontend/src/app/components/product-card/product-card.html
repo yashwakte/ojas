@@ -4,6 +4,7 @@
       [src]="product().imageUrl"
       [alt]="product().name"
       loading="lazy"
+      decoding="async"
       (error)="onImgError($event)"
     />
     @if (badge()) {

@@ -3,6 +3,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { ProductManagement } from './product-management';
 import { ProductService } from '../../services/product.service';
+import { MediaUploadService, UploadedImage } from '../../services/media-upload.service';
 import { Product } from '../../models/interfaces';
 import { signal } from '@angular/core';
 
@@ -28,6 +29,7 @@ describe('ProductManagement', () => {
   };
 
   let productServiceSpy: any;
+  let mediaUploadSpy: jasmine.SpyObj<MediaUploadService>;
 
   beforeEach(() => {
     productServiceSpy = jasmine.createSpyObj(
@@ -40,9 +42,18 @@ describe('ProductManagement', () => {
       },
     );
 
+    mediaUploadSpy = jasmine.createSpyObj<MediaUploadService>('MediaUploadService', ['upload', 'validate']);
+    mediaUploadSpy.validate.and.returnValue(null);
+    mediaUploadSpy.upload.and.returnValue(
+      of<UploadedImage>({ url: '/api/media/abc.webp', width: 800, height: 600 }),
+    );
+
     TestBed.configureTestingModule({
       imports: [ProductManagement],
-      providers: [{ provide: ProductService, useValue: productServiceSpy }],
+      providers: [
+        { provide: ProductService, useValue: productServiceSpy },
+        { provide: MediaUploadService, useValue: mediaUploadSpy },
+      ],
     });
   });
 
@@ -313,30 +324,22 @@ describe('ProductManagement', () => {
     expect(img.src).toContain('/images/placeholder.svg');
   });
 
-  it('onFileSelected rejects non-image files with an error snackbar', () => {
+  it('onFileSelected surfaces whatever reason the upload service gives for refusing a file', () => {
     const { fixture, snackBar } = create();
-    const file = new File(['data'], 'doc.txt', { type: 'text/plain' });
+    mediaUploadSpy.validate.and.returnValue('Image must be smaller than 12MB');
+    const file = new File([new Uint8Array(8)], 'big.png', { type: 'image/png' });
     const input = document.createElement('input');
     Object.defineProperty(input, 'files', { value: [file] });
 
     fixture.componentInstance.onFileSelected({ target: input } as unknown as Event);
 
-    expect(snackBar.open).toHaveBeenCalledWith('Please select a valid image file', 'Close', jasmine.any(Object));
+    expect(snackBar.open).toHaveBeenCalledWith('Image must be smaller than 12MB', 'Close', jasmine.any(Object));
+    expect(mediaUploadSpy.upload).not.toHaveBeenCalled();
   });
 
-  it('onFileSelected rejects files over 5MB with an error snackbar', () => {
-    const { fixture, snackBar } = create();
-    const bigContent = new Uint8Array(5 * 1024 * 1024 + 1);
-    const file = new File([bigContent], 'big.png', { type: 'image/png' });
-    const input = document.createElement('input');
-    Object.defineProperty(input, 'files', { value: [file] });
-
-    fixture.componentInstance.onFileSelected({ target: input } as unknown as Event);
-
-    expect(snackBar.open).toHaveBeenCalledWith('Image size must be less than 5MB', 'Close', jasmine.any(Object));
-  });
-
-  it('onFileSelected reads a valid small image file into a base64 data URL', (done) => {
+  // Images are no longer inlined as base64 on the product document - they are uploaded as their
+  // own cacheable file and the product keeps only the URL. See MediaUploadService.
+  it('onFileSelected uploads the file and stores the URL it comes back with', () => {
     const { fixture } = create();
     const file = new File(['tinydata'], 'small.png', { type: 'image/png' });
     const input = document.createElement('input');
@@ -344,10 +347,35 @@ describe('ProductManagement', () => {
 
     fixture.componentInstance.onFileSelected({ target: input } as unknown as Event);
 
-    setTimeout(() => {
-      expect(fixture.componentInstance.formData().imageUrl).toContain('data:image/png');
-      expect(fixture.componentInstance.previewImage()).toContain('data:image/png');
-      done();
-    }, 500);
+    expect(mediaUploadSpy.upload).toHaveBeenCalledWith(file, 'product');
+    expect(fixture.componentInstance.formData().imageUrl).toBe('/api/media/abc.webp');
+    expect(fixture.componentInstance.previewImage()).toBe('/api/media/abc.webp');
+    expect(fixture.componentInstance.uploadingImage()).toBeFalse();
+  });
+
+  it('onGalleryFileSelected uploads into the slot it was given', () => {
+    const { fixture } = create();
+    fixture.componentInstance.formData.update((d) => ({ ...d, galleryImageUrls: ['', ''] }));
+    const file = new File(['tinydata'], 'small.png', { type: 'image/png' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file] });
+
+    fixture.componentInstance.onGalleryFileSelected({ target: input } as unknown as Event, 1);
+
+    expect(fixture.componentInstance.formData().galleryImageUrls).toEqual(['', '/api/media/abc.webp']);
+  });
+
+  it('onFileSelected reports a failed upload and stops showing progress', () => {
+    const { fixture, snackBar } = create();
+    mediaUploadSpy.upload.and.returnValue(throwError(() => ({ error: { message: 'Storage is full' } })));
+    const file = new File(['tinydata'], 'small.png', { type: 'image/png' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file] });
+
+    fixture.componentInstance.onFileSelected({ target: input } as unknown as Event);
+
+    expect(snackBar.open).toHaveBeenCalledWith('Storage is full', 'Close', jasmine.any(Object));
+    expect(fixture.componentInstance.uploadingImage()).toBeFalse();
+    expect(fixture.componentInstance.formData().imageUrl).not.toBe('/api/media/abc.webp');
   });
 });

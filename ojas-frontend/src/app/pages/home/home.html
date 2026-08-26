@@ -1,6 +1,37 @@
-<!-- HERO -->
+<!-- HERO
+     The largest thing in the first screenful, so it decides how fast the site feels. It ships
+     as a WebP ladder rather than one big file: a phone downloads the 640px version (~43KB), a
+     desktop the 1280px one (~122KB). The original was a single 2.1MB PNG served to everyone.
+
+     width/height are the intrinsic size of the artwork. They don't constrain the rendered size
+     - the CSS still does that - they let the browser reserve the right shape before the picture
+     arrives, so the page below never jumps as it loads.
+
+     fetchpriority="high" tells the browser this is the one image worth fetching ahead of
+     everything else; it is paired with a preload in index.html so the download can start
+     before Angular has even booted. -->
 <section class="hero">
-  <img src="/images/hero-banner.jpg" alt="Ojas - A Culinary Journey Through Generations" class="hero-banner-img" />
+  <picture>
+    <source
+      type="image/webp"
+      srcset="
+        /images/hero-banner-640.webp   640w,
+        /images/hero-banner-960.webp   960w,
+        /images/hero-banner-1280.webp 1280w,
+        /images/hero-banner-1600.webp 1600w
+      "
+      sizes="(min-width: 901px) min(92vw, 1020px), 100vw"
+    />
+    <img
+      src="/images/hero-banner-1280.jpg"
+      alt="Ojas - A Culinary Journey Through Generations"
+      class="hero-banner-img"
+      width="1717"
+      height="916"
+      fetchpriority="high"
+      decoding="async"
+    />
+  </picture>
 </section>
 
 <section class="hero-cta-section">
@@ -35,6 +66,7 @@
     [ctaText]="c.ctaText"
     [ctaLink]="c.ctaLink"
     [backgroundImageUrl]="c.backgroundImageUrl"
+    [priority]="$index === 0"
   />
 
   <!-- CAMPAIGN FEATURED PRODUCTS -->

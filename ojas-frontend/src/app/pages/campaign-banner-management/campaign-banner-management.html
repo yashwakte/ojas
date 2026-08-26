@@ -41,7 +41,7 @@
                 }
               </div>
               <div class="campaign-list-info">
-                <h3>{{ c.title }}</h3>
+                <h3>{{ c.title || 'Untitled campaign' }}</h3>
                 <p>{{ c.subtitle || 'No subtitle' }}</p>
                 <p class="campaign-list-featured-hint">
                   "Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}" &middot;
@@ -85,15 +85,15 @@
         <form #bannerForm="ngForm" (ngSubmit)="saveConfig()" class="banner-form">
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Banner Title</mat-label>
+              <mat-label>Banner Title <span class="optional">(optional)</span></mat-label>
               <input matInput
                 name="title"
                 [ngModel]="formData().title"
                 (ngModelChange)="formData.update(d => ({...d, title: $event}))"
-                required
                 maxlength="100"
                 placeholder="e.g., Diwali Dhamaka — Flat 20% Off"
                 [class.error]="hasError('title')">
+              <mat-hint>Leave the title and subtitle blank when the artwork already has its own wording — only the button will sit over the picture.</mat-hint>
               @if (hasError('title')) {
                 <mat-error>{{ getError('title') }}</mat-error>
               }
@@ -141,6 +141,7 @@
 
           <div class="form-row">
             <span class="form-block-label">Background Image <span class="optional">(optional — e.g. a Ganpati festival scene)</span></span>
+            <span class="field-hint">Uploads are resized and converted to WebP in your browser before they are saved, so a large photo is fine — pick the best-quality original you have.</span>
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Background Image URL</mat-label>
               <input matInput
@@ -151,9 +152,9 @@
             </mat-form-field>
             <div class="bg-image-actions">
               <input type="file" accept="image/*" (change)="onBackgroundImageSelected($event)" hidden #bgFileInput>
-              <button type="button" mat-stroked-button (click)="bgFileInput.click()">
+              <button type="button" mat-stroked-button [disabled]="uploadingImage()" (click)="bgFileInput.click()">
                 <mat-icon>upload</mat-icon>
-                Upload Image (Max 5MB)
+                {{ uploadingImage() ? 'Optimising…' : 'Upload Image' }}
               </button>
               @if (formData().backgroundImageUrl) {
                 <button type="button" mat-button color="warn" (click)="clearBackgroundImage()">
@@ -174,7 +175,7 @@
             </mat-slide-toggle>
           </div>
 
-          @if (formData().title) {
+          @if (formData().title || formData().subtitle || formData().backgroundImageUrl) {
             <div class="banner-preview" [class.inactive]="!formData().isActive">
               <p class="preview-label">Live Preview — exactly how it'll look on the home page</p>
               <app-campaign-banner

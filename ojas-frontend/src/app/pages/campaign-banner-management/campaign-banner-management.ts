@@ -14,6 +14,7 @@ import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { ProductService } from '../../services/product.service';
 import { CampaignBannerConfig, UpdateCampaignBannerRequest } from '../../models/interfaces';
 import { CampaignBanner } from '../../components/campaign-banner/campaign-banner';
+import { MediaUploadService } from '../../services/media-upload.service';
 
 function emptyFormData(): UpdateCampaignBannerRequest {
   return {
@@ -53,12 +54,14 @@ export class CampaignBannerManagement implements OnInit {
   private campaignBannerService = inject(CampaignBannerService);
   private productService = inject(ProductService);
   private snackBar = inject(MatSnackBar);
+  private mediaUpload = inject(MediaUploadService);
 
   readonly campaigns = computed(() => this.campaignBannerService.campaigns());
   readonly loading = computed(() => this.campaignBannerService.loading());
   readonly products = computed(() => this.productService.products());
 
   readonly submitting = signal(false);
+  readonly uploadingImage = signal(false);
   readonly productSearch = signal('');
 
   // null = list view; 'new' = create form; an id = editing that campaign.
@@ -110,7 +113,7 @@ export class CampaignBannerManagement implements OnInit {
   }
 
   deleteCampaign(campaign: CampaignBannerConfig): void {
-    if (!confirm(`Delete "${campaign.title}"? This can't be undone.`)) {
+    if (!confirm(`Delete "${campaign.title || 'this untitled campaign'}"? This can't be undone.`)) {
       return;
     }
     this.campaignBannerService.deleteCampaign(campaign.id).subscribe({
@@ -119,25 +122,40 @@ export class CampaignBannerManagement implements OnInit {
     });
   }
 
+  /**
+   * Downscales, re-encodes and uploads the picture, then stores the URL it was given.
+   *
+   * The banner used to be kept as a base64 string on the campaign document itself, which meant
+   * every visitor downloaded the full image inside the campaign JSON on every page load, with
+   * no way for any cache to help. It is now a file of its own behind an immutable URL - see
+   * MediaUploadService and the API's MediaController.
+   */
   onBackgroundImageSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || !input.files[0]) return;
 
     const file = input.files[0];
-    if (!file.type.startsWith('image/')) {
-      this.showError('Please select a valid image file');
+    const problem = this.mediaUpload.validate(file);
+    if (problem) {
+      this.showError(problem);
+      // Let the same file be picked again once the admin has fixed it.
+      input.value = '';
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      this.showError('Image size must be less than 5MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      this.formData.update((d) => ({ ...d, backgroundImageUrl: base64 }));
-    };
-    reader.readAsDataURL(file);
+
+    this.uploadingImage.set(true);
+    this.mediaUpload.upload(file, 'banner').subscribe({
+      next: (image) => {
+        this.formData.update((d) => ({ ...d, backgroundImageUrl: image.url }));
+        this.uploadingImage.set(false);
+        input.value = '';
+      },
+      error: (err) => {
+        this.showError(err?.error?.message ?? 'Could not upload that image. Please try again.');
+        this.uploadingImage.set(false);
+        input.value = '';
+      },
+    });
   }
 
   clearBackgroundImage(): void {
@@ -176,9 +194,10 @@ export class CampaignBannerManagement implements OnInit {
     const errors: Partial<Record<keyof UpdateCampaignBannerRequest, string>> = {};
     const data = this.formData();
 
-    if (!data.title?.trim()) {
-      errors.title = 'Title is required';
-    } else if (data.title.trim().length > 100) {
+    // Title is optional on purpose: festival artwork usually carries its own headline,
+    // and a second one laid over the picture looked like a mistake. A campaign with no
+    // title is just the picture and its button.
+    if ((data.title?.trim().length ?? 0) > 100) {
       errors.title = 'Title must not exceed 100 characters';
     }
 

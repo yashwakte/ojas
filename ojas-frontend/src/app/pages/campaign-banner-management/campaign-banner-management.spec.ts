@@ -6,6 +6,7 @@ import { CampaignBannerManagement } from './campaign-banner-management';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { ProductService } from '../../services/product.service';
 import { CampaignBannerConfig, Product } from '../../models/interfaces';
+import { MediaUploadService, UploadedImage } from '../../services/media-upload.service';
 
 describe('CampaignBannerManagement', () => {
   const config: CampaignBannerConfig = {
@@ -46,6 +47,7 @@ describe('CampaignBannerManagement', () => {
   let campaignsSignal: ReturnType<typeof signal<CampaignBannerConfig[]>>;
   let campaignBannerServiceSpy: any;
   let productServiceSpy: any;
+  let mediaUploadSpy: jasmine.SpyObj<MediaUploadService>;
 
   beforeEach(() => {
     campaignsSignal = signal<CampaignBannerConfig[]>([]);
@@ -59,11 +61,18 @@ describe('CampaignBannerManagement', () => {
     );
     productServiceSpy = { products: signal<Product[]>([product, product2]) };
 
+    mediaUploadSpy = jasmine.createSpyObj<MediaUploadService>('MediaUploadService', ['upload', 'validate']);
+    mediaUploadSpy.validate.and.returnValue(null);
+    mediaUploadSpy.upload.and.returnValue(
+      of<UploadedImage>({ url: '/api/media/abc.webp', width: 1600, height: 900 }),
+    );
+
     TestBed.configureTestingModule({
       imports: [CampaignBannerManagement],
       providers: [
         { provide: CampaignBannerService, useValue: campaignBannerServiceSpy },
         { provide: ProductService, useValue: productServiceSpy },
+        { provide: MediaUploadService, useValue: mediaUploadSpy },
       ],
     });
   });
@@ -144,14 +153,21 @@ describe('CampaignBannerManagement', () => {
     expect(fixture.componentInstance.isFallbackBestseller('p2')).toBeTrue();
   });
 
-  it('validateForm requires a title within 100 characters and subtitle within 200', () => {
+  // Title and subtitle are both optional: festival artwork usually carries its own headline and
+  // a second one laid over the picture looked like a mistake. A campaign is allowed to be
+  // nothing but its image and its button.
+  it('validateForm accepts an empty title and subtitle', () => {
     const { fixture } = create();
     fixture.componentInstance.formData.set({ title: '', subtitle: '' });
-    expect(fixture.componentInstance.validateForm()).toBeFalse();
-    expect(fixture.componentInstance.hasError('title')).toBeTrue();
+    expect(fixture.componentInstance.validateForm()).toBeTrue();
+    expect(fixture.componentInstance.hasError('title')).toBeFalse();
+  });
 
+  it('validateForm caps the title at 100 characters and the subtitle at 200', () => {
+    const { fixture } = create();
     fixture.componentInstance.formData.set({ title: 'a'.repeat(101), subtitle: '' });
     expect(fixture.componentInstance.validateForm()).toBeFalse();
+    expect(fixture.componentInstance.hasError('title')).toBeTrue();
 
     fixture.componentInstance.formData.set({ title: 'Valid', subtitle: 'a'.repeat(201) });
     expect(fixture.componentInstance.validateForm()).toBeFalse();
@@ -164,12 +180,42 @@ describe('CampaignBannerManagement', () => {
   it('saveConfig shows an error and skips the service call when the form is invalid', () => {
     const { fixture, snackBar } = create();
     fixture.componentInstance.startCreate();
-    fixture.componentInstance.formData.set({ title: '' });
+    fixture.componentInstance.formData.set({ title: 'a'.repeat(101) });
 
     fixture.componentInstance.saveConfig();
 
     expect(snackBar.open).toHaveBeenCalledWith('Please fix the validation errors', 'Close', jasmine.any(Object));
     expect(campaignBannerServiceSpy.createCampaign).not.toHaveBeenCalled();
+  });
+
+  it('onBackgroundImageSelected uploads the picture and keeps only the URL', () => {
+    const { fixture } = create();
+    fixture.componentInstance.startCreate();
+    const file = new File(['artwork'], 'janmashtami.png', { type: 'image/png' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file] });
+
+    fixture.componentInstance.onBackgroundImageSelected({ target: input } as unknown as Event);
+
+    expect(mediaUploadSpy.upload).toHaveBeenCalledWith(file, 'banner');
+    expect(fixture.componentInstance.formData().backgroundImageUrl).toBe('/api/media/abc.webp');
+    expect(fixture.componentInstance.uploadingImage()).toBeFalse();
+  });
+
+  it('onBackgroundImageSelected leaves the existing image alone when the upload fails', () => {
+    const { fixture, snackBar } = create();
+    fixture.componentInstance.startCreate();
+    fixture.componentInstance.formData.update((d) => ({ ...d, backgroundImageUrl: '/api/media/old.webp' }));
+    mediaUploadSpy.upload.and.returnValue(throwError(() => ({ error: { message: 'Upload rejected' } })));
+    const file = new File(['artwork'], 'janmashtami.png', { type: 'image/png' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file] });
+
+    fixture.componentInstance.onBackgroundImageSelected({ target: input } as unknown as Event);
+
+    expect(snackBar.open).toHaveBeenCalledWith('Upload rejected', 'Close', jasmine.any(Object));
+    expect(fixture.componentInstance.formData().backgroundImageUrl).toBe('/api/media/old.webp');
+    expect(fixture.componentInstance.uploadingImage()).toBeFalse();
   });
 
   it('saveConfig calls createCampaign and shows a success message when creating', () => {

@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ProductService } from '../../services/product.service';
+import { MediaUploadService } from '../../services/media-upload.service';
 import { Product, CreateProductRequest, UpdateProductRequest } from '../../models/interfaces';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 
@@ -30,6 +31,7 @@ import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 export class ProductManagement implements OnInit {
   private productService = inject(ProductService);
   private snackBar = inject(MatSnackBar);
+  private mediaUpload = inject(MediaUploadService);
 
   readonly categories = PRODUCT_CATEGORIES;
 
@@ -61,6 +63,7 @@ export class ProductManagement implements OnInit {
   readonly editingProduct = signal<Product | null>(null);
   readonly submitting = signal(false);
   readonly previewImage = signal<string | null>(null);
+  readonly uploadingImage = signal(false);
 
   readonly formData = signal<CreateProductRequest>({
     name: '',
@@ -196,43 +199,51 @@ export class ProductManagement implements OnInit {
     const input = event.target as HTMLInputElement;
     if (!input.files || !input.files[0]) return;
 
-    const file = input.files[0];
-    if (!file.type.startsWith('image/')) {
-      this.showError('Please select a valid image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      this.showError('Image size must be less than 5MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      this.updateGalleryImageUrl(index, base64);
-    };
-    reader.readAsDataURL(file);
+    this.uploadImage(input, (url) => this.updateGalleryImageUrl(index, url));
   }
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      if (!file.type.startsWith('image/')) {
-        this.showError('Please select a valid image file');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError('Image size must be less than 5MB');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        this.formData.update((data) => ({ ...data, imageUrl: base64 }));
-        this.previewImage.set(base64);
-      };
-      reader.readAsDataURL(file);
+    if (!input.files || !input.files[0]) return;
+
+    this.uploadImage(input, (url) => {
+      this.formData.update((data) => ({ ...data, imageUrl: url }));
+      this.previewImage.set(url);
+    });
+  }
+
+  /**
+   * Shared by the main photo and every gallery slot: downscale and re-encode the file in the
+   * browser, upload it, and hand back the URL it now lives at.
+   *
+   * Product images used to be stored as base64 strings on the product document, which put a
+   * multi-megabyte blob inside every catalog response and pushed each document towards Mongo's
+   * 16 MB per-document ceiling. They are now separate, immutably cached files - see
+   * MediaUploadService.
+   */
+  private uploadImage(input: HTMLInputElement, apply: (url: string) => void): void {
+    const file = input.files![0];
+    const problem = this.mediaUpload.validate(file);
+    if (problem) {
+      this.showError(problem);
+      input.value = '';
+      return;
     }
+
+    this.uploadingImage.set(true);
+    this.mediaUpload.upload(file, 'product').subscribe({
+      next: (image) => {
+        apply(image.url);
+        this.uploadingImage.set(false);
+        // Clearing it lets the admin re-pick the same file, e.g. after re-exporting it.
+        input.value = '';
+      },
+      error: (err) => {
+        this.showError(err?.error?.message ?? 'Could not upload that image. Please try again.');
+        this.uploadingImage.set(false);
+        input.value = '';
+      },
+    });
   }
 
   validateForm(): boolean {

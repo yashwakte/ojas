@@ -46,7 +46,9 @@
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
-            "allowedCommonJsDependencies": ["leaflet"],
+            "allowedCommonJsDependencies": [
+              "leaflet"
+            ],
             "assets": [
               {
                 "glob": "**/*",
@@ -54,7 +56,10 @@
               },
               "src/staticwebapp.config.json"
             ],
-            "styles": ["node_modules/leaflet/dist/leaflet.css", "src/styles.scss"]
+            "styles": [
+              "node_modules/leaflet/dist/leaflet.css",
+              "src/styles.scss"
+            ]
           },
           "configurations": {
             "production": {
@@ -96,7 +101,10 @@
               "buildTarget": "ojas-frontend:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.conf.mjs"
+          }
         },
         "test": {
           "builder": "@angular/build:karma",

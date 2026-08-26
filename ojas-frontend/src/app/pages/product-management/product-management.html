@@ -124,16 +124,16 @@
               @if (hasError('imageUrl')) {
                 <span class="field-error">{{ getError('imageUrl') }}</span>
               }
-              <span class="field-hint">Use an image URL, a local /images path, or upload a file below.</span>
+              <span class="field-hint">Use an image URL, a local /images path, or upload a file below. Uploads are resized and converted to WebP in your browser before saving.</span>
             </label>
           </div>
 
           <div class="form-row">
             <label class="file-upload-label">
               <input type="file" accept="image/*" (change)="onFileSelected($event)" hidden #fileInput>
-              <button type="button" mat-stroked-button (click)="fileInput.click()">
+              <button type="button" mat-stroked-button [disabled]="uploadingImage()" (click)="fileInput.click()">
                 <mat-icon>upload</mat-icon>
-                Upload Image (Max 5MB)
+                {{ uploadingImage() ? 'Optimising…' : 'Upload Image' }}
               </button>
             </label>
           </div>
@@ -160,7 +160,7 @@
                   />
                   <label class="file-upload-label">
                     <input type="file" accept="image/*" (change)="onGalleryFileSelected($event, $index)" hidden #galleryFileInput>
-                    <button type="button" mat-stroked-button (click)="galleryFileInput.click()">
+                    <button type="button" mat-stroked-button [disabled]="uploadingImage()" (click)="galleryFileInput.click()">
                       <mat-icon>upload</mat-icon>
                     </button>
                   </label>
@@ -355,7 +355,7 @@
           @for (product of filteredProducts(); track product.id) {
             <mat-card class="product-card">
               <div class="product-image">
-                <img [src]="product.imageUrl" [alt]="product.name" loading="lazy" />
+                <img [src]="product.imageUrl" [alt]="product.name" loading="lazy" decoding="async" />
                 @if (!product.isAvailable) {
                   <span class="unavailable-badge">Unavailable</span>
                 }

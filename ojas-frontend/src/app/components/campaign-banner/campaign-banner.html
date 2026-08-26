@@ -1,15 +1,25 @@
 <section
   class="campaign-banner"
   [class.has-bg-image]="backgroundImageUrl()"
+  [class.has-overlay-text]="hasOverlayText()"
   [class.is-preview]="preview()"
 >
   @if (backgroundImageUrl()) {
     <div class="campaign-banner-media">
-      <img class="campaign-banner-img" [src]="backgroundImageUrl()" alt="" />
+      <img
+        class="campaign-banner-img"
+        [src]="backgroundImageUrl()"
+        [attr.fetchpriority]="priority() ? 'high' : null"
+        [attr.loading]="priority() ? 'eager' : 'lazy'"
+        decoding="async"
+        alt=""
+      />
     </div>
   }
   <div class="campaign-banner-inner">
-    <h2>{{ title() }}</h2>
+    @if (title()) {
+      <h2>{{ title() }}</h2>
+    }
     @if (subtitle()) {
       <p>{{ subtitle() }}</p>
     }
