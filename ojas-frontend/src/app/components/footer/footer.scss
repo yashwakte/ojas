@@ -163,3 +163,16 @@
     max-width: 100%;
   }
 }
+
+// Names the company behind the brand, next to the description of what the brand sells.
+.footer-legal {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  opacity: 0.82;
+
+  strong {
+    font-weight: 600;
+    opacity: 1;
+  }
+}
