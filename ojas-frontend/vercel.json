@@ -4,7 +4,6 @@
   "framework": null,
   "headers": [
     {
-      "//": "Vercel serves files from public/ with must-revalidate by default, which costs a round trip to the edge on every page view just to be told the picture has not changed. These files change only when someone deliberately replaces the artwork, so a day of hard caching with a week of background refresh behind it means a returning visitor's images appear instantly and a replacement still rolls out on its own within a day.",
       "source": "/images/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
