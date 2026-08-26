@@ -31,26 +31,19 @@ test('a signed-out visitor can still navigate and reach a usable sign-in form', 
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([]);
 });
 
-// The SPA catch-all rewrite used to hand back index.html for *any* path that wasn't a real file,
-// build assets included. A tab left open across a deploy asks for a chunk whose hash no longer
-// exists; instead of a clean 404 it got 200 text/html, and the browser's dynamic import failed on
-// a MIME mismatch — the failure that leaves a header, a footer and blank space in between.
-// The rewrite now excludes .js/.mjs/.css/.map, and these two assertions are what prove it, since
-// getting the exclusion wrong in the other direction would break every deep link on the site.
-test('a missing build asset 404s instead of being answered with the app shell', async ({
+// Vercel's SPA catch-all answers *any* path that isn't a real file with index.html at 200
+// text/html - build assets included. So a tab left open across a deploy, asking for a chunk whose
+// hash no longer exists, gets HTML where it expected JavaScript.
+//
+// An exclusion was tried (`/:path((?!.*\.(?:js|mjs|css|map)$).*)`) so that a gone chunk would 404
+// honestly. It compiles and behaves correctly under path-to-regexp v6, but on Vercel it had no
+// effect: a bogus .js was still rewritten. Rather than keep guessing at a config that costs a
+// deploy per attempt, the catch-all was left as it is and the client was made to cope - which it
+// has to anyway, since this is what production actually does. Do not re-add the exclusion without
+// a way to verify it; these assertions are what would catch it breaking every deep link.
+test('the app shell answers deep links, and a missing chunk is served as HTML', async ({
   request,
 }) => {
-  const response = await request.get('/chunk-THIS-HASH-DOES-NOT-EXIST.js');
-  expect(
-    response.status(),
-    'a gone chunk must fail honestly; answering it with index.html is what makes a stale tab silently blank',
-  ).toBe(404);
-  expect(response.headers()['content-type'] ?? '').not.toContain('text/html');
-});
-
-test('a deep link is still served the app shell', async ({ request }) => {
-  // The other half of the same rewrite. A 200 alone proves nothing here — the catch-all returns
-  // index.html for anything — so the content type is what is actually being checked.
   for (const path of ['/products', '/my-orders', '/products/some-id']) {
     const response = await request.get(path);
     expect(response.status(), `${path} should serve the app`).toBe(200);
@@ -58,4 +51,15 @@ test('a deep link is still served the app shell', async ({ request }) => {
       'text/html',
     );
   }
+
+  // Documented, not desired. AppRecoveryService must recognise the resulting browser error - a
+  // MIME-type complaint or "Unexpected token '<'" rather than a clean fetch failure - which is
+  // covered by its own unit tests and was verified by driving a real browser against this exact
+  // response. If this ever starts returning 404, that is an improvement, not a regression: relax
+  // the assertion rather than reverting whatever caused it.
+  const missingChunk = await request.get('/chunk-THIS-HASH-DOES-NOT-EXIST.js');
+  expect(
+    missingChunk.headers()['content-type'] ?? '',
+    'if this is no longer HTML, the catch-all changed - see the note above',
+  ).toContain('text/html');
 });
