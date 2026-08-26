@@ -27,6 +27,6 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://ojas-api-kl2q.onrender.com/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/:path((?!.*\\.(?:js|mjs|css|map)$).*)", "destination": "/index.html" }
   ]
 }

@@ -261,4 +261,103 @@ describe('ProductDetail', () => {
     expect([from.getFullYear(), from.getMonth(), from.getDate()]).toEqual([2027, 0, 1]);
     expect([to.getFullYear(), to.getMonth(), to.getDate()]).toEqual([2027, 0, 2]);
   });
+
+  // The photo strip is a real scroller: a swipe, an arrow and a thumbnail all move the same
+  // scrollLeft, and the active photo is read back out of it rather than each control keeping its
+  // own idea of which one is showing.
+  describe('the photo gallery', () => {
+    /** The strip has no layout in a test browser, so its width and a recording scrollTo are
+     * supplied - the component measures against exactly these two things. */
+    function pinTrack(fixture: ReturnType<typeof create>, width = 400) {
+      const track: HTMLElement = fixture.nativeElement.querySelector('.gallery-track');
+      Object.defineProperty(track, 'clientWidth', { value: width, configurable: true });
+      const scrolls: number[] = [];
+      track.scrollTo = ((options: ScrollToOptions) => {
+        scrolls.push(options.left ?? 0);
+        Object.defineProperty(track, 'scrollLeft', {
+          value: options.left ?? 0,
+          configurable: true,
+        });
+      }) as typeof track.scrollTo;
+      return { track, scrolls };
+    }
+
+    it('shows every photo in the strip, front first', () => {
+      const fixture = create();
+      const slides = fixture.nativeElement.querySelectorAll('.gallery-slide img');
+
+      expect(slides.length).toBe(2);
+      expect(slides[0].getAttribute('src')).toBe('/images/p1.jpg');
+      expect(slides[1].getAttribute('src')).toBe('/images/p1b.jpg');
+    });
+
+    it('follows a swipe without anyone touching a thumbnail', () => {
+      const fixture = create();
+      const { track } = pinTrack(fixture);
+
+      // What the browser reports after the strip has snapped to the second photo.
+      Object.defineProperty(track, 'scrollLeft', { value: 400, configurable: true });
+      track.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.activeImageIndex()).toBe(1);
+    });
+
+    it('rounds to the nearest photo, so a part-way drag does not flicker', () => {
+      const fixture = create();
+      const { track } = pinTrack(fixture);
+
+      Object.defineProperty(track, 'scrollLeft', { value: 160, configurable: true });
+      track.dispatchEvent(new Event('scroll'));
+
+      expect(fixture.componentInstance.activeImageIndex()).toBe(0);
+    });
+
+    it('scrolls the strip when a thumbnail is chosen, rather than swapping the image out', () => {
+      const fixture = create();
+      const { scrolls } = pinTrack(fixture);
+
+      fixture.componentInstance.selectImage(1);
+
+      expect(scrolls).toEqual([400]);
+      expect(fixture.componentInstance.activeImageIndex()).toBe(1);
+    });
+
+    it('opens the full-screen viewer on the photo that was tapped', () => {
+      const fixture = create();
+      expect(fixture.nativeElement.querySelector('app-image-lightbox')).toBeNull();
+
+      fixture.nativeElement.querySelectorAll('.gallery-slide')[1].click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.lightboxIndex()).toBe(1);
+      expect(fixture.nativeElement.querySelector('app-image-lightbox')).not.toBeNull();
+    });
+
+    it('opens on the first photo too — index 0 must not read as "closed"', () => {
+      // lightboxIndex is a number-or-null on purpose. Anything that treats 0 as falsy here leaves
+      // tapping the main photo doing nothing at all.
+      const fixture = create();
+      fixture.nativeElement.querySelectorAll('.gallery-slide')[0].click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.lightboxIndex()).toBe(0);
+      expect(fixture.nativeElement.querySelector('app-image-lightbox')).not.toBeNull();
+    });
+
+    it('leaves the strip on whatever the viewer was closed at', () => {
+      const fixture = create();
+      const { scrolls } = pinTrack(fixture);
+
+      fixture.componentInstance.openLightbox(0);
+      fixture.componentInstance.onLightboxIndexChanged(1);
+      fixture.componentInstance.closeLightbox();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.activeImageIndex()).toBe(1);
+      expect(scrolls).toEqual([400]);
+      expect(fixture.nativeElement.querySelector('app-image-lightbox')).toBeNull();
+    });
+  });
+
 });

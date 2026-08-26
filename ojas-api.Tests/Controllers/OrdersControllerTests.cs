@@ -80,6 +80,7 @@ public class OrdersControllerTests
             new OrderService(_dbMock.Object),
             new ProductService(_dbMock.Object),
             new WalletService(_dbMock.Object),
+            cashfreeService,
             NullLogger<OrderPaymentOutcomeService>.Instance),
         NullLogger<OrdersController>.Instance);
 

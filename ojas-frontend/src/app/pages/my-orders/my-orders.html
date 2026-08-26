@@ -101,36 +101,53 @@
 
               <div class="order-items">
                 @for (item of editItems(); track item.productId; let i = $index) {
+                  <!-- The same row as the cart and the order card above it, so opening an order
+                       to edit it doesn't drop the customer into a different-looking screen. -->
                   <div class="order-item editable">
+                    <div class="item-thumb">
+                      @if (itemImage(item); as image) {
+                        <img
+                          [src]="image"
+                          [alt]="item.productName"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      } @else {
+                        <mat-icon>inventory_2</mat-icon>
+                      }
+                    </div>
                     <div class="item-info">
                       <span class="item-name">{{ item.productName }}</span>
-                      <span class="item-weight">{{ item.weight }}</span>
-                    </div>
-                    <!-- Add-only: an order that has been placed can be topped up, never cut
-                         down. Taking things off meant an edit could owe money back, which is what
-                         dragged refunds and stock returns into what should be a one-way flow. -->
-                    <div class="edit-qty">
-                      <button
-                        type="button"
-                        (click)="changeQty(i, -1)"
-                        [disabled]="item.quantity <= originalQuantityOf(item.productId)"
-                        [attr.aria-label]="'Decrease quantity of ' + item.productName"
-                        [title]="
-                          item.quantity <= originalQuantityOf(item.productId)
-                            ? 'Items already ordered cannot be removed. Cancel the order instead.'
-                            : 'Decrease quantity'
-                        "
-                      >
-                        −
-                      </button>
-                      <span>{{ item.quantity }}</span>
-                      <button
-                        type="button"
-                        (click)="changeQty(i, 1)"
-                        [attr.aria-label]="'Increase quantity of ' + item.productName"
-                      >
-                        +
-                      </button>
+                      <div class="item-meta">
+                        <span class="item-tag">{{ item.weight }}</span>
+                        <!-- Add-only: an order that has been placed can be topped up, never cut
+                             down. Taking things off meant an edit could owe money back, which is
+                             what dragged refunds and stock returns into what should be a one-way
+                             flow. The minus stops at the quantity the order already holds. -->
+                        <div class="edit-qty">
+                          <button
+                            type="button"
+                            (click)="changeQty(i, -1)"
+                            [disabled]="item.quantity <= originalQuantityOf(item.productId)"
+                            [attr.aria-label]="'Decrease quantity of ' + item.productName"
+                            [title]="
+                              item.quantity <= originalQuantityOf(item.productId)
+                                ? 'Items already ordered cannot be removed. Cancel the order instead.'
+                                : 'Decrease quantity'
+                            "
+                          >
+                            −
+                          </button>
+                          <span>{{ item.quantity }}</span>
+                          <button
+                            type="button"
+                            (click)="changeQty(i, 1)"
+                            [attr.aria-label]="'Increase quantity of ' + item.productName"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <span class="item-price">{{
                       item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2'
@@ -225,13 +242,30 @@
                   <span>Already paid</span>
                   <span>{{ originalAmountPaid() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
                 </div>
+                @if (originalGatewayDiscount() > 0) {
+                  <!-- Shown as its own line so what is owed visibly adds up. The customer was
+                       charged less than the order was raised for by an offer on the payment page;
+                       leaving it out made a fully paid order look short by exactly that much. -->
+                  <div class="summary-line summary-was">
+                    <span>Offer applied at payment</span>
+                    <span>{{ originalGatewayDiscount() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
+                  </div>
+                }
 
                 @if (amountDifference() > 0) {
+                  <!-- The sentence is one element, not three loose text nodes around a
+                       <strong>. Left bare inside a flex row each run became its own flex item and
+                       wrapped on its own, which is what broke "You'll pay / <amount> / more online
+                       to confirm these changes" into three ragged columns on a phone. -->
                   <div class="summary-diff owe">
                     <mat-icon>lock</mat-icon>
-                    You'll pay
-                    <strong>{{ amountDifference() | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
-                    more online to confirm these changes
+                    <span>
+                      You'll pay
+                      <strong>{{
+                        amountDifference() | currency: 'INR' : 'symbol' : '1.2-2'
+                      }}</strong>
+                      more online to confirm these changes
+                    </span>
                   </div>
                   <p class="refund-note">
                     Your order stays exactly as it is until that payment goes through — if you
@@ -240,17 +274,19 @@
                 } @else if (amountDifference() < 0) {
                   <div class="summary-diff refund">
                     <mat-icon>account_balance_wallet</mat-icon>
-                    <strong>{{
-                      -amountDifference() | currency: 'INR' : 'symbol' : '1.2-2'
-                    }}</strong>
-                    goes to your Ojas wallet
+                    <span>
+                      <strong>{{
+                        -amountDifference() | currency: 'INR' : 'symbol' : '1.2-2'
+                      }}</strong>
+                      goes to your Ojas wallet
+                    </span>
                   </div>
                   <p class="refund-note">
                     Want it back on your original payment method instead? Cancel this order and
                     place a fresh one — you'll get that choice there.
                   </p>
                 } @else {
-                  <div class="summary-diff same">No change to the amount</div>
+                  <div class="summary-diff same"><span>No change to the amount</span></div>
                 }
               </div>
 
@@ -269,19 +305,29 @@
               </div>
             </div>
           } @else {
+            <!-- Same row as the cart and the checkout: pack shot, name, then the weight and
+                 quantity as pills. A customer recognises what they bought by the picture long
+                 before they read the name back. -->
             <div class="order-items">
               @for (item of order.items; track item.productId) {
                 <div class="order-item">
+                  <div class="item-thumb">
+                    @if (itemImage(item); as image) {
+                      <img [src]="image" [alt]="item.productName" loading="lazy" decoding="async" />
+                    } @else {
+                      <mat-icon>inventory_2</mat-icon>
+                    }
+                  </div>
                   <div class="item-info">
                     <span class="item-name">{{ item.productName }}</span>
-                    <span class="item-weight">{{ item.weight }}</span>
+                    <span class="item-meta">
+                      <span class="item-tag">{{ item.weight }}</span>
+                      <span class="item-tag">Qty {{ item.quantity }}</span>
+                    </span>
                   </div>
-                  <div class="item-qty-price">
-                    <span class="item-qty">× {{ item.quantity }}</span>
-                    <span class="item-price">{{
-                      item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2'
-                    }}</span>
-                  </div>
+                  <span class="item-price">{{
+                    item.price * item.quantity | currency: 'INR' : 'symbol' : '1.2-2'
+                  }}</span>
                 </div>
               }
             </div>
@@ -306,30 +352,37 @@
                   </div>
                 }
               </div>
+              <!-- The amount and the badges are two groups, not one run of loose items. Left as
+                   siblings in a single wrapping flex row they staggered one per line, each landing
+                   at a different edge. -->
               <div class="order-total">
-                Total:
-                <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
-                @if (order.gatewayDiscount && order.gatewayDiscount > 0) {
-                  <!-- The customer was charged less than the total by an offer applied on the
-                       payment page. Saying so is the difference between an order that looks
-                       correctly settled and one that looks short of money. -->
-                  <span class="gateway-offer">
-                    <mat-icon>local_offer</mat-icon>
-                    {{ order.gatewayDiscount | currency: 'INR' : 'symbol' : '1.2-2' }} offer applied at payment
+                <div class="order-total-line">
+                  <span>Total:</span>
+                  <strong>{{ order.totalAmount | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
+                </div>
+                <div class="order-total-chips">
+                  @if (order.gatewayDiscount && order.gatewayDiscount > 0) {
+                    <!-- The customer was charged less than the total by an offer applied on the
+                         payment page. Saying so is the difference between an order that looks
+                         correctly settled and one that looks short of money. -->
+                    <span class="gateway-offer">
+                      <mat-icon>local_offer</mat-icon>
+                      {{ order.gatewayDiscount | currency: 'INR' : 'symbol' : '1.2-2' }} offer applied
+                    </span>
+                  }
+                  <span
+                    class="payment-pill"
+                    [class.payment-pill--collected]="
+                      order.paymentStatus === 'Collected' || order.paymentStatus === 'Paid'
+                    "
+                    [class.payment-pill--unpaid]="
+                      order.paymentStatus === 'Failed' || order.paymentStatus === 'PartiallyPaid'
+                    "
+                  >
+                    <mat-icon>{{ paymentIcon(order) }}</mat-icon>
+                    {{ paymentLabel(order) }}
                   </span>
-                }
-                <span
-                  class="payment-pill"
-                  [class.payment-pill--collected]="
-                    order.paymentStatus === 'Collected' || order.paymentStatus === 'Paid'
-                  "
-                  [class.payment-pill--unpaid]="
-                    order.paymentStatus === 'Failed' || order.paymentStatus === 'PartiallyPaid'
-                  "
-                >
-                  <mat-icon>{{ paymentIcon(order) }}</mat-icon>
-                  {{ paymentLabel(order) }}
-                </span>
+                </div>
               </div>
             </div>
 
@@ -358,6 +411,48 @@
                   <mat-icon>lock</mat-icon>
                   {{ retryingPaymentId() === order.id ? 'Starting payment…' : 'Try payment again' }}
                 </button>
+              </div>
+            }
+
+            <!-- An order that was placed but never paid for. Whatever else is true, there is
+                 always a way to hand over the money from here: this used to show "Payment
+                 Pending" beside an Edit and a Cancel button and nothing else, which left the
+                 customer with an order they could not complete and no idea why. -->
+            @if (canPayOnline(order)) {
+              <div class="payment-due">
+                <p class="payment-due-title">
+                  <mat-icon>schedule</mat-icon>
+                  Payment not completed
+                </p>
+                <p class="payment-due-note">
+                  This order is held for you but isn't confirmed until it's paid for.
+                </p>
+                @if (paymentInFlightFor(order.id)) {
+                  <!-- Withheld deliberately. A customer told "we're not sure yet" and handed a Pay
+                       button will press it, and the surplus coming back via the wallet is not the
+                       same as never having taken it. -->
+                  <p class="payment-due-inflight">
+                    <mat-icon class="spin">autorenew</mat-icon>
+                    Your bank is still confirming a payment for this order. Nothing more is needed
+                    from you — this updates on its own.
+                  </p>
+                } @else {
+                  <button
+                    type="button"
+                    class="payment-due-pay"
+                    [disabled]="startingPaymentId() === order.id"
+                    (click)="payNow(order)"
+                  >
+                    <mat-icon>lock</mat-icon>
+                    {{
+                      startingPaymentId() === order.id
+                        ? 'Starting payment…'
+                        : 'Pay ' +
+                          (amountOutstanding(order) | currency: 'INR' : 'symbol' : '1.2-2') +
+                          ' now'
+                    }}
+                  </button>
+                }
               </div>
             }
 

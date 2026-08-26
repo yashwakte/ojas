@@ -9,6 +9,7 @@ import {
   RefundDestination,
   OrderResponse,
   PlaceOrderRequest,
+  ResumePaymentResponse,
   StaffUserResponse,
   UpdateMyOrderRequest,
   UpdateMyOrderResponse,
@@ -63,6 +64,18 @@ export class OrderService {
    * was, the extra stock is released and nothing is charged. */
   discardAmendment(orderId: string): Observable<OrderResponse> {
     return this.http.delete<OrderResponse>(`${this.apiUrl}/my/${orderId}/amendment`);
+  }
+
+  /**
+   * Pays what a live order still owes.
+   *
+   * The amount is never sent — the server works out what is outstanding, asks the gateway about
+   * every payment already raised against the order first, and only then creates a new one. That
+   * ordering is the whole point: it is what stops a customer being sent to pay a second time for
+   * money that has already arrived, or alongside a payment the bank is still deciding on.
+   */
+  resumePayment(orderId: string): Observable<ResumePaymentResponse> {
+    return this.http.post<ResumePaymentResponse>(`${this.apiUrl}/my/${orderId}/pay`, {});
   }
 
   /** Asks the server to check with the payment gateway directly, rather than waiting for the

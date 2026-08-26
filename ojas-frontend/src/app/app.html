@@ -1,5 +1,28 @@
 <app-header />
 <main class="main-content">
+  <!-- A route that would not load used to leave this space empty: no page, no error, nothing to
+       click. Whatever else happens, the customer is told what went wrong and given a way out. -->
+  @if (recovery.failure(); as failure) {
+    <div class="shell-failure" role="alert">
+      <mat-icon>cloud_off</mat-icon>
+      <h2>We couldn't load this page</h2>
+      @if (failure.staleBuild) {
+        <p>
+          Ojas has been updated since this tab was opened, so part of the page is no longer
+          available. Reloading picks up the new version.
+        </p>
+      } @else {
+        <p>
+          Something went wrong loading this page. It's usually a patchy connection — reloading
+          normally sorts it out.
+        </p>
+      }
+      <button type="button" class="shell-failure-reload" (click)="recovery.reload()">
+        <mat-icon>refresh</mat-icon>
+        Reload Ojas
+      </button>
+    </div>
+  }
   <router-outlet />
 </main>
 <app-footer />

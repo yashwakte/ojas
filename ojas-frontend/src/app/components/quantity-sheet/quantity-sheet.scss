@@ -1,0 +1,328 @@
+// Matches the address picker deliberately: same backdrop, same radii, same easing, same bottom
+// sheet on a phone and centred card on a desktop. Choosing a quantity and choosing an address
+// should feel like one app rather than two.
+:host {
+  display: contents;
+}
+
+.qs-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(28, 18, 12, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: qsFade 0.3s ease both;
+}
+
+.qs-sheet {
+  position: fixed;
+  z-index: 1301;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(94vw, 420px);
+  padding: 20px 22px 22px;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: var(--ojas-shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.12));
+  overflow: hidden;
+  isolation: isolate;
+  animation: qsIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+// A slow warm bloom rather than a flat panel. Behind everything, and inert.
+.qs-glow {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  translate: -50% 0;
+  width: 320px;
+  height: 240px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(242, 90, 26, 0.16),
+    rgba(242, 90, 26, 0) 68%
+  );
+  animation: qsBloom 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.qs-grip {
+  display: none;
+}
+
+// ===== HEADER =====
+.qs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  animation: qsRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+}
+
+.qs-product {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.qs-thumb {
+  flex-shrink: 0;
+  width: 46px;
+  height: 54px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f7f5f3;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.qs-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  strong {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--ojas-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  small {
+    font-size: 0.78rem;
+    color: var(--ojas-text-light);
+  }
+}
+
+.qs-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ojas-ink-bg);
+  color: var(--ojas-text);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    background: var(--ojas-orange-bg);
+    color: var(--ojas-orange-dark);
+    transform: rotate(90deg);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.qs-prompt {
+  margin: 18px 0 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ojas-text-light);
+  animation: qsRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.11s both;
+}
+
+// ===== THE NUMBERS =====
+// A grid, not a list: every option is one tap away with nothing to scroll, and the shape of the
+// grid itself tells the customer how many they may take.
+.qs-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.qs-tile {
+  position: relative;
+  height: 52px;
+  border: 1.5px solid #e8e2db;
+  border-radius: 14px;
+  background: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--ojas-text);
+  cursor: pointer;
+  // Each tile arrives a beat after the one before it, left to right, rather than the whole grid
+  // appearing at once. --qs-delay is set per tile from the template.
+  animation: qsPop 0.44s cubic-bezier(0.16, 1, 0.3, 1) calc(140ms + var(--qs-delay, 0ms)) both;
+  transition:
+    border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.2s ease,
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:hover:not(:disabled):not(.selected) {
+    border-color: var(--ojas-orange-light, #ffb599);
+    transform: translateY(-2px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0) scale(0.96);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange);
+    outline-offset: 3px;
+  }
+
+  &.selected {
+    border-color: transparent;
+    color: #fff;
+    background: linear-gradient(135deg, var(--ojas-orange), var(--ojas-orange-dark));
+    box-shadow: var(--ojas-shadow-orange, 0 8px 30px rgba(242, 90, 26, 0.2));
+  }
+
+  &:disabled {
+    border-style: dashed;
+    border-color: #ece7e1;
+    color: #c4bdb5;
+    cursor: not-allowed;
+    background: #fbfaf8;
+  }
+}
+
+.qs-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+  font-size: 0.78rem;
+  color: var(--ojas-text-light);
+  animation: qsRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.34s both;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+// ===== PHONE: a bottom sheet, thumb-reachable =====
+@media (max-width: 600px) {
+  .qs-sheet {
+    top: auto;
+    bottom: 0;
+    translate: -50% 0;
+    width: 100vw;
+    border-radius: 26px 26px 0 0;
+    padding: 10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+    animation: qsUp 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  // The handle that tells a thumb this came up from the bottom edge.
+  .qs-grip {
+    display: block;
+    width: 42px;
+    height: 4px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: #e2dcd5;
+  }
+
+  .qs-tile {
+    height: 56px;
+  }
+}
+
+@keyframes qsFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes qsIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes qsUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes qsBloom {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes qsRise {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes qsPop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Motion is decoration here; the sheet must still work without it.
+@media (prefers-reduced-motion: reduce) {
+  .qs-backdrop,
+  .qs-sheet,
+  .qs-glow,
+  .qs-head,
+  .qs-prompt,
+  .qs-tile,
+  .qs-note {
+    animation: none;
+  }
+
+  .qs-tile,
+  .qs-close {
+    transition: none;
+  }
+}

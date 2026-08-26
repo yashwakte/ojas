@@ -20,8 +20,87 @@ public class OrderPaymentOutcomeService(
     OrderService orderService,
     ProductService productService,
     WalletService walletService,
+    CashfreeService cashfreeService,
     ILogger<OrderPaymentOutcomeService> logger)
 {
+    /// <summary>
+    /// What the gateway says about every payment raised against an order.
+    /// <paramref name="AnyInFlight"/> is the one that matters before offering a Pay button: a bank
+    /// that hasn't finished deciding may still take the money, so raising a second payment then is
+    /// how a customer pays twice for the same order.
+    /// </summary>
+    public record GatewayReconciliation(Order Order, bool AnyInFlight, string? LastFailureReason);
+
+    /// <summary>
+    /// Asks Cashfree what actually happened to every payment recorded against an order, and writes
+    /// down anything we didn't already know.
+    ///
+    /// This is what makes an unpaid order self-healing rather than something that sits saying
+    /// "Payment Pending" indefinitely: a payment that succeeded while the customer's browser was
+    /// closed gets recorded here, and one that never happened is exposed as such so the order can
+    /// be stood down and retried.
+    ///
+    /// Every write below is idempotent - payments keyed by Cashfree's payment id, discounts by the
+    /// gateway order id - so running this on every status check, webhook retry and Pay click can
+    /// never count the same money twice.
+    /// </summary>
+    public async Task<GatewayReconciliation> ReconcileWithGatewayAsync(string orderId)
+    {
+        var order = await orderService.GetOrderByIdAsync(orderId)
+            ?? throw new InvalidOperationException($"Order {orderId} not found.");
+
+        // Every gateway order raised against this one, not just the first: a top-up lives under
+        // its own id, and asking only about the original is exactly how a paid top-up ends up
+        // invisible. Orders placed before the attempts list existed had one gateway order, named
+        // after the order itself.
+        var attempts = order.PaymentAttempts.Count > 0
+            ? order.PaymentAttempts.Select(a => a.CashfreeOrderId).ToList()
+            : [orderId];
+
+        var anyInFlight = false;
+        string? lastFailureReason = null;
+
+        foreach (var cashfreeOrderId in attempts)
+        {
+            var payments = await cashfreeService.GetPaymentsAsync(cashfreeOrderId);
+
+            // Cashfree is the authority on whether the order it created was paid, not our sum of
+            // the payments beneath it. An offer applied on the payment page charges the customer
+            // less than the order was raised for while Cashfree still reports it PAID, and that
+            // shortfall settles the order rather than being money still owed.
+            var gatewayOrder = await cashfreeService.GetOrderStatusAsync(cashfreeOrderId);
+            if (gatewayOrder is { IsPaid: true })
+            {
+                var charged = payments.Where(p => p.IsSuccess).Sum(p => p.Amount);
+                await orderService.TryRecordGatewayDiscountAsync(
+                    orderId, cashfreeOrderId, gatewayOrder.OrderAmount - charged);
+            }
+
+            foreach (var payment in payments)
+            {
+                if (payment.IsSuccess)
+                {
+                    await orderService.TryRecordPaymentAsync(orderId, new OrderPayment
+                    {
+                        CfPaymentId = payment.CfPaymentId,
+                        CashfreeOrderId = payment.CashfreeOrderId,
+                        Amount = payment.Amount,
+                        Instrument = payment.PaymentGroup,
+                    });
+                }
+
+                anyInFlight |= payment.IsInFlight;
+                if (payment.IsFailed) lastFailureReason = payment.FailureReason ?? lastFailureReason;
+            }
+        }
+
+        var refreshed = await orderService.RefreshPaymentStateAsync(orderId)
+            ?? await orderService.GetOrderByIdAsync(orderId)
+            ?? order;
+
+        return new GatewayReconciliation(refreshed, anyInFlight, lastFailureReason);
+    }
+
     /// <summary>
     /// Applies the pending amendment if — and only if — the gateway order raised for it has
     /// actually been paid. Judged on payments recorded against the amendment's own gateway order

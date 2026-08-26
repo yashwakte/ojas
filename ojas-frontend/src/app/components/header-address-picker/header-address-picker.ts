@@ -1,9 +1,20 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  HostListener,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { DeliveryAddressService } from '../../services/delivery-address.service';
 import { SavedAddress } from '../../models/interfaces';
+
+/** How much of the address label the header pill shows on a phone. */
+const SHORT_LABEL_MAX = 5;
 
 /**
  * The "deliver to" control that lives in the header once an address has been
@@ -26,6 +37,21 @@ export class HeaderAddressPicker {
   protected readonly open = signal(false);
   protected readonly savedAddresses = signal<SavedAddress[]>([]);
   protected readonly loadingSaved = signal(false);
+
+  /**
+   * The phone-width label. A bare pin icon told the customer nothing about where their order was
+   * going — which address is selected matters most on the device where the full one doesn't fit.
+   *
+   * Five characters is the budget: it is what sits beside the pin and the chevron without pushing
+   * the centred logo off its axis, and it is enough for the labels people actually use ("Home",
+   * "Work", "Mom's"). Anything longer is trimmed with an ellipsis rather than being allowed to
+   * grow the pill.
+   */
+  protected readonly shortLabel = computed(() => {
+    const label = this.deliveryAddress.selected()?.label?.trim();
+    if (!label) return 'Set';
+    return label.length > SHORT_LABEL_MAX ? `${label.slice(0, SHORT_LABEL_MAX)}…` : label;
+  });
 
   toggle(): void {
     if (this.open()) {

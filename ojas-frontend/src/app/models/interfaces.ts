@@ -469,11 +469,71 @@ export function paymentLabel(order: OrderResponse): string {
   }
 }
 
+/**
+ * What the customer still owes on an order: its total, less everything settled against it —
+ * money actually captured plus anything the gateway discounted on its own payment page.
+ *
+ * Mirrors `Order.SettledAmount` on the server, and deliberately not `totalAmount - amountPaid`:
+ * a customer who used a bank offer was charged less than the order was raised for and owes
+ * nothing further, so measuring against money received alone would keep asking them for a
+ * difference that had already been discounted away.
+ */
+export function amountOutstanding(order: OrderResponse): number {
+  const settled = order.amountPaid + (order.gatewayDiscount ?? 0);
+  return roundToPaise(order.totalAmount - settled);
+}
+
+/** Money is computed in paise everywhere, so comparisons don't turn on floating-point dust. */
+function roundToPaise(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * True when the only useful thing left to do with an order is pay for it.
+ *
+ * This exists because an unpaid order used to be a dead end: it sat in the customer's list saying
+ * "Payment Pending", offered Edit and Cancel, and gave them no way at all to hand over the money.
+ * Anything this returns true for must be shown a way to pay.
+ *
+ * Deliberately excludes:
+ *  - a failed payment, whose route forward is "Try payment again" — standing an order down
+ *    cancels it and puts the stock back, so it is re-placed rather than paid for;
+ *  - a legacy Cash on Delivery order, which is settled at the door;
+ *  - an order with a pending amendment, which has its own Pay button for its own amount. Offering
+ *    both is how a customer pays twice for the same change.
+ */
+export function canPayOnline(order: OrderResponse): boolean {
+  const status = order.status.toLowerCase();
+  if (status === 'cancelled' || status === 'delivered') return false;
+  if (isPaymentFailed(order)) return false;
+  if (isCashOnDelivery(order)) return false;
+  if (order.pendingAmendment) return false;
+  return amountOutstanding(order) > 0;
+}
+
 /** An order whose payment never went through. Deliberately its own idea rather than a shade of
  * "cancelled": nothing was bought, nothing was charged, and the only thing the customer can
  * usefully do is try again — so it is presented differently and can't be edited. */
 export function isPaymentFailed(order: OrderResponse): boolean {
   return order.paymentStatus === 'Failed';
+}
+
+/**
+ * The server's answer to "let me pay what this order still owes". Exactly one of the three
+ * outcomes below applies, and they must not be collapsed into one another — telling a customer
+ * whose money already arrived to pay again is the failure this whole endpoint exists to prevent.
+ */
+export interface ResumePaymentResponse {
+  /** The order as it now stands, after the server reconciled it against the gateway. */
+  order: OrderResponse;
+  /** What is still owed, computed server-side. The browser never names a price. */
+  amountDue: number;
+  /** Set when a fresh gateway order was raised and the customer should be sent to pay. */
+  paymentSessionId?: string | null;
+  /** Asking the gateway turned up money we hadn't recorded. Nothing is owed. */
+  alreadyPaid?: boolean;
+  /** A payment is still with the bank. No second one may be started until it resolves. */
+  paymentInFlight?: boolean;
 }
 
 export interface DeliveryEstimate {
@@ -513,6 +573,15 @@ export function deliveryWindow(placedAt = new Date()): { from: Date; to: Date } 
 /** Just the span: "1–2 days". For places whose own heading already says what it refers to. */
 export function deliveryDaysLabel(): string {
   return `${DELIVERY_DAYS_MIN}–${DELIVERY_DAYS_MAX} days`;
+}
+
+/** The delivery window as two dates — "31 Aug - 2 Sep". Used before purchase, where a customer
+ * comparing options wants the days themselves rather than a count of them. Derived from the same
+ * `deliveryWindow` as the post-purchase estimate, so the two can never promise different things. */
+export function deliveryBetweenLabel(placedAt = new Date()): string {
+  const { from, to } = deliveryWindow(placedAt);
+  const day = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return `${day(from)} - ${day(to)}`;
 }
 
 /** The pre-purchase promise: "Arriving in 1–2 days". */

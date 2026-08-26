@@ -1,6 +1,9 @@
 <div class="hap">
   <button type="button" class="hap-trigger" [class.open]="open()" (click)="toggle()">
     <mat-icon class="hap-pin">location_on</mat-icon>
+    <!-- Phone width only. The full "Deliver to / <label>" stack below has no room there, and
+         hiding it outright left a naked pin that said nothing about where the order was going. -->
+    <span class="hap-short">{{ shortLabel() }}</span>
     <span class="hap-text">
       @if (deliveryAddress.selected(); as addr) {
         <span class="hap-label">Deliver to</span>

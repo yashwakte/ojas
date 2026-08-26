@@ -378,6 +378,59 @@ public class OrderRepricingTests : IDisposable
         amendment.Items.Single().Quantity.ShouldBe(8);
     }
 
+    /// <summary>Records a gateway offer alongside a smaller payment: the customer was charged less
+    /// than the order was raised for, and Cashfree still reported it PAID.</summary>
+    private async Task MarkPaidWithOfferAsync(string orderId, decimal charged, decimal discounted)
+    {
+        await MarkPaidAsync(orderId, charged);
+        await _factory.SeedAsync(async db => await db.Orders.UpdateOneAsync(
+            o => o.Id == orderId,
+            Builders<Order>.Update.Push(o => o.GatewayDiscounts, new OrderGatewayDiscount
+            {
+                CashfreeOrderId = orderId,
+                Amount = discounted,
+            })));
+    }
+
+    /// <summary>
+    /// Reported from production. A customer applied an offer on Cashfree's own payment page, paid
+    /// in full as far as everyone was concerned, then opened the order to add something — and was
+    /// asked for the discount back on top of the change, because the edit was priced against the
+    /// money that arrived rather than against what the order was settled for.
+    /// </summary>
+    [Fact]
+    public async Task AnOfferAppliedAtPayment_SettlesTheOrder_AndIsNotAskedForAgainOnAnEdit()
+    {
+        await SeedDeliveryChargesAsync();
+        var (order, csrf) = await PlaceOrderAsync(Items(6)); // 600, free delivery
+        await MarkPaidWithOfferAsync(order.Id, charged: 500m, discounted: 100m);
+
+        var result = await EditOrderAsync(order.Id, csrf, Items(8)); // 800
+
+        // ₹200 of goods added, so ₹200 owed - not ₹300, which is what measuring against the
+        // ₹500 actually captured produced.
+        result.TopUpAmount.ShouldBe(200m);
+        result.Order.PendingAmendment.ShouldNotBeNull().TopUpAmount.ShouldBe(200m);
+    }
+
+    [Fact]
+    public async Task AnOfferThatCoversTheWholeChange_LeavesNothingToPay()
+    {
+        await SeedDeliveryChargesAsync();
+        var (order, csrf) = await PlaceOrderAsync(Items(6)); // 600, free delivery
+        await MarkPaidWithOfferAsync(order.Id, charged: 400m, discounted: 200m);
+
+        // Re-saving the same order costs nothing, so no payment page and no pending amendment -
+        // the edit simply applies. Before this, opening an order settled by an offer and saving
+        // it unchanged demanded the discount over again.
+        var result = await EditOrderAsync(order.Id, csrf, Items(6));
+
+        result.TopUpAmount.ShouldBeNull();
+        result.PendingPayment.ShouldBeFalse();
+        result.Order.PendingAmendment.ShouldBeNull();
+        result.RefundAmount.ShouldBeNull();
+    }
+
     [Fact]
     public async Task EditingAnUnpaidOrder_NeitherTopsUpNorRefunds()
     {
