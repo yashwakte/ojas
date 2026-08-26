@@ -15,7 +15,49 @@ public class AuthService
     // token is the one that's actually revocable (server-tracked, deleted on logout/rotation),
     // which is the capability a bare long-lived JWT never had.
     private const int AccessTokenMinutes = 15;
-    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
+
+    // How long a session may live, by who it belongs to. Two different jobs, so two different
+    // answers rather than one compromise that serves neither.
+    //
+    // **Customers** are not signed out of a shop they are browsing. Every large consumer
+    // delivery app keeps them signed in for weeks, and shortening it does not buy security worth
+    // having - a customer session can read that customer's own orders and nothing else - while
+    // it very much costs orders, because someone who has to log in before buying atta often
+    // simply doesn't.
+    //
+    // **Staff** are the opposite. An admin session can read every customer's data and change
+    // prices; a delivery session can see addresses and phone numbers. Those live on phones that
+    // get shared, lost, and left unlocked, so a staff session is deliberately short and, unlike
+    // a customer's, cannot be extended by continuing to use it.
+    private static readonly TimeSpan CustomerRefreshTokenLifetime = TimeSpan.FromDays(30);
+    private static readonly TimeSpan StaffRefreshTokenLifetime = TimeSpan.FromHours(8);
+
+    // The ceiling on a whole sign-in, measured from when it happened rather than from the last
+    // request. This is the half that actually constrains an attacker: a rolling window alone
+    // renews forever as long as the token keeps being used, so a stolen token that is used stays
+    // alive indefinitely. Past this, everyone signs in again.
+    //
+    // Staff get no headroom at all beyond their rolling window - a staff session is simply
+    // "eight hours from sign-in", which is a shift.
+    private static readonly TimeSpan CustomerAbsoluteSessionLifetime = TimeSpan.FromDays(90);
+    private static readonly TimeSpan StaffAbsoluteSessionLifetime = StaffRefreshTokenLifetime;
+
+    private static TimeSpan RollingLifetimeFor(string? role) =>
+        DeviceService.IsRestrictedRole(role) ? StaffRefreshTokenLifetime : CustomerRefreshTokenLifetime;
+
+    private static TimeSpan AbsoluteLifetimeFor(string? role) =>
+        DeviceService.IsRestrictedRole(role) ? StaffAbsoluteSessionLifetime : CustomerAbsoluteSessionLifetime;
+
+    /// <summary>
+    /// When a token issued now to this role must expire: the rolling window, but never later
+    /// than the absolute ceiling measured from the original sign-in.
+    /// </summary>
+    private static DateTime RefreshTokenExpiryFor(string? role, DateTime familyStartedAt)
+    {
+        var rolling = DateTime.UtcNow.Add(RollingLifetimeFor(role));
+        var absolute = familyStartedAt.Add(AbsoluteLifetimeFor(role));
+        return rolling < absolute ? rolling : absolute;
+    }
 
     // How long after a refresh token is spent a second presentation of it still reads as two
     // tabs racing rather than as theft. Long enough to cover a slow request against a cold
@@ -234,7 +276,7 @@ public class AuthService
     private async Task<AuthResult> IssueSessionAsync(User user, string? deviceIdHash)
     {
         var token = GenerateToken(user);
-        var refreshToken = await IssueRefreshTokenAsync(user.Id!, deviceIdHash);
+        var refreshToken = await IssueRefreshTokenAsync(user.Id!, user.Role, deviceIdHash);
         return new AuthResult(
             token,
             new AuthResponse(user.Id!, user.FullName, user.Email, user.Phone, user.Role),
@@ -427,9 +469,15 @@ public class AuthService
 
     private async Task<string> IssueRefreshTokenAsync(
         string userId,
+        string? role,
         string? deviceIdHash = null,
-        string? familyId = null)
+        string? familyId = null,
+        DateTime? familyStartedAt = null)
     {
+        // A rotation inherits the original sign-in's timestamp; a fresh sign-in starts the clock.
+        // Inheriting it is what stops a session from renewing itself past its ceiling.
+        var startedAt = familyStartedAt ?? DateTime.UtcNow;
+
         var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var record = new RefreshToken
         {
@@ -438,7 +486,8 @@ public class AuthService
             // A fresh sign-in starts a new family; a rotation continues the one it came from.
             FamilyId = familyId ?? Guid.NewGuid().ToString("N"),
             DeviceIdHash = deviceIdHash,
-            ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime),
+            FamilyStartedAt = startedAt,
+            ExpiresAt = RefreshTokenExpiryFor(role, startedAt),
         };
         await _db.RefreshTokens.InsertOneAsync(record);
         return rawToken;
@@ -492,6 +541,17 @@ public class AuthService
         if (user == null)
             return new RefreshResult(RefreshOutcome.Invalid);
 
+        // The absolute ceiling, re-checked against the user's *current* role rather than the
+        // role they had when the token was minted. Promoting someone to admin has to shorten
+        // their existing session immediately; leaving them on a customer's 30-day window until
+        // it happens to lapse would be a standing hole every promotion quietly opens.
+        if (record.FamilyStartedAt is { } startedAt &&
+            DateTime.UtcNow > startedAt.Add(AbsoluteLifetimeFor(user.Role)))
+        {
+            await RevokeFamilyAsync(familyId);
+            return new RefreshResult(RefreshOutcome.Invalid);
+        }
+
         // Without this, a refresh token lifted from a staff session would keep minting access
         // tokens on the attacker's machine for the next 30 days, silently bypassing the whole
         // device restriction - the token itself must be pinned to the device it was issued to,
@@ -526,7 +586,12 @@ public class AuthService
                 new AuthResult(GenerateToken(user), userResponse, string.Empty),
                 IsGraceReplay: true);
 
-        var newRefreshToken = await IssueRefreshTokenAsync(user.Id!, record.DeviceIdHash, familyId);
+        // The successor inherits the original sign-in's timestamp, so the ceiling holds however
+        // many times the session is refreshed. A row written before this field existed has no
+        // timestamp to inherit; starting its clock now gives those sessions one more full window
+        // rather than signing everyone out the moment this ships.
+        var newRefreshToken = await IssueRefreshTokenAsync(
+            user.Id!, user.Role, record.DeviceIdHash, familyId, record.FamilyStartedAt ?? DateTime.UtcNow);
         return new RefreshResult(
             RefreshOutcome.Success,
             new AuthResult(GenerateToken(user), userResponse, newRefreshToken));

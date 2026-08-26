@@ -39,6 +39,18 @@ public class RefreshToken
     [BsonElement("rotatedAt")]
     public DateTime? RotatedAt { get; set; }
 
+    /// <summary>When the sign-in this token descends from actually happened, carried forward
+    /// unchanged through every rotation.
+    ///
+    /// Without it a session renews itself forever: each rotation issued a successor with a full
+    /// fresh lifetime, so anyone who kept using the app was never signed out at all. This is
+    /// what gives a session an <em>absolute</em> ceiling independent of activity - which is the
+    /// only part of the policy a thief with a live token cannot simply refresh past.
+    ///
+    /// Null on rows written before this existed; those start the clock at their next rotation.</summary>
+    [BsonElement("familyStartedAt")]
+    public DateTime? FamilyStartedAt { get; set; }
+
     [BsonElement("expiresAt")]
     public DateTime ExpiresAt { get; set; }
 

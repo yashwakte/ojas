@@ -22,11 +22,17 @@ public class AuthController : ControllerBase
     // re-enrol the next morning. 400 days is the maximum Chrome will honour.
     private static readonly TimeSpan DeviceCookieLifetime = TimeSpan.FromDays(400);
 
-    // Must match AuthService's AccessTokenMinutes/RefreshTokenLifetime - these govern how long
-    // the browser keeps offering each cookie, the token's own claims/hash-expiry are what the
-    // server actually enforces.
+    // Must match AuthService's own lifetimes - these govern how long the browser keeps offering
+    // each cookie; the token's claims and its stored expiry are what the server actually
+    // enforces. A session's length now depends on whose it is, so these do too: a staff cookie
+    // that outlived its token would leave a phone carrying a credential the server stopped
+    // honouring hours ago.
     private const int AccessTokenMinutes = 15;
-    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
+    private static readonly TimeSpan CustomerSessionCookieLifetime = TimeSpan.FromDays(30);
+    private static readonly TimeSpan StaffSessionCookieLifetime = TimeSpan.FromHours(8);
+
+    private static TimeSpan SessionCookieLifetimeFor(string? role) =>
+        DeviceService.IsRestrictedRole(role) ? StaffSessionCookieLifetime : CustomerSessionCookieLifetime;
 
     private readonly AuthService _authService;
     private readonly OtpService _otpService;
@@ -76,24 +82,24 @@ public class AuthController : ControllerBase
 
     // Lives as long as the refresh token, not the access token - it needs to still be valid
     // whenever a silent /refresh call reissues a fresh access token partway through the session.
-    private CookieOptions BuildCsrfCookieOptions() => new()
+    private CookieOptions BuildCsrfCookieOptions(string? role) => new()
     {
         HttpOnly = false,
         Secure = true,
         SameSite = SameSiteMode.None,
         Path = "/",
-        Expires = DateTimeOffset.UtcNow.Add(RefreshTokenLifetime)
+        Expires = DateTimeOffset.UtcNow.Add(SessionCookieLifetimeFor(role))
     };
 
     // Scoped to /api/auth only (not "/") - it's never needed outside login/refresh/logout, so
     // there's no reason for it to ride along on every single API request.
-    private CookieOptions BuildRefreshCookieOptions() => new()
+    private CookieOptions BuildRefreshCookieOptions(string? role) => new()
     {
         HttpOnly = true,
         Secure = true,
         SameSite = SameSiteMode.None,
         Path = "/api/auth",
-        Expires = DateTimeOffset.UtcNow.Add(RefreshTokenLifetime)
+        Expires = DateTimeOffset.UtcNow.Add(SessionCookieLifetimeFor(role))
     };
 
     // HttpOnly is the whole point: script on the page can't read the device id, so an XSS bug
@@ -115,8 +121,8 @@ public class AuthController : ControllerBase
     {
         var csrfToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         Response.Cookies.Append(AuthCookieName, result.Token, BuildAuthCookieOptions());
-        Response.Cookies.Append(RefreshCookieName, result.RefreshToken, BuildRefreshCookieOptions());
-        Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions());
+        Response.Cookies.Append(RefreshCookieName, result.RefreshToken, BuildRefreshCookieOptions(result.User.Role));
+        Response.Cookies.Append(CsrfCookieName, csrfToken, BuildCsrfCookieOptions(result.User.Role));
 
         // Only set when this session also bound a new device (enrolment or first-admin
         // bootstrap); ordinary logins reuse the cookie the browser already holds.
@@ -145,7 +151,7 @@ public class AuthController : ControllerBase
         // No CSRF cookie to preserve - issue one, otherwise this caller would be left unable to
         // make any mutating request at all.
         var freshCsrf = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        Response.Cookies.Append(CsrfCookieName, freshCsrf, BuildCsrfCookieOptions());
+        Response.Cookies.Append(CsrfCookieName, freshCsrf, BuildCsrfCookieOptions(result.User.Role));
         return result.User with { CsrfToken = freshCsrf };
     }
 
