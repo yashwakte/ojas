@@ -651,11 +651,24 @@ public class AuthController : ControllerBase
     {
         var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
         if (!verification.Success)
+        {
+            _logger.LogWarning(
+                "Phone login rejected at the MSG91 verification step for {Phone}: {Error}",
+                request.Phone, verification.Error);
             return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
+        }
 
         var result = await _authService.PhoneLoginAsync(request.Phone);
         if (result == null)
+        {
+            // MSG91 confirmed the code - this is a *different* failure: no customer account
+            // matched request.Phone exactly. Logged with the phone so it can be compared
+            // character-for-character against what's actually stored, rather than guessed at.
+            _logger.LogWarning(
+                "Phone login: MSG91 verified {VerifiedIdentifier} for request phone {Phone}, but no matching loginable customer account was found.",
+                verification.VerifiedIdentifier, request.Phone);
             return BadRequest(new { message = "That code is invalid or has expired." });
+        }
 
         return Ok(IssueSession(result));
     }
