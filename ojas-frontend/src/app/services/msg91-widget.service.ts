@@ -88,8 +88,14 @@ export class Msg91WidgetService {
         }
         window.sendOtp(
           toMsg91Identifier(phone),
-          () => resolve(),
-          (error) => reject(new Msg91WidgetError(firstNonEmpty(error) ?? 'Could not send the code. Please try again.')),
+          (data) => {
+            console.log('[msg91] sendOtp success payload', JSON.stringify(data));
+            resolve();
+          },
+          (error) => {
+            console.log('[msg91] sendOtp failure payload', JSON.stringify(error));
+            reject(new Msg91WidgetError(firstNonEmpty(error) ?? 'Could not send the code. Please try again.'));
+          },
         );
       }),
       SendOtpWatchdogMs,
@@ -109,14 +115,22 @@ export class Msg91WidgetService {
         window.verifyOtp(
           code,
           (data) => {
-            const token = data['access-token'] ?? data['accessToken'] ?? data['token'];
-            if (typeof token === 'string' && token.length > 0) {
+            // Logged deliberately: confirmed live 2026-08-29 that the callback shape is
+            // {type, message} - previously-guessed field names (access-token/accessToken/token)
+            // all missed it, so a real MSG91 success was being reported to the customer as "That
+            // code is invalid or has expired." Kept logged in case that's not the whole picture.
+            console.log('[msg91] verifyOtp success payload', JSON.stringify(data));
+            const token = data['message'] ?? data['access-token'] ?? data['accessToken'] ?? data['token'];
+            if (data['type'] === 'success' && typeof token === 'string' && token.length > 0) {
               resolve(token);
             } else {
               reject(new Msg91WidgetError('That code is invalid or has expired.'));
             }
           },
-          (error) => reject(new Msg91WidgetError(firstNonEmpty(error) ?? 'That code is invalid or has expired.')),
+          (error) => {
+            console.log('[msg91] verifyOtp failure payload', JSON.stringify(error));
+            reject(new Msg91WidgetError(firstNonEmpty(error) ?? 'That code is invalid or has expired.'));
+          },
         );
       }),
       VerifyOtpWatchdogMs,
