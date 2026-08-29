@@ -66,8 +66,12 @@ public class AuthControllerTests
         envMock.Setup(e => e.EnvironmentName).Returns("Development");
         var inviteService = new StaffInviteService(
             _dbMock.Object, _emailSenderMock.Object, config, NullLogger<StaffInviteService>.Instance);
+        // Unconfigured (config carries no Msg91:WidgetAuthKey) - same posture as
+        // _phoneOtpSenderMock's default, matching production today. Msg91WidgetVerifierTests
+        // covers the configured/verified paths in isolation.
+        var phoneWidgetVerifier = new Msg91WidgetVerifier(new HttpClient(), config, NullLogger<Msg91WidgetVerifier>.Instance);
 
-        _sut = new AuthController(authService, otpService, deviceService, inviteService, _turnstileVerifierMock.Object, envMock.Object, NullLogger<AuthController>.Instance)
+        _sut = new AuthController(authService, otpService, deviceService, inviteService, _turnstileVerifierMock.Object, phoneWidgetVerifier, envMock.Object, NullLogger<AuthController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };

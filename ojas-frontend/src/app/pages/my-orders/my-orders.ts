@@ -18,7 +18,9 @@ import {
   OrderItem,
   OrderResponse,
   PaymentAttemptOutcome,
+  RefundBreakdown,
   RefundDestination,
+  RefundLine,
   amountOutstanding,
   canPayOnline,
   deliveryEstimate,
@@ -235,6 +237,11 @@ export class MyOrders implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    // Reaching this page is the end of the round trip to the payment gateway, however it went -
+    // paid and redirected back, or backed out of. Left set, the marker would bounce the customer
+    // here from their *next* visit to checkout.
+    this.cashfreeCheckout.clearAwaitingPayment();
+
     const cashfreeOrderId = this.route.snapshot.queryParamMap.get('cashfreeOrderId');
     if (cashfreeOrderId) {
       this.pendingCashfreeOrderId.set(cashfreeOrderId);
@@ -574,15 +581,15 @@ export class MyOrders implements OnInit, OnDestroy {
             this.showSuccess(
               `Almost there — pay ₹${result.topUpAmount?.toFixed(2)} to confirm your changes.`,
             );
-            // Both handlers rather than .finally(), which would rethrow the rejection.
+            // Runs only when the handoff really failed - see whenHandOffFails.
             const handoffDidNotTake = () => {
               this.showError(
                 `We couldn't open the payment page for the extra ₹${result.topUpAmount?.toFixed(2)}. Your order is unchanged — use "Pay" on it to try again.`,
               );
             };
             this.cashfreeCheckout
-              .checkout(result.paymentSessionId)
-              .then(handoffDidNotTake, handoffDidNotTake);
+              .whenHandOffFails(result.paymentSessionId)
+              .then(handoffDidNotTake);
             return;
           }
 
@@ -630,8 +637,8 @@ export class MyOrders implements OnInit, OnDestroy {
       );
     };
     this.cashfreeCheckout
-      .checkout(amendment.paymentSessionId)
-      .then(handoffDidNotTake, handoffDidNotTake);
+      .whenHandOffFails(amendment.paymentSessionId)
+      .then(handoffDidNotTake);
   }
 
   /** Drops unpaid changes for good. Nothing was charged, so the order simply goes back to what
@@ -695,8 +702,8 @@ export class MyOrders implements OnInit, OnDestroy {
               this.load();
             };
             this.cashfreeCheckout
-              .checkout(placed.paymentSessionId)
-              .then(handoffDidNotTake, handoffDidNotTake);
+              .whenHandOffFails(placed.paymentSessionId)
+              .then(handoffDidNotTake);
             return;
           }
 
@@ -783,8 +790,8 @@ export class MyOrders implements OnInit, OnDestroy {
           );
         };
         this.cashfreeCheckout
-          .checkout(result.paymentSessionId)
-          .then(handoffDidNotTake, handoffDidNotTake);
+          .whenHandOffFails(result.paymentSessionId)
+          .then(handoffDidNotTake);
       },
       error: (err) => {
         this.startingPaymentId.set(null);
@@ -799,6 +806,70 @@ export class MyOrders implements OnInit, OnDestroy {
   askCancel(orderId: string): void {
     this.confirmingCancelId.set(orderId);
     this.cancelRefundDestination.set('wallet');
+  }
+
+  /**
+   * Where the customer's money actually went, one line per destination.
+   *
+   * A cancellation splits routinely: the wallet-funded share of an order can only ever return to
+   * the wallet, while the rest goes back to the card or UPI account it came from. Stating one
+   * total would send someone hunting their card statement for ₹220 when only ₹20 is ever going to
+   * appear there. The three sources never overlap — money queued to source has not been counted
+   * as refunded yet, and money already refunded is no longer queued.
+   *
+   * Shown on the card rather than only in the toast that follows the customer's own cancel,
+   * because an order cancelled by us never shows that toast at all.
+   */
+  refundBreakdown(order: OrderResponse): RefundBreakdown | null {
+    const owed = order.refundPendingAmount ?? 0;
+    const toWallet = order.refundedToWallet ?? 0;
+    const toSource = order.refundedToSource ?? 0;
+
+    const lines: RefundLine[] = [];
+
+    if (toWallet > 0) {
+      lines.push({
+        destination: 'wallet',
+        amount: toWallet,
+        note: 'Added to your Ojas wallet, ready to spend now',
+        pending: false,
+      });
+    }
+
+    if (toSource > 0) {
+      lines.push({
+        destination: 'source',
+        amount: toSource,
+        note: 'Sent back to the payment method you used — usually lands within 5-7 working days',
+        pending: false,
+      });
+    }
+
+    if (owed > 0) {
+      lines.push({
+        destination: 'source',
+        amount: owed,
+        note: 'On its way back to the payment method you used — usually lands within 5-7 working days',
+        pending: true,
+      });
+    }
+
+    if (lines.length === 0) return null;
+
+    const pending = lines.some((line) => line.pending);
+    return {
+      title: pending ? 'Refund on its way' : 'Refunded',
+      lines,
+      pending,
+    };
+  }
+
+  refundIcon(line: RefundLine): string {
+    return line.destination === 'wallet' ? 'account_balance_wallet' : 'credit_card';
+  }
+
+  refundDestinationLabel(line: RefundLine): string {
+    return line.destination === 'wallet' ? 'Ojas wallet' : 'Original payment method';
   }
 
   /** Says what actually happened to the money, rather than a bare "Order cancelled". */

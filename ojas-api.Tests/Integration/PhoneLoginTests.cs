@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Serialization;
 using System.Net.Http.Json;
 using OjasApi.Models;
 using Shouldly;
@@ -6,10 +7,16 @@ using Shouldly;
 namespace OjasApi.Tests.Integration;
 
 /// <summary>
-/// Customer sign-in with a phone number instead of email+password. The factory registers
-/// FakePhoneOtpSender (IsConfigured = true, no real MSG91 call), so this suite exercises the
-/// "MSG91 is live" path end to end - the real, currently-unconfigured 503 branch is covered by
-/// AuthControllerTests instead, where the mock's default state matches production today.
+/// Customer sign-in with a phone number instead of email+password, via the MSG91 OTP Widget: the
+/// browser sends and collects the code directly against MSG91 (never modelled here - there is no
+/// backend send step left to test), and hands the resulting access token to
+/// /phone-login/verify, which Msg91WidgetVerifier checks against MSG91 and binds to the phone in
+/// the request. FakeMsg91WidgetHandler.IssueToken stands in for a customer having completed that
+/// widget flow for a given number.
+///
+/// /phone-login/send-otp (the pre-widget raw-code flow) still exists and still works - kept as a
+/// fallback, not deleted - but is no longer called by the frontend, so it is not exercised here;
+/// its own behaviour is unchanged and still covered by AuthControllerTests.
 /// </summary>
 [Collection(MongoCollectionFixture.Name)]
 public class PhoneLoginTests : IDisposable
@@ -23,30 +30,26 @@ public class PhoneLoginTests : IDisposable
 
     public void Dispose() => _factory.Dispose();
 
-    private static async Task<string?> RequestPhoneLoginCodeAsync(HttpClient client, string phone)
+    /// <summary>Guid.ToString("N") is hex, not decimal - it can contain letters (a-f), which
+    /// Msg91WidgetVerifier's country-code-agnostic phone comparison strips out along with any
+    /// other non-digit character. A real phone number never contains letters, so the fix belongs
+    /// here (generate digits only) rather than in the verifier.</summary>
+    private static string GeneratePhone(string leadingDigit = "9")
     {
-        var response = await client.PostAsJsonAsync(
-            "/api/auth/phone-login/send-otp", new PhoneLoginRequest(phone, "test-turnstile-token"));
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadFromJsonAsync<PhoneLoginDevResponse>();
-        return body!.DevCode;
+        var digits = Math.Abs(Guid.NewGuid().GetHashCode()).ToString().PadLeft(9, '0')[..9];
+        return $"{leadingDigit}{digits}";
     }
 
     [Fact]
-    public async Task ARegisteredCustomer_CanSignIn_WithJustTheirPhoneNumber()
+    public async Task ARegisteredCustomer_CanSignIn_WithAVerifiedWidgetToken()
     {
         using var client = _factory.CreateClient();
-        var suffix = Guid.NewGuid().ToString("N")[..8];
-        var phone = $"9{suffix.PadRight(9, '0')}";
+        var phone = GeneratePhone();
         var (auth, _) = await client.RegisterAsync(phone: phone);
 
-        using var loginClient = _factory.CreateClient();
-        var code = await RequestPhoneLoginCodeAsync(loginClient, phone);
-        code.ShouldNotBeNull();
-
-        var response = await loginClient.PostAsJsonAsync(
-            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, code!));
+        var token = _factory.Msg91Widget.IssueToken(phone);
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, token));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var session = await response.Content.ReadFromJsonAsync<AuthResponse>();
@@ -55,42 +58,49 @@ public class PhoneLoginTests : IDisposable
     }
 
     [Fact]
-    public async Task AnUnregisteredNumber_GetsTheGenericResponse_WithNoCode()
+    public async Task AToken_CannotSignInAsADifferentPhone_ThanItWasIssuedFor()
     {
+        // The security-critical check: a token proves *some* number was verified, not that it was
+        // the number in this request. Without binding these, verifying your own phone and
+        // replaying the token against someone else's would sign you into their account.
         using var client = _factory.CreateClient();
+        var ownPhone = GeneratePhone();
+        var victimPhone = GeneratePhone();
+        await client.RegisterAsync(phone: victimPhone);
 
+        var token = _factory.Msg91Widget.IssueToken(ownPhone);
         var response = await client.PostAsJsonAsync(
-            "/api/auth/phone-login/send-otp",
-            new PhoneLoginRequest($"9{Guid.NewGuid():N}".Substring(0, 10), "test-turnstile-token"));
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(victimPhone, token));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PhoneLoginDevResponse>();
-        body!.DevCode.ShouldBeNull();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     [Fact]
-    public async Task StaffPhoneNumbers_CannotSignIn_ThroughThePhoneLoginPath()
+    public async Task StaffPhoneNumbers_CannotSignIn_EvenWithAVerifiedWidgetToken()
     {
         // Staff have phone numbers on file too, but phone login has no device concept - allowing
         // it here would let anyone with the number bypass the single-device restriction entirely.
+        // This has to hold at verify time now, not only at a send-time gate the widget bypasses.
         using var client = _factory.CreateClient();
-        var (_, phone) = await SeedStaffWithPhoneAsync();
+        var phone = GeneratePhone("8");
+        await SeedStaffWithPhoneAsync(phone);
 
-        var code = await RequestPhoneLoginCodeAsync(client, phone);
+        var token = _factory.Msg91Widget.IssueToken(phone);
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, token));
 
-        // No code was ever generated for a staff number, so this is silently a no-op - the same
-        // shape as an unregistered number, which is the point: it must not be distinguishable.
-        code.ShouldBeNull();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     [Fact]
-    public async Task AnUnverifiedCustomer_CannotSignIn_ThroughThePhoneLoginPath()
+    public async Task AnUnverifiedCustomer_CannotSignIn_EvenWithAVerifiedWidgetToken()
     {
-        // Registered but never completed email verification - a phone-login code must not hand
-        // out a session to an account that never finished signing up.
+        // Registered but never completed email verification - a phone-login token must not hand
+        // out a session to an account that never finished signing up, regardless of what MSG91
+        // itself confirmed about the phone number.
         using var client = _factory.CreateClient();
+        var phone = GeneratePhone();
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var phone = $"9{suffix.PadRight(9, '0')}";
 
         await _factory.SeedAsync(async db => await db.Users.InsertOneAsync(new User
         {
@@ -102,78 +112,106 @@ public class PhoneLoginTests : IDisposable
             IsEmailVerified = false,
         }));
 
-        var code = await RequestPhoneLoginCodeAsync(client, phone);
-
-        code.ShouldBeNull();
-    }
-
-    [Fact]
-    public async Task AWrongCode_IsRejected_AndIssuesNoSession()
-    {
-        using var client = _factory.CreateClient();
-        var suffix = Guid.NewGuid().ToString("N")[..8];
-        var phone = $"9{suffix.PadRight(9, '0')}";
-        await client.RegisterAsync(phone: phone);
-        await RequestPhoneLoginCodeAsync(client, phone);
-
+        var token = _factory.Msg91Widget.IssueToken(phone);
         var response = await client.PostAsJsonAsync(
-            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, "000000"));
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, token));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     [Fact]
-    public async Task ACodeCannotBeRedeemedTwice()
+    public async Task AnUnrecognisedToken_IsRejected_AndIssuesNoSession()
     {
         using var client = _factory.CreateClient();
-        var suffix = Guid.NewGuid().ToString("N")[..8];
-        var phone = $"9{suffix.PadRight(9, '0')}";
+        var phone = GeneratePhone();
         await client.RegisterAsync(phone: phone);
-        var code = await RequestPhoneLoginCodeAsync(client, phone);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, "never-issued-token"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ATokenCannotBeRedeemedTwice()
+    {
+        using var client = _factory.CreateClient();
+        var phone = GeneratePhone();
+        await client.RegisterAsync(phone: phone);
+        var token = _factory.Msg91Widget.IssueToken(phone);
 
         var first = await client.PostAsJsonAsync(
-            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, code!));
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, token));
         first.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var replay = await client.PostAsJsonAsync(
-            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, code!));
+            "/api/auth/phone-login/verify", new PhoneLoginVerifyRequest(phone, token));
         replay.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    // ---------- phone-login/exists (MSG91's "User Existence Validation" hook) ----------
+
     [Fact]
-    public async Task PhoneLogin_IsRejected_WithoutACorrectTurnstileToken()
+    public async Task Exists_ReportsTrue_ForARegisteredVerifiedCustomer()
     {
         using var client = _factory.CreateClient();
-        var suffix = Guid.NewGuid().ToString("N")[..8];
-        var phone = $"9{suffix.PadRight(9, '0')}";
+        var phone = GeneratePhone();
         await client.RegisterAsync(phone: phone);
 
-        var response = await client.PostAsJsonAsync(
-            "/api/auth/phone-login/send-otp", new PhoneLoginRequest(phone, ""));
+        var response = await client.GetAsync($"/api/auth/phone-login/exists?identifier={phone}");
 
-        // Missing token fails model validation ([Required]) before Turnstile is even checked.
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<UserExistenceResponse>();
+        body!.UserFound.ShouldBeTrue();
+        body.Identifier.ShouldBe(phone);
     }
 
-    private async Task<(string Email, string Phone)> SeedStaffWithPhoneAsync()
+    [Fact]
+    public async Task Exists_ReportsFalse_ForAnUnregisteredNumber()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/auth/phone-login/exists?identifier={GeneratePhone()}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<UserExistenceResponse>();
+        body!.UserFound.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Exists_ReportsFalse_ForAStaffPhoneNumber()
+    {
+        using var client = _factory.CreateClient();
+        var phone = GeneratePhone("8");
+        await SeedStaffWithPhoneAsync(phone);
+
+        var response = await client.GetAsync($"/api/auth/phone-login/exists?identifier={phone}");
+
+        var body = await response.Content.ReadFromJsonAsync<UserExistenceResponse>();
+        body!.UserFound.ShouldBeFalse();
+    }
+
+    private async Task SeedStaffWithPhoneAsync(string phone)
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var email = $"staff.{suffix}@example.com";
-        var phone = $"8{suffix.PadRight(9, '0')}";
 
         await _factory.SeedAsync(async db => await db.Users.InsertOneAsync(new User
         {
             FullName = "Test Delivery Partner",
-            Email = email,
+            Email = $"staff.{suffix}@example.com",
             Phone = phone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Passw0rd123!"),
             Role = UserRoles.Delivery,
             IsEmailVerified = true,
             IsPhoneVerified = true,
         }));
-
-        return (email, phone);
     }
 
-    private record PhoneLoginDevResponse(string Message, string? DevCode);
+    /// <summary>MSG91's required contract is snake_case (user_found), not the .NET default -
+    /// System.Text.Json does not bridge that gap on its own, so the property names have to be
+    /// pinned explicitly rather than relying on case-insensitive matching (which only handles
+    /// case, not the underscore).</summary>
+    private record UserExistenceResponse(
+        [property: JsonPropertyName("user_found")] bool UserFound,
+        [property: JsonPropertyName("identifier")] string Identifier);
 }

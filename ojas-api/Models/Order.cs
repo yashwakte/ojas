@@ -158,6 +158,44 @@ public class OrderAmendment
     public bool HasExpired => DateTime.UtcNow >= ExpiresAt;
 }
 
+/// <summary>One refund we sent back to the original payment method, keyed by the refund id we
+/// generated for it. Recorded per <em>gateway order</em> rather than only as an order-wide total,
+/// because the money an order holds can be spread across several gateway orders — the original
+/// plus one per top-up — and a refund has to be raised against the gateway order that actually
+/// captured it. Without this the allocator could not tell how much of each leg was still
+/// refundable, and a second refund would try to take it out of the first leg all over again.</summary>
+public class OrderRefund
+{
+    /// <summary>The id we generated and sent to the gateway. Unique per attempt, and the
+    /// idempotency key that stops a retried call recording the same refund twice.</summary>
+    [BsonElement("refundId")]
+    public required string RefundId { get; set; }
+
+    /// <summary>The gateway order this refund was raised against — the original order id, or a
+    /// suffixed top-up id.</summary>
+    [BsonElement("cashfreeOrderId")]
+    public required string CashfreeOrderId { get; set; }
+
+    [BsonElement("amount")]
+    public decimal Amount { get; set; }
+
+    /// <summary>Whatever the gateway last reported - "PENDING", "ONHOLD", "SUCCESS", "FAILED",
+    /// "CANCELLED". Creating a refund answers PENDING, not SUCCESS: the acquiring bank can still
+    /// reject it days later, which is what <see cref="IsReversed"/> is for.</summary>
+    [BsonElement("status")]
+    public string? Status { get; set; }
+
+    /// <summary>The bank refused this refund, so the money never reached the customer and the
+    /// order still holds it. Such a refund must stop counting against what is refundable, or the
+    /// order would go on believing it handed back money it still has.</summary>
+    public bool IsReversed =>
+        string.Equals(Status, "FAILED", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Status, "CANCELLED", StringComparison.OrdinalIgnoreCase);
+
+    [BsonElement("createdAt")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class Order
 {
     [BsonId]
@@ -277,10 +315,84 @@ public class Order
     public decimal SettledAmount =>
         Math.Round(AmountPaid + GatewayDiscountTotal, 2, MidpointRounding.AwayFromZero);
 
+    /// <summary>Every refund sent back to the original payment method, keyed by refund id.
+    /// Wallet credits are not in here — nothing leaves the business for those — so this is
+    /// specifically what the gateway has been asked to hand back, and it is what tells the
+    /// allocator how much of each gateway order is still refundable.</summary>
+    [BsonElement("refunds")]
+    public List<OrderRefund> Refunds { get; set; } = [];
+
+    /// <summary>What each gateway order still has refundable on it: everything it captured, less
+    /// everything already refunded against it. A gateway offer is deliberately not counted — the
+    /// discount was never our money, so it can never be handed back, and neither is the
+    /// wallet-funded share, which has no card behind it to refund to.</summary>
+    public Dictionary<string, decimal> RefundableByGatewayOrder(string fallbackGatewayOrderId)
+    {
+        // An order that holds gateway money but records no individual payments predates payments
+        // being recorded one by one. There is only one place that money can have come from — the
+        // original gateway order, whose id is the order's own — so it is refundable rather than
+        // stranded. Measured against what the order still holds rather than against the refund
+        // records, because reserving a refund already lowers that figure.
+        if (Payments.Count == 0)
+        {
+            var legacy = Math.Round(AmountPaid - WalletAmountApplied, 2, MidpointRounding.AwayFromZero);
+            return legacy > 0
+                ? new Dictionary<string, decimal>(StringComparer.Ordinal) { [fallbackGatewayOrderId] = legacy }
+                : new Dictionary<string, decimal>(StringComparer.Ordinal);
+        }
+
+        var balances = new Dictionary<string, decimal>(StringComparer.Ordinal);
+
+        foreach (var payment in Payments)
+        {
+            // Payments recorded before top-ups existed carry no gateway order id; they can only
+            // have come from the original gateway order.
+            var key = string.IsNullOrWhiteSpace(payment.CashfreeOrderId)
+                ? fallbackGatewayOrderId
+                : payment.CashfreeOrderId;
+            balances.TryGetValue(key, out var current);
+            balances[key] = current + payment.Amount;
+        }
+
+        foreach (var refund in Refunds)
+        {
+            // A refund the bank bounced gave nothing back, so the money is refundable again.
+            if (refund.IsReversed) continue;
+
+            balances.TryGetValue(refund.CashfreeOrderId, out var current);
+            balances[refund.CashfreeOrderId] = current - refund.Amount;
+        }
+
+        return balances
+            .Where(kv => Math.Round(kv.Value, 2, MidpointRounding.AwayFromZero) > 0)
+            .ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value, 2, MidpointRounding.AwayFromZero), StringComparer.Ordinal);
+    }
+
     /// <summary>Total handed back so far — wallet credits and refunds to the original payment
     /// method alike. Kept separate from the captured figure so neither has to be overwritten.</summary>
     [BsonElement("amountRefunded")]
     public decimal AmountRefunded { get; set; }
+
+    /// <summary>
+    /// How much of <see cref="AmountRefunded"/> went back to the original payment method.
+    ///
+    /// Derived from the refund records rather than counted separately, so it cannot drift from
+    /// them. Refunds the bank bounced are excluded for the same reason they are excluded from
+    /// what is refundable: nothing reached the customer.
+    /// </summary>
+    public decimal RefundedToSource =>
+        Math.Round(Refunds.Where(r => !r.IsReversed).Sum(r => r.Amount), 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>The rest of what was handed back, which went to the customer's Ojas wallet — the
+    /// wallet-funded share of any cancellation always does, and so does the whole refund when a
+    /// cancelling customer picks wallet credit.
+    ///
+    /// A cancellation can easily split both ways at once (a part-wallet order cancelled to source
+    /// hands the wallet share back to the wallet and the rest to the card), and one total cannot
+    /// say that. The customer has to be told which money went where, or "₹220 refunded" leaves
+    /// them looking for ₹220 on a card statement that will only ever show ₹20.</summary>
+    public decimal RefundedToWallet =>
+        Math.Round(AmountRefunded - RefundedToSource, 2, MidpointRounding.AwayFromZero);
 
     /// <summary>What this order currently holds: wallet credit spent, plus every captured
     /// gateway payment, minus everything handed back. Derived from the records above rather than

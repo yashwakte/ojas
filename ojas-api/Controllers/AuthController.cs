@@ -40,6 +40,7 @@ public class AuthController : ControllerBase
     private readonly DeviceService _deviceService;
     private readonly StaffInviteService _inviteService;
     private readonly ITurnstileVerifier _turnstileVerifier;
+    private readonly Msg91WidgetVerifier _phoneWidgetVerifier;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AuthController> _logger;
 
@@ -49,6 +50,7 @@ public class AuthController : ControllerBase
         DeviceService deviceService,
         StaffInviteService inviteService,
         ITurnstileVerifier turnstileVerifier,
+        Msg91WidgetVerifier phoneWidgetVerifier,
         IWebHostEnvironment env,
         ILogger<AuthController> logger)
     {
@@ -57,6 +59,7 @@ public class AuthController : ControllerBase
         _deviceService = deviceService;
         _inviteService = inviteService;
         _turnstileVerifier = turnstileVerifier;
+        _phoneWidgetVerifier = phoneWidgetVerifier;
         _env = env;
         _logger = logger;
     }
@@ -615,7 +618,11 @@ public class AuthController : ControllerBase
 
     /// <summary>Step one of signing in by phone instead of email+password - customers only, see
     /// AuthService.IsLoginablePhoneAsync. 503s until MSG91 is configured; Turnstile-gated since,
-    /// unlike device/send-otp, nothing here already proves the caller controls anything.</summary>
+    /// unlike device/send-otp, nothing here already proves the caller controls anything.
+    ///
+    /// Superseded by the MSG91 OTP Widget, which sends directly from the browser rather than
+    /// through this endpoint - kept working (not deleted) as a fallback path, same posture as
+    /// SmtpEmailSender being kept alongside Resend, but the frontend no longer calls it.</summary>
     [HttpPost("phone-login/send-otp")]
     public async Task<IActionResult> SendPhoneLoginOtp([FromBody] PhoneLoginRequest request)
     {
@@ -635,20 +642,35 @@ public class AuthController : ControllerBase
         return Ok(new { message = "If that number is registered, we've sent a code.", devCode });
     }
 
-    /// <summary>Step two: a correct code signs the customer in directly - no password, no device
-    /// concept, since phone login only ever applies to customers.</summary>
+    /// <summary>Step two: a token from the MSG91 OTP Widget signs the customer in directly - no
+    /// password, no device concept, since phone login only ever applies to customers. The token
+    /// is checked against MSG91's own servers and bound to this exact phone number by
+    /// Msg91WidgetVerifier - never trusted on the strength of "MSG91 says it's valid" alone.</summary>
     [HttpPost("phone-login/verify")]
     public async Task<ActionResult<AuthResponse>> VerifyPhoneLogin([FromBody] PhoneLoginVerifyRequest request)
     {
-        var isValid = await _otpService.VerifyAsync(request.Phone, OtpChannels.PhoneLogin, request.Code);
-        if (!isValid)
-            return BadRequest(new { message = "That code is invalid or has expired." });
+        var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
+        if (!verification.Success)
+            return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
 
         var result = await _authService.PhoneLoginAsync(request.Phone);
         if (result == null)
             return BadRequest(new { message = "That code is invalid or has expired." });
 
         return Ok(IssueSession(result));
+    }
+
+    /// <summary>Called by MSG91's servers, not the browser - the "User Existence Validation" hook
+    /// the OTP Widget queries before sending, so a stranger cannot use Ojas's widget to blast an
+    /// OTP at a phone number with no Ojas account. Deliberately anonymous, matching the payment
+    /// webhook's posture: it is a server-to-server callback by design. The response shape
+    /// (user_found / identifier) is MSG91's required contract, not Ojas's own convention.</summary>
+    [HttpGet("phone-login/exists")]
+    [AllowAnonymous]
+    public async Task<IActionResult> PhoneLoginExists([FromQuery] string identifier)
+    {
+        var found = !string.IsNullOrWhiteSpace(identifier) && await _authService.IsLoginablePhoneAsync(identifier);
+        return Ok(new { user_found = found, identifier });
     }
 
     [HttpGet("staff/{userId}/devices")]

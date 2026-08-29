@@ -115,8 +115,20 @@ describe('Checkout', () => {
       },
     );
     orderServiceSpy = jasmine.createSpyObj('OrderService', ['placeOrder']);
-    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', ['checkout']);
-    cashfreeCheckoutServiceSpy.checkout.and.returnValue(Promise.resolve());
+    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', [
+      'whenHandOffFails',
+      'markAwaitingPayment',
+      'awaitingPayment',
+      'clearAwaitingPayment',
+    ]);
+    // whenHandOffFails settles ONLY when the handoff failed, so a successful one never settles.
+    // This used to be Promise.resolve() against a service whose promise settled on success too,
+    // and the "spinner stays up" assertion below only passed because it ran before the microtask
+    // did. In a real browser that microtask won, and the customer was told the payment page
+    // couldn't open at the exact moment it was opening.
+    cashfreeCheckoutServiceSpy.whenHandOffFails.and.returnValue(new Promise<void>(() => {}));
+    // No marker by default: an ordinary visit to checkout, not a return from the payment page.
+    cashfreeCheckoutServiceSpy.awaitingPayment.and.returnValue(null);
     productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts']);
     authServiceSpy = { user: signal<AuthResponse | null>(authUser) };
     userServiceSpy = jasmine.createSpyObj('UserService', ['getProfile', 'saveAddress']);
@@ -367,7 +379,7 @@ describe('Checkout', () => {
 
     fixture.componentInstance.placeOrder();
 
-    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_abc');
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_abc');
     // The redirect takes over from here, so the spinner deliberately stays up.
     expect(fixture.componentInstance.loading()).toBeTrue();
   });
@@ -432,23 +444,74 @@ describe('Checkout', () => {
     fixture.componentInstance.placeOrder();
     await fixture.whenStable();
 
-    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_abc');
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_abc');
     // Emptying the basket here is what used to leave a customer whose payment failed with
     // nothing to try again from. My Orders clears it once the payment is actually confirmed.
     expect(checkoutServiceSpy.clear).not.toHaveBeenCalled();
     expect(cartServiceSpy.removeFromCart).not.toHaveBeenCalled();
   });
 
-  it('tells the customer nothing was charged if the payment page never opens', async () => {
+  /**
+   * The order already exists by this point, so this page must not offer to "try again" from here
+   * — pressing Proceed to Pay again would place a second order for the same basket. My Orders is
+   * where an unpaid order can actually be paid, and it asks the gateway what really happened
+   * rather than this page guessing.
+   */
+  it('sends the customer to their unpaid order when the payment page never opens', async () => {
     orderServiceSpy.placeOrder.and.returnValue(of(order));
-    cashfreeCheckoutServiceSpy.checkout.and.returnValue(Promise.reject(new Error('sdk failed')));
+    cashfreeCheckoutServiceSpy.whenHandOffFails.and.returnValue(Promise.resolve());
+    const navigateSpy = spyOn(router, 'navigate');
     const fixture = create();
 
     fixture.componentInstance.placeOrder();
     await fixture.whenStable();
 
     expect(fixture.componentInstance.loading()).toBeFalse();
-    expect(fixture.componentInstance.errorMsg()).toContain('nothing was charged');
+    expect(navigateSpy).toHaveBeenCalledWith(['/my-orders'], {
+      queryParams: { cashfreeOrderId: order.id },
+    });
+    expect(cashfreeCheckoutServiceSpy.clearAwaitingPayment).toHaveBeenCalled();
+  });
+
+  /**
+   * The case the customer actually reported: they reach Cashfree's page, decide not to pay, and
+   * press Back. That used to land them here being told "We couldn't open the payment page" — for
+   * a page that had opened perfectly well, about an order that already exists. Pressing Back can
+   * restore this page from the browser's cache without re-running ngOnInit, which is why the
+   * pageshow handler carries this and not only ngOnInit.
+   */
+  it('sends a customer who backs out of the payment page to their order, not to an error', () => {
+    cashfreeCheckoutServiceSpy.awaitingPayment.and.returnValue('order-1');
+    const navigateSpy = spyOn(router, 'navigate');
+    const fixture = create();
+
+    fixture.componentInstance.onPageShow();
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/my-orders'], {
+      queryParams: { cashfreeOrderId: 'order-1' },
+    });
+    expect(fixture.componentInstance.errorMsg()).toBe('');
+  });
+
+  it('leaves an ordinary visit to checkout alone', () => {
+    cashfreeCheckoutServiceSpy.awaitingPayment.and.returnValue(null);
+    const navigateSpy = spyOn(router, 'navigate');
+    const fixture = create();
+
+    fixture.componentInstance.onPageShow();
+
+    expect(navigateSpy).not.toHaveBeenCalledWith(['/my-orders'], jasmine.anything());
+  });
+
+  it('remembers the order it sent the customer off to pay for', async () => {
+    orderServiceSpy.placeOrder.and.returnValue(of(order));
+    const navigateSpy = spyOn(router, 'navigate');
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+    await fixture.whenStable();
+
+    expect(cashfreeCheckoutServiceSpy.markAwaitingPayment).toHaveBeenCalledWith(order.id);
   });
 
   // ---------- wallet ----------
@@ -551,7 +614,7 @@ describe('Checkout', () => {
     fixture.componentInstance.placeOrder();
     await fixture.whenStable();
 
-    expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/my-orders']);
     expect(fixture.componentInstance.errorMsg()).toBe('');
     // Nothing was left to pay, so there is no payment that could still fail - this is the one
@@ -567,7 +630,7 @@ describe('Checkout', () => {
     fixture.componentInstance.placeOrder();
     await fixture.whenStable();
 
-    expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
     expect(fixture.componentInstance.errorMsg()).toContain("couldn't start the payment");
   });
 

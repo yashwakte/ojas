@@ -69,11 +69,12 @@ describe('MyOrders', () => {
     // Order lines resolve their pack shot from the live catalogue; an order for a product that
     // has since been withdrawn simply gets no image, which is the default here.
     productServiceSpy.getProduct.and.returnValue(undefined);
-    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', ['checkout']);
-    // A handoff that takes navigates the browser away, so the promise never settles. Resolving it
-    // instead would model the *failure* path — the component treats "came back" as "the page
-    // didn't open" — and fire a snackbar after the fixture is torn down.
-    cashfreeCheckoutServiceSpy.checkout.and.returnValue(new Promise<void>(() => {}));
+    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', ['whenHandOffFails', 'clearAwaitingPayment']);
+    // whenHandOffFails settles ONLY when the handoff failed, so a successful one never settles.
+    // Note this double now matches the SDK rather than a belief about it: cashfree.checkout()
+    // does settle on success, and a double that never did could never have caught the bug where
+    // success was treated as failure.
+    cashfreeCheckoutServiceSpy.whenHandOffFails.and.returnValue(new Promise<void>(() => {}));
     walletServiceSpy = jasmine.createSpyObj('WalletService', ['load'], { balance: signal(0) });
     walletServiceSpy.load.and.returnValue(of({ balance: 0, transactions: [] }));
     cartServiceSpy = jasmine.createSpyObj('CartService', ['removeFromCart']);
@@ -286,7 +287,7 @@ describe('MyOrders', () => {
       fixture.componentInstance.payForAmendment(withPendingTopUp);
       fixture.componentInstance.retryPayment(withPendingTopUp);
 
-      expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+      expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
       expect(orderServiceSpy.placeOrder).not.toHaveBeenCalled();
     });
 
@@ -523,7 +524,7 @@ describe('MyOrders', () => {
     fixture.componentInstance.saveEdit(couponOrder);
     await flushMicrotasks();
 
-    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_topup');
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_topup');
   });
 
   // ---------- changes that were never paid for ----------
@@ -558,7 +559,7 @@ describe('MyOrders', () => {
 
     fixture.componentInstance.payForAmendment(orderWithAmendment);
 
-    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_topup');
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_topup');
   });
 
   it('drops unpaid changes and puts the untouched order back on screen', () => {
@@ -761,7 +762,7 @@ describe('MyOrders', () => {
     fixture.componentInstance.saveEdit(couponOrder);
     await flushMicrotasks();
 
-    expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
   });
   // ---------- a payment that never went through ----------
 
@@ -802,7 +803,7 @@ describe('MyOrders', () => {
       }),
     );
     // Straight to the payment page — no detour through the cart and checkout again.
-    expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session_retry');
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_retry');
     expect(fixture.componentInstance.retryingPaymentId()).toBeNull();
   });
 
@@ -815,7 +816,7 @@ describe('MyOrders', () => {
 
     fixture.componentInstance.retryPayment(failedOrder);
 
-    expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+    expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
     expect(fixture.componentInstance.retryingPaymentId()).toBeNull();
   });
 
@@ -991,7 +992,7 @@ describe('MyOrders', () => {
       const fixture = create();
       fixture.componentInstance.payNow(unpaid);
 
-      expect(cashfreeCheckoutServiceSpy.checkout).toHaveBeenCalledWith('session-abc');
+      expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session-abc');
     });
 
     it('never opens a payment page when the money already arrived', () => {
@@ -1006,7 +1007,7 @@ describe('MyOrders', () => {
       const fixture = create();
       fixture.componentInstance.payNow(unpaid);
 
-      expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+      expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
       // Swapped in whole, not patched: reconciliation moves more of the order than this handler
       // knows about.
       expect(fixture.componentInstance.orders()[0]).toEqual(settled);
@@ -1021,7 +1022,7 @@ describe('MyOrders', () => {
       const fixture = create();
       fixture.componentInstance.payNow(unpaid);
 
-      expect(cashfreeCheckoutServiceSpy.checkout).not.toHaveBeenCalled();
+      expect(cashfreeCheckoutServiceSpy.whenHandOffFails).not.toHaveBeenCalled();
     });
   });
 
@@ -1085,4 +1086,65 @@ describe('MyOrders', () => {
     });
   });
 
+  /**
+   * An order cancelled by us never goes through the customer's own cancel dialog, so it never
+   * shows the toast that says where the money went. And a cancellation routinely splits: the
+   * wallet-funded share can only ever return to the wallet while the rest goes back to the card.
+   * One total would send someone hunting a card statement for money that was never coming there.
+   */
+  describe('where the money went on a cancelled order', () => {
+    it('breaks the refund out by destination when it went both ways', () => {
+      const cancelled = {
+        ...order,
+        status: 'Cancelled',
+        amountPaid: 0,
+        amountRefunded: 220,
+        refundedToWallet: 200,
+        refundedToSource: 20,
+      };
+      userServiceSpy.getMyOrders.and.returnValue(of([cancelled]));
+      const fixture = create();
+
+      const refund = fixture.componentInstance.refundBreakdown(cancelled);
+
+      expect(refund?.title).toBe('Refunded');
+      expect(refund?.pending).toBeFalse();
+      expect(refund?.lines.map((l) => [l.destination, l.amount])).toEqual([
+        ['wallet', 200],
+        ['source', 20],
+      ]);
+    });
+
+    it('shows a queued refund as still on its way, alongside what has already landed', () => {
+      const owed = {
+        ...order,
+        status: 'Cancelled',
+        amountPaid: 20,
+        amountRefunded: 200,
+        refundedToWallet: 200,
+        refundedToSource: 0,
+        refundPendingAmount: 20,
+      };
+      userServiceSpy.getMyOrders.and.returnValue(of([owed]));
+      const fixture = create();
+
+      const refund = fixture.componentInstance.refundBreakdown(owed);
+
+      expect(refund?.title).toBe('Refund on its way');
+      expect(refund?.pending).toBeTrue();
+      // The wallet credit is already there; only the card refund is still in flight. Queued money
+      // has not been counted as refunded, so the two can never double up.
+      expect(refund?.lines).toEqual([
+        jasmine.objectContaining({ destination: 'wallet', amount: 200, pending: false }),
+        jasmine.objectContaining({ destination: 'source', amount: 20, pending: true }),
+      ]);
+    });
+
+    it('says nothing on an ordinary order that was never refunded', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.refundBreakdown(order)).toBeNull();
+    });
+  });
 });

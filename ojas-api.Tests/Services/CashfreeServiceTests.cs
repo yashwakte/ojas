@@ -50,6 +50,107 @@ public class CashfreeServiceTests
         return Convert.ToBase64String(hash);
     }
 
+    // ---------- Environment ----------
+
+    /// <summary>The mode the browser is told to load its checkout SDK in. It has to be derived
+    /// from the same setting that picks the API base URL — if the two could ever disagree, the
+    /// server would raise a payment session in one environment and the SDK would try to open it
+    /// in the other, which fails every time.</summary>
+    [Theory]
+    [InlineData("production", "production")]
+    [InlineData("PRODUCTION", "production")]
+    [InlineData("sandbox", "sandbox")]
+    [InlineData("", "sandbox")]
+    [InlineData(null, "sandbox")]
+    public void Mode_IsProduction_OnlyWhenExplicitlyConfiguredSo(string? configured, string expected)
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Cashfree:Environment"] = configured })
+            .Build();
+
+        new CashfreeService(new HttpClient(), config).Mode.ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("production", "api.cashfree.com")]
+    [InlineData("sandbox", "sandbox.cashfree.com")]
+    public async Task CreateOrderAsync_CallsTheHostMatchingTheConfiguredEnvironment(string environment, string expectedHost)
+    {
+        Uri? requested = null;
+        var service = MakeService(
+            request =>
+            {
+                requested = request.RequestUri;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """{"cf_order_id":"cf_order_1","payment_session_id":"session_abc"}""",
+                        Encoding.UTF8, "application/json"),
+                };
+            },
+            ConfiguredSettings(environment));
+
+        await service.CreateOrderAsync(MakeOrder());
+
+        requested!.Host.ShouldBe(expectedHost);
+    }
+
+    // ---------- EnsureCredentialsMatchEnvironment ----------
+
+    private static IConfiguration Credentials(string? environment, string? clientId) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cashfree:Environment"] = environment,
+                ["Cashfree:ClientId"] = clientId,
+            })
+            .Build();
+
+    /// <summary>The half-done go-live: the environment was flipped but the sandbox key was left
+    /// behind. It authenticates against nothing on the live API, so every payment on the site
+    /// fails — which is worth refusing to start over.</summary>
+    [Fact]
+    public void EnsureCredentialsMatchEnvironment_Throws_WhenAProductionEnvironmentHasASandboxKey()
+    {
+        Should.Throw<InvalidOperationException>(
+            () => CashfreeService.EnsureCredentialsMatchEnvironment(
+                Credentials("production", "TEST11190806f0443e55c5602153d89a608091")));
+    }
+
+    /// <summary>The likelier half-done go-live, because nothing defaults the environment: the
+    /// live keys get pasted into Render and Cashfree__Environment is forgotten, which quietly
+    /// sends them to the sandbox gateway.</summary>
+    [Theory]
+    [InlineData("sandbox")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void EnsureCredentialsMatchEnvironment_Throws_WhenALiveKeyIsNotInProduction(string? environment)
+    {
+        Should.Throw<InvalidOperationException>(
+            () => CashfreeService.EnsureCredentialsMatchEnvironment(
+                Credentials(environment, "1234567890abcdef")));
+    }
+
+    [Theory]
+    [InlineData("production", "1234567890abcdef")]
+    [InlineData("sandbox", "TEST11190806f0443e55c5602153d89a608091")]
+    public void EnsureCredentialsMatchEnvironment_Allows_AMatchingPair(string environment, string clientId)
+    {
+        Should.NotThrow(() => CashfreeService.EnsureCredentialsMatchEnvironment(
+            Credentials(environment, clientId)));
+    }
+
+    /// <summary>An unconfigured gateway must not stop the storefront from starting — browsing
+    /// still works, and the checkout says plainly that payments are unavailable.</summary>
+    [Theory]
+    [InlineData("sandbox", null)]
+    [InlineData("production", null)]
+    [InlineData("production", "")]
+    public void EnsureCredentialsMatchEnvironment_DoesNotThrow_WhenThereAreNoCredentials(string environment, string? clientId)
+    {
+        Should.NotThrow(() => CashfreeService.EnsureCredentialsMatchEnvironment(Credentials(environment, clientId)));
+    }
+
     // ---------- IsConfigured ----------
 
     [Fact]

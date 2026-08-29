@@ -69,20 +69,32 @@ public class OrdersControllerTests
         SetUser("user-1");
     }
 
-    private OrdersController BuildController(CashfreeService cashfreeService) => new(
-        new OrderService(_dbMock.Object),
-        _dbMock.Object,
-        new DeliveryChargesService(_dbMock.Object),
-        new ProductService(_dbMock.Object),
-        cashfreeService,
-        new WalletService(_dbMock.Object),
-        new OrderPaymentOutcomeService(
+    private OrdersController BuildController(CashfreeService cashfreeService)
+    {
+        var paymentOutcome = new OrderPaymentOutcomeService(
             new OrderService(_dbMock.Object),
             new ProductService(_dbMock.Object),
             new WalletService(_dbMock.Object),
             cashfreeService,
-            NullLogger<OrderPaymentOutcomeService>.Instance),
-        NullLogger<OrdersController>.Instance);
+            NullLogger<OrderPaymentOutcomeService>.Instance);
+
+        return new(
+            new OrderService(_dbMock.Object),
+            _dbMock.Object,
+            new DeliveryChargesService(_dbMock.Object),
+            new ProductService(_dbMock.Object),
+            cashfreeService,
+            new WalletService(_dbMock.Object),
+            paymentOutcome,
+            new OrderCancellationService(
+                new OrderService(_dbMock.Object),
+                new ProductService(_dbMock.Object),
+                new WalletService(_dbMock.Object),
+                cashfreeService,
+                paymentOutcome,
+                NullLogger<OrderCancellationService>.Instance),
+            NullLogger<OrdersController>.Instance);
+    }
 
     /// <summary>A controller whose Cashfree has no credentials — the state production sits in
     /// before live keys are set, where online payment (and so all checkout) is unavailable.</summary>
@@ -320,7 +332,7 @@ public class OrdersControllerTests
     {
         var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("NotAStatus"));
 
-        result.ShouldBeOfType<BadRequestObjectResult>();
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -331,11 +343,14 @@ public class OrdersControllerTests
 
         var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Confirmed"));
 
-        result.ShouldBeOfType<NotFoundObjectResult>();
+        result.Result.ShouldBeOfType<NotFoundObjectResult>();
     }
 
+    /// <summary>The whole order comes back rather than a bare 204: cancelling changes what the
+    /// order holds and what was refunded, and a dashboard patching one field onto its own copy
+    /// would go on showing the rest as it was before.</summary>
     [Fact]
-    public async Task UpdateOrderStatusAsAdmin_ReturnsNoContent_OnSuccess()
+    public async Task UpdateOrderStatusAsAdmin_ReturnsTheUpdatedOrder_OnSuccess()
     {
         _ordersMock.SetupFind(new List<Order> { MakeOrder() });
         _ordersMock
@@ -344,7 +359,10 @@ public class OrdersControllerTests
 
         var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Confirmed"));
 
-        result.ShouldBeOfType<NoContentResult>();
+        var ok = result.Result.ShouldBeOfType<OkObjectResult>();
+        var payload = ok.Value.ShouldBeOfType<AdminStatusChangeResponse>();
+        payload.Order.ShouldNotBeNull();
+        payload.RefundedToSource.ShouldBe(0m);
     }
 
     [Fact]
@@ -359,7 +377,7 @@ public class OrdersControllerTests
 
         var result = await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Cancelled"));
 
-        result.ShouldBeOfType<NoContentResult>();
+        result.Result.ShouldBeOfType<OkObjectResult>();
         // Cancelled goods go back on the shelf — one update per order line.
         _productsMock.Verify(c => c.UpdateOneAsync(
             It.IsAny<FilterDefinition<Product>>(),
@@ -368,25 +386,11 @@ public class OrdersControllerTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
-    public async Task UpdateOrderStatusAsAdmin_DoesNotRestoreStockTwice_WhenAlreadyCancelled()
-    {
-        var order = MakeOrder();
-        order.Status = "Cancelled";
-        order.Items = [MakeOrderItem()];
-        _ordersMock.SetupFind(new List<Order> { order });
-        _ordersMock
-            .Setup(c => c.UpdateOneAsync(It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
-
-        await _sut.UpdateOrderStatusAsAdmin("507f1f77bcf86cd799439011", new UpdateOrderStatusRequest("Cancelled"));
-
-        _productsMock.Verify(c => c.UpdateOneAsync(
-            It.IsAny<FilterDefinition<Product>>(),
-            It.IsAny<UpdateDefinition<Product>>(),
-            It.IsAny<UpdateOptions>(),
-            It.IsAny<CancellationToken>()), Times.Never);
-    }
+    // Cancelling twice used to be guarded by reading the status and writing it afterwards, which
+    // a mocked collection could express. It is now claimed by the cancelling write's own filter,
+    // which only a real database enforces — so that guarantee is covered by
+    // AdminCancellationTests.CancellingTwice_RefundsOnlyOnce against real MongoDB. A mock that
+    // acknowledges every update would assert the mock rather than the behaviour.
 
     // ---------- AssignDeliveryPartner ----------
 
@@ -504,11 +508,12 @@ public class OrdersControllerTests
         var result = await _sut.RefundOrder(order.Id!, new RefundOrderRequest(100m));
 
         result.ShouldBeOfType<OkObjectResult>();
-        // Three writes once the money is on its way back: the queued reminder is discharged, the
-        // refund is recorded against the order, and the paid figure is re-derived from both.
+        // Four writes once the money is on its way back: the amount is reserved before the payout,
+        // the refund is recorded against the gateway order that took the money, the queued
+        // reminder is discharged, and the paid figure is re-derived from all of it.
         _ordersMock.Verify(c => c.UpdateOneAsync(
             It.IsAny<FilterDefinition<Order>>(), It.IsAny<UpdateDefinition<Order>>(),
-            It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+            It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()), Times.Exactly(4));
     }
 
     [Fact]

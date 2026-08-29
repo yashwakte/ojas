@@ -348,6 +348,61 @@ export interface OrderResponse {
    * 'Failed'. Shown verbatim: a declined card and an abandoned page need different things done
    * about them, so guessing between them is worse than saying nothing. */
   paymentFailureReason?: string | null;
+  /** What has been handed back so far — wallet credit and refunds to the original payment method
+   * alike. A cancelled order that was paid for shows nothing paid once it is refunded, so without
+   * this the customer sees no sign of where their money went. */
+  amountRefunded?: number;
+  /** How `amountRefunded` was split. One cancellation routinely goes both ways at once — the
+   * wallet-funded share can only return to the wallet while the rest goes back to the card — and
+   * a single total leaves the customer hunting a card statement for money that went elsewhere. */
+  refundedToSource?: number;
+  refundedToWallet?: number;
+}
+
+/** One destination the money went back to. There is a line per destination because a single
+ * cancellation routinely uses two of them at once. */
+export interface RefundLine {
+  destination: 'wallet' | 'source';
+  amount: number;
+  /** What the customer should expect, which differs by destination: wallet credit is there now,
+   * a card refund is not. */
+  note: string;
+  /** Still on its way rather than already handed over. */
+  pending: boolean;
+}
+
+export interface RefundBreakdown {
+  title: string;
+  lines: RefundLine[];
+  /** Any line still in flight, which the card uses to pick its colour. */
+  pending: boolean;
+}
+
+/** What an admin's status change actually did. Cancelling gives goods and money back, so the
+ * whole order comes back rather than the page patching one field onto its stale copy. */
+export interface AdminStatusChangeResponse {
+  order: OrderResponse | null;
+  /** Credited to the customer's wallet — the wallet-funded share of what they had paid. */
+  walletCredited: number;
+  /** Sent back to the original payment method. */
+  refundedToSource: number;
+  /** The gateway would not take it, so it is owed and waiting to be retried. */
+  sourceRefundQueued: number;
+  refundError?: string | null;
+}
+
+/** What cancelling an order would hand back, so the admin confirms against the real figure. */
+export interface CancellationPreviewResponse {
+  amountPaid: number;
+  walletShare: number;
+  gatewayShare: number;
+  hasPendingAmendment: boolean;
+}
+
+export interface RefundOrderResponse {
+  refunded: number;
+  error?: string | null;
+  order: OrderResponse | null;
 }
 
 /** A priced-but-unpaid edit waiting on its top-up. */
@@ -746,8 +801,9 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
-/** Customer-only: signing in with a phone number instead of email+password. 503s until MSG91 is
- * configured. */
+/** The pre-widget raw-code send path - still functions server-side (kept as a fallback, not
+ * deleted) but is no longer called from the login page, which sends via Msg91WidgetService
+ * instead. Left here only for completeness against the still-live endpoint. */
 export interface PhoneLoginRequest {
   phone: string;
   turnstileToken: string;
@@ -759,9 +815,12 @@ export interface PhoneLoginResponse {
   devCode?: string | null;
 }
 
+/** widgetToken is the access token Msg91WidgetService.verifyOtp() resolves with - the backend
+ * checks it against MSG91 and binds it to this exact phone (Msg91WidgetVerifier), so a token
+ * verified for one number can't be replayed against another. */
 export interface PhoneLoginVerifyRequest {
   phone: string;
-  code: string;
+  widgetToken: string;
 }
 
 export interface StaffDeviceResponse {

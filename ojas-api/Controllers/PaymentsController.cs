@@ -37,6 +37,20 @@ public class PaymentsController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>Tells the browser which Cashfree environment to load its checkout SDK against.
+    /// Anonymous and cacheable — it carries no secret, and the answer is the same for everybody.
+    /// Having the server answer it is what makes going live a single change: flipping
+    /// Cashfree:Environment moves the API and the browser together, instead of relying on a
+    /// separately-deployed frontend constant being changed in the same breath.</summary>
+    [HttpGet("cashfree/config")]
+    public IActionResult GetCashfreeConfig()
+    {
+        // Short enough that flipping the environment takes effect within a minute, long enough
+        // that a busy checkout page isn't asking on every visit.
+        Response.Headers.CacheControl = "public, max-age=60";
+        return Ok(new CashfreeConfigResponse(_cashfreeService.Mode, _cashfreeService.IsConfigured));
+    }
+
     /// <summary>Asks Cashfree directly how a payment went, for the customer who has just been
     /// redirected back from the hosted checkout page. Waiting for the webhook to arrive leaves
     /// them watching a spinner (and, before this existed, refreshing the page by hand); asking
@@ -241,7 +255,7 @@ public class PaymentsController : ControllerBase
         using var doc = JsonDocument.Parse(rawBody);
         var root = doc.RootElement;
         var type = root.GetProperty("type").GetString();
-        var cashfreeOrderId = root.GetProperty("data").GetProperty("order").GetProperty("order_id").GetString();
+        var cashfreeOrderId = WebhookOrderId(root);
 
         if (string.IsNullOrWhiteSpace(cashfreeOrderId))
             return Ok(); // Nothing to act on - acknowledge so Cashfree doesn't keep retrying.
@@ -293,6 +307,41 @@ public class PaymentsController : ControllerBase
                     refreshed?.AmountPaid, refreshed?.TotalAmount);
                 break;
             }
+            case "REFUND_STATUS_WEBHOOK":
+            {
+                // Creating a refund only ever answers PENDING. The bank can reject it afterwards
+                // — a closed account, a cancelled card — and the customer is then never credited.
+                // Without this the order would go on showing money as handed back that it still
+                // holds, which is the same lie as not refunding at all, only harder to notice.
+                var refundNode = root.GetProperty("data").GetProperty("refund");
+                var refundId = refundNode.TryGetProperty("refund_id", out var rid) ? rid.GetString() : null;
+                var refundStatus = refundNode.TryGetProperty("refund_status", out var rst) ? rst.GetString() : null;
+
+                if (string.IsNullOrWhiteSpace(refundId))
+                    break;
+
+                var bounced = await _orderService.RecordRefundOutcomeAsync(orderId, refundId, refundStatus);
+                if (bounced is not { } amount)
+                {
+                    _logger.LogInformation(
+                        "Cashfree refund {RefundId} on order {OrderId} is now {Status}.",
+                        refundId, orderId, refundStatus);
+                    break;
+                }
+
+                // The money never left, so the order holds it again — and it is owed to the
+                // customer, so it goes back on the admin's list rather than quietly disappearing.
+                await _orderService.ReleaseReservedRefundAsync(orderId, amount);
+                var owed = await _orderService.GetOrderByIdAsync(orderId);
+                await _orderService.SetRefundPendingAsync(
+                    orderId, (owed?.RefundPendingAmount ?? 0m) + amount);
+                await _orderService.RefreshPaymentStateAsync(orderId);
+
+                _logger.LogError(
+                    "Cashfree refund {RefundId} of {Amount} on order {OrderId} came back {Status} — the customer was not credited, and it is queued as owed.",
+                    refundId, amount, orderId, refundStatus);
+                break;
+            }
             case "PAYMENT_FAILED_WEBHOOK":
             case "PAYMENT_USER_DROPPED_WEBHOOK":
             {
@@ -319,6 +368,24 @@ public class PaymentsController : ControllerBase
         }
 
         return Ok();
+    }
+
+    /// <summary>The gateway order a webhook is about. Payment events carry it under data.order;
+    /// a refund event need not, and carries it on the refund itself. Reading data.order blindly
+    /// threw on a refund webhook, which Cashfree sees as a 500 and retries indefinitely.</summary>
+    private static string? WebhookOrderId(JsonElement root)
+    {
+        if (!root.TryGetProperty("data", out var data))
+            return null;
+
+        if (data.TryGetProperty("order", out var order) &&
+            order.TryGetProperty("order_id", out var fromOrder))
+            return fromOrder.GetString();
+
+        return data.TryGetProperty("refund", out var refund) &&
+            refund.TryGetProperty("order_id", out var fromRefund)
+                ? fromRefund.GetString()
+                : null;
     }
 
     /// <summary>Digs the human-readable reason out of a failure webhook. Cashfree puts it in

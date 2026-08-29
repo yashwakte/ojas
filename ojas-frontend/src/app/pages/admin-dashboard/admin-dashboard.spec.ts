@@ -9,7 +9,9 @@ import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import {
+  AdminStatusChangeResponse,
   CampaignBannerConfig,
+  CancellationPreviewResponse,
   DeliveryChargesConfig,
   OrderResponse,
   Product,
@@ -72,6 +74,8 @@ describe('AdminDashboard', () => {
       'getAdminOrders',
       'getDeliveryPartners',
       'updateOrderStatusAsAdmin',
+      'previewCancellation',
+      'refundToSource',
       'assignDeliveryPartner',
     ]);
     orderServiceSpy.getAdminOrders.and.returnValue(of([order, order2, order3]));
@@ -329,8 +333,28 @@ describe('AdminDashboard', () => {
     expect(fixture.componentInstance.deliveryDraft()['o1']).toBe('d1');
   });
 
+  /** The server now answers a status change with the whole order and what it refunded. */
+  const statusResult = (
+    updated: Partial<OrderResponse>,
+    money: Partial<AdminStatusChangeResponse> = {},
+  ): AdminStatusChangeResponse => ({
+    order: { ...order, ...updated },
+    walletCredited: 0,
+    refundedToSource: 0,
+    sourceRefundQueued: 0,
+    refundError: null,
+    ...money,
+  });
+
+  const noRefundPreview: CancellationPreviewResponse = {
+    amountPaid: 0,
+    walletShare: 0,
+    gatewayShare: 0,
+    hasPendingAmendment: false,
+  };
+
   it('updateOrderStatus updates the order and shows a success message', () => {
-    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(undefined));
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(statusResult({ status: 'Packed' })));
     const { fixture, snackBar } = create();
     fixture.componentInstance.setStatusDraft('o1', 'Packed');
 
@@ -341,21 +365,129 @@ describe('AdminDashboard', () => {
     expect(snackBar.open).toHaveBeenCalledWith('Order status updated', 'Close', jasmine.any(Object));
   });
 
+  /**
+   * The bug this whole area exists for: an admin cancelling a paid order used to hand back the
+   * goods and keep the money. The dashboard has to ask first, and then say what was refunded —
+   * an admin who is not told a refund went out has no way to know whether one did.
+   */
+  it('cancelling asks for confirmation first, then reports the refund', () => {
+    orderServiceSpy.previewCancellation.and.returnValue(
+      of({ amountPaid: 564.61, walletShare: 64.61, gatewayShare: 500, hasPendingAmendment: false }),
+    );
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(
+      of(
+        statusResult(
+          { status: 'Cancelled', amountPaid: 0, amountRefunded: 564.61 },
+          { refundedToSource: 500, walletCredited: 64.61 },
+        ),
+      ),
+    );
+    const { fixture, snackBar } = create();
+    fixture.componentInstance.setStatusDraft('o1', 'Cancelled');
+
+    fixture.componentInstance.updateOrderStatus(order);
+
+    // Nothing has been cancelled yet — the admin is being asked.
+    expect(orderServiceSpy.updateOrderStatusAsAdmin).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.cancelPreview()?.preview.gatewayShare).toBe(500);
+
+    fixture.componentInstance.confirmCancel();
+
+    expect(orderServiceSpy.updateOrderStatusAsAdmin).toHaveBeenCalledWith('o1', {
+      status: 'Cancelled',
+    });
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Order cancelled — ₹500.00 refunded to the original payment method, ₹64.61 returned to the customer' +
+        "'s wallet",
+      'Close',
+      jasmine.any(Object),
+    );
+  });
+
+  it('backing out of the confirmation cancels nothing and resets the dropdown', () => {
+    orderServiceSpy.previewCancellation.and.returnValue(of(noRefundPreview));
+    const { fixture } = create();
+    fixture.componentInstance.setStatusDraft('o1', 'Cancelled');
+    fixture.componentInstance.updateOrderStatus(order);
+
+    fixture.componentInstance.dismissCancelPreview();
+
+    expect(orderServiceSpy.updateOrderStatusAsAdmin).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.cancelPreview()).toBeNull();
+    // Left showing "Cancelled", the dropdown would claim an order was cancelled when it wasn't.
+    expect(fixture.componentInstance.statusDraft()['o1']).toBe('Pending');
+  });
+
+  /** A refund the gateway refused must be said out loud, not swallowed by a success toast. */
+  it('surfaces a refund that did not go through, and offers it as still owed', () => {
+    orderServiceSpy.previewCancellation.and.returnValue(
+      of({ amountPaid: 100, walletShare: 0, gatewayShare: 100, hasPendingAmendment: false }),
+    );
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(
+      of(
+        statusResult(
+          { status: 'Cancelled', refundPendingAmount: 100 },
+          { sourceRefundQueued: 100, refundError: 'gateway said no' },
+        ),
+      ),
+    );
+    const { fixture } = create();
+    fixture.componentInstance.setStatusDraft('o1', 'Cancelled');
+    fixture.componentInstance.updateOrderStatus(order);
+    fixture.componentInstance.confirmCancel();
+
+    expect(fixture.componentInstance.ordersError()).toContain('gateway said no');
+    expect(
+      fixture.componentInstance.orders().find((o) => o.id === 'o1')?.refundPendingAmount,
+    ).toBe(100);
+  });
+
+  it('refundOwed pays back what the order still owes and swaps in the server copy', () => {
+    orderServiceSpy.refundToSource.and.returnValue(
+      of({
+        refunded: 100,
+        error: null,
+        order: { ...order, refundPendingAmount: null, amountRefunded: 100 },
+      }),
+    );
+    const { fixture, snackBar } = create();
+
+    fixture.componentInstance.refundOwed({ ...order, refundPendingAmount: 100 });
+
+    expect(orderServiceSpy.refundToSource).toHaveBeenCalledWith(
+      'o1',
+      100,
+      'Refund owed on cancelled order',
+    );
+    expect(
+      fixture.componentInstance.orders().find((o) => o.id === 'o1')?.refundPendingAmount,
+    ).toBeNull();
+    expect(snackBar.open).toHaveBeenCalledWith(
+      '₹100.00 refunded to the original payment method',
+      'Close',
+      jasmine.any(Object),
+    );
+  });
+
   it('updateOrderStatus refreshes products and low-stock when cancelling, since stock is restored server-side', () => {
-    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(undefined));
+    orderServiceSpy.previewCancellation.and.returnValue(of(noRefundPreview));
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(
+      of(statusResult({ status: 'Cancelled' })),
+    );
     const { fixture } = create();
     productServiceSpy.loadProducts.calls.reset();
     productServiceSpy.getLowStock.calls.reset();
     fixture.componentInstance.setStatusDraft('o1', 'Cancelled');
 
     fixture.componentInstance.updateOrderStatus(order);
+    fixture.componentInstance.confirmCancel();
 
     expect(productServiceSpy.loadProducts).toHaveBeenCalled();
     expect(productServiceSpy.getLowStock).toHaveBeenCalled();
   });
 
   it('updateOrderStatus does not refresh products for non-cancelling transitions', () => {
-    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(undefined));
+    orderServiceSpy.updateOrderStatusAsAdmin.and.returnValue(of(statusResult({ status: 'Packed' })));
     const { fixture } = create();
     productServiceSpy.loadProducts.calls.reset();
     fixture.componentInstance.setStatusDraft('o1', 'Packed');

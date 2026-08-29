@@ -253,7 +253,7 @@
         <span class="auth-logo-mobile">ओजस</span>
         <h2>Sign In</h2>
         @if (phoneStage === 'enter') {
-          <p>Enter your phone number and we'll send you a 6-digit code.</p>
+          <p>Enter your phone number and we'll send you a 4-digit code.</p>
         } @else {
           <p>Enter the code we sent to <strong>{{ phoneNumber }}</strong></p>
         }
@@ -262,17 +262,7 @@
       @if (phoneUnavailable) {
         <div class="error-banner" role="alert">
           <mat-icon>error_outline</mat-icon>
-          <span>Phone sign-in isn't available yet. Please sign in with email instead.</span>
-        </div>
-      }
-
-      @if (phoneDevCode) {
-        <div class="dev-code-hint">
-          <mat-icon>code</mat-icon>
-          <span
-            >Dev mode — real SMS isn't configured yet. Your code is
-            <strong>{{ phoneDevCode }}</strong></span
-          >
+          <span>Phone sign-in isn't available right now. Please sign in with email instead.</span>
         </div>
       }
 
@@ -298,17 +288,16 @@
             <mat-icon matPrefix>phone</mat-icon>
           </mat-form-field>
 
-          <app-turnstile-widget
-            class="turnstile-slot"
-            (verified)="onTurnstileVerified($event)"
-            (expired)="onTurnstileExpired()"
-          />
+          <!-- MSG91's captcha renders into this element (captchaRenderId) - it must already be
+               in the DOM before Msg91WidgetService.initialize() calls initSendOTP, which
+               switchToPhoneLogin() guarantees by triggering only after this template renders. -->
+          <div [id]="phoneCaptchaElementId" class="msg91-captcha-slot"></div>
 
           <button
             mat-flat-button
             class="submit-btn"
             type="submit"
-            [disabled]="phoneBusy || !phoneNumber.trim() || !turnstileToken"
+            [disabled]="phoneBusy || !phoneNumber.trim()"
           >
             @if (phoneBusy) {
               <mat-spinner diameter="20"></mat-spinner>
@@ -326,8 +315,8 @@
               [(ngModel)]="phoneCode"
               name="phoneCode"
               inputmode="numeric"
-              maxlength="6"
-              placeholder="6-digit code"
+              maxlength="4"
+              placeholder="4-digit code"
               autocomplete="one-time-code"
             />
             <mat-icon matPrefix>pin</mat-icon>
@@ -337,7 +326,7 @@
             mat-flat-button
             class="submit-btn"
             type="submit"
-            [disabled]="phoneBusy || phoneCode.trim().length !== 6"
+            [disabled]="phoneBusy || phoneCode.trim().length !== 4"
           >
             @if (phoneBusy) {
               <mat-spinner diameter="20"></mat-spinner>
@@ -425,11 +414,13 @@
         }
       </form>
 
-      <p class="auth-switch">
-        <button type="button" class="link-btn" (click)="switchToPhoneLogin()">
-          Use phone number instead
-        </button>
-      </p>
+      @if (phoneLoginEnabled) {
+        <p class="auth-switch">
+          <button type="button" class="link-btn" (click)="switchToPhoneLogin()">
+            Use phone number instead
+          </button>
+        </p>
+      }
       <p class="auth-switch">Don't have an account? <a routerLink="/register">Create one</a></p>
       }
     </div>

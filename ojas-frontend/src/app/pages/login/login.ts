@@ -8,8 +8,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
+import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
+import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { timeout } from 'rxjs';
 
 @Component({
@@ -33,6 +35,12 @@ export class Login implements OnDestroy {
   private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
   private readonly turnstileWidget = viewChild(TurnstileWidget);
+  private readonly msg91Widget = inject(Msg91WidgetService);
+  readonly phoneCaptchaElementId = this.msg91Widget.captchaElementId;
+
+  // MSG91 isn't live yet - offering "Use phone number instead" only for a customer to discover
+  // it 503s after they've typed their number is a dead end worth not showing at all.
+  readonly phoneLoginEnabled = environment.phoneLoginEnabled;
 
   loginForm: FormGroup;
   loading = false;
@@ -67,12 +75,12 @@ export class Login implements OnDestroy {
 
   // Phone-number sign-in - a second, customer-only login method alongside email+password.
   // 'enter' collects the number, 'code' takes the OTP; both live on this card like the
-  // reset/device flows above. Inert (503) until MSG91 is configured server-side.
+  // reset/device flows above. Sends and verifies via the MSG91 OTP Widget (Msg91WidgetService),
+  // not a direct backend call - only the final token goes to Ojas's own API.
   loginMode: 'email' | 'phone' = 'email';
   phoneStage: 'enter' | 'code' = 'enter';
   phoneNumber = '';
   phoneCode = '';
-  phoneDevCode: string | null = null;
   phoneError = '';
   phoneBusy = false;
   phoneUnavailable = false;
@@ -361,8 +369,15 @@ export class Login implements OnDestroy {
     this.phoneNumber = '';
     this.phoneCode = '';
     this.phoneError = '';
-    this.phoneDevCode = null;
     this.phoneUnavailable = false;
+    // Kicked off here, not eagerly on page load - most visits never reach phone login, same
+    // reasoning as the Cashfree SDK's lazy load. The captcha's target div only exists once this
+    // click has rendered the phone/enter template, which initialize() (async: it loads a script)
+    // will always run after.
+    this.msg91Widget.initialize().catch(() => {
+      this.phoneUnavailable = true;
+      this.cdr.detectChanges();
+    });
   }
 
   switchToEmailLogin() {
@@ -372,66 +387,59 @@ export class Login implements OnDestroy {
   }
 
   sendPhoneLoginCode() {
-    if (!this.phoneNumber.trim() || !this.turnstileToken) return;
+    if (!this.phoneNumber.trim()) return;
 
     this.phoneBusy = true;
     this.phoneError = '';
 
-    this.auth
-      .sendPhoneLoginOtp({ phone: this.phoneNumber.trim(), turnstileToken: this.turnstileToken })
-      .subscribe({
-        next: (res) => {
-          this.phoneBusy = false;
-          this.phoneDevCode = res.devCode ?? null;
-          this.phoneStage = 'code';
-          this.turnstileToken = null;
-          this.turnstileWidget()?.reset();
-          this.cdr.detectChanges();
-        },
-        error: (err) => {
-          this.phoneBusy = false;
-          this.turnstileToken = null;
-          this.turnstileWidget()?.reset();
-          if (err.status === 503) {
-            this.phoneUnavailable = true;
-          } else {
-            this.phoneError =
-              err.status === 429
-                ? 'Too many attempts. Please wait a minute.'
-                : (err.error?.message ?? 'Something went wrong. Please try again.');
-          }
-          this.cdr.detectChanges();
-        },
+    this.msg91Widget
+      .sendOtp(this.phoneNumber.trim())
+      .then(() => {
+        this.phoneBusy = false;
+        this.phoneStage = 'code';
+        this.cdr.detectChanges();
+      })
+      .catch((error: Error) => {
+        this.phoneBusy = false;
+        this.phoneError = error.message || 'Something went wrong. Please try again.';
+        this.cdr.detectChanges();
       });
   }
 
   verifyPhoneLoginCode() {
-    if (this.phoneCode.trim().length !== 6) return;
+    if (this.phoneCode.trim().length !== 4) return;
 
     this.phoneBusy = true;
     this.phoneError = '';
 
-    this.auth
-      .verifyPhoneLogin({ phone: this.phoneNumber.trim(), code: this.phoneCode.trim() })
-      .subscribe({
-        next: (res) => {
-          this.phoneBusy = false;
-          this.cdr.detectChanges();
-          this.auth.saveAuth(res);
-          this.welcome.celebrate('login', res.fullName);
+    this.msg91Widget
+      .verifyOtp(this.phoneCode.trim())
+      .then((widgetToken) =>
+        this.auth.verifyPhoneLogin({ phone: this.phoneNumber.trim(), widgetToken }).subscribe({
+          next: (res) => {
+            this.phoneBusy = false;
+            this.cdr.detectChanges();
+            this.auth.saveAuth(res);
+            this.welcome.celebrate('login', res.fullName);
 
-          const redirect = this.route.snapshot.queryParamMap.get('redirect');
-          const target =
-            redirect && res.role === 'customer'
-              ? redirect
-              : this.auth.getDefaultRouteForRole(res.role);
-          this.router.navigateByUrl(target);
-        },
-        error: (err) => {
-          this.phoneBusy = false;
-          this.phoneError = err.error?.message ?? 'That code is invalid or has expired.';
-          this.cdr.detectChanges();
-        },
+            const redirect = this.route.snapshot.queryParamMap.get('redirect');
+            const target =
+              redirect && res.role === 'customer'
+                ? redirect
+                : this.auth.getDefaultRouteForRole(res.role);
+            this.router.navigateByUrl(target);
+          },
+          error: (err) => {
+            this.phoneBusy = false;
+            this.phoneError = err.error?.message ?? 'That code is invalid or has expired.';
+            this.cdr.detectChanges();
+          },
+        }),
+      )
+      .catch((error: Error) => {
+        this.phoneBusy = false;
+        this.phoneError = error.message || 'That code is invalid or has expired.';
+        this.cdr.detectChanges();
       });
   }
 

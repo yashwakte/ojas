@@ -20,8 +20,9 @@
     "Issuer": "OjasApi",
     "Audience": "OjasApp"
   },
-  // Hostinger SMTP for wecare@ojasaata.com, the live sender (SmtpEmailSender). Confirmed via
-  // Hostinger's own mailbox settings: port 465 with UseSsl true (implicit TLS).
+  // Hostinger SMTP for wecare@ojasaata.com - kept for a host that allows outbound SMTP, but NOT
+  // the live sender (see Resend below). Render blocks outbound SMTP entirely (confirmed
+  // 2026-08-21, both port 465 and 587 time out), which is why Resend's HTTP API is used instead.
   "Smtp": {
     "Host": "smtp.hostinger.com",
     "Port": 465,
@@ -30,6 +31,17 @@
     "Password": "<hostinger-mailbox-password>",
     "SenderEmail": "wecare@ojasaata.com",
     "SenderName": "Ojas"
+  },
+  // Resend - the live transactional email sender (ResendEmailSender), unaffected by Render's
+  // SMTP block because it's an HTTPS API. FromEmail sends from a dedicated subdomain rather than
+  // the root domain (Resend's own deliverability guidance), so high-volume OTP mail can never
+  // damage the sending reputation of the real mailbox; ReplyTo points back at that real mailbox
+  // so a customer who hits reply still reaches a human.
+  "Resend": {
+    "ApiKey": "<resend-api-key>",
+    "FromEmail": "wecare@notifications.ojasaata.com",
+    "FromName": "Ojas",
+    "ReplyTo": "wecare@ojasaata.com"
   },
   // Where staff invite links point. Must be the real site origin in Production, or the emailed
   // "set up my account" link will send people to localhost.
@@ -42,10 +54,20 @@
   "Email": {
     "SendInDevelopment": false
   },
+  // Msg91:AuthKey/TemplateId/SenderId are the raw SendOTP API (Msg91PhoneOtpSender) - blocked on
+  // this business's own DLT template approval and no longer the live phone-login path (see
+  // WidgetAuthKey below), but kept for the registration-time profile-phone-verification flow.
   "Msg91": {
     "AuthKey": "<msg91-auth-key>",
     "TemplateId": "<dlt-approved-template-id>",
-    "SenderId": "<dlt-approved-sender-id>"
+    "SenderId": "<dlt-approved-sender-id>",
+    // Msg91WidgetVerifier's server-side secret, from the OTP Widget's Server Side Integration
+    // tab (Create Authkey) - NOT the same value as Msg91:AuthKey above. Scoped to the User role
+    // and the OTP widget only, with IP Security off (Render's shared/non-static outbound IPs
+    // make IP whitelisting here unreliable rather than safer). This is what lets phone login
+    // work today via the widget's default channel configuration, which sends through MSG91's own
+    // pre-registered template and does not require this business's own DLT registration.
+    "WidgetAuthKey": "<otp-widget-server-side-authkey>"
   },
   // Cashfree Payment Gateway - inert (returns 503 on checkout) until ClientId/ClientSecret are
   // set. Sandbox and production use separate, distinct credential pairs from Cashfree's

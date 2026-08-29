@@ -119,9 +119,12 @@ public record PhoneLoginRequest(
 	[Required, MinLength(10), MaxLength(20)] string Phone,
 	[Required] string TurnstileToken);
 
+/// <summary>WidgetToken is the access token MSG91's OTP Widget hands back after the customer
+/// enters the code - the widget owns code generation and entry now, so Ojas never sees the raw
+/// digits, only this token, which Msg91WidgetVerifier checks server-side.</summary>
 public record PhoneLoginVerifyRequest(
 	[Required, MinLength(10), MaxLength(20)] string Phone,
-	[Required, RegularExpression(@"^\d{6}$")] string Code);
+	[Required] string WidgetToken);
 
 /// <summary>Returned by /register while the account is awaiting OTP verification - deliberately
 /// not an AuthResponse, since no session exists until the code is verified.</summary>
@@ -229,7 +232,16 @@ public record OrderResponse(
 	/// <summary>What the payment gateway knocked off - a bank offer or a code entered on its own
 	/// page. The customer was charged less than the order total by exactly this much, and owes
 	/// nothing further; without showing it, the order reads as though money is missing.</summary>
-	decimal GatewayDiscount = 0);
+	decimal GatewayDiscount = 0,
+	/// <summary>What has been handed back so far - wallet credit and refunds to the original
+	/// payment method alike. Without it a cancelled order shows nothing paid and no sign of where
+	/// the money went, which reads exactly like it was kept.</summary>
+	decimal AmountRefunded = 0,
+	/// <summary>The share of AmountRefunded that went back to the original payment method, and
+	/// the share that went to the Ojas wallet. One cancellation routinely splits both ways, and a
+	/// single total cannot say which money the customer should be looking for where.</summary>
+	decimal RefundedToSource = 0,
+	decimal RefundedToWallet = 0);
 
 /// <summary>An edit the customer priced but hasn't paid the difference for yet. The order's own
 /// fields above still describe what was actually bought and paid for — this is only a proposal,
@@ -318,6 +330,20 @@ public record ResumePaymentResponse(
 	bool AlreadyPaid = false,
 	bool PaymentInFlight = false);
 
+/// <summary>What the browser needs to know before it can open a payment page: which Cashfree
+/// environment the server is talking to, so the checkout SDK is loaded in the matching mode.
+///
+/// It is deliberately the server that answers this. The mode used to be a constant compiled into
+/// the frontend bundle while the API read its own from an environment variable, which meant going
+/// live required changing two things in two places in lockstep — and getting them out of step
+/// breaks every payment on the site, because a payment session raised in one environment will not
+/// open in the other. Nothing secret is exposed: which environment we use is plainly visible in
+/// the payment page's own URL.
+///
+/// <paramref name="Configured"/> reports whether credentials exist at all, so an unconfigured
+/// gateway can be said out loud rather than discovered when a customer tries to pay.</summary>
+public record CashfreeConfigResponse(string Mode, bool Configured);
+
 /// <summary>The server's verdict after asking the gateway directly. AmendmentDiscarded reports
 /// that the customer left the payment page without paying, so the edit they were paying for has
 /// been dropped and their order is untouched — the UI has to say so rather than leaving them
@@ -362,6 +388,28 @@ public static class PaymentAttemptOutcomes
 /// <summary>RefundAmount is still capped server-side against what the order actually captured -
 /// this is only the admin's requested amount, not the final authority.</summary>
 public record RefundOrderRequest([Required] decimal RefundAmount, string? Note = null);
+
+/// <summary>The result of an admin moving an order along. The whole order comes back rather than
+/// a bare 204, because cancelling changes far more of it than the status - what it holds, what
+/// was refunded, whether a refund is still owed - and a dashboard patching one field onto the
+/// copy it already had would go on showing the rest as it was before.</summary>
+public record AdminStatusChangeResponse(
+	OrderResponse? Order,
+	decimal WalletCredited,
+	decimal RefundedToSource,
+	decimal SourceRefundQueued,
+	string? RefundError);
+
+/// <summary>What cancelling this order would hand back, so the admin confirms against the real
+/// figure instead of the dashboard guessing at it.</summary>
+public record CancellationPreviewResponse(
+	decimal AmountPaid,
+	decimal WalletShare,
+	decimal GatewayShare,
+	bool HasPendingAmendment);
+
+public record RefundOrderResponse(decimal Refunded, string? Error, OrderResponse? Order);
+
 
 /// <summary>PricedByPincode says the charge came from the admin's serviceable-pincode list rather
 /// than from the map pin, which is what makes it safe from a browser that lies about where it is.

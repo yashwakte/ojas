@@ -71,6 +71,34 @@ test.describe('anonymous access', () => {
 });
 
 /**
+ * Whether the live site can actually take money. Both halves have to agree: the API must hold
+ * live credentials, and it must say so, because the browser loads Cashfree's checkout SDK in
+ * whichever mode this endpoint reports. A production payment session simply will not open in
+ * sandbox mode, so a disagreement here is every payment on the site failing.
+ *
+ * This is the check to run right after flipping the Render environment variables.
+ */
+test.describe('payment gateway', () => {
+  test('the live site is on the production gateway, with credentials', async ({ request }) => {
+    const response = await request.get('/api/payments/cashfree/config');
+    expect(response.status()).toBe(200);
+
+    const config = (await response.json()) as { mode: string; configured: boolean };
+
+    expect(
+      config.configured,
+      'Cashfree has no credentials on the API — nobody can pay for an order. ' +
+        'Set Cashfree__ClientId and Cashfree__ClientSecret on Render.',
+    ).toBeTruthy();
+
+    expect(
+      config.mode,
+      'the live site is still pointed at Cashfree sandbox — set Cashfree__Environment=production on Render',
+    ).toBe('production');
+  });
+});
+
+/**
  * The payment webhook is the one unauthenticated write path in the system: it is what marks
  * orders paid. It is anonymous by necessity — Cashfree calls it server-to-server — so its only
  * gate is the HMAC signature over the raw body. If that gate failed, anyone could mark any order

@@ -21,6 +21,8 @@ import { ProductManagement } from '../product-management/product-management';
 import { DeliveryChargesManagement } from '../delivery-charges-management/delivery-charges-management';
 import { CampaignBannerManagement } from '../campaign-banner-management/campaign-banner-management';
 import {
+  AdminStatusChangeResponse,
+  CancellationPreviewResponse,
   CreateStaffRequest,
   OrderResponse,
   Product,
@@ -97,6 +99,12 @@ export class AdminDashboard implements OnInit {
   readonly busyOrderAction = signal<string | null>(null);
   readonly statusDraft = signal<Record<string, string>>({});
   readonly deliveryDraft = signal<Record<string, string>>({});
+  /** The cancellation waiting on confirmation, together with what the server says it would hand
+   * back. Held rather than asked with confirm() so the figures can actually be shown. */
+  readonly cancelPreview = signal<{
+    order: OrderResponse;
+    preview: CancellationPreviewResponse;
+  } | null>(null);
 
   // Delivery Partners tab
   readonly deliveryPartners = signal<StaffUserResponse[]>([]);
@@ -258,31 +266,73 @@ export class AdminDashboard implements OnInit {
     this.deliveryDraft.update((current) => ({ ...current, [orderId]: value }));
   }
 
+  /**
+   * Cancelling gives the customer's money back, so it is confirmed against a figure the server
+   * works out rather than fired straight off a dropdown. Everything else goes through untouched.
+   */
   updateOrderStatus(order: OrderResponse): void {
     const nextStatus = this.statusDraft()[order.id] ?? order.status;
     if (!nextStatus || nextStatus === order.status) return;
 
     this.ordersError.set('');
+
+    if (nextStatus === 'Cancelled') {
+      this.busyOrderAction.set(`${order.id}-status`);
+      this.orderService.previewCancellation(order.id).subscribe({
+        next: (preview) => {
+          this.busyOrderAction.set(null);
+          this.cancelPreview.set({ order, preview });
+        },
+        error: () => {
+          this.ordersError.set('Could not work out what cancelling this order would refund');
+          this.busyOrderAction.set(null);
+        },
+      });
+      return;
+    }
+
+    this.sendStatus(order, nextStatus);
+  }
+
+  /** Backs out of the confirmation, putting the dropdown back to where the order actually is so
+   * it doesn't sit showing "Cancelled" for an order that wasn't. */
+  dismissCancelPreview(): void {
+    const pending = this.cancelPreview();
+    if (pending) this.setStatusDraft(pending.order.id, pending.order.status);
+    this.cancelPreview.set(null);
+  }
+
+  confirmCancel(): void {
+    const pending = this.cancelPreview();
+    if (!pending) return;
+    this.cancelPreview.set(null);
+    this.sendStatus(pending.order, 'Cancelled');
+  }
+
+  private sendStatus(order: OrderResponse, nextStatus: string): void {
     this.busyOrderAction.set(`${order.id}-status`);
 
     const request: UpdateOrderStatusRequest = { status: nextStatus };
     this.orderService.updateOrderStatusAsAdmin(order.id, request).subscribe({
-      next: () => {
-        this.orders.update((orders) =>
-          orders.map((item) =>
-            item.id === order.id
-              ? { ...item, status: nextStatus, updatedAt: new Date().toISOString() }
-              : item,
-          ),
-        );
+      next: (result) => {
+        // Swapped in whole, never patched: cancelling moves what the order holds, what was
+        // refunded and whether a refund is still owed, and patching only the status would leave
+        // every one of those showing its pre-cancellation value.
+        this.replaceOrder(order.id, result.order);
         this.busyOrderAction.set(null);
-        this.showSuccess('Order status updated');
+        this.showSuccess(this.statusChangeMessage(nextStatus, result));
         window.scrollTo({ top: 0, behavior: 'smooth' });
         // Cancelling restores stock server-side; refresh so the products
         // list and low-stock widget don't show stale availability.
         if (nextStatus === 'Cancelled') {
           this.productService.loadProducts();
           this.loadLowStock();
+          if (result.refundError && result.sourceRefundQueued > 0) {
+            this.ordersError.set(
+              `The order was cancelled but the refund did not go through: ${result.refundError}. ` +
+                'It is listed as owed on the order and can be retried.',
+            );
+          }
         }
       },
       error: () => {
@@ -290,6 +340,59 @@ export class AdminDashboard implements OnInit {
         this.busyOrderAction.set(null);
       },
     });
+  }
+
+  /** Says what actually happened to the money, rather than a bare "status updated" on an action
+   * that just refunded someone. */
+  private statusChangeMessage(nextStatus: string, result: AdminStatusChangeResponse): string {
+    if (nextStatus !== 'Cancelled') return 'Order status updated';
+
+    const parts: string[] = [];
+    if (result.refundedToSource > 0)
+      parts.push(`${this.money(result.refundedToSource)} refunded to the original payment method`);
+    if (result.walletCredited > 0)
+      parts.push(`${this.money(result.walletCredited)} returned to the customer's wallet`);
+    if (result.sourceRefundQueued > 0)
+      parts.push(`${this.money(result.sourceRefundQueued)} still owed — refund it from the order`);
+
+    return parts.length ? `Order cancelled — ${parts.join(', ')}` : 'Order cancelled';
+  }
+
+  /** Retries a refund the gateway wouldn't take at cancellation time, or issues the one a
+   * cancelling customer asked to have back on their original payment method. */
+  refundOwed(order: OrderResponse): void {
+    const owed = order.refundPendingAmount ?? 0;
+    if (owed <= 0) return;
+
+    this.ordersError.set('');
+    this.busyOrderAction.set(`${order.id}-refund`);
+
+    this.orderService.refundToSource(order.id, owed, 'Refund owed on cancelled order').subscribe({
+      next: (result) => {
+        this.replaceOrder(order.id, result.order);
+        this.busyOrderAction.set(null);
+        this.showSuccess(`${this.money(result.refunded)} refunded to the original payment method`);
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.ordersError.set(err?.error?.message ?? 'Could not issue the refund');
+        this.busyOrderAction.set(null);
+      },
+    });
+  }
+
+  /** The one place an order in the list is updated. Handlers hand over what the server returned
+   * rather than spreading a field or two onto the copy the page already had. */
+  private replaceOrder(orderId: string, updated: OrderResponse | null): void {
+    if (!updated) {
+      this.loadOrders();
+      return;
+    }
+    this.orders.update((orders) => orders.map((item) => (item.id === orderId ? updated : item)));
+    this.statusDraft.update((current) => ({ ...current, [orderId]: updated.status }));
+  }
+
+  private money(amount: number): string {
+    return `₹${amount.toFixed(2)}`;
   }
 
   assignDelivery(order: OrderResponse): void {

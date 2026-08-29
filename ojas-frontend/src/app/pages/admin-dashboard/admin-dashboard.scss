@@ -1181,3 +1181,146 @@
     color: #fff;
   }
 }
+
+/* Money owed back to a customer. Loud on purpose: this is the one surface telling an admin
+   that somebody is out of pocket, and it used to not exist at all. */
+.refund-owed {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  background: rgba(251, 191, 36, 0.12);
+  border-radius: 10px;
+
+  .refund-owed-text {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: #92400e;
+
+    mat-icon {
+      flex: none;
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+      color: #b45309;
+    }
+  }
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.refund-done {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: #15803d;
+
+  .refund-done-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0.25rem 0 0 1.4rem;
+    padding: 0;
+    display: grid;
+    gap: 0.15rem;
+    font-size: 0.78rem;
+    opacity: 0.9;
+  }
+}
+
+.cancel-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 1000;
+}
+
+.cancel-sheet {
+  position: fixed;
+  z-index: 1001;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
+
+  h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+  }
+
+  .cancel-sheet-lede {
+    margin: 0 0 0.85rem;
+    font-size: 0.87rem;
+    color: #475569;
+  }
+
+  .cancel-sheet-money {
+    list-style: none;
+    margin: 0 0 0.85rem;
+    padding: 0.7rem 0.8rem;
+    background: #f8fafc;
+    border-radius: 10px;
+    display: grid;
+    gap: 0.6rem;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      font-size: 0.87rem;
+      line-height: 1.4;
+      color: #1e293b;
+
+      mat-icon {
+        flex: none;
+        font-size: 1.15rem;
+        width: 1.15rem;
+        height: 1.15rem;
+        color: #0f766e;
+      }
+    }
+  }
+
+  .cancel-sheet-money-none,
+  .cancel-sheet-note {
+    margin: 0 0 0.85rem;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+
+  .cancel-sheet-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+
+    button {
+      flex: 1 1 auto;
+    }
+  }
+}

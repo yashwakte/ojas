@@ -105,7 +105,9 @@ public class OrderFlowTests : IDisposable
 
         var statusUpdateResponse = await adminClient.SendAsync(
             PatchJson($"/api/orders/admin/{placedOrder.Id}/status", new UpdateOrderStatusRequest("Confirmed"), adminCsrf));
-        statusUpdateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        // The whole order comes back, not a bare 204 — cancelling moves money, so every status
+        // change reports what the order now is rather than leaving the caller to guess.
+        statusUpdateResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         using var deliveryClient = _factory.CreateClient();
         var (deliveryAuth, deliveryCsrf) = await _factory.SeedAndLoginAsStaffAsync(deliveryClient, UserRoles.Delivery);

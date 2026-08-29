@@ -50,6 +50,7 @@ import {
   templateUrl: './checkout.html',
   styleUrl: './checkout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(window:pageshow)': 'onPageShow()' },
 })
 export class Checkout implements OnInit {
   fullName = '';
@@ -173,6 +174,14 @@ export class Checkout implements OnInit {
   }
 
   ngOnInit(): void {
+    // Back from the payment page without paying, on a browser that rebuilt the app rather than
+    // restoring it from cache. The order exists and is unpaid, so it is dealt with there.
+    const awaiting = this.cashfreeCheckout.awaitingPayment();
+    if (awaiting) {
+      this.goToUnfinishedOrder(awaiting);
+      return;
+    }
+
     // Balance drives the payment summary below, so it's needed before they can pay.
     this.wallet.load().subscribe({ error: () => {} });
 
@@ -237,6 +246,34 @@ export class Checkout implements OnInit {
     ]
       .filter(Boolean)
       .join(', ');
+  }
+
+
+  /**
+   * The customer is back on checkout with an order already placed and unpaid — they pressed Back
+   * from the payment page rather than paying, or the handoff failed outright.
+   *
+   * They are sent to their order rather than left here, for two reasons. This page cannot take
+   * the payment: pressing "Proceed to Pay" again would place a *second* order for the same
+   * basket. And the honest answer to "what happened to my payment" is the gateway's, which is
+   * exactly what My Orders asks for when handed the order id — it reconciles against Cashfree and
+   * says plainly whether anything was charged, instead of this page guessing.
+   */
+  private goToUnfinishedOrder(orderId: string): void {
+    this.cashfreeCheckout.clearAwaitingPayment();
+    this.loading.set(false);
+    this.router.navigate(['/my-orders'], { queryParams: { cashfreeOrderId: orderId } });
+  }
+
+  /**
+   * Pressing Back from Cashfree's page restores this one from the browser's back/forward cache,
+   * which resumes the app without re-running ngOnInit. Without this the customer would sit here
+   * looking at a spinner, and then at an error, for an order that is perfectly fine and merely
+   * unpaid.
+   */
+  onPageShow(): void {
+    const orderId = this.cashfreeCheckout.awaitingPayment();
+    if (orderId) this.goToUnfinishedOrder(orderId);
   }
 
   placeOrder(): void {
@@ -321,20 +358,21 @@ export class Checkout implements OnInit {
         // actually confirmed, which is the first point at which the sale is real.
 
         if (res.paymentSessionId) {
-          // Either outcome that leaves the customer on this page means the handoff didn't take;
-          // the order itself already exists, so point them at it rather than stranding a spinner.
-          // Passed as both handlers rather than .finally(), which would rethrow the rejection.
-          const handoffDidNotTake = () => {
-            this.loading.set(false);
-            // Points at the one thing that actually works from here. Your items are still in the
-            // basket, and the unpaid order stands itself down rather than being left to pay for.
-            this.errorMsg.set(
-              "We couldn't open the payment page, so nothing was charged. Your items are still here — please try again.",
-            );
-          };
+          // The order now exists, unpaid. Remembered so that if the customer comes back here by
+          // pressing Back rather than by paying, this page recognises the return instead of
+          // treating it as a fresh visit.
+          this.cashfreeCheckout.markAwaitingPayment(res.id);
+
+          // Runs only if the handoff actually failed and the customer is still here. It used to
+          // run on success too - the SDK resolves as soon as the redirect is under way, not when
+          // the browser has left - which put an error on screen every time it worked.
+          //
+          // Either way the order exists, so this must not offer to "try again" from here: doing
+          // that would place a second order for the same basket. My Orders is where an unpaid
+          // order can actually be paid, and it says what the gateway really thinks happened.
           this.cashfreeCheckout
-            .checkout(res.paymentSessionId)
-            .then(handoffDidNotTake, handoffDidNotTake);
+            .whenHandOffFails(res.paymentSessionId)
+            .then(() => this.goToUnfinishedOrder(res.id));
           return;
         }
 

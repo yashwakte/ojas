@@ -74,14 +74,57 @@ public class CashfreeService
 
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
+    private readonly bool _isSandbox;
 
     public CashfreeService(HttpClient http, IConfiguration config)
     {
         _config = config;
-        var isSandbox = !string.Equals(_config["Cashfree:Environment"], "production", StringComparison.OrdinalIgnoreCase);
-        http.BaseAddress = new Uri(isSandbox ? "https://sandbox.cashfree.com" : "https://api.cashfree.com");
+        _isSandbox = IsSandboxEnvironment(config);
+        http.BaseAddress = new Uri(_isSandbox ? "https://sandbox.cashfree.com" : "https://api.cashfree.com");
         _http = http;
     }
+
+    /// <summary>Anything that isn't explicitly "production" is sandbox, so a missing or misspelt
+    /// setting can never point live credentials at real money by accident.</summary>
+    public static bool IsSandboxEnvironment(IConfiguration config) =>
+        !string.Equals(config["Cashfree:Environment"], "production", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Refuses to start when the credentials and the environment disagree — in either
+    /// direction. Going live means changing three environment variables together, and this is
+    /// what stops it being done halfway: keys sent to the wrong gateway authenticate against
+    /// nothing, so <em>every</em> payment on the site fails, and a deploy log is a far better
+    /// place to find that out than a customer's checkout. Cashfree prefixes its sandbox client
+    /// id with TEST, which is what makes the mismatch detectable at all.
+    ///
+    /// Missing credentials are deliberately not fatal: the gateway already degrades to a clear
+    /// "payments unavailable", and taking the whole storefront down with it would be worse.</summary>
+    public static void EnsureCredentialsMatchEnvironment(IConfiguration config)
+    {
+        var clientId = config["Cashfree:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId)) return;
+
+        var isSandboxKey = clientId.StartsWith("TEST", StringComparison.OrdinalIgnoreCase);
+        var isSandboxEnvironment = IsSandboxEnvironment(config);
+        if (isSandboxKey == isSandboxEnvironment) return;
+
+        throw new InvalidOperationException(isSandboxEnvironment
+            // The likelier of the two on a deploy: the live keys were pasted in from the Cashfree
+            // dashboard and Cashfree:Environment was left behind. Nothing defaults it to
+            // production - the deployed API is configured entirely from environment variables,
+            // and the setting that isn't set is the one nobody remembers.
+            ? "Cashfree:ClientId is a live key but Cashfree:Environment is not 'production', so " +
+              "the live credentials would be sent to the sandbox gateway. Set " +
+              "Cashfree:Environment to 'production'."
+            : "Cashfree:Environment is 'production' but Cashfree:ClientId is a sandbox (TEST) key. " +
+              "Set the live credentials, or set Cashfree:Environment back to 'sandbox'.");
+    }
+
+    /// <summary>The mode the checkout SDK in the browser has to be loaded in. A payment session
+    /// created against one environment simply will not open in the other, and the two used to be
+    /// configured independently - the API from Render's env vars, the browser from a constant
+    /// baked into the bundle - so a deploy that changed one and not the other broke every
+    /// payment. The browser asks the server which one it is instead.</summary>
+    public string Mode => _isSandbox ? "sandbox" : "production";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(_config["Cashfree:ClientId"]) &&

@@ -374,6 +374,110 @@ public class OrderService(IMongoDbService db)
             amendment.TotalAmount);
 
     /// <summary>
+    /// Splits a refund across the gateway orders that actually captured the money.
+    ///
+    /// An order's money is not necessarily in one place: the original gateway order takes the
+    /// first payment, and every edit that raises the total is charged as its own gateway order,
+    /// because a Cashfree order's amount cannot be amended. A refund is raised against a gateway
+    /// order, so "refund ₹500 for this order" has to become one call per leg. Sending the whole
+    /// amount to the original id — which is what the admin refund endpoint used to do — refunds
+    /// too much from the first payment, or is simply rejected, and leaves every top-up untouched.
+    ///
+    /// Oldest capture first, so the customer's first payment method is the first made whole.
+    /// </summary>
+    public static List<(string CashfreeOrderId, decimal Amount)> AllocateSourceRefund(Order order, decimal amount)
+    {
+        var remaining = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        if (remaining <= 0)
+            return [];
+
+        var balances = order.RefundableByGatewayOrder(order.Id!);
+
+        // Capture order, so the legs are refunded in the sequence the customer paid them. An
+        // order with no recorded payments falls back to whatever key the balances carry, which is
+        // the original gateway order.
+        var sequence = order.Payments.Count > 0
+            ? order.Payments
+                .Select(p => string.IsNullOrWhiteSpace(p.CashfreeOrderId) ? order.Id! : p.CashfreeOrderId)
+                .Distinct(StringComparer.Ordinal)
+                .Where(balances.ContainsKey)
+            : balances.Keys;
+
+        var allocation = new List<(string, decimal)>();
+        foreach (var gatewayOrderId in sequence)
+        {
+            if (remaining <= 0) break;
+
+            var take = Math.Min(balances[gatewayOrderId], remaining);
+            if (take <= 0) continue;
+
+            allocation.Add((gatewayOrderId, take));
+            remaining = Math.Round(remaining - take, 2, MidpointRounding.AwayFromZero);
+        }
+
+        return allocation;
+    }
+
+    /// <summary>
+    /// Records what the gateway finally decided about a refund, and reports whether this call is
+    /// the one that moved it to a terminal failure.
+    ///
+    /// Creating a refund answers "PENDING", not "SUCCESS" — the acquiring bank can still reject it
+    /// afterwards, and the customer's card is then never credited. So the outcome has to be taken
+    /// as its own event. The status flip is the atomic claim, exactly as cancelling is: Cashfree
+    /// retries webhooks by design, and the caller undoes a bounced refund on the strength of this
+    /// returning true, which must happen once.
+    /// </summary>
+    /// <returns>The refund's amount when this call is the one that recorded a bounce, and null
+    /// otherwise — including for a success, an unknown refund id, and a repeat of a bounce
+    /// already recorded.</returns>
+    public async Task<decimal?> RecordRefundOutcomeAsync(string orderId, string refundId, string? status)
+    {
+        var reversed =
+            string.Equals(status, "FAILED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "CANCELLED", StringComparison.OrdinalIgnoreCase);
+
+        var order = await GetOrderByIdAsync(orderId);
+        var refund = order?.Refunds.FirstOrDefault(r =>
+            string.Equals(r.RefundId, refundId, StringComparison.Ordinal));
+
+        if (refund == null)
+            return null;
+
+        // Matching on the refund's *current* state as part of the write is what makes this run
+        // once. A repeat webhook finds the entry already reversed and matches nothing.
+        var filter = Builders<Order>.Filter.And(
+            Builders<Order>.Filter.Eq(o => o.Id, orderId),
+            Builders<Order>.Filter.ElemMatch(
+                o => o.Refunds,
+                r => r.RefundId == refundId && r.Status != "FAILED" && r.Status != "CANCELLED"));
+
+        var result = await _orders.UpdateOneAsync(
+            filter,
+            Builders<Order>.Update
+                .Set("refunds.$.status", status)
+                .Set(o => o.UpdatedAt, DateTime.UtcNow));
+
+        return reversed && result.ModifiedCount > 0 ? refund.Amount : null;
+    }
+
+    /// <summary>Records a refund we sent to the gateway, keyed by its refund id so a retried call
+    /// cannot record the same payout twice — the same reason payments are keyed by payment id.</summary>
+    public async Task<bool> RecordGatewayRefundAsync(string orderId, OrderRefund refund)
+    {
+        var result = await _orders.UpdateOneAsync(
+            Builders<Order>.Filter.And(
+                Builders<Order>.Filter.Eq(o => o.Id, orderId),
+                Builders<Order>.Filter.Not(
+                    Builders<Order>.Filter.ElemMatch(o => o.Refunds, r => r.RefundId == refund.RefundId))),
+            Builders<Order>.Update
+                .Push(o => o.Refunds, refund)
+                .Set(o => o.UpdatedAt, DateTime.UtcNow));
+
+        return result.ModifiedCount > 0;
+    }
+
+    /// <summary>
     /// Claims the right to refund <paramref name="amount"/>, atomically, and reports whether this
     /// call got it. The cap is part of the write: reading what an order holds and then paying out
     /// afterwards lets two refunds issued together each see the full balance and each pay out, so

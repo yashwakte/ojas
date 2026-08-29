@@ -4,10 +4,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subject, of, throwError } from 'rxjs';
 import { Login } from './login';
 import { AuthService } from '../../services/auth.service';
+import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { AuthResponse } from '../../models/interfaces';
 
 describe('Login', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
+  let msg91WidgetServiceSpy: jasmine.SpyObj<Msg91WidgetService>;
   let router: Router;
 
   const authResponse: AuthResponse = {
@@ -28,15 +30,23 @@ describe('Login', () => {
       'enrollPreApprovedDevice',
       'forgotPassword',
       'resetPassword',
-      'sendPhoneLoginOtp',
       'verifyPhoneLogin',
     ]);
     authServiceSpy.getDefaultRouteForRole.and.returnValue('/');
     authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'sent', devCode: null }));
 
+    msg91WidgetServiceSpy = jasmine.createSpyObj('Msg91WidgetService', ['initialize', 'sendOtp', 'verifyOtp'], {
+      captchaElementId: 'msg91-phone-captcha',
+    });
+    msg91WidgetServiceSpy.initialize.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       imports: [Login],
-      providers: [provideRouter([]), { provide: AuthService, useValue: authServiceSpy }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authServiceSpy },
+        { provide: Msg91WidgetService, useValue: msg91WidgetServiceSpy },
+      ],
     });
     router = TestBed.inject(Router);
   });
@@ -436,100 +446,124 @@ describe('Login', () => {
   });
 
   describe('phone login', () => {
-    it('switching to phone mode resets the sub-flow to entering a number', () => {
+    it('switching to phone mode resets the sub-flow to entering a number, and initialises the widget', () => {
       const { fixture } = create();
 
       fixture.componentInstance.switchToPhoneLogin();
 
       expect(fixture.componentInstance.loginMode).toBe('phone');
       expect(fixture.componentInstance.phoneStage).toBe('enter');
+      expect(msg91WidgetServiceSpy.initialize).toHaveBeenCalled();
     });
 
-    it('will not send a code without a solved Turnstile', () => {
+    it('shows "not available" when the widget itself fails to initialise', async () => {
+      msg91WidgetServiceSpy.initialize.and.returnValue(Promise.reject(new Error('script blocked')));
       const { fixture } = create();
+
       fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '9123456789';
-      fixture.componentInstance.turnstileToken = null;
-
-      fixture.componentInstance.sendPhoneLoginCode();
-
-      expect(authServiceSpy.sendPhoneLoginOtp).not.toHaveBeenCalled();
-    });
-
-    it('sending a code advances to the code stage and spends the Turnstile token', () => {
-      authServiceSpy.sendPhoneLoginOtp.and.returnValue(of({ message: 'sent', devCode: null }));
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '9123456789';
-
-      fixture.componentInstance.sendPhoneLoginCode();
-
-      expect(authServiceSpy.sendPhoneLoginOtp).toHaveBeenCalledWith({
-        phone: '9123456789',
-        turnstileToken: 'test-turnstile-token',
-      });
-      expect(fixture.componentInstance.phoneStage).toBe('code');
-      expect(fixture.componentInstance.turnstileToken).toBeNull();
-    });
-
-    it('surfaces the dev-mode code when the backend returns one', () => {
-      authServiceSpy.sendPhoneLoginOtp.and.returnValue(of({ message: 'sent', devCode: '135790' }));
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '9123456789';
-
-      fixture.componentInstance.sendPhoneLoginCode();
-
-      expect(fixture.componentInstance.phoneDevCode).toBe('135790');
-    });
-
-    it('a 503 shows the "not available yet" message rather than a generic error', () => {
-      authServiceSpy.sendPhoneLoginOtp.and.returnValue(throwError(() => ({ status: 503 })));
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '9123456789';
-
-      fixture.componentInstance.sendPhoneLoginCode();
+      await fixture.whenStable();
 
       expect(fixture.componentInstance.phoneUnavailable).toBeTrue();
-      expect(fixture.componentInstance.phoneError).toBe('');
     });
 
-    it('verifyPhoneLoginCode does nothing until a full 6-digit code is entered', () => {
+    it('will not send a code for an empty phone number', () => {
       const { fixture } = create();
-      fixture.componentInstance.phoneCode = '123';
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '';
+
+      fixture.componentInstance.sendPhoneLoginCode();
+
+      expect(msg91WidgetServiceSpy.sendOtp).not.toHaveBeenCalled();
+    });
+
+    it('sending a code asks the widget to send it, and advances to the code stage', async () => {
+      msg91WidgetServiceSpy.sendOtp.and.returnValue(Promise.resolve());
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '9123456789';
+
+      fixture.componentInstance.sendPhoneLoginCode();
+      await fixture.whenStable();
+
+      expect(msg91WidgetServiceSpy.sendOtp).toHaveBeenCalledWith('9123456789');
+      expect(fixture.componentInstance.phoneStage).toBe('code');
+    });
+
+    it('surfaces the widget failure message when sending fails', async () => {
+      msg91WidgetServiceSpy.sendOtp.and.returnValue(Promise.reject(new Error('Too many attempts. Please wait a minute.')));
+      const { fixture } = create();
+      fixture.componentInstance.switchToPhoneLogin();
+      fixture.componentInstance.phoneNumber = '9123456789';
+
+      fixture.componentInstance.sendPhoneLoginCode();
+      // Zoneless: a bare Promise.reject() settled before .then()/.catch() attach isn't tracked by
+      // whenStable()'s pending-task signal, so flush the microtask queue explicitly instead.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fixture.componentInstance.phoneError).toBe('Too many attempts. Please wait a minute.');
+      expect(fixture.componentInstance.phoneStage).toBe('enter');
+    });
+
+    it('verifyPhoneLoginCode does nothing until a full 4-digit code is entered', () => {
+      const { fixture } = create();
+      fixture.componentInstance.phoneCode = '12';
 
       fixture.componentInstance.verifyPhoneLoginCode();
 
+      expect(msg91WidgetServiceSpy.verifyOtp).not.toHaveBeenCalled();
       expect(authServiceSpy.verifyPhoneLogin).not.toHaveBeenCalled();
     });
 
-    it('a valid code signs in, saves auth, and navigates to the role home', () => {
+    it('a valid code verifies against the widget, signs in via the resulting token, and navigates home', async () => {
+      msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
       authServiceSpy.verifyPhoneLogin.and.returnValue(of(authResponse));
       spyOn(router, 'navigateByUrl');
       const { fixture } = create();
       fixture.componentInstance.phoneNumber = '9123456789';
-      fixture.componentInstance.phoneCode = '246810';
+      fixture.componentInstance.phoneCode = '2468';
 
       fixture.componentInstance.verifyPhoneLoginCode();
+      await fixture.whenStable();
 
+      expect(msg91WidgetServiceSpy.verifyOtp).toHaveBeenCalledWith('2468');
       expect(authServiceSpy.verifyPhoneLogin).toHaveBeenCalledWith({
         phone: '9123456789',
-        code: '246810',
+        widgetToken: 'widget-access-token',
       });
       expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
       expect(router.navigateByUrl).toHaveBeenCalledWith('/');
     });
 
-    it('shows the server message and stays put when the code is wrong', () => {
+    it('shows the widget failure message when the entered code itself is wrong', async () => {
+      msg91WidgetServiceSpy.verifyOtp.and.returnValue(
+        Promise.reject(new Error('That code is invalid or has expired.')),
+      );
+      const { fixture } = create();
+      fixture.componentInstance.phoneNumber = '9123456789';
+      fixture.componentInstance.phoneCode = '0000';
+
+      fixture.componentInstance.verifyPhoneLoginCode();
+      // Same zoneless caveat as the sendOtp failure test above.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
+      expect(authServiceSpy.verifyPhoneLogin).not.toHaveBeenCalled();
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    });
+
+    it('shows the server message and stays put when the backend rejects an otherwise-valid token', async () => {
+      msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
       authServiceSpy.verifyPhoneLogin.and.returnValue(
         throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
       );
       const { fixture } = create();
       fixture.componentInstance.phoneNumber = '9123456789';
-      fixture.componentInstance.phoneCode = '000000';
+      fixture.componentInstance.phoneCode = '0000';
 
       fixture.componentInstance.verifyPhoneLoginCode();
+      await fixture.whenStable();
 
       expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
       expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();

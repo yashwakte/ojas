@@ -74,6 +74,23 @@ public class PaymentsControllerTests
         return Convert.ToBase64String(hash);
     }
 
+    // ---------- Cashfree config ----------
+
+    /// <summary>The browser has to load its checkout SDK in the same environment the payment
+    /// session was raised in, and it gets that answer from here rather than from a constant baked
+    /// into the bundle at build time.</summary>
+    [Fact]
+    public void GetCashfreeConfig_ReportsTheModeTheServerIsActuallyIn()
+    {
+        _sut.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = _sut.GetCashfreeConfig().ShouldBeOfType<OkObjectResult>();
+        var config = result.Value.ShouldBeOfType<CashfreeConfigResponse>();
+
+        config.Mode.ShouldBe("sandbox");
+        config.Configured.ShouldBeTrue();
+    }
+
     private void SetRequestBody(string rawBody, string? signatureOverride = null, string timestamp = "1700000000")
     {
         var context = new DefaultHttpContext();

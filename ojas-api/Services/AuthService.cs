@@ -199,15 +199,19 @@ public class AuthService
             .AnyAsync();
     }
 
-    /// <summary>Issues a session for the customer owning this phone number. Assumes a
-    /// SendPhoneLoginOtpAsync code has already been verified for it - this method itself does
-    /// not re-check eligibility, since a code could only ever have been issued to an eligible
-    /// number in the first place.</summary>
+    /// <summary>Issues a session for the customer owning this phone number. Re-checks the same
+    /// eligibility IsLoginablePhoneAsync enforces (customer role, email verified) rather than
+    /// assuming a code could only have reached here for an eligible number: that assumption held
+    /// when Ojas's own backend controlled sending, but the MSG91 OTP Widget sends directly from
+    /// the browser, bypassing IsLoginablePhoneAsync entirely unless the widget's own "User
+    /// Existence Validation" hook is both enabled and correctly wired. That hook is a UX
+    /// nicety - not sending an OTP nobody eligible could redeem - not the actual security
+    /// boundary; this check is.</summary>
     public async Task<AuthResult?> PhoneLoginAsync(string phone)
     {
         var normalizedPhone = NormalizePhone(phone);
         var user = await _db.Users
-            .Find(u => u.Phone == normalizedPhone && u.Role == UserRoles.Customer)
+            .Find(u => u.Phone == normalizedPhone && u.Role == UserRoles.Customer && u.IsEmailVerified)
             .FirstOrDefaultAsync();
 
         if (user == null)

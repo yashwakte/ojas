@@ -386,6 +386,32 @@
               </div>
             </div>
 
+            <!-- Where the money went, split by destination. One cancellation routinely uses two
+                 at once - the wallet-funded share can only ever go back to the wallet while the
+                 rest returns to the card - and a single total sends the customer hunting a card
+                 statement for money that was never coming there. Present however the order was
+                 cancelled, since one we cancelled never showed the customer their own toast. -->
+            @if (refundBreakdown(order); as refund) {
+              <div class="refund-status" [class.refund-status--pending]="refund.pending">
+                <p class="refund-status-title">
+                  <mat-icon>{{ refund.pending ? 'hourglass_top' : 'check_circle' }}</mat-icon>
+                  {{ refund.title }}
+                </p>
+                <ul class="refund-status-lines">
+                  @for (line of refund.lines; track $index) {
+                    <li>
+                      <mat-icon>{{ refundIcon(line) }}</mat-icon>
+                      <span class="refund-line-text">
+                        <strong>{{ line.amount | currency: 'INR' : 'symbol' : '1.2-2' }}</strong>
+                        to your {{ refundDestinationLabel(line) }}
+                        <small>{{ line.note }}</small>
+                      </span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+
             <!-- A payment that never went through. Nothing was bought and nothing was charged,
                  so this reads as something to retry rather than as a cancelled order — and it
                  says what actually happened instead of leaving the customer to guess. -->

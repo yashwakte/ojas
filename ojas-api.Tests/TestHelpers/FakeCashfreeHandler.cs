@@ -37,6 +37,21 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
     /// <summary>Set to make order creation fail, for the rollback/502 paths.</summary>
     public bool FailOrderCreation { get; set; }
 
+    /// <summary>Set to make every refund be refused, so the "the payout didn't go through" path
+    /// is exercised rather than assumed.</summary>
+    public bool FailRefunds { get; set; }
+
+    private readonly List<(string GatewayOrderId, decimal Amount)> _refunds = [];
+
+    /// <summary>Every refund we asked the gateway for, and crucially <em>which gateway order</em>
+    /// each was raised against. That is what proves a refund on a topped-up order is split across
+    /// the legs holding the money instead of all being aimed at the original id, where it would
+    /// take too much from the first payment and miss the top-up entirely.</summary>
+    public IReadOnlyList<(string GatewayOrderId, decimal Amount)> Refunds
+    {
+        get { lock (_refunds) return _refunds.ToList(); }
+    }
+
     /// <summary>Gateway order ids in the order they were created — the first is the original
     /// payment, any others are top-ups. Kept as its own list because a ConcurrentDictionary's
     /// keys come back in no particular order, which made "the top-up is the last one" a coin
@@ -100,7 +115,7 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
             return Payments(path);
 
         if (path.EndsWith("/refunds", StringComparison.Ordinal))
-            return Json(HttpStatusCode.OK, """{"refund_status":"SUCCESS"}""");
+            return await RefundAsync(path, request, cancellationToken);
 
         // Route on the method as well as the path, the way Cashfree actually does. Treating every
         // unrecognised request as an order creation meant a GET of an order's status silently
@@ -154,6 +169,28 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
         return Json(
             HttpStatusCode.OK,
             $$"""{"cf_order_id":"cf_{{orderId}}","payment_session_id":"session_{{orderId}}","order_status":"ACTIVE"}""");
+    }
+
+    /// <summary>POST /pg/orders/{id}/refunds — records what was asked for against which gateway
+    /// order, since a refund is raised against a gateway order and not against our own order id.</summary>
+    private async Task<HttpResponseMessage> RefundAsync(
+        string path, HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (FailRefunds)
+            return Json(HttpStatusCode.BadRequest, """{"message":"simulated refund failure"}""");
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var gatewayOrderId = segments.Length >= 2 ? segments[^2] : "";
+
+        var body = request.Content is null ? "{}" : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        var amount = doc.RootElement.TryGetProperty("refund_amount", out var amt) && amt.TryGetDecimal(out var parsed)
+            ? parsed
+            : 0m;
+
+        lock (_refunds) _refunds.Add((gatewayOrderId, amount));
+
+        return Json(HttpStatusCode.OK, """{"refund_status":"SUCCESS"}""");
     }
 
     private HttpResponseMessage Payments(string path)

@@ -3,12 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
+  AdminStatusChangeResponse,
   AssignDeliveryPartnerRequest,
   CancelOrderResponse,
+  CancellationPreviewResponse,
   CashfreePaymentStatusResponse,
   RefundDestination,
   OrderResponse,
   PlaceOrderRequest,
+  RefundOrderResponse,
   ResumePaymentResponse,
   StaffUserResponse,
   UpdateMyOrderRequest,
@@ -110,8 +113,33 @@ export class OrderService {
     return this.http.get<StaffUserResponse[]>(`${this.apiUrl}/admin/delivery-partners`);
   }
 
-  updateOrderStatusAsAdmin(orderId: string, request: UpdateOrderStatusRequest): Observable<void> {
-    return this.http.patch<void>(`${this.apiUrl}/admin/${orderId}/status`, request);
+  /** Cancelling is not just another status - it restores stock, drops any unpaid edit and hands
+   * the customer's money back - so the server returns the whole order and what it refunded. */
+  updateOrderStatusAsAdmin(
+    orderId: string,
+    request: UpdateOrderStatusRequest,
+  ): Observable<AdminStatusChangeResponse> {
+    return this.http.patch<AdminStatusChangeResponse>(
+      `${this.apiUrl}/admin/${orderId}/status`,
+      request,
+    );
+  }
+
+  /** What cancelling this order would hand back. Asked before the confirmation is shown, so the
+   * admin sees the real figure rather than one the dashboard worked out for itself. */
+  previewCancellation(orderId: string): Observable<CancellationPreviewResponse> {
+    return this.http.get<CancellationPreviewResponse>(
+      `${this.apiUrl}/admin/${orderId}/cancellation-preview`,
+    );
+  }
+
+  /** Sends money back to the original payment method. The server caps the amount at what the
+   * order actually captured and splits it across the gateway orders holding it. */
+  refundToSource(orderId: string, refundAmount: number, note?: string): Observable<RefundOrderResponse> {
+    return this.http.post<RefundOrderResponse>(`${this.apiUrl}/admin/${orderId}/refund`, {
+      refundAmount,
+      note: note ?? null,
+    });
   }
 
   assignDeliveryPartner(orderId: string, request: AssignDeliveryPartnerRequest): Observable<void> {

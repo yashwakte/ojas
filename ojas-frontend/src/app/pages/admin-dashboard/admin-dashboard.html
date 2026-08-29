@@ -182,6 +182,54 @@
                     </span>
                   </div>
 
+                  <!-- Money owed back. This is the only place it is visible: a cancelling
+                       customer who asks for their money on the original payment method leaves
+                       exactly this, and before it existed no admin was ever told. -->
+                  @if ((order.refundPendingAmount ?? 0) > 0) {
+                    <div class="refund-owed">
+                      <div class="refund-owed-text">
+                        <mat-icon>currency_rupee</mat-icon>
+                        <span>
+                          {{ order.refundPendingAmount | currency: 'INR' : 'symbol' : '1.2-2' }} owed
+                          back to the customer's original payment method.
+                        </span>
+                      </div>
+                      <button
+                        mat-flat-button
+                        color="primary"
+                        [disabled]="busyOrderAction() === order.id + '-refund'"
+                        (click)="refundOwed(order)"
+                      >
+                        {{ busyOrderAction() === order.id + '-refund' ? 'Refunding…' : 'Refund now' }}
+                      </button>
+                    </div>
+                  }
+                  <!-- Broken out by destination: a cancellation routinely returns the
+                       wallet-funded share to the wallet and the rest to the card, and one total
+                       cannot answer "where did the customer's money actually go". -->
+                  @if ((order.refundedToWallet ?? 0) > 0 || (order.refundedToSource ?? 0) > 0) {
+                    <div class="refund-done">
+                      <p class="refund-done-title">
+                        <mat-icon>check_circle</mat-icon>
+                        {{ order.amountRefunded | currency: 'INR' : 'symbol' : '1.2-2' }} refunded
+                      </p>
+                      <ul>
+                        @if ((order.refundedToSource ?? 0) > 0) {
+                          <li>
+                            {{ order.refundedToSource | currency: 'INR' : 'symbol' : '1.2-2' }} to
+                            the original payment method
+                          </li>
+                        }
+                        @if ((order.refundedToWallet ?? 0) > 0) {
+                          <li>
+                            {{ order.refundedToWallet | currency: 'INR' : 'symbol' : '1.2-2' }} to
+                            the customer's Ojas wallet
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  }
+
                   <div class="action-row">
                     <div class="field-col">
                       <label>Status</label>
@@ -475,3 +523,58 @@
     </mat-tab>
   </mat-tab-group>
 </section>
+
+<!-- Cancelling moves real money, so it is confirmed against figures the server worked out rather
+     than fired straight off the status dropdown, where one mis-tap would refund a delivered order. -->
+@if (cancelPreview(); as pending) {
+  <div class="cancel-scrim" (click)="dismissCancelPreview()"></div>
+  <div class="cancel-sheet" role="dialog" aria-modal="true" aria-labelledby="cancel-sheet-title">
+    <h3 id="cancel-sheet-title">
+      Cancel order #{{ pending.order.id.slice(-8).toUpperCase() }}?
+    </h3>
+
+    <p class="cancel-sheet-lede">
+      The items go back on the shelf and the customer is told the order was cancelled.
+    </p>
+
+    @if (pending.preview.amountPaid > 0) {
+      <ul class="cancel-sheet-money">
+        @if (pending.preview.gatewayShare > 0) {
+          <li>
+            <mat-icon>credit_card</mat-icon>
+            <span
+              >{{ pending.preview.gatewayShare | currency: 'INR' : 'symbol' : '1.2-2' }} goes back to
+              the payment method they used.</span
+            >
+          </li>
+        }
+        @if (pending.preview.walletShare > 0) {
+          <li>
+            <mat-icon>account_balance_wallet</mat-icon>
+            <span
+              >{{ pending.preview.walletShare | currency: 'INR' : 'symbol' : '1.2-2' }} returns to
+              their Ojas wallet, since that is where it came from.</span
+            >
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="cancel-sheet-money-none">Nothing was paid for this order, so there is nothing to refund.</p>
+    }
+
+    @if (pending.preview.hasPendingAmendment) {
+      <p class="cancel-sheet-note">The customer has an unpaid edit open — it is dropped too.</p>
+    }
+
+    <div class="cancel-sheet-actions">
+      <button mat-stroked-button (click)="dismissCancelPreview()">Keep the order</button>
+      <button mat-flat-button color="warn" (click)="confirmCancel()">
+        {{
+          pending.preview.amountPaid > 0
+            ? 'Cancel and refund ' + (pending.preview.amountPaid | currency: 'INR' : 'symbol' : '1.2-2')
+            : 'Cancel the order'
+        }}
+      </button>
+    </div>
+  </div>
+}

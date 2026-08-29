@@ -54,6 +54,9 @@ var turnstileSecretKey = builder.Configuration["Turnstile:SecretKey"];
 if (string.IsNullOrWhiteSpace(turnstileSecretKey))
     throw new InvalidOperationException("Turnstile:SecretKey must be set.");
 
+// Fails the deploy rather than the checkout when going live has been done only halfway.
+CashfreeService.EnsureCredentialsMatchEnvironment(builder.Configuration);
+
 var productionOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()
@@ -70,6 +73,7 @@ builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<OrderPaymentOutcomeService>();
+builder.Services.AddScoped<OrderCancellationService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
@@ -90,18 +94,19 @@ builder.Services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongodb");
 // you're testing.
 if (builder.Environment.IsProduction() || builder.Configuration.GetValue<bool>("Email:SendInDevelopment"))
 {
-    // NotConfiguredEmailSender, not SmtpEmailSender, until a real HTTP-API-based provider
-    // replaces it - confirmed live on Render that outbound SMTP is blocked on both 465 and 587
-    // (both time out rather than fail fast), so SmtpEmailSender would just make every affected
-    // request hang for MailKit's ~100s default timeout instead of failing immediately. Brevo is
-    // suspended and unrecoverable, so there is currently no working email delivery at all.
-    builder.Services.AddSingleton<IEmailSender, NotConfiguredEmailSender>();
+    // Resend, not SmtpEmailSender - confirmed live on Render that outbound SMTP is blocked on
+    // both 465 and 587 (both time out rather than fail fast), so an SMTP sender would just make
+    // every affected request hang for MailKit's ~100s default timeout instead of failing
+    // immediately. Resend's HTTP API is unaffected by that block. Brevo remains suspended and
+    // unrecoverable.
+    builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
 }
 else
 {
     builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
 }
 builder.Services.AddHttpClient<IPhoneOtpSender, Msg91PhoneOtpSender>();
+builder.Services.AddHttpClient<Msg91WidgetVerifier>();
 builder.Services.AddHttpClient<ITurnstileVerifier, CloudflareTurnstileVerifier>();
 
 // JWT Authentication
@@ -246,6 +251,36 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
+
+// Online payment is the only way to pay for an Ojas order — COD was retired — so an unconfigured
+// gateway means nobody can complete a purchase. Said once, loudly, at startup rather than left to
+// be discovered one failed checkout at a time.
+if (app.Environment.IsProduction())
+{
+    using var cashfreeScope = app.Services.CreateScope();
+    var cashfree = cashfreeScope.ServiceProvider.GetRequiredService<CashfreeService>();
+    if (!cashfree.IsConfigured)
+    {
+        app.Logger.LogCritical(
+            "Cashfree is not configured (Cashfree:ClientId / Cashfree:ClientSecret). " +
+            "No customer can pay for an order until it is.");
+    }
+    else
+    {
+        app.Logger.LogInformation("Cashfree is configured in {Mode} mode.", cashfree.Mode);
+    }
+
+    // Same posture as the Cashfree check above: registration, password reset, staff invites and
+    // device approval all depend on this, so an unconfigured Resend key means those flows fail
+    // for every real customer until someone notices - said once, loudly, here instead.
+    var emailSender = cashfreeScope.ServiceProvider.GetRequiredService<IEmailSender>();
+    if (emailSender is ResendEmailSender resend && !resend.IsConfigured)
+    {
+        app.Logger.LogCritical(
+            "Resend is not configured (Resend:ApiKey / Resend:FromEmail). " +
+            "No registration code, password reset, or invite email can be sent until it is.");
+    }
+}
 
 // Seed products (non-blocking)
 _ = Task.Run(async () =>

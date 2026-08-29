@@ -26,3 +26,4 @@ ojas-e2e/playwright-report/
 Thumbs.db
 .DS_Store
 .vercel
+.claude/skills/

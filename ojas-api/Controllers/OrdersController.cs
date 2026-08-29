@@ -21,6 +21,7 @@ public class OrdersController : ControllerBase
     private readonly CashfreeService _cashfreeService;
     private readonly WalletService _walletService;
     private readonly OrderPaymentOutcomeService _paymentOutcome;
+    private readonly OrderCancellationService _cancellation;
     private readonly ILogger<OrdersController> _logger;
 
     // Cash on Delivery was retired - every new order is paid online. Orders already stored with
@@ -38,6 +39,7 @@ public class OrdersController : ControllerBase
         CashfreeService cashfreeService,
         WalletService walletService,
         OrderPaymentOutcomeService paymentOutcome,
+        OrderCancellationService cancellation,
         ILogger<OrdersController> logger)
     {
         _orderService = orderService;
@@ -47,6 +49,7 @@ public class OrdersController : ControllerBase
         _cashfreeService = cashfreeService;
         _walletService = walletService;
         _paymentOutcome = paymentOutcome;
+        _cancellation = cancellation;
         _logger = logger;
     }
 
@@ -777,63 +780,20 @@ public class OrdersController : ControllerBase
                 notEditable = true,
             });
 
-        // Claims the right to cancel, atomically. Everything below hands goods and money back, so
-        // it must run exactly once: reading the status above and writing it here would let two
-        // requests sent together both pass, and refund the customer twice.
-        if (!await _orderService.TryCancelAsync(orderId, OrderService.CustomerCancellableStatuses))
-        {
-            var current = await _orderService.GetOrderByIdAsync(orderId);
-            return Ok(new CancelOrderResponse(0m, 0m, current?.ToResponse()));
-        }
+        // Everything a cancellation gives back - the goods, the unpaid edit, wallet credit and
+        // captured money - happens in one place, so no caller can end up doing three quarters of
+        // it. An admin cancelling used to do exactly that, and kept the customer's money.
+        var outcome = await _cancellation.CancelAsync(
+            orderId,
+            CancellationInitiator.Customer,
+            destination,
+            OrderService.CustomerCancellableStatuses);
 
-        // An unpaid edit dies with the order, and the stock it was holding comes back with the
-        // rest — done before the order's own restore so that isn't measured against a proposal.
-        if (order.PendingAmendment != null)
-            await _paymentOutcome.DiscardAsync(orderId);
+        if (!outcome.Cancelled)
+            return Ok(new CancelOrderResponse(0m, 0m, outcome.Order?.ToResponse()));
 
-        // Cancelled goods go back on the shelf.
-        await _productService.RestoreStockAsync(order.Items.Select(i => (i.ProductId, i.Quantity)));
-
-        // The wallet-funded share can only ever go back to the wallet; the rest follows the
-        // customer's choice.
-        var walletShare = Math.Min(order.WalletAmountApplied, order.AmountPaid);
-        var gatewayShare = Math.Round(order.AmountPaid - walletShare, 2, MidpointRounding.AwayFromZero);
-
-        var walletCredited = 0m;
-        if (walletShare > 0)
-        {
-            await _walletService.CreditAsync(
-                userId, walletShare, WalletTransactionReasons.WalletPortionReturned, orderId);
-            await _orderService.AddRefundedAmountAsync(orderId, walletShare);
-            walletCredited += walletShare;
-        }
-
-        var sourceRefundQueued = 0m;
-        if (gatewayShare > 0)
-        {
-            if (destination == RefundDestinations.Wallet)
-            {
-                await _walletService.CreditAsync(
-                    userId, gatewayShare, WalletTransactionReasons.OrderCancellationRefund, orderId);
-                await _orderService.AddRefundedAmountAsync(orderId, gatewayShare);
-                walletCredited += gatewayShare;
-            }
-            else
-            {
-                // Real money, so it waits on a human - the admin refund endpoint does the payout,
-                // and only then is it recorded as handed back.
-                await _orderService.SetRefundPendingAsync(orderId, gatewayShare);
-                sourceRefundQueued = gatewayShare;
-            }
-        }
-
-        var cancelled = await _orderService.RefreshPaymentStateAsync(orderId);
-
-        _logger.LogInformation(
-            "Customer cancelled order {OrderId}: {WalletCredited} to wallet, {SourceQueued} queued for refund to source.",
-            orderId, walletCredited, sourceRefundQueued);
-
-        return Ok(new CancelOrderResponse(walletCredited, sourceRefundQueued, cancelled?.ToResponse()));
+        return Ok(new CancelOrderResponse(
+            outcome.WalletCredited, outcome.SourceRefundQueued, outcome.Order?.ToResponse()));
     }
 
     [HttpGet("admin/all")]
@@ -873,9 +833,16 @@ public class OrdersController : ControllerBase
             .ToList());
     }
 
+    /// <summary>
+    /// Admin moves an order along. Cancelling is not just another status: it gives the goods and
+    /// the money back, through the same path a customer cancel takes, and to the customer's
+    /// original payment method - a merchant-initiated cancellation must never quietly convert
+    /// someone's card payment into store credit they didn't ask for.
+    /// </summary>
     [HttpPatch("admin/{orderId}/status")]
     [Authorize(Roles = UserRoles.Admin)]
-    public async Task<IActionResult> UpdateOrderStatusAsAdmin(string orderId, [FromBody] UpdateOrderStatusRequest request)
+    public async Task<ActionResult<AdminStatusChangeResponse>> UpdateOrderStatusAsAdmin(
+        string orderId, [FromBody] UpdateOrderStatusRequest request)
     {
         var normalizedStatus = OrderService.NormalizeStatus(request.Status);
         if (normalizedStatus == null)
@@ -885,25 +852,58 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound(new { message = "Order not found." });
 
+        if (normalizedStatus == "Cancelled")
+        {
+            // The cancellation itself is what claims the right to hand everything back, so a
+            // double-click can't restore the stock or refund the money twice.
+            var outcome = await _cancellation.CancelAsync(
+                orderId, CancellationInitiator.Admin, RefundDestinations.Source);
+
+            if (outcome.Cancelled)
+                _logger.LogInformation(
+                    "Admin {AdminId} cancelled order {OrderId}.",
+                    User.FindFirstValue(ClaimTypes.NameIdentifier), orderId);
+
+            return Ok(new AdminStatusChangeResponse(
+                outcome.Order?.ToResponse(),
+                outcome.WalletCredited,
+                outcome.RefundedToSource,
+                outcome.SourceRefundQueued,
+                outcome.RefundError));
+        }
+
         var updated = await _orderService.UpdateOrderStatusAsync(orderId, normalizedStatus);
         if (!updated)
             return NotFound(new { message = "Order not found." });
 
-        // An admin cancelling returns the goods, exactly as a customer cancel does.
-        // Guarded on the previous status so re-saving "Cancelled" can't credit twice.
-        var wasCancelled = string.Equals(order.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
-        if (normalizedStatus == "Cancelled" && !wasCancelled)
-        {
-            // Any unpaid edit dies with the order, releasing the stock it was holding.
-            await _paymentOutcome.DiscardAsync(orderId);
-            await _productService.RestoreStockAsync(order.Items.Select(i => (i.ProductId, i.Quantity)));
-        }
+        var refreshed = await _orderService.GetOrderByIdAsync(orderId);
+        return Ok(new AdminStatusChangeResponse(refreshed?.ToResponse(), 0m, 0m, 0m, null));
+    }
 
-        return NoContent();
+    /// <summary>What a cancelling admin is about to hand back, worked out server-side so the
+    /// confirmation they see is the real figure rather than the dashboard's own arithmetic.</summary>
+    [HttpGet("admin/{orderId}/cancellation-preview")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<ActionResult<CancellationPreviewResponse>> PreviewCancellation(string orderId)
+    {
+        var order = await _orderService.GetOrderByIdAsync(orderId);
+        if (order == null)
+            return NotFound(new { message = "Order not found." });
+
+        var walletShare = Math.Min(order.WalletAmountApplied, order.AmountPaid);
+        var gatewayShare = Math.Round(order.AmountPaid - walletShare, 2, MidpointRounding.AwayFromZero);
+
+        return Ok(new CancellationPreviewResponse(
+            Math.Round(order.AmountPaid, 2, MidpointRounding.AwayFromZero),
+            walletShare,
+            gatewayShare,
+            order.PendingAmendment != null));
     }
 
     /// <summary>Server-side, admin-only, audited refund - the amount is re-validated against
-    /// what this order actually captured on every call, never trusted from the request alone.</summary>
+    /// what this order actually captured on every call, never trusted from the request alone,
+    /// and split across the gateway orders that hold the money rather than aimed at the original
+    /// one, which would miss every top-up.</summary>
     [HttpPost("admin/{orderId}/refund")]
     [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> RefundOrder(string orderId, [FromBody] RefundOrderRequest request)
@@ -918,32 +918,25 @@ public class OrdersController : ControllerBase
         if (request.RefundAmount <= 0)
             return BadRequest(new { message = "Refund amount must be positive." });
 
-        // Capped against what was actually captured, not the order total - an edit can leave the
-        // total above or below the captured amount, and only the latter is refundable. The cap is
-        // claimed atomically *before* the payout: checking it and then paying out lets two refunds
-        // issued at the same moment each see the full balance and each send money.
-        if (!await _orderService.TryReserveRefundAsync(orderId, request.RefundAmount))
+        if (request.RefundAmount > order.AmountPaid)
             return BadRequest(new { message = "Refund amount cannot exceed the amount actually paid." });
 
-        var refundId = $"refund_{orderId}_{DateTime.UtcNow:yyyyMMddHHmmssfff}";
-        var result = await _cashfreeService.CreateRefundAsync(orderId, request.RefundAmount, refundId, request.Note);
+        var outcome = await _cancellation.RefundToSourceAsync(orderId, request.RefundAmount, request.Note);
 
-        if (!result.Success)
-        {
-            // Nothing was sent, so the order must not go on believing it refunded this.
-            await _orderService.ReleaseReservedRefundAsync(orderId, request.RefundAmount);
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = result.Error });
-        }
+        if (outcome.Refunded <= 0)
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = outcome.Error });
 
-        // The money is on its way back, so the queued reminder has been discharged.
-        await _orderService.SetRefundPendingAsync(orderId, null);
-        await _orderService.RefreshPaymentStateAsync(orderId);
+        // The money is on its way back, so the queued reminder is discharged by however much of
+        // it went out - a partly successful refund must leave the rest still showing as owed.
+        var stillOwed = Math.Round((order.RefundPendingAmount ?? 0m) - outcome.Refunded, 2, MidpointRounding.AwayFromZero);
+        await _orderService.SetRefundPendingAsync(orderId, stillOwed > 0 ? stillOwed : null);
+        var refreshed = await _orderService.RefreshPaymentStateAsync(orderId);
 
         _logger.LogInformation(
-            "Admin {AdminId} refunded {Amount} for order {OrderId} ({RefundId}), Cashfree status {Status}",
-            User.FindFirstValue(ClaimTypes.NameIdentifier), request.RefundAmount, orderId, refundId, result.RefundStatus);
+            "Admin {AdminId} refunded {Amount} for order {OrderId}.",
+            User.FindFirstValue(ClaimTypes.NameIdentifier), outcome.Refunded, orderId);
 
-        return Ok(new { refundStatus = result.RefundStatus });
+        return Ok(new RefundOrderResponse(outcome.Refunded, outcome.Error, refreshed?.ToResponse()));
     }
 
     [HttpPatch("admin/{orderId}/assign")]

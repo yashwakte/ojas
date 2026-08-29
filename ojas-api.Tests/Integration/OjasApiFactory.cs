@@ -58,6 +58,9 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Cashfree__ClientId", FakeCashfreeHandler.ClientId);
         Environment.SetEnvironmentVariable("Cashfree__ClientSecret", FakeCashfreeHandler.ClientSecret);
         Environment.SetEnvironmentVariable("Cashfree__Environment", "sandbox");
+        // Msg91WidgetVerifier.IsConfigured reads this; the transport is swapped for
+        // FakeMsg91WidgetHandler below, same pattern as Cashfree above.
+        Environment.SetEnvironmentVariable("Msg91__WidgetAuthKey", FakeMsg91WidgetHandler.WidgetAuthKey);
     }
 
     public string DatabaseName => _databaseName;
@@ -65,6 +68,10 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
     /// <summary>The stand-in gateway backing this factory's CashfreeService, so a test can
     /// simulate the customer actually completing (or failing) a payment.</summary>
     public FakeCashfreeHandler Cashfree { get; } = new();
+
+    /// <summary>The stand-in for MSG91's OTP Widget verify API, so a test can issue a token as
+    /// though a customer had completed the real widget flow for a given phone.</summary>
+    public FakeMsg91WidgetHandler Msg91Widget { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -85,6 +92,8 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
             // genuinely exercised) but pointed at a canned transport instead of the live gateway.
             services.AddHttpClient<CashfreeService>()
                 .ConfigurePrimaryHttpMessageHandler(() => Cashfree);
+            services.AddHttpClient<Msg91WidgetVerifier>()
+                .ConfigurePrimaryHttpMessageHandler(() => Msg91Widget);
         });
     }
 
