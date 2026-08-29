@@ -59,6 +59,23 @@ public class Msg91WidgetVerifierTests
         result.VerifiedIdentifier.ShouldBe("919123456789");
     }
 
+    /// <summary>MSG91's actual production response (captured from Render logs 2026-08-29), not a
+    /// guess: {"message":"918862068684","type":"success"} - the verified phone sits under
+    /// "message", the same field name VerifyAsync's failure branch reads as a human-readable
+    /// error. A prior version of this code checked identifier/mobile/phone/verified_identifier
+    /// and missed this entirely, silently rejecting every real, successful verification.</summary>
+    [Fact]
+    public async Task VerifyAsync_Succeeds_AgainstMsg91sRealResponseShape()
+    {
+        var verifier = MakeVerifier(_ => Json(HttpStatusCode.OK,
+            """{"message":"918862068684","type":"success"}"""));
+
+        var result = await verifier.VerifyAsync("some-token", "8862068684");
+
+        result.Success.ShouldBeTrue();
+        result.VerifiedIdentifier.ShouldBe("918862068684");
+    }
+
     [Fact]
     public async Task VerifyAsync_Succeeds_WhenIdentifierIsNestedUnderData()
     {

@@ -120,7 +120,11 @@ public class Msg91WidgetVerifier
 
     private static string? ExtractIdentifier(JsonElement root)
     {
-        foreach (var name in new[] { "identifier", "mobile", "phone", "verified_identifier" })
+        // Confirmed live 2026-08-29: MSG91's real response is {"message":"<identifier>","type":
+        // "success"} - "message" carries the verified phone number, not an error string, despite
+        // being the same field VerifyAsync's failure branch reads as a human-readable error.
+        // Never ambiguous in practice: this is only read once IndicatesSuccess is already true.
+        foreach (var name in new[] { "message", "identifier", "mobile", "phone", "verified_identifier" })
         {
             var value = StringProperty(root, name);
             if (!string.IsNullOrWhiteSpace(value)) return value;
