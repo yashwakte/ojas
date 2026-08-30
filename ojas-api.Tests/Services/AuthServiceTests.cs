@@ -49,7 +49,9 @@ public class AuthServiceTests
         _sut = new AuthService(_dbMock.Object, config, new DeviceService(_dbMock.Object));
     }
 
-    private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!", string role = UserRoles.Customer, bool isEmailVerified = true) => new()
+    private static User MakeUser(
+        string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!",
+        string role = UserRoles.Customer, bool isEmailVerified = true, bool isPhoneVerified = true) => new()
     {
         Id = "507f1f77bcf86cd799439011",
         FullName = "Jane Doe",
@@ -58,6 +60,7 @@ public class AuthServiceTests
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
         Role = role,
         IsEmailVerified = isEmailVerified,
+        IsPhoneVerified = isPhoneVerified,
     };
 
     [Fact]
@@ -217,51 +220,35 @@ public class AuthServiceTests
         result.Auth.ShouldBeNull();
     }
 
+    /// <summary>The whole point of an identifier that can be either kind: an account whose
+    /// email happens to have been registered as a phone-only lookalike must not exist for this
+    /// to matter - what matters is that typing the phone number finds the account and password
+    /// verification still gates it exactly as email-based login does.</summary>
     [Fact]
-    public async Task IsLoginablePhoneAsync_ReturnsTrue_ForAVerifiedCustomer()
+    public async Task LoginAsync_Succeeds_WhenTheIdentifierIsThePhoneNumberInstead()
     {
-        var user = MakeUser(phone: "9123456789", role: UserRoles.Customer, isEmailVerified: true);
+        var user = MakeUser(phone: "9123456789", password: "Passw0rd!");
         _usersMock.SetupFind(new List<User> { user });
 
-        (await _sut.IsLoginablePhoneAsync("9123456789")).ShouldBeTrue();
-    }
+        var result = await _sut.LoginAsync(new LoginRequest("9123456789", "Passw0rd!", "test-turnstile-token"), null);
 
-    // The staff-exclusion and unverified-account exclusion both live in the Find(...) filter
-    // itself, which SetupFind can't evaluate (it returns the full seeded list regardless of the
-    // predicate - see MongoCollectionMockExtensions' own doc comment). Those two branches are
-    // covered by the Mongo2Go-backed integration suite instead, where the filter genuinely runs.
-
-    [Fact]
-    public async Task IsLoginablePhoneAsync_ReturnsFalse_WhenNoUserHasThatNumber()
-    {
-        _usersMock.SetupFind(new List<User>());
-
-        (await _sut.IsLoginablePhoneAsync("9123456789")).ShouldBeFalse();
+        result.Outcome.ShouldBe(LoginOutcome.Success);
+        result.Auth!.User.Email.ShouldBe(user.Email);
     }
 
     [Fact]
-    public async Task PhoneLoginAsync_IssuesASession_ForTheMatchingCustomer()
+    public async Task LoginAsync_ReturnsTheAccountsRealEmail_NotTheTypedIdentifier_WhenUnverified()
     {
-        var user = MakeUser(phone: "9123456789", role: UserRoles.Customer);
+        // Login was attempted by phone number, but the device/email-verification follow-up
+        // flows need a real email to act on - echoing back the phone number typed at login
+        // would be useless there.
+        var user = MakeUser(phone: "9123456789", isEmailVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
-        var result = await _sut.PhoneLoginAsync("9123456789");
+        var result = await _sut.LoginAsync(new LoginRequest("9123456789", "Passw0rd!", "test-turnstile-token"), null);
 
-        result.ShouldNotBeNull();
-        result!.User.Phone.ShouldBe("9123456789");
-        result.Token.ShouldNotBeNullOrWhiteSpace();
-        // Not device-restricted - only staff sessions carry a bound device.
-        result.RawDeviceId.ShouldBeNull();
-    }
-
-    [Fact]
-    public async Task PhoneLoginAsync_ReturnsNull_WhenNoCustomerHasThatNumber()
-    {
-        _usersMock.SetupFind(new List<User>());
-
-        var result = await _sut.PhoneLoginAsync("9123456789");
-
-        result.ShouldBeNull();
+        result.Outcome.ShouldBe(LoginOutcome.NeedsEmailVerification);
+        result.Email.ShouldBe(user.Email);
     }
 
     [Fact]
@@ -320,21 +307,40 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task CompleteEmailVerificationAsync_MarksVerifiedAndReturnsToken()
+    public async Task CompleteEmailVerificationAsync_IssuesASession_WhenPhoneWasAlreadyVerified()
     {
-        var user = MakeUser(isEmailVerified: false);
+        var user = MakeUser(isEmailVerified: false, isPhoneVerified: true);
         _usersMock.SetupFind(new List<User> { user });
 
         var result = await _sut.CompleteEmailVerificationAsync(user.Email);
 
         result.ShouldNotBeNull();
-        result!.User.Email.ShouldBe(user.Email);
-        result.Token.ShouldNotBeNullOrWhiteSpace();
+        result!.EmailVerified.ShouldBeTrue();
+        result.PhoneVerified.ShouldBeTrue();
+        result.Session.ShouldNotBeNull();
+        result.Session!.User.Email.ShouldBe(user.Email);
+        result.Session.Token.ShouldNotBeNullOrWhiteSpace();
         _usersMock.Verify(c => c.UpdateOneAsync(
             It.IsAny<FilterDefinition<User>>(),
             It.IsAny<UpdateDefinition<User>>(),
             It.IsAny<UpdateOptions>(),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>The two-step registration's whole point: verifying email alone must not be
+    /// enough for a session while phone verification is still outstanding.</summary>
+    [Fact]
+    public async Task CompleteEmailVerificationAsync_WithholdsTheSession_WhenPhoneIsNotYetVerified()
+    {
+        var user = MakeUser(isEmailVerified: false, isPhoneVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.CompleteEmailVerificationAsync(user.Email);
+
+        result.ShouldNotBeNull();
+        result!.EmailVerified.ShouldBeTrue();
+        result.PhoneVerified.ShouldBeFalse();
+        result.Session.ShouldBeNull();
     }
 
     [Fact]
@@ -343,6 +349,44 @@ public class AuthServiceTests
         _usersMock.SetupFind(new List<User>());
 
         var result = await _sut.CompleteEmailVerificationAsync("nobody@example.com");
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task CompletePhoneVerificationAsync_IssuesASession_WhenEmailWasAlreadyVerified()
+    {
+        var user = MakeUser(isEmailVerified: true, isPhoneVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.CompletePhoneVerificationAsync(user.Phone);
+
+        result.ShouldNotBeNull();
+        result!.Session.ShouldNotBeNull();
+        result.Session!.User.Phone.ShouldBe(user.Phone);
+        // Not device-restricted - only staff sessions carry a bound device.
+        result.Session.RawDeviceId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task CompletePhoneVerificationAsync_WithholdsTheSession_WhenEmailIsNotYetVerified()
+    {
+        var user = MakeUser(isEmailVerified: false, isPhoneVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.CompletePhoneVerificationAsync(user.Phone);
+
+        result.ShouldNotBeNull();
+        result!.PhoneVerified.ShouldBeTrue();
+        result.Session.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task CompletePhoneVerificationAsync_ReturnsNull_WhenNoUserHasThatNumber()
+    {
+        _usersMock.SetupFind(new List<User>());
+
+        var result = await _sut.CompletePhoneVerificationAsync("9999999999");
 
         result.ShouldBeNull();
     }

@@ -4,12 +4,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subject, of, throwError } from 'rxjs';
 import { Login } from './login';
 import { AuthService } from '../../services/auth.service';
-import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { AuthResponse } from '../../models/interfaces';
 
 describe('Login', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
-  let msg91WidgetServiceSpy: jasmine.SpyObj<Msg91WidgetService>;
   let router: Router;
 
   const authResponse: AuthResponse = {
@@ -30,23 +28,13 @@ describe('Login', () => {
       'enrollPreApprovedDevice',
       'forgotPassword',
       'resetPassword',
-      'verifyPhoneLogin',
     ]);
     authServiceSpy.getDefaultRouteForRole.and.returnValue('/');
     authServiceSpy.sendDeviceOtp.and.returnValue(of({ message: 'sent', devCode: null }));
 
-    msg91WidgetServiceSpy = jasmine.createSpyObj('Msg91WidgetService', ['initialize', 'sendOtp', 'verifyOtp'], {
-      captchaElementId: 'msg91-phone-captcha',
-    });
-    msg91WidgetServiceSpy.initialize.and.returnValue(Promise.resolve());
-
     TestBed.configureTestingModule({
       imports: [Login],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: authServiceSpy },
-        { provide: Msg91WidgetService, useValue: msg91WidgetServiceSpy },
-      ],
+      providers: [provideRouter([]), { provide: AuthService, useValue: authServiceSpy }],
     });
     router = TestBed.inject(Router);
   });
@@ -72,17 +60,16 @@ describe('Login', () => {
     expect(fixture.componentInstance.loginForm.invalid).toBeTrue();
   });
 
-  it('requires a valid email and a password of at least 6 characters', () => {
+  it('requires an identifier and a password of at least 6 characters', () => {
     const { fixture } = create();
     const form = fixture.componentInstance.loginForm;
 
-    form.get('email')?.setValue('not-an-email');
     form.get('password')?.setValue('12345');
     expect(form.invalid).toBeTrue();
-    expect(form.get('email')?.hasError('email')).toBeTrue();
+    expect(form.get('identifier')?.hasError('required')).toBeTrue();
     expect(form.get('password')?.hasError('minlength')).toBeTrue();
 
-    form.get('email')?.setValue('jane@x.com');
+    form.get('identifier')?.setValue('jane@x.com');
     form.get('password')?.setValue('123456');
     expect(form.valid).toBeTrue();
   });
@@ -95,7 +82,7 @@ describe('Login', () => {
 
   it('onSubmit does nothing until the Turnstile widget has been solved', () => {
     const { fixture } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
     fixture.componentInstance.turnstileToken = null;
 
     fixture.componentInstance.onSubmit();
@@ -106,7 +93,7 @@ describe('Login', () => {
   it('onSubmit includes the Turnstile token in the login request', () => {
     authServiceSpy.login.and.returnValue(of(authResponse));
     const { fixture } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
     fixture.componentInstance.turnstileToken = 'solved-token';
 
     fixture.componentInstance.onSubmit();
@@ -119,7 +106,7 @@ describe('Login', () => {
   it('a failed submit clears the spent Turnstile token so the widget must be resolved again', () => {
     authServiceSpy.login.and.returnValue(throwError(() => ({ status: 500 })));
     const { fixture } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
@@ -130,7 +117,7 @@ describe('Login', () => {
     authServiceSpy.login.and.returnValue(of(authResponse));
     spyOn(router, 'navigateByUrl');
     const { fixture } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
@@ -140,14 +127,30 @@ describe('Login', () => {
     expect(fixture.componentInstance.loading).toBeFalse();
   });
 
-  it('shows an "Invalid email or password" message for a 401', () => {
-    authServiceSpy.login.and.returnValue(throwError(() => ({ status: 401 })));
-    const { fixture, snackBar } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+  it('onSubmit accepts a phone number as the identifier', () => {
+    authServiceSpy.login.and.returnValue(of(authResponse));
+    const { fixture } = create();
+    fixture.componentInstance.loginForm.setValue({ identifier: '9123456789', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
-    expect(snackBar.open).toHaveBeenCalledWith('Invalid email or password', 'Close', jasmine.any(Object));
+    expect(authServiceSpy.login).toHaveBeenCalledWith(
+      jasmine.objectContaining({ identifier: '9123456789' }),
+    );
+  });
+
+  it('shows an "Invalid email/phone or password" message for a 401', () => {
+    authServiceSpy.login.and.returnValue(throwError(() => ({ status: 401 })));
+    const { fixture, snackBar } = create();
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
+
+    fixture.componentInstance.onSubmit();
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Invalid email/phone or password',
+      'Close',
+      jasmine.any(Object),
+    );
     expect(fixture.componentInstance.loading).toBeFalse();
   });
 
@@ -156,7 +159,7 @@ describe('Login', () => {
       throwError(() => ({ status: 400, error: { message: 'Verification failed. Please try again.' } })),
     );
     const { fixture, snackBar } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
@@ -170,7 +173,7 @@ describe('Login', () => {
   it('shows a rate-limit message for 429 errors', () => {
     authServiceSpy.login.and.returnValue(throwError(() => ({ status: 429 })));
     const { fixture, snackBar } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
@@ -184,7 +187,7 @@ describe('Login', () => {
   it('shows a server-unreachable message for status 0 / TimeoutError', () => {
     authServiceSpy.login.and.returnValue(throwError(() => ({ status: 0 })));
     const { fixture, snackBar } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
@@ -198,7 +201,7 @@ describe('Login', () => {
   it('shows a generic error message for other failures', () => {
     authServiceSpy.login.and.returnValue(throwError(() => ({ status: 500 })));
     const { fixture, snackBar } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     fixture.componentInstance.onSubmit();
 
@@ -207,6 +210,39 @@ describe('Login', () => {
       'Close',
       jasmine.any(Object),
     );
+  });
+
+  it('redirects to registration to finish email verification for a 403 needsEmailVerification response', () => {
+    authServiceSpy.login.and.returnValue(
+      throwError(() => ({ status: 403, error: { needsEmailVerification: true, email: 'jane@x.com' } })),
+    );
+    spyOn(router, 'navigate');
+    const { fixture } = create();
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
+
+    fixture.componentInstance.onSubmit();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/register'], {
+      queryParams: { verify: 'jane@x.com' },
+    });
+  });
+
+  it('redirects to registration to finish phone verification for a 403 needsPhoneVerification response', () => {
+    authServiceSpy.login.and.returnValue(
+      throwError(() => ({
+        status: 403,
+        error: { needsPhoneVerification: true, email: 'jane@x.com', phone: '9123456789' },
+      })),
+    );
+    spyOn(router, 'navigate');
+    const { fixture } = create();
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
+
+    fixture.componentInstance.onSubmit();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/register'], {
+      queryParams: { verifyPhone: '9123456789', email: 'jane@x.com' },
+    });
   });
 
   describe('staff device approval', () => {
@@ -219,7 +255,7 @@ describe('Login', () => {
       authServiceSpy.login.and.returnValue(throwError(() => deviceBlocked));
       const created = create();
       created.fixture.componentInstance.loginForm.setValue({
-        email: 'admin@x.com',
+        identifier: 'admin@x.com',
         password: '123456',
       });
       created.fixture.componentInstance.onSubmit();
@@ -340,12 +376,21 @@ describe('Login', () => {
   describe('forgot password', () => {
     it('carries the already-typed email into the reset form', () => {
       const { fixture } = create();
-      fixture.componentInstance.loginForm.patchValue({ email: 'jane@x.com' });
+      fixture.componentInstance.loginForm.patchValue({ identifier: 'jane@x.com' });
 
       fixture.componentInstance.startPasswordReset();
 
       expect(fixture.componentInstance.resetStage).toBe('request');
       expect(fixture.componentInstance.resetEmail).toBe('jane@x.com');
+    });
+
+    it('does not carry across a typed phone number - password reset is email-only', () => {
+      const { fixture } = create();
+      fixture.componentInstance.loginForm.patchValue({ identifier: '9123456789' });
+
+      fixture.componentInstance.startPasswordReset();
+
+      expect(fixture.componentInstance.resetEmail).toBe('');
     });
 
     it('will not request a code without a solved Turnstile', () => {
@@ -408,7 +453,7 @@ describe('Login', () => {
       fixture.componentInstance.submitNewPassword();
 
       expect(fixture.componentInstance.resetStage).toBe('none');
-      expect(fixture.componentInstance.loginForm.value.email).toBe('jane@x.com');
+      expect(fixture.componentInstance.loginForm.value.identifier).toBe('jane@x.com');
       expect(fixture.componentInstance.loginForm.value.password).toBe('');
       // Reset deliberately issues no session, so nothing should have been saved.
       expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
@@ -445,149 +490,11 @@ describe('Login', () => {
     });
   });
 
-  describe('phone login', () => {
-    it('switching to phone mode resets the sub-flow to entering a number, and initialises the widget', () => {
-      const { fixture } = create();
-
-      fixture.componentInstance.switchToPhoneLogin();
-
-      expect(fixture.componentInstance.loginMode).toBe('phone');
-      expect(fixture.componentInstance.phoneStage).toBe('enter');
-      expect(msg91WidgetServiceSpy.initialize).toHaveBeenCalled();
-    });
-
-    it('shows "not available" when the widget itself fails to initialise', async () => {
-      msg91WidgetServiceSpy.initialize.and.returnValue(Promise.reject(new Error('script blocked')));
-      const { fixture } = create();
-
-      fixture.componentInstance.switchToPhoneLogin();
-      await fixture.whenStable();
-
-      expect(fixture.componentInstance.phoneUnavailable).toBeTrue();
-    });
-
-    it('will not send a code for an empty phone number', () => {
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '';
-
-      fixture.componentInstance.sendPhoneLoginCode();
-
-      expect(msg91WidgetServiceSpy.sendOtp).not.toHaveBeenCalled();
-    });
-
-    it('sending a code asks the widget to send it, and advances to the code stage', async () => {
-      msg91WidgetServiceSpy.sendOtp.and.returnValue(Promise.resolve());
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '9123456789';
-
-      fixture.componentInstance.sendPhoneLoginCode();
-      await fixture.whenStable();
-
-      expect(msg91WidgetServiceSpy.sendOtp).toHaveBeenCalledWith('9123456789');
-      expect(fixture.componentInstance.phoneStage).toBe('code');
-    });
-
-    it('surfaces the widget failure message when sending fails', async () => {
-      msg91WidgetServiceSpy.sendOtp.and.returnValue(Promise.reject(new Error('Too many attempts. Please wait a minute.')));
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneNumber = '9123456789';
-
-      fixture.componentInstance.sendPhoneLoginCode();
-      // Zoneless: a bare Promise.reject() settled before .then()/.catch() attach isn't tracked by
-      // whenStable()'s pending-task signal, so flush the microtask queue explicitly instead.
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(fixture.componentInstance.phoneError).toBe('Too many attempts. Please wait a minute.');
-      expect(fixture.componentInstance.phoneStage).toBe('enter');
-    });
-
-    it('verifyPhoneLoginCode does nothing until a full 4-digit code is entered', () => {
-      const { fixture } = create();
-      fixture.componentInstance.phoneCode = '12';
-
-      fixture.componentInstance.verifyPhoneLoginCode();
-
-      expect(msg91WidgetServiceSpy.verifyOtp).not.toHaveBeenCalled();
-      expect(authServiceSpy.verifyPhoneLogin).not.toHaveBeenCalled();
-    });
-
-    it('a valid code verifies against the widget, signs in via the resulting token, and navigates home', async () => {
-      msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
-      authServiceSpy.verifyPhoneLogin.and.returnValue(of(authResponse));
-      spyOn(router, 'navigateByUrl');
-      const { fixture } = create();
-      fixture.componentInstance.phoneNumber = '9123456789';
-      fixture.componentInstance.phoneCode = '2468';
-
-      fixture.componentInstance.verifyPhoneLoginCode();
-      await fixture.whenStable();
-
-      expect(msg91WidgetServiceSpy.verifyOtp).toHaveBeenCalledWith('2468');
-      expect(authServiceSpy.verifyPhoneLogin).toHaveBeenCalledWith({
-        phone: '9123456789',
-        widgetToken: 'widget-access-token',
-      });
-      expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
-      expect(router.navigateByUrl).toHaveBeenCalledWith('/');
-    });
-
-    it('shows the widget failure message when the entered code itself is wrong', async () => {
-      msg91WidgetServiceSpy.verifyOtp.and.returnValue(
-        Promise.reject(new Error('That code is invalid or has expired.')),
-      );
-      const { fixture } = create();
-      fixture.componentInstance.phoneNumber = '9123456789';
-      fixture.componentInstance.phoneCode = '0000';
-
-      fixture.componentInstance.verifyPhoneLoginCode();
-      // Same zoneless caveat as the sendOtp failure test above.
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
-      expect(authServiceSpy.verifyPhoneLogin).not.toHaveBeenCalled();
-      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
-    });
-
-    it('shows the server message and stays put when the backend rejects an otherwise-valid token', async () => {
-      msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
-      authServiceSpy.verifyPhoneLogin.and.returnValue(
-        throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
-      );
-      const { fixture } = create();
-      fixture.componentInstance.phoneNumber = '9123456789';
-      fixture.componentInstance.phoneCode = '0000';
-
-      fixture.componentInstance.verifyPhoneLoginCode();
-      await fixture.whenStable();
-
-      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
-      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
-    });
-
-    it('switching back to email login clears phone errors', () => {
-      const { fixture } = create();
-      fixture.componentInstance.switchToPhoneLogin();
-      fixture.componentInstance.phoneError = 'stale error';
-      fixture.componentInstance.phoneUnavailable = true;
-
-      fixture.componentInstance.switchToEmailLogin();
-
-      expect(fixture.componentInstance.loginMode).toBe('email');
-      expect(fixture.componentInstance.phoneError).toBe('');
-      expect(fixture.componentInstance.phoneUnavailable).toBeFalse();
-    });
-  });
-
   it('sets slowConnection true after 5s while the request is still pending', () => {
     const subject = new Subject<AuthResponse>();
     authServiceSpy.login.and.returnValue(subject.asObservable());
     const { fixture } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     jasmine.clock().install();
     try {
@@ -609,7 +516,7 @@ describe('Login', () => {
     const subject = new Subject<AuthResponse>();
     authServiceSpy.login.and.returnValue(subject.asObservable());
     const { fixture } = create();
-    fixture.componentInstance.loginForm.setValue({ email: 'jane@x.com', password: '123456' });
+    fixture.componentInstance.loginForm.setValue({ identifier: 'jane@x.com', password: '123456' });
 
     jasmine.clock().install();
     try {

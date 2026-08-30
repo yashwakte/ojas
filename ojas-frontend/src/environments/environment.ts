@@ -5,9 +5,6 @@ export const environment = {
   // localhost. Paired with the dummy secret key already set in the API's local config.
   turnstileSiteKey: '1x00000000000000000000AA',
   cashfreeMode: 'sandbox' as 'sandbox' | 'production',
-  // On for a real local test against the widget - flip back to false once verified, so a plain
-  // `npm start` doesn't silently show phone login before it's been confirmed working.
-  phoneLoginEnabled: true,
   msg91WidgetId: '3668436b4156363032343133',
   msg91TokenAuth: '562938TjibpKmLOJku6a92d768P1',
 };

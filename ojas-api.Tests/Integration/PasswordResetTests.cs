@@ -206,6 +206,10 @@ public class PasswordResetTests : IDisposable
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(OldPassword),
             Role = UserRoles.Customer,
             IsEmailVerified = false,
+            // Phone verification is a separate requirement a password-reset code proves nothing
+            // about - true here so this test isolates what it's actually about: that redeeming a
+            // reset code counts as proving email control, without also needing phone verified.
+            IsPhoneVerified = true,
         }));
 
         using var client = _factory.CreateClient();

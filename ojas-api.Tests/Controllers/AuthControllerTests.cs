@@ -22,7 +22,6 @@ public class AuthControllerTests
     private readonly Mock<IMongoCollection<StaffDevice>> _staffDevicesMock = new();
     private readonly Mock<IMongoCollection<StaffInvite>> _staffInvitesMock = new();
     private readonly Mock<IEmailSender> _emailSenderMock = new();
-    private readonly Mock<IPhoneOtpSender> _phoneOtpSenderMock = new();
     private readonly Mock<ITurnstileVerifier> _turnstileVerifierMock = new();
     private readonly AuthController _sut;
 
@@ -45,7 +44,6 @@ public class AuthControllerTests
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
             .Returns(Task.CompletedTask);
-        _phoneOtpSenderMock.Setup(s => s.IsConfigured).Returns(false);
         _turnstileVerifierMock
             .Setup(v => v.VerifyAsync(It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
@@ -61,14 +59,13 @@ public class AuthControllerTests
 
         var deviceService = new DeviceService(_dbMock.Object);
         var authService = new AuthService(_dbMock.Object, config, deviceService);
-        var otpService = new OtpService(_dbMock.Object, _emailSenderMock.Object, _phoneOtpSenderMock.Object, NullLogger<OtpService>.Instance);
+        var otpService = new OtpService(_dbMock.Object, _emailSenderMock.Object, NullLogger<OtpService>.Instance);
         var envMock = new Mock<IWebHostEnvironment>();
         envMock.Setup(e => e.EnvironmentName).Returns("Development");
         var inviteService = new StaffInviteService(
             _dbMock.Object, _emailSenderMock.Object, config, NullLogger<StaffInviteService>.Instance);
-        // Unconfigured (config carries no Msg91:WidgetAuthKey) - same posture as
-        // _phoneOtpSenderMock's default, matching production today. Msg91WidgetVerifierTests
-        // covers the configured/verified paths in isolation.
+        // Unconfigured (config carries no Msg91:WidgetAuthKey), matching production until it's
+        // set. Msg91WidgetVerifierTests covers the configured/verified paths in isolation.
         var phoneWidgetVerifier = new Msg91WidgetVerifier(new HttpClient(), config, NullLogger<Msg91WidgetVerifier>.Instance);
 
         _sut = new AuthController(authService, otpService, deviceService, inviteService, _turnstileVerifierMock.Object, phoneWidgetVerifier, envMock.Object, NullLogger<AuthController>.Instance)
@@ -77,7 +74,9 @@ public class AuthControllerTests
         };
     }
 
-    private static User MakeUser(string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!", bool isEmailVerified = true) => new()
+    private static User MakeUser(
+        string email = "jane@example.com", string phone = "9123456789", string password = "Passw0rd!",
+        bool isEmailVerified = true, bool isPhoneVerified = true) => new()
     {
         Id = "507f1f77bcf86cd799439011",
         FullName = "Jane Doe",
@@ -86,6 +85,7 @@ public class AuthControllerTests
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
         Role = UserRoles.Customer,
         IsEmailVerified = isEmailVerified,
+        IsPhoneVerified = isPhoneVerified,
     };
 
     private static IEnumerable<string> SetCookieHeaders(ControllerContext context) =>
@@ -187,8 +187,9 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task VerifyEmailOtp_Success_SetsAuthAndCsrfCookies()
+    public async Task VerifyEmailOtp_Success_IssuesASession_WhenPhoneWasAlreadyVerified()
     {
+        // Default MakeUser is phone-verified - this is the "second step finishes" case.
         var user = MakeUser(isEmailVerified: false);
         _usersMock.SetupFind(new List<User> { user });
         var otp = new OtpCode
@@ -203,13 +204,44 @@ public class AuthControllerTests
         var result = await _sut.VerifyEmailOtp(new VerifyEmailOtpRequest(user.Email, "123456"));
 
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
-        var response = okResult.Value.ShouldBeOfType<AuthResponse>();
-        response.CsrfToken.ShouldNotBeNullOrWhiteSpace();
+        var response = okResult.Value.ShouldBeOfType<RegistrationStepResponse>();
+        response.EmailVerified.ShouldBeTrue();
+        response.PhoneVerified.ShouldBeTrue();
+        response.Session.ShouldNotBeNull();
+        response.Session!.CsrfToken.ShouldNotBeNullOrWhiteSpace();
 
         var cookies = SetCookieHeaders(_sut.ControllerContext);
         cookies.ShouldContain(c => c.StartsWith("ojas_auth="));
         cookies.ShouldContain(c => c.StartsWith("ojas_refresh="));
         cookies.ShouldContain(c => c.StartsWith("ojas_csrf="));
+    }
+
+    /// <summary>The two-step registration's whole point, tested at the controller level too:
+    /// verifying email alone must not be enough for a session while phone is still outstanding,
+    /// and no cookies get set for a step that isn't actually a sign-in.</summary>
+    [Fact]
+    public async Task VerifyEmailOtp_Success_WithholdsTheSession_WhenPhoneIsNotYetVerified()
+    {
+        var user = MakeUser(isEmailVerified: false, isPhoneVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+        var otp = new OtpCode
+        {
+            Target = user.Email,
+            Channel = OtpChannels.Email,
+            CodeHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+        };
+        _otpCodesMock.SetupFind(new List<OtpCode> { otp });
+
+        var result = await _sut.VerifyEmailOtp(new VerifyEmailOtpRequest(user.Email, "123456"));
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var response = okResult.Value.ShouldBeOfType<RegistrationStepResponse>();
+        response.EmailVerified.ShouldBeTrue();
+        response.PhoneVerified.ShouldBeFalse();
+        response.Session.ShouldBeNull();
+
+        SetCookieHeaders(_sut.ControllerContext).ShouldBeEmpty();
     }
 
     [Fact]
@@ -261,27 +293,6 @@ public class AuthControllerTests
         result.Result.ShouldBeOfType<BadRequestObjectResult>();
         var cookies = SetCookieHeaders(_sut.ControllerContext);
         cookies.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task SendPhoneLoginOtp_WhenMsg91IsNotConfigured_Returns503()
-    {
-        // The mock's default (set in the constructor) matches the real, currently-unconfigured
-        // Msg91PhoneOtpSender - this is production's actual behaviour today, not a hypothetical.
-        var result = await _sut.SendPhoneLoginOtp(new PhoneLoginRequest("9123456789", "test-turnstile-token"));
-
-        var objectResult = result.ShouldBeOfType<ObjectResult>();
-        objectResult.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
-    }
-
-    [Fact]
-    public async Task SendPhoneLoginOtp_TurnstileFails_ReturnsBadRequest_BeforeCheckingConfiguration()
-    {
-        _turnstileVerifierMock.Setup(v => v.VerifyAsync(It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
-
-        var result = await _sut.SendPhoneLoginOtp(new PhoneLoginRequest("9123456789", "bad-token"));
-
-        result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]

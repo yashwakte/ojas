@@ -17,6 +17,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
+import { Msg91WidgetService } from '../../services/msg91-widget.service';
+import { AuthResponse } from '../../models/interfaces';
 import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
 
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -41,6 +43,8 @@ export class Register implements OnInit, OnDestroy {
   private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
   private readonly turnstileWidget = viewChild(TurnstileWidget);
+  private readonly msg91Widget = inject(Msg91WidgetService);
+  readonly phoneCaptchaElementId = this.msg91Widget.captchaElementId;
 
   registerForm: FormGroup;
   loading = false;
@@ -48,12 +52,17 @@ export class Register implements OnInit, OnDestroy {
   serverError = '';
   turnstileToken: string | null = null;
 
-  // Step 2: OTP entry. showOtpStep flips on once registration succeeds (or when arriving
-  // from /login with a "verify your email" redirect for an account that never finished).
-  showOtpStep = false;
+  // Registration is three stages now: the form, then email verification, then phone
+  // verification - completable in either order once past the form, but this component always
+  // does email first, then phone. 'stage' starts at 'form' and only ever moves forward; resuming
+  // via a link from login (an account that verified one step and came back later) can start
+  // straight at 'email' or 'phone' - see ngOnInit.
+  stage: 'form' | 'email' | 'phone' = 'form';
   pendingEmail = '';
-  // Only ever populated outside Production (see AuthController.Register) - lets the flow be
-  // tested end-to-end before real email sending is configured.
+  pendingPhone = '';
+
+  // Email step. Only ever populated outside Production (see AuthController.Register) - lets the
+  // flow be tested end-to-end before real email sending is configured.
   devCode: string | null = null;
   otpCode = '';
   otpError = '';
@@ -61,6 +70,14 @@ export class Register implements OnInit, OnDestroy {
   resending = false;
   resendCooldown = 0;
   private resendTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Phone step, via the MSG91 OTP Widget - same service and pattern login's phone flow uses.
+  // 'send' shows the captcha and a Send button; 'code' takes the 4-digit code once sent.
+  phoneSubStage: 'send' | 'code' = 'send';
+  phoneCode = '';
+  phoneError = '';
+  phoneBusy = false;
+  phoneUnavailable = false;
 
   constructor(
     private fb: FormBuilder,
@@ -91,15 +108,22 @@ export class Register implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    // Login redirects here with ?verify=<email> when the account exists but never
-    // completed OTP verification, so they can pick the flow back up without re-registering.
-    // Deferred to ngOnInit rather than done in the constructor because sendResend() calls
-    // cdr.detectChanges(), which throws if the component's view hasn't been created yet -
-    // the constructor runs before that, ngOnInit runs after.
-    const verifyEmail = this.route.snapshot.queryParamMap.get('verify');
-    if (verifyEmail) {
+    // Login redirects here when an account exists but hasn't finished registration - either
+    // ?verify=<email> (email still outstanding) or ?verifyPhone=<phone>&email=<email> (email
+    // already done, only phone left). Deferred to ngOnInit rather than the constructor because
+    // sendResend()/switchToPhoneStage() touch the view, which doesn't exist yet in the
+    // constructor.
+    const params = this.route.snapshot.queryParamMap;
+    const verifyEmail = params.get('verify');
+    const verifyPhone = params.get('verifyPhone');
+
+    if (verifyPhone) {
+      this.pendingPhone = verifyPhone;
+      this.pendingEmail = params.get('email') ?? '';
+      this.switchToPhoneStage();
+    } else if (verifyEmail) {
       this.pendingEmail = verifyEmail;
-      this.showOtpStep = true;
+      this.stage = 'email';
       this.sendResend();
     }
   }
@@ -161,8 +185,9 @@ export class Register implements OnInit, OnDestroy {
         next: (res) => {
           this.loading = false;
           this.pendingEmail = res.email;
+          this.pendingPhone = this.registerForm.value.phone;
           this.devCode = res.devCode ?? null;
-          this.showOtpStep = true;
+          this.stage = 'email';
           this.startResendCooldown();
           this.cdr.detectChanges();
         },
@@ -206,9 +231,12 @@ export class Register implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.verifying = false;
-          this.auth.saveAuth(res);
-          this.welcome.celebrate('register', res.fullName);
-          this.router.navigate(['/']);
+          this.pendingPhone = res.phone;
+          if (res.session) {
+            this.completeRegistration(res.session);
+          } else {
+            this.switchToPhoneStage();
+          }
         },
         error: (err) => {
           this.verifying = false;
@@ -269,6 +297,90 @@ export class Register implements OnInit, OnDestroy {
       clearInterval(this.resendTimer);
       this.resendTimer = null;
     }
+  }
+
+  private switchToPhoneStage() {
+    // The email step's resend cooldown is meaningless once we've moved past it - left running,
+    // it keeps firing every second, patching resendCooldown and calling cdr.detectChanges() on a
+    // component that no longer shows it, for as long as the tab stays on this page.
+    this.clearResendTimer();
+    this.stage = 'phone';
+    this.phoneSubStage = 'send';
+    this.phoneCode = '';
+    this.phoneError = '';
+    this.phoneUnavailable = false;
+    // Kicked off here, not eagerly - most visits never reach this step. The captcha's target div
+    // only exists once this stage has rendered, so force that render before calling initialize()
+    // (async: it loads a script) rather than relying on some other trigger to have flushed it -
+    // this can run from a plain method call, not just a DOM event binding, and zoneless Angular
+    // does not auto-schedule a check for either kind of caller.
+    this.cdr.detectChanges();
+    this.msg91Widget.initialize().catch(() => {
+      this.phoneUnavailable = true;
+      this.cdr.detectChanges();
+    });
+  }
+
+  sendPhoneCode() {
+    if (this.phoneBusy) return;
+
+    this.phoneBusy = true;
+    this.phoneError = '';
+
+    this.msg91Widget
+      .sendOtp(this.pendingPhone)
+      .then(() => {
+        this.phoneBusy = false;
+        this.phoneSubStage = 'code';
+        this.cdr.detectChanges();
+      })
+      .catch((error: Error) => {
+        this.phoneBusy = false;
+        this.phoneError = error.message || 'Something went wrong. Please try again.';
+        this.cdr.detectChanges();
+      });
+  }
+
+  verifyPhoneCode() {
+    if (this.phoneCode.trim().length !== 4 || this.phoneBusy) return;
+
+    this.phoneBusy = true;
+    this.phoneError = '';
+
+    this.msg91Widget
+      .verifyOtp(this.phoneCode.trim())
+      .then((widgetToken) =>
+        this.auth.verifyPhoneRegistration({ phone: this.pendingPhone, widgetToken }).subscribe({
+          next: (res) => {
+            this.phoneBusy = false;
+            if (res.session) {
+              this.completeRegistration(res.session);
+            } else {
+              // Phone verified but email still isn't (arrived here via ?verifyPhone without
+              // ever doing the email step) - send them to finish that instead.
+              this.pendingEmail = res.email;
+              this.stage = 'email';
+              this.sendResend();
+            }
+          },
+          error: (err) => {
+            this.phoneBusy = false;
+            this.phoneError = err.error?.message ?? 'That code is invalid or has expired.';
+            this.cdr.detectChanges();
+          },
+        }),
+      )
+      .catch((error: Error) => {
+        this.phoneBusy = false;
+        this.phoneError = error.message || 'That code is invalid or has expired.';
+        this.cdr.detectChanges();
+      });
+  }
+
+  private completeRegistration(session: AuthResponse) {
+    this.auth.saveAuth(session);
+    this.welcome.celebrate('register', session.fullName);
+    this.router.navigate(['/']);
   }
 
   ngOnDestroy() {

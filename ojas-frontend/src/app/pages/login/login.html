@@ -248,100 +248,6 @@
             Back to sign in
           </button>
         </p>
-      } @else if (loginMode === 'phone') {
-      <div class="auth-header">
-        <span class="auth-logo-mobile">ओजस</span>
-        <h2>Sign In</h2>
-        @if (phoneStage === 'enter') {
-          <p>Enter your phone number and we'll send you a 4-digit code.</p>
-        } @else {
-          <p>Enter the code we sent to <strong>{{ phoneNumber }}</strong></p>
-        }
-      </div>
-
-      @if (phoneUnavailable) {
-        <div class="error-banner" role="alert">
-          <mat-icon>error_outline</mat-icon>
-          <span>Phone sign-in isn't available right now. Please sign in with email instead.</span>
-        </div>
-      }
-
-      @if (phoneError) {
-        <div class="error-banner" role="alert">
-          <mat-icon>error_outline</mat-icon>
-          <span>{{ phoneError }}</span>
-        </div>
-      }
-
-      @if (phoneStage === 'enter') {
-        <form (ngSubmit)="sendPhoneLoginCode()">
-          <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
-            <mat-label>Phone number</mat-label>
-            <input
-              matInput
-              [(ngModel)]="phoneNumber"
-              name="phoneNumber"
-              type="tel"
-              inputmode="tel"
-              placeholder="10-digit mobile number"
-            />
-            <mat-icon matPrefix>phone</mat-icon>
-          </mat-form-field>
-
-          <!-- MSG91's captcha renders into this element (captchaRenderId) - it must already be
-               in the DOM before Msg91WidgetService.initialize() calls initSendOTP, which
-               switchToPhoneLogin() guarantees by triggering only after this template renders. -->
-          <div [id]="phoneCaptchaElementId" class="msg91-captcha-slot"></div>
-
-          <button
-            mat-flat-button
-            class="submit-btn"
-            type="submit"
-            [disabled]="phoneBusy || !phoneNumber.trim()"
-          >
-            @if (phoneBusy) {
-              <mat-spinner diameter="20"></mat-spinner>
-            } @else {
-              <ng-container>Send code</ng-container>
-            }
-          </button>
-        </form>
-      } @else {
-        <form (ngSubmit)="verifyPhoneLoginCode()">
-          <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
-            <mat-label>Verification code</mat-label>
-            <input
-              matInput
-              [(ngModel)]="phoneCode"
-              name="phoneCode"
-              inputmode="numeric"
-              maxlength="4"
-              placeholder="4-digit code"
-              autocomplete="one-time-code"
-            />
-            <mat-icon matPrefix>pin</mat-icon>
-          </mat-form-field>
-
-          <button
-            mat-flat-button
-            class="submit-btn"
-            type="submit"
-            [disabled]="phoneBusy || phoneCode.trim().length !== 4"
-          >
-            @if (phoneBusy) {
-              <mat-spinner diameter="20"></mat-spinner>
-            } @else {
-              <ng-container>Sign In</ng-container>
-            }
-          </button>
-        </form>
-      }
-
-      <p class="auth-switch">
-        <button type="button" class="link-btn" (click)="switchToEmailLogin()">
-          Use email instead
-        </button>
-      </p>
       } @else {
       <div class="auth-header">
         <span class="auth-logo-mobile">ओजस</span>
@@ -351,14 +257,20 @@
 
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Email</mat-label>
-          <input matInput formControlName="email" type="email" placeholder="Enter your email" />
-          <mat-icon matPrefix>email</mat-icon>
-          @if (loginForm.get('email')?.hasError('required') && loginForm.get('email')?.touched) {
-            <mat-error>Email is required</mat-error>
-          }
-          @if (loginForm.get('email')?.hasError('email')) {
-            <mat-error>Please enter a valid email</mat-error>
+          <mat-label>Email or phone number</mat-label>
+          <input
+            matInput
+            formControlName="identifier"
+            type="text"
+            autocomplete="username"
+            placeholder="Enter your email or phone number"
+          />
+          <mat-icon matPrefix>person</mat-icon>
+          @if (
+            loginForm.get('identifier')?.hasError('required') &&
+            loginForm.get('identifier')?.touched
+          ) {
+            <mat-error>Email or phone number is required</mat-error>
           }
         </mat-form-field>
 
@@ -414,13 +326,6 @@
         }
       </form>
 
-      @if (phoneLoginEnabled) {
-        <p class="auth-switch">
-          <button type="button" class="link-btn" (click)="switchToPhoneLogin()">
-            Use phone number instead
-          </button>
-        </p>
-      }
       <p class="auth-switch">Don't have an account? <a routerLink="/register">Create one</a></p>
       }
     </div>

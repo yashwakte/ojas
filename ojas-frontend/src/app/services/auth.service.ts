@@ -16,16 +16,15 @@ import {
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   LoginRequest,
-  PhoneLoginRequest,
-  PhoneLoginResponse,
-  PhoneLoginVerifyRequest,
   PreApprovedEnrollRequest,
   ResetPasswordRequest,
   RegisterPendingResponse,
   RegisterRequest,
+  RegistrationStepResponse,
   ResendEmailOtpRequest,
   ResendEmailOtpResponse,
   SessionResponse,
+  VerifyPhoneRegistrationRequest,
   StaffDeviceResponse,
   StaffUserResponse,
   UserRole,
@@ -256,8 +255,14 @@ export class AuthService {
     return this.http.post<RegisterPendingResponse>(`${this.apiUrl}/register`, request);
   }
 
+  // Registration now requires both this and verifyPhoneRegistration before a session exists -
+  // whichever finishes second carries it back in the response's session field.
   verifyEmailOtp(request: VerifyEmailOtpRequest) {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/verify-email-otp`, request);
+    return this.http.post<RegistrationStepResponse>(`${this.apiUrl}/verify-email-otp`, request);
+  }
+
+  verifyPhoneRegistration(request: VerifyPhoneRegistrationRequest) {
+    return this.http.post<RegistrationStepResponse>(`${this.apiUrl}/verify-phone-registration`, request);
   }
 
   resendEmailOtp(request: ResendEmailOtpRequest) {
@@ -290,16 +295,6 @@ export class AuthService {
   // means passing the device check.
   resetPassword(request: ResetPasswordRequest) {
     return this.http.post<{ message: string }>(`${this.apiUrl}/reset-password`, request);
-  }
-
-  // Customer-only: sign in with a phone number instead of email+password. 503s until MSG91 is
-  // configured server-side.
-  sendPhoneLoginOtp(request: PhoneLoginRequest) {
-    return this.http.post<PhoneLoginResponse>(`${this.apiUrl}/phone-login/send-otp`, request);
-  }
-
-  verifyPhoneLogin(request: PhoneLoginVerifyRequest) {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/phone-login/verify`, request);
   }
 
   // Staff accounts are restricted to a single device. When login comes back 403 with

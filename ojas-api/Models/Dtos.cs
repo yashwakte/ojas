@@ -9,8 +9,12 @@ public record RegisterRequest(
 	[Required, MinLength(10), MaxLength(128)] string Password,
 	[Required] string TurnstileToken);
 
+/// <summary>Identifier is either the account's email or its phone number - both are unique
+/// per account and both are verified at registration, so either safely identifies who is
+/// trying to sign in. AuthService.FindByCredentialsAsync checks it against both fields rather
+/// than the caller having to say which kind it typed.</summary>
 public record LoginRequest(
-	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, MaxLength(120)] string Identifier,
 	[Required, MinLength(6), MaxLength(128)] string Password,
 	[Required] string TurnstileToken);
 
@@ -36,16 +40,32 @@ public record AuthResponse(string Id, string FullName, string Email, string Phon
 /// controller knows to write the device cookie; null for ordinary customer sessions.</summary>
 public record AuthResult(string Token, AuthResponse User, string RefreshToken, string? RawDeviceId = null);
 
+/// <summary>The service-layer twin of RegistrationStepResponse - Session is set only once both
+/// EmailVerified and PhoneVerified are true.</summary>
+/// <summary>Email and Phone are the account's own values regardless of which one this step was
+/// for - the frontend needs both to drive whichever step comes next, and a caller who resumed
+/// via a link carrying only the email (or only the phone) would otherwise have no way to learn
+/// the other.</summary>
+public record RegistrationStepResult(AuthResult? Session, bool EmailVerified, bool PhoneVerified, string Email, string Phone);
+
 public enum LoginOutcome
 {
 	Success,
 	InvalidCredentials,
 	NeedsEmailVerification,
+	/// <summary>Password was correct and email is verified, but registration was abandoned
+	/// before the phone step - without this, an account could complete only email and then
+	/// log in with password forever, never actually finishing the phone verification
+	/// registration is supposed to require.</summary>
+	NeedsPhoneVerification,
 	/// <summary>Password was correct, but this staff account is bound to a different device.</summary>
 	NeedsDeviceEnrollment,
 }
 
-public record LoginServiceResult(LoginOutcome Outcome, AuthResult? Auth = null);
+/// <summary>Email is the resolved account's actual email - not an echo of whatever identifier
+/// the caller typed, since that could have been the phone number. NeedsEmailVerification and
+/// NeedsDeviceEnrollment both need a real email to act on (a resend, a device-approval code).</summary>
+public record LoginServiceResult(LoginOutcome Outcome, AuthResult? Auth = null, string? Email = null, string? Phone = null);
 
 /// <summary>Who the session cookie currently belongs to, straight from the server. The browser
 /// keeps a cached copy of the signed-in user so the first paint isn't blank, but cookies are
@@ -112,20 +132,6 @@ public record StaffDeviceResponse(
 	DateTime CreatedAt,
 	DateTime LastSeenAt);
 
-/// <summary>Customer-only: signing in with a phone number instead of email+password. Requires
-/// Turnstile since, unlike device/reset flows, nothing here already proves the caller controls
-/// a password - this is the sole anonymous entry point into the flow.</summary>
-public record PhoneLoginRequest(
-	[Required, MinLength(10), MaxLength(20)] string Phone,
-	[Required] string TurnstileToken);
-
-/// <summary>WidgetToken is the access token MSG91's OTP Widget hands back after the customer
-/// enters the code - the widget owns code generation and entry now, so Ojas never sees the raw
-/// digits, only this token, which Msg91WidgetVerifier checks server-side.</summary>
-public record PhoneLoginVerifyRequest(
-	[Required, MinLength(10), MaxLength(20)] string Phone,
-	[Required] string WidgetToken);
-
 /// <summary>Returned by /register while the account is awaiting OTP verification - deliberately
 /// not an AuthResponse, since no session exists until the code is verified.</summary>
 public record RegisterPendingResponse(string Email, string Message, string? DevCode = null);
@@ -136,11 +142,26 @@ public record VerifyEmailOtpRequest(
 
 public record ResendEmailOtpRequest([Required, EmailAddress] string Email);
 
-public record SendPhoneOtpRequest([Required] string Phone);
+/// <summary>WidgetToken is the access token MSG91's OTP Widget hands back after the customer
+/// enters the code during registration - Ojas never sees the raw digits, only this token, which
+/// Msg91WidgetVerifier checks server-side and binds to Phone before trusting it.</summary>
+public record VerifyPhoneRegistrationRequest(
+	[Required, MinLength(10), MaxLength(20)] string Phone,
+	[Required] string WidgetToken);
 
-public record VerifyPhoneOtpRequest(
-	[Required] string Phone,
-	[Required, RegularExpression(@"^\d{6}$")] string Code);
+/// <summary>Registration now requires both steps - verify-email-otp and
+/// verify-phone-registration - completable in either order. Whichever one finishes second
+/// carries Session; the other reports what's still outstanding so the frontend knows which
+/// screen to show next. Email and Phone are always the account's real values, regardless of
+/// which step this response is for - a caller who resumed via a link carrying only one of them
+/// (e.g. login's needsEmailVerification redirect) needs the other to drive the next step.</summary>
+public record RegistrationStepResponse(
+	string Message,
+	bool EmailVerified,
+	bool PhoneVerified,
+	string Email,
+	string Phone,
+	AuthResponse? Session = null);
 
 /// <summary>InvitePending is true while the account still has no password - i.e. the invite was
 /// sent but never accepted. The admin UI surfaces it so a stalled onboarding is visible.</summary>

@@ -210,8 +210,30 @@ export interface ResendEmailOtpResponse {
   devCode?: string | null;
 }
 
-export interface LoginRequest {
+/** widgetToken is what Msg91WidgetService.verifyOtp() resolves with - the backend checks it
+ * against MSG91 and binds it to this exact phone before trusting it. */
+export interface VerifyPhoneRegistrationRequest {
+  phone: string;
+  widgetToken: string;
+}
+
+/** Registration requires both verify-email-otp and verify-phone-registration, completable in
+ * either order - session is set only once both are done. email/phone are always the account's
+ * real values regardless of which step this came from, so the frontend always knows what to
+ * show next even when resuming from a link that only carried one of them. */
+export interface RegistrationStepResponse {
+  message: string;
+  emailVerified: boolean;
+  phoneVerified: boolean;
   email: string;
+  phone: string;
+  session?: AuthResponse | null;
+}
+
+/** identifier is either the account's email or its phone number - both are unique and both are
+ * verified at registration, so either safely identifies who is signing in. */
+export interface LoginRequest {
+  identifier: string;
   password: string;
   turnstileToken: string;
 }
@@ -799,28 +821,6 @@ export interface ResetPasswordRequest {
   email: string;
   code: string;
   newPassword: string;
-}
-
-/** The pre-widget raw-code send path - still functions server-side (kept as a fallback, not
- * deleted) but is no longer called from the login page, which sends via Msg91WidgetService
- * instead. Left here only for completeness against the still-live endpoint. */
-export interface PhoneLoginRequest {
-  phone: string;
-  turnstileToken: string;
-}
-
-export interface PhoneLoginResponse {
-  message: string;
-  /** Populated outside Production only, so the flow can be tested without real MSG91 set up. */
-  devCode?: string | null;
-}
-
-/** widgetToken is the access token Msg91WidgetService.verifyOtp() resolves with - the backend
- * checks it against MSG91 and binds it to this exact phone (Msg91WidgetVerifier), so a token
- * verified for one number can't be replayed against another. */
-export interface PhoneLoginVerifyRequest {
-  phone: string;
-  widgetToken: string;
 }
 
 export interface StaffDeviceResponse {

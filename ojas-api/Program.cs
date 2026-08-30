@@ -105,7 +105,6 @@ else
 {
     builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
 }
-builder.Services.AddHttpClient<IPhoneOtpSender, Msg91PhoneOtpSender>();
 builder.Services.AddHttpClient<Msg91WidgetVerifier>();
 builder.Services.AddHttpClient<ITurnstileVerifier, CloudflareTurnstileVerifier>();
 
@@ -411,8 +410,7 @@ app.Use(async (context, next) =>
         path.StartsWithSegments("/api/auth/reset-password") ||
         path.StartsWithSegments("/api/auth/device/send-otp") ||
         path.StartsWithSegments("/api/auth/device/enroll") ||
-        path.StartsWithSegments("/api/auth/accept-invite") ||
-        path.StartsWithSegments("/api/auth/phone-login");
+        path.StartsWithSegments("/api/auth/accept-invite");
 
     // Payment gateway callbacks are server-to-server and authenticated by the HMAC signature on
     // the request itself, never by a session. They happen to carry no auth cookie today, so the

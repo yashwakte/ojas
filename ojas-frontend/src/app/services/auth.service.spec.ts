@@ -103,11 +103,19 @@ describe('AuthService', () => {
   it('verifyEmailOtp() posts to /auth/verify-email-otp', () => {
     setup();
     const req = { email: 'a@b.com', code: '123456' };
-    service.verifyEmailOtp(req).subscribe((res) => expect(res).toEqual(authResponse));
+    const step = {
+      message: 'ok',
+      emailVerified: true,
+      phoneVerified: true,
+      email: 'a@b.com',
+      phone: '9876543210',
+      session: authResponse,
+    };
+    service.verifyEmailOtp(req).subscribe((res) => expect(res).toEqual(step));
     const call = httpMock.expectOne(`${environment.apiUrl}/auth/verify-email-otp`);
     expect(call.request.method).toBe('POST');
     expect(call.request.body).toEqual(req);
-    call.flush(authResponse);
+    call.flush(step);
   });
 
   it('resendEmailOtp() posts to /auth/resend-email-otp', () => {
@@ -142,7 +150,7 @@ describe('AuthService', () => {
 
   it('login() posts to /auth/login', () => {
     setup();
-    const req = { email: 'a@b.com', password: 'secret', turnstileToken: 'tok' };
+    const req = { identifier: 'a@b.com', password: 'secret', turnstileToken: 'tok' };
     service.login(req).subscribe((res) => expect(res).toEqual(authResponse));
     const call = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
     expect(call.request.method).toBe('POST');

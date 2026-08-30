@@ -242,17 +242,55 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-email-otp")]
-    public async Task<ActionResult<AuthResponse>> VerifyEmailOtp([FromBody] VerifyEmailOtpRequest request)
+    public async Task<ActionResult<RegistrationStepResponse>> VerifyEmailOtp([FromBody] VerifyEmailOtpRequest request)
     {
         var isValid = await _otpService.VerifyAsync(request.Email, OtpChannels.Email, request.Code);
         if (!isValid)
             return BadRequest(new { message = "That code is invalid or has expired." });
 
-        var result = await _authService.CompleteEmailVerificationAsync(request.Email);
-        if (result == null)
+        var step = await _authService.CompleteEmailVerificationAsync(request.Email);
+        if (step == null)
             return NotFound();
 
-        return Ok(IssueSession(result));
+        return Ok(RegistrationStepResponseFor(step));
+    }
+
+    /// <summary>Step two of registration: a token from the MSG91 OTP Widget verifies the phone
+    /// number given at signup. Anonymous, like verify-email-otp - no session exists until both
+    /// steps are done. The token is checked against MSG91's own servers and bound to this exact
+    /// phone by Msg91WidgetVerifier, never trusted on the strength of "MSG91 says it's valid"
+    /// alone.</summary>
+    [HttpPost("verify-phone-registration")]
+    public async Task<ActionResult<RegistrationStepResponse>> VerifyPhoneRegistration([FromBody] VerifyPhoneRegistrationRequest request)
+    {
+        var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
+        if (!verification.Success)
+        {
+            _logger.LogWarning(
+                "Phone registration rejected at the MSG91 verification step for {Phone}: {Error}",
+                request.Phone, verification.Error);
+            return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
+        }
+
+        var step = await _authService.CompletePhoneVerificationAsync(request.Phone);
+        if (step == null)
+            return NotFound();
+
+        return Ok(RegistrationStepResponseFor(step));
+    }
+
+    private RegistrationStepResponse RegistrationStepResponseFor(RegistrationStepResult step)
+    {
+        if (step.Session != null)
+        {
+            return new RegistrationStepResponse(
+                "Account verified.", step.EmailVerified, step.PhoneVerified, step.Email, step.Phone, IssueSession(step.Session));
+        }
+
+        var message = !step.EmailVerified
+            ? "Phone verified. Now verify your email."
+            : "Email verified. Now verify your phone.";
+        return new RegistrationStepResponse(message, step.EmailVerified, step.PhoneVerified, step.Email, step.Phone);
     }
 
     // Doesn't reveal whether the email is registered - always returns the same generic message.
@@ -286,7 +324,21 @@ public class AuthController : ControllerBase
                 {
                     message = "Please verify your email before signing in.",
                     needsEmailVerification = true,
-                    email = request.Email,
+                    // The resolved account's real email, not an echo of request.Identifier -
+                    // that could have been the phone number instead.
+                    email = login.Email,
+                });
+
+            // Registration was abandoned after the email step - the frontend resumes the same
+            // phone-verification widget flow registration itself uses, rather than treating this
+            // as a login failure.
+            case LoginOutcome.NeedsPhoneVerification:
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Please verify your phone number before signing in.",
+                    needsPhoneVerification = true,
+                    email = login.Email,
+                    phone = login.Phone,
                 });
 
             // Deliberately the same shape as the email-verification case: the password was
@@ -297,11 +349,11 @@ public class AuthController : ControllerBase
                 {
                     message = "This device isn't recognised. We'll email you a code to approve it.",
                     needsDeviceEnrollment = true,
-                    email = request.Email,
+                    email = login.Email,
                 });
 
             case LoginOutcome.InvalidCredentials:
-                return Unauthorized(new { message = "Invalid email or password" });
+                return Unauthorized(new { message = "Invalid email/phone or password" });
 
             default:
                 return Ok(IssueSession(login.Auth!));
@@ -396,41 +448,6 @@ public class AuthController : ControllerBase
         return Ok(IssueSession(result));
     }
 
-    // Scaffolded ahead of MSG91/DLT registration - returns 503 until Msg91:* config is set,
-    // at which point these become live with no code changes needed.
-    [HttpPost("send-phone-otp")]
-    [Authorize]
-    public async Task<IActionResult> SendPhoneOtp()
-    {
-        if (!_otpService.IsPhoneOtpConfigured)
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Phone verification isn't available yet." });
-
-        var phone = User.FindFirstValue("phone");
-        if (string.IsNullOrWhiteSpace(phone))
-            return BadRequest();
-
-        await _otpService.SendPhoneOtpAsync(phone);
-        return Ok(new { message = "Code sent." });
-    }
-
-    [HttpPost("verify-phone-otp")]
-    [Authorize]
-    public async Task<IActionResult> VerifyPhoneOtp([FromBody] VerifyPhoneOtpRequest request)
-    {
-        if (!_otpService.IsPhoneOtpConfigured)
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Phone verification isn't available yet." });
-
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
-            return Unauthorized();
-
-        var isValid = await _otpService.VerifyAsync(request.Phone, OtpChannels.Phone, request.Code);
-        if (!isValid)
-            return BadRequest(new { message = "That code is invalid or has expired." });
-
-        await _authService.MarkPhoneVerifiedAsync(userId);
-        return Ok();
-    }
 
     [HttpPost("staff")]
     [Authorize(Roles = UserRoles.Admin)]
@@ -614,76 +631,6 @@ public class AuthController : ControllerBase
         _logger.LogInformation("Staff device enrolled for user {UserId} ({Role}).", user.Id, user.Role);
 
         return Ok(IssueSession(result));
-    }
-
-    /// <summary>Step one of signing in by phone instead of email+password - customers only, see
-    /// AuthService.IsLoginablePhoneAsync. 503s until MSG91 is configured; Turnstile-gated since,
-    /// unlike device/send-otp, nothing here already proves the caller controls anything.
-    ///
-    /// Superseded by the MSG91 OTP Widget, which sends directly from the browser rather than
-    /// through this endpoint - kept working (not deleted) as a fallback path, same posture as
-    /// SmtpEmailSender being kept alongside Resend, but the frontend no longer calls it.</summary>
-    [HttpPost("phone-login/send-otp")]
-    public async Task<IActionResult> SendPhoneLoginOtp([FromBody] PhoneLoginRequest request)
-    {
-        if (!await VerifyTurnstileAsync(request.TurnstileToken))
-            return BadRequest(new { message = "Verification failed. Please try again." });
-
-        if (!_otpService.IsPhoneOtpConfigured)
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Phone login isn't available yet." });
-
-        string? devCode = null;
-        if (await _authService.IsLoginablePhoneAsync(request.Phone))
-        {
-            var code = await _otpService.SendPhoneLoginOtpAsync(request.Phone);
-            devCode = _env.IsProduction() ? null : code;
-        }
-
-        return Ok(new { message = "If that number is registered, we've sent a code.", devCode });
-    }
-
-    /// <summary>Step two: a token from the MSG91 OTP Widget signs the customer in directly - no
-    /// password, no device concept, since phone login only ever applies to customers. The token
-    /// is checked against MSG91's own servers and bound to this exact phone number by
-    /// Msg91WidgetVerifier - never trusted on the strength of "MSG91 says it's valid" alone.</summary>
-    [HttpPost("phone-login/verify")]
-    public async Task<ActionResult<AuthResponse>> VerifyPhoneLogin([FromBody] PhoneLoginVerifyRequest request)
-    {
-        var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
-        if (!verification.Success)
-        {
-            _logger.LogWarning(
-                "Phone login rejected at the MSG91 verification step for {Phone}: {Error}",
-                request.Phone, verification.Error);
-            return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
-        }
-
-        var result = await _authService.PhoneLoginAsync(request.Phone);
-        if (result == null)
-        {
-            // MSG91 confirmed the code - this is a *different* failure: no customer account
-            // matched request.Phone exactly. Logged with the phone so it can be compared
-            // character-for-character against what's actually stored, rather than guessed at.
-            _logger.LogWarning(
-                "Phone login: MSG91 verified {VerifiedIdentifier} for request phone {Phone}, but no matching loginable customer account was found.",
-                verification.VerifiedIdentifier, request.Phone);
-            return BadRequest(new { message = "That code is invalid or has expired." });
-        }
-
-        return Ok(IssueSession(result));
-    }
-
-    /// <summary>Called by MSG91's servers, not the browser - the "User Existence Validation" hook
-    /// the OTP Widget queries before sending, so a stranger cannot use Ojas's widget to blast an
-    /// OTP at a phone number with no Ojas account. Deliberately anonymous, matching the payment
-    /// webhook's posture: it is a server-to-server callback by design. The response shape
-    /// (user_found / identifier) is MSG91's required contract, not Ojas's own convention.</summary>
-    [HttpGet("phone-login/exists")]
-    [AllowAnonymous]
-    public async Task<IActionResult> PhoneLoginExists([FromQuery] string identifier)
-    {
-        var found = !string.IsNullOrWhiteSpace(identifier) && await _authService.IsLoginablePhoneAsync(identifier);
-        return Ok(new { user_found = found, identifier });
     }
 
     [HttpGet("staff/{userId}/devices")]

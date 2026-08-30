@@ -2,6 +2,7 @@ using System.Net;
 using MongoDB.Driver;
 using System.Net.Http.Json;
 using OjasApi.Models;
+using OjasApi.Tests.TestHelpers;
 using Shouldly;
 
 namespace OjasApi.Tests.Integration;
@@ -217,18 +218,26 @@ public class AuthFlowTests : IDisposable
     }
 
     /// <summary>Registers a throwaway verified account on _client and returns the refresh token
-    /// its session was issued.</summary>
+    /// its session was issued. Registration is two verification steps now - the session only
+    /// exists once both are done.</summary>
     private async Task<string> RegisterAndGetRefreshTokenAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
+        // Digits only - see AuthFlowExtensions.RegisterAsync for why a hex suffix breaks phone
+        // verification now that it's actually checked.
+        var phone = $"9{Math.Abs(Guid.NewGuid().GetHashCode()).ToString().PadLeft(9, '0')[..9]}";
         var registerRequest = new RegisterRequest(
-            $"Test User {suffix}", $"user.{suffix}@example.com", $"9{suffix.PadRight(9, '0')}", "Passw0rd123!", "test-turnstile-token");
+            $"Test User {suffix}", $"user.{suffix}@example.com", phone, "Passw0rd123!", "test-turnstile-token");
         var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", registerRequest);
         var pending = await registerResponse.Content.ReadFromJsonAsync<RegisterPendingResponse>();
 
-        var verifyResponse = await _client.PostAsJsonAsync(
+        await _client.PostAsJsonAsync(
             "/api/auth/verify-email-otp", new VerifyEmailOtpRequest(pending!.Email, pending.DevCode!));
-        return ExtractCookieValue(verifyResponse, "ojas_refresh");
+
+        var verifyPhoneResponse = await _client.PostAsJsonAsync(
+            "/api/auth/verify-phone-registration",
+            new VerifyPhoneRegistrationRequest(phone, FakeMsg91WidgetHandler.TokenFor(phone)));
+        return ExtractCookieValue(verifyPhoneResponse, "ojas_refresh");
     }
 
     private static string ExtractCookieValue(HttpResponseMessage response, string cookieName)

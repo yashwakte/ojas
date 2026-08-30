@@ -18,17 +18,13 @@ export const environment = {
   // the site breaks for however long the deploys are apart. This value is used only if that call
   // fails, so it matches what a deployed API defaults to.
   cashfreeMode: 'production' as 'sandbox' | 'production',
-  // Phone login goes through MSG91's OTP Widget (client-side send + verify) rather than the raw
-  // DLT-gated SendOTP API - its default channel configuration sends through MSG91's own
-  // pre-registered template, so it does not wait on this business's own DLT approval. widgetId
-  // and tokenAuth are both meant to be public here (same trust level as a Cashfree App ID or
-  // Turnstile site key) - the real secret is Msg91:WidgetAuthKey, which lives only on the API.
-  // msg91TokenAuth is the real value (from the widget's Tokens section, named "ojasProduction").
-  // phoneLoginEnabled is on for a live production test - localhost can't complete this flow at
-  // all (hCaptcha, which the widget uses internally, refuses to validate on "localhost"), so this
-  // has to be verified against the real deployed site. Requires Msg91:WidgetAuthKey to also be
-  // set on Render, or /phone-login/verify reports unavailable regardless of this flag.
-  phoneLoginEnabled: true,
+  // Phone verification (at registration only - see register.ts) goes through MSG91's OTP Widget
+  // (client-side send + verify) rather than the raw DLT-gated SendOTP API - its default channel
+  // configuration sends through MSG91's own pre-registered template, so it does not wait on this
+  // business's own DLT approval. widgetId and tokenAuth are both meant to be public here (same
+  // trust level as a Cashfree App ID or Turnstile site key) - the real secret is
+  // Msg91:WidgetAuthKey, which lives only on the API. msg91TokenAuth is the real value (from the
+  // widget's Tokens section, named "ojasProduction").
   msg91WidgetId: '3668436b4156363032343133',
   msg91TokenAuth: '562938TjibpKmLOJku6a92d768P1',
 };

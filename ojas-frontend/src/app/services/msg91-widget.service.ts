@@ -20,8 +20,8 @@ export class Msg91WidgetError extends Error {}
  *
  * exposeMethods requires a real DOM element for its captcha to render into
  * (id="msg91-phone-captcha") - that element must already be in the DOM the moment the script's
- * onload fires initSendOTP, which is why this is only initialised from the phone-login step of
- * the login page, after Angular has rendered that step's template, never eagerly on page load.
+ * onload fires initSendOTP, which is why this is only initialised from the phone step of the
+ * registration page, after Angular has rendered that step's template, never eagerly on page load.
  *
  * The exact field name for the returned access token isn't pinned down from MSG91's docs (their
  * docs page is JS-rendered and did not yield the schema) - checked defensively across a few

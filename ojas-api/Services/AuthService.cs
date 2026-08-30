@@ -117,10 +117,12 @@ public class AuthService
         return (user, null);
     }
 
-    /// <summary>Marks the account verified and issues a session. Called once an OTP has been
-    /// confirmed - either right after registration, or when a user who abandoned that step
-    /// comes back through the login screen.</summary>
-    public async Task<AuthResult?> CompleteEmailVerificationAsync(string email)
+    /// <summary>Marks email verified. Registration now requires both email and phone to be
+    /// verified before a session exists - if phone already is (whichever order the customer
+    /// completed them in), this is the step that issues it; otherwise it reports what's still
+    /// outstanding. Called both right after registration and when a user who abandoned that
+    /// step comes back through the login screen.</summary>
+    public async Task<RegistrationStepResult?> CompleteEmailVerificationAsync(string email)
     {
         var normalizedEmail = NormalizeEmail(email);
         var user = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
@@ -135,19 +137,55 @@ public class AuthService
             user.IsEmailVerified = true;
         }
 
-        // Staff accounts are created already-verified, so this path only ever runs for
-        // customers - no device to bind.
-        return await IssueSessionAsync(user, null);
+        return await CompleteRegistrationStepAsync(user);
+    }
+
+    /// <summary>Marks phone verified via a widget token Msg91WidgetVerifier has already checked
+    /// and bound to this exact number - mirrors CompleteEmailVerificationAsync, and either step
+    /// may finish first.</summary>
+    public async Task<RegistrationStepResult?> CompletePhoneVerificationAsync(string phone)
+    {
+        var normalizedPhone = NormalizePhone(phone);
+        var user = await _db.Users.Find(u => u.Phone == normalizedPhone).FirstOrDefaultAsync();
+        if (user == null)
+            return null;
+
+        if (!user.IsPhoneVerified)
+        {
+            await _db.Users.UpdateOneAsync(
+                Builders<User>.Filter.Eq(u => u.Id, user.Id),
+                Builders<User>.Update.Set(u => u.IsPhoneVerified, true));
+            user.IsPhoneVerified = true;
+        }
+
+        return await CompleteRegistrationStepAsync(user);
+    }
+
+    /// <summary>Staff accounts are created with both flags already true (invite-accept is what
+    /// activates them, not this path), so this only ever gates on both for a fresh customer
+    /// registration. No device to bind either way - only staff are device-restricted.</summary>
+    private async Task<RegistrationStepResult> CompleteRegistrationStepAsync(User user)
+    {
+        var session = user.IsEmailVerified && user.IsPhoneVerified ? await IssueSessionAsync(user, null) : null;
+        return new RegistrationStepResult(session, user.IsEmailVerified, user.IsPhoneVerified, user.Email, user.Phone);
     }
 
     public async Task<LoginServiceResult> LoginAsync(LoginRequest request, string? rawDeviceId)
     {
-        var user = await FindByCredentialsAsync(request.Email, request.Password);
+        var user = await FindByCredentialsAsync(request.Identifier, request.Password);
         if (user == null)
             return new LoginServiceResult(LoginOutcome.InvalidCredentials);
 
         if (!user.IsEmailVerified)
-            return new LoginServiceResult(LoginOutcome.NeedsEmailVerification);
+            return new LoginServiceResult(LoginOutcome.NeedsEmailVerification, Email: user.Email);
+
+        // Staff are always created with IsPhoneVerified already true (invite-accept is what
+        // activates them, not this flow), so this only ever gates a customer registration that
+        // was abandoned after the email step. Without it, that account could sign in with
+        // password forever and never actually finish the phone verification registration
+        // requires.
+        if (!user.IsPhoneVerified)
+            return new LoginServiceResult(LoginOutcome.NeedsPhoneVerification, Email: user.Email, Phone: user.Phone);
 
         if (string.IsNullOrWhiteSpace(user.Role))
             user.Role = UserRoles.Customer;
@@ -158,7 +196,7 @@ public class AuthService
         if (DeviceService.IsRestrictedRole(user.Role) &&
             !await _devices.IsDeviceTrustedAsync(user.Id!, rawDeviceId))
         {
-            return new LoginServiceResult(LoginOutcome.NeedsDeviceEnrollment);
+            return new LoginServiceResult(LoginOutcome.NeedsDeviceEnrollment, Email: user.Email);
         }
 
         var deviceIdHash = DeviceService.IsRestrictedRole(user.Role) && rawDeviceId != null
@@ -169,11 +207,18 @@ public class AuthService
     }
 
     /// <summary>Shared by login and the device-enrollment endpoints, which re-check the password
-    /// rather than carrying a half-authenticated session between the two steps.</summary>
-    public async Task<User?> FindByCredentialsAsync(string email, string password)
+    /// rather than carrying a half-authenticated session between the two steps. identifier is
+    /// either the account's email or its phone number - both are unique and both are verified at
+    /// registration, so checking either field is unambiguous; normalising the same string both
+    /// ways (email-form and phone-form) and matching on either avoids needing to guess which kind
+    /// was typed.</summary>
+    public async Task<User?> FindByCredentialsAsync(string identifier, string password)
     {
-        var normalizedEmail = NormalizeEmail(email);
-        var user = await _db.Users.Find(u => u.Email == normalizedEmail).FirstOrDefaultAsync();
+        var emailForm = NormalizeEmail(identifier);
+        var phoneForm = NormalizePhone(identifier);
+        var user = await _db.Users
+            .Find(u => u.Email == emailForm || u.Phone == phoneForm)
+            .FirstOrDefaultAsync();
 
         // A staff account whose invite hasn't been accepted has no password yet. Bail before
         // BCrypt.Verify, which throws rather than returning false on an empty hash.
@@ -184,41 +229,6 @@ public class AuthService
             return null;
 
         return user;
-    }
-
-    /// <summary>Whether SendPhoneLoginOtpAsync should actually be triggered for this number.
-    /// Deliberately staff-excluded: phone login has no device concept, so allowing it for
-    /// admin/delivery would let anyone with the phone bypass the single-device restriction
-    /// entirely from any browser. Also gated on IsEmailVerified so a code can't hand a session
-    /// to an account that never finished registration.</summary>
-    public async Task<bool> IsLoginablePhoneAsync(string phone)
-    {
-        var normalizedPhone = NormalizePhone(phone);
-        return await _db.Users
-            .Find(u => u.Phone == normalizedPhone && u.Role == UserRoles.Customer && u.IsEmailVerified)
-            .AnyAsync();
-    }
-
-    /// <summary>Issues a session for the customer owning this phone number. Re-checks the same
-    /// eligibility IsLoginablePhoneAsync enforces (customer role, email verified) rather than
-    /// assuming a code could only have reached here for an eligible number: that assumption held
-    /// when Ojas's own backend controlled sending, but the MSG91 OTP Widget sends directly from
-    /// the browser, bypassing IsLoginablePhoneAsync entirely unless the widget's own "User
-    /// Existence Validation" hook is both enabled and correctly wired. That hook is a UX
-    /// nicety - not sending an OTP nobody eligible could redeem - not the actual security
-    /// boundary; this check is.</summary>
-    public async Task<AuthResult?> PhoneLoginAsync(string phone)
-    {
-        var normalizedPhone = NormalizePhone(phone);
-        var user = await _db.Users
-            .Find(u => u.Phone == normalizedPhone && u.Role == UserRoles.Customer && u.IsEmailVerified)
-            .FirstOrDefaultAsync();
-
-        if (user == null)
-            return null;
-
-        // Not device-restricted - only staff are.
-        return await IssueSessionAsync(user, null);
     }
 
     /// <summary>Binds the calling device to a staff account and issues a session on it. Because
@@ -325,13 +335,6 @@ public class AuthService
 
         await RevokeAllRefreshTokensForUserAsync(user.Id!);
         return true;
-    }
-
-    public async Task MarkPhoneVerifiedAsync(string userId)
-    {
-        await _db.Users.UpdateOneAsync(
-            Builders<User>.Filter.Eq(u => u.Id, userId),
-            Builders<User>.Update.Set(u => u.IsPhoneVerified, true));
     }
 
     /// <summary>

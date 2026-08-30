@@ -8,10 +8,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
-import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
-import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { timeout } from 'rxjs';
 
 @Component({
@@ -35,12 +33,6 @@ export class Login implements OnDestroy {
   private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
   private readonly turnstileWidget = viewChild(TurnstileWidget);
-  private readonly msg91Widget = inject(Msg91WidgetService);
-  readonly phoneCaptchaElementId = this.msg91Widget.captchaElementId;
-
-  // MSG91 isn't live yet - offering "Use phone number instead" only for a customer to discover
-  // it 503s after they've typed their number is a dead end worth not showing at all.
-  readonly phoneLoginEnabled = environment.phoneLoginEnabled;
 
   loginForm: FormGroup;
   loading = false;
@@ -73,18 +65,6 @@ export class Login implements OnDestroy {
   // automatically with no code to enter.
   devicePreApproved = false;
 
-  // Phone-number sign-in - a second, customer-only login method alongside email+password.
-  // 'enter' collects the number, 'code' takes the OTP; both live on this card like the
-  // reset/device flows above. Sends and verifies via the MSG91 OTP Widget (Msg91WidgetService),
-  // not a direct backend call - only the final token goes to Ojas's own API.
-  loginMode: 'email' | 'phone' = 'email';
-  phoneStage: 'enter' | 'code' = 'enter';
-  phoneNumber = '';
-  phoneCode = '';
-  phoneError = '';
-  phoneBusy = false;
-  phoneUnavailable = false;
-
   constructor(
     private fb: FormBuilder,
     private auth: AuthService,
@@ -93,7 +73,7 @@ export class Login implements OnDestroy {
     private cdr: ChangeDetectorRef,
   ) {
     this.loginForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
+      identifier: ['', [Validators.required]],
       password: ['', [Validators.required, Validators.minLength(6)]],
     });
   }
@@ -153,6 +133,15 @@ export class Login implements OnDestroy {
             return;
           }
 
+          // Registration was abandoned after the email step - resume the same phone-widget flow
+          // registration itself uses, rather than treating this as a login failure.
+          if (err.status === 403 && err.error?.needsPhoneVerification) {
+            this.router.navigate(['/register'], {
+              queryParams: { verifyPhone: err.error.phone, email: err.error.email },
+            });
+            return;
+          }
+
           // The password was right, but this staff account is bound to a different device.
           if (err.status === 403 && err.error?.needsDeviceEnrollment) {
             this.startDeviceEnrollment(err.error.email);
@@ -163,7 +152,7 @@ export class Login implements OnDestroy {
           if (err.status === 429) {
             msg = 'Too many attempts. Please wait a minute.';
           } else if (err.status === 401) {
-            msg = 'Invalid email or password';
+            msg = 'Invalid email/phone or password';
           } else if (err.status === 400) {
             // Distinct from a credentials failure (401) - this is Turnstile verification failing.
             msg = err.error?.message ?? 'Verification failed. Please try again.';
@@ -180,8 +169,10 @@ export class Login implements OnDestroy {
 
   startPasswordReset() {
     this.resetStage = 'request';
-    // Carry across whatever they already typed - they usually got here after a failed attempt.
-    this.resetEmail = this.loginForm.value.email ?? '';
+    // Carry across whatever they already typed, but only if it's actually an email - password
+    // reset is email-only, and the identifier field may currently hold a phone number.
+    const identifier = (this.loginForm.value.identifier ?? '').trim();
+    this.resetEmail = identifier.includes('@') ? identifier : '';
     this.resetCode = '';
     this.resetNewPassword = '';
     this.resetError = '';
@@ -247,7 +238,7 @@ export class Login implements OnDestroy {
           this.resetDevCode = null;
           // No session is issued by design, so drop them back on the sign-in form with the
           // email prefilled rather than pretending they're logged in.
-          this.loginForm.patchValue({ email: this.resetEmail.trim(), password: '' });
+          this.loginForm.patchValue({ identifier: this.resetEmail.trim(), password: '' });
           this.cdr.detectChanges();
           this.snackBar.open('Password updated. Please sign in.', 'Close', { duration: 5000 });
         },
@@ -361,86 +352,6 @@ export class Login implements OnDestroy {
     this.deviceError = '';
     this.deviceDevCode = null;
     this.devicePreApproved = false;
-  }
-
-  switchToPhoneLogin() {
-    this.loginMode = 'phone';
-    this.phoneStage = 'enter';
-    this.phoneNumber = '';
-    this.phoneCode = '';
-    this.phoneError = '';
-    this.phoneUnavailable = false;
-    // Kicked off here, not eagerly on page load - most visits never reach phone login, same
-    // reasoning as the Cashfree SDK's lazy load. The captcha's target div only exists once this
-    // click has rendered the phone/enter template, which initialize() (async: it loads a script)
-    // will always run after.
-    this.msg91Widget.initialize().catch(() => {
-      this.phoneUnavailable = true;
-      this.cdr.detectChanges();
-    });
-  }
-
-  switchToEmailLogin() {
-    this.loginMode = 'email';
-    this.phoneError = '';
-    this.phoneUnavailable = false;
-  }
-
-  sendPhoneLoginCode() {
-    if (!this.phoneNumber.trim()) return;
-
-    this.phoneBusy = true;
-    this.phoneError = '';
-
-    this.msg91Widget
-      .sendOtp(this.phoneNumber.trim())
-      .then(() => {
-        this.phoneBusy = false;
-        this.phoneStage = 'code';
-        this.cdr.detectChanges();
-      })
-      .catch((error: Error) => {
-        this.phoneBusy = false;
-        this.phoneError = error.message || 'Something went wrong. Please try again.';
-        this.cdr.detectChanges();
-      });
-  }
-
-  verifyPhoneLoginCode() {
-    if (this.phoneCode.trim().length !== 4) return;
-
-    this.phoneBusy = true;
-    this.phoneError = '';
-
-    this.msg91Widget
-      .verifyOtp(this.phoneCode.trim())
-      .then((widgetToken) =>
-        this.auth.verifyPhoneLogin({ phone: this.phoneNumber.trim(), widgetToken }).subscribe({
-          next: (res) => {
-            this.phoneBusy = false;
-            this.cdr.detectChanges();
-            this.auth.saveAuth(res);
-            this.welcome.celebrate('login', res.fullName);
-
-            const redirect = this.route.snapshot.queryParamMap.get('redirect');
-            const target =
-              redirect && res.role === 'customer'
-                ? redirect
-                : this.auth.getDefaultRouteForRole(res.role);
-            this.router.navigateByUrl(target);
-          },
-          error: (err) => {
-            this.phoneBusy = false;
-            this.phoneError = err.error?.message ?? 'That code is invalid or has expired.';
-            this.cdr.detectChanges();
-          },
-        }),
-      )
-      .catch((error: Error) => {
-        this.phoneBusy = false;
-        this.phoneError = error.message || 'That code is invalid or has expired.';
-        this.cdr.detectChanges();
-      });
   }
 
   private clearSlowTimer() {

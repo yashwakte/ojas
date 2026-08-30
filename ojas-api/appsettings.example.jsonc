@@ -54,19 +54,13 @@
   "Email": {
     "SendInDevelopment": false
   },
-  // Msg91:AuthKey/TemplateId/SenderId are the raw SendOTP API (Msg91PhoneOtpSender) - blocked on
-  // this business's own DLT template approval and no longer the live phone-login path (see
-  // WidgetAuthKey below), but kept for the registration-time profile-phone-verification flow.
+  // Msg91WidgetVerifier's server-side secret, from the OTP Widget's Server Side Integration tab
+  // (Create Authkey). Scoped to the User role and the OTP widget only, with IP Security off
+  // (Render's shared/non-static outbound IPs make IP whitelisting here unreliable rather than
+  // safer). This is what verifies the phone number given at registration - the widget's own
+  // default channel configuration sends through MSG91's own pre-registered template and does not
+  // require this business's own DLT registration, which is why this is live today.
   "Msg91": {
-    "AuthKey": "<msg91-auth-key>",
-    "TemplateId": "<dlt-approved-template-id>",
-    "SenderId": "<dlt-approved-sender-id>",
-    // Msg91WidgetVerifier's server-side secret, from the OTP Widget's Server Side Integration
-    // tab (Create Authkey) - NOT the same value as Msg91:AuthKey above. Scoped to the User role
-    // and the OTP widget only, with IP Security off (Render's shared/non-static outbound IPs
-    // make IP whitelisting here unreliable rather than safer). This is what lets phone login
-    // work today via the widget's default channel configuration, which sends through MSG91's own
-    // pre-registered template and does not require this business's own DLT registration.
     "WidgetAuthKey": "<otp-widget-server-side-authkey>"
   },
   // Cashfree Payment Gateway - inert (returns 503 on checkout) until ClientId/ClientSecret are

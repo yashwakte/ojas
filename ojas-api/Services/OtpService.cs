@@ -10,18 +10,14 @@ public class OtpService
 
     private readonly IMongoDbService _db;
     private readonly IEmailSender _emailSender;
-    private readonly IPhoneOtpSender _phoneOtpSender;
     private readonly ILogger<OtpService> _logger;
 
-    public OtpService(IMongoDbService db, IEmailSender emailSender, IPhoneOtpSender phoneOtpSender, ILogger<OtpService> logger)
+    public OtpService(IMongoDbService db, IEmailSender emailSender, ILogger<OtpService> logger)
     {
         _db = db;
         _emailSender = emailSender;
-        _phoneOtpSender = phoneOtpSender;
         _logger = logger;
     }
-
-    public bool IsPhoneOtpConfigured => _phoneOtpSender.IsConfigured;
 
     /// <summary>
     /// Generates and stores a code, then best-effort emails it. Always returns the plaintext
@@ -99,31 +95,6 @@ public class OtpService
             _logger.LogWarning(ex, "Could not send password reset OTP to {Email}; the code was still generated.", email);
         }
 
-        return code;
-    }
-
-    public async Task<string> SendPhoneOtpAsync(string phone)
-    {
-        if (!_phoneOtpSender.IsConfigured)
-            throw new InvalidOperationException("Phone verification is not available yet.");
-
-        var code = GenerateCode();
-        await StoreCodeAsync(phone, OtpChannels.Phone, code);
-        await _phoneOtpSender.SendAsync(phone, code);
-        return code;
-    }
-
-    /// <summary>Same mechanism as SendPhoneOtpAsync but on its own channel (OtpChannels.PhoneLogin
-    /// vs Phone), so a code issued to sign in can't also verify the profile phone number, or the
-    /// reverse.</summary>
-    public async Task<string> SendPhoneLoginOtpAsync(string phone)
-    {
-        if (!_phoneOtpSender.IsConfigured)
-            throw new InvalidOperationException("Phone login is not available yet.");
-
-        var code = GenerateCode();
-        await StoreCodeAsync(phone, OtpChannels.PhoneLogin, code);
-        await _phoneOtpSender.SendAsync(phone, code);
         return code;
     }
 

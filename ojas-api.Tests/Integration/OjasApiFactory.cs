@@ -78,16 +78,10 @@ public sealed class OjasApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
 
         // Swap the real Cloudflare-calling verifier for one that always passes, so the suite
-        // doesn't depend on a live network call to siteverify for every register/login. Same
-        // reasoning for the phone OTP sender - MSG91 isn't configured in this environment (nor
-        // in production yet), but phone-login tests still need IsConfigured=true to exercise
-        // the flow; the "not configured -> 503" branch is covered by AuthControllerTests instead,
-        // where the mock's default (matching the real, currently-unconfigured Msg91 sender) is
-        // easier to keep separate from the "configured" happy-path tests.
+        // doesn't depend on a live network call to siteverify for every register/login.
         builder.ConfigureTestServices(services =>
         {
             services.AddScoped<ITurnstileVerifier, FakeTurnstileVerifier>();
-            services.AddScoped<IPhoneOtpSender, FakePhoneOtpSender>();
             // The real CashfreeService is kept (so its request building and response parsing are
             // genuinely exercised) but pointed at a canned transport instead of the live gateway.
             services.AddHttpClient<CashfreeService>()

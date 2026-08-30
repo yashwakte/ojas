@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using OjasApi.Models;
 using OjasApi.Services;
+using OjasApi.Tests.TestHelpers;
 
 namespace OjasApi.Tests.Integration;
 
@@ -14,17 +15,27 @@ namespace OjasApi.Tests.Integration;
 /// </summary>
 public static class AuthFlowExtensions
 {
-    /// <summary>Registration is now two steps - create the account, then verify the emailed
-    /// code before a session exists. The test host runs in Development, so the register
-    /// response includes the code directly (DevCode) instead of requiring a real inbox.</summary>
+    /// <summary>Registration is now three steps - create the account, verify the emailed code,
+    /// and verify the phone via the MSG91 OTP Widget - completable in either order, with no
+    /// session until both are done. The test host runs in Development, so the register response
+    /// includes the email code directly (DevCode) instead of requiring a real inbox; the phone
+    /// step uses FakeMsg91WidgetHandler.TokenFor, a token this suite's fake widget transport
+    /// accepts without needing a reference to the OjasApiFactory that owns it - this helper is an
+    /// HttpClient extension with no way to reach the factory.</summary>
     public static async Task<(AuthResponse Auth, string CsrfToken)> RegisterAsync(
         this HttpClient client, string? fullName = null, string? email = null, string? phone = null, string password = "Passw0rd123!")
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
+        // Guid.ToString("N") is hex, not decimal - it can contain letters (a-f), which
+        // Msg91WidgetVerifier's phone comparison strips out along with any other non-digit
+        // character. A real phone number never contains letters, and now that phone verification
+        // is actually checked (not just stored), a hex-letter "phone" fails that check instead of
+        // being silently ignored the way it used to be - so this has to be digits only.
+        var resolvedPhone = phone ?? $"9{Math.Abs(Guid.NewGuid().GetHashCode()).ToString().PadLeft(9, '0')[..9]}";
         var request = new RegisterRequest(
             fullName ?? $"Test User {suffix}",
             email ?? $"user.{suffix}@example.com",
-            phone ?? $"9{suffix.PadRight(9, '0')}",
+            resolvedPhone,
             password,
             "test-turnstile-token");
 
@@ -32,11 +43,17 @@ public static class AuthFlowExtensions
         response.EnsureSuccessStatusCode();
         var pending = await response.Content.ReadFromJsonAsync<RegisterPendingResponse>();
 
-        var verifyResponse = await client.PostAsJsonAsync(
+        var verifyEmailResponse = await client.PostAsJsonAsync(
             "/api/auth/verify-email-otp",
             new VerifyEmailOtpRequest(pending!.Email, pending.DevCode!));
-        verifyResponse.EnsureSuccessStatusCode();
-        var auth = await verifyResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        verifyEmailResponse.EnsureSuccessStatusCode();
+
+        var verifyPhoneResponse = await client.PostAsJsonAsync(
+            "/api/auth/verify-phone-registration",
+            new VerifyPhoneRegistrationRequest(resolvedPhone, FakeMsg91WidgetHandler.TokenFor(resolvedPhone)));
+        verifyPhoneResponse.EnsureSuccessStatusCode();
+        var step = await verifyPhoneResponse.Content.ReadFromJsonAsync<RegistrationStepResponse>();
+        var auth = step!.Session;
         return (auth!, auth!.CsrfToken!);
     }
 
