@@ -156,7 +156,10 @@ public class AuthControllerTests
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
         var response = okResult.Value.ShouldBeOfType<RegisterPendingResponse>();
         response.Email.ShouldBe("new@example.com");
-        response.DevCode.ShouldNotBeNullOrWhiteSpace();
+        // Registration verifies by phone alone and sends no email code. This controller is built
+        // in a non-Production environment, so a code that had been sent would come back here -
+        // null is what proves none was.
+        response.DevCode.ShouldBeNull();
 
         var cookies = SetCookieHeaders(_sut.ControllerContext);
         cookies.ShouldBeEmpty();
@@ -305,10 +308,25 @@ public class AuthControllerTests
         result.Result.ShouldBeOfType<UnauthorizedObjectResult>();
     }
 
+    /// <summary>Registration verifies by phone, not email, so an unverified address is the normal
+    /// state of a real customer account and must not stand between them and their orders.</summary>
     [Fact]
-    public async Task Login_UnverifiedEmail_Returns403AndNoCookies()
+    public async Task Login_UnverifiedEmail_StillSucceeds()
     {
         var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
+        _usersMock.SetupFind(new List<User> { user });
+
+        var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));
+
+        result.Result.ShouldBeOfType<OkObjectResult>();
+        SetCookieHeaders(_sut.ControllerContext).ShouldContain(c => c.StartsWith("ojas_auth="));
+    }
+
+    /// <summary>The gate that does still apply - an unverified phone is what blocks a login.</summary>
+    [Fact]
+    public async Task Login_UnverifiedPhone_Returns403AndNoCookies()
+    {
+        var user = MakeUser(password: "Passw0rd!", isPhoneVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
         var result = await _sut.Login(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"));

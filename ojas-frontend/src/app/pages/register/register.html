@@ -27,141 +27,189 @@
 
   <div class="auth-form-side">
     <div class="auth-card">
-      @if (stage === 'email') {
+      @if (stage === 'verify') {
         <div class="auth-header">
           <span class="auth-logo-mobile">ओजस</span>
-          <h2>Verify your email</h2>
-          <p>Enter the 6-digit code we sent to <strong>{{ pendingEmail }}</strong></p>
+          <h2>Almost there</h2>
+          <p>Verify your mobile number to finish creating your account.</p>
         </div>
 
-        @if (devCode) {
-          <div class="dev-code-hint">
-            <mat-icon>code</mat-icon>
-            <span>Dev mode — real email isn't configured yet. Your code is <strong>{{ devCode }}</strong></span>
-          </div>
-        }
-
-        @if (otpError) {
-          <div class="error-banner" role="alert">
-            <mat-icon>error_outline</mat-icon>
-            <span>{{ otpError }}</span>
-          </div>
-        }
-
-        <form (ngSubmit)="verifyOtp()">
-          <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
-            <mat-label>Verification code</mat-label>
-            <input
-              matInput
-              [(ngModel)]="otpCode"
-              name="otpCode"
-              inputmode="numeric"
-              maxlength="6"
-              placeholder="6-digit code"
-              autocomplete="one-time-code"
-            />
-            <mat-icon matPrefix>pin</mat-icon>
-          </mat-form-field>
-
-          <button
-            mat-flat-button
-            class="submit-btn"
-            type="submit"
-            [disabled]="verifying || otpCode.trim().length !== 6"
-          >
-            @if (verifying) {
-              <mat-spinner diameter="20"></mat-spinner>
+        <!-- Phone: the required step, and the one that issues the session. -->
+        <section class="verify-row" [class.done]="phoneVerified">
+          <div class="verify-row-head">
+            <mat-icon class="verify-ico">smartphone</mat-icon>
+            <div class="verify-what">
+              <span class="verify-label">Mobile number</span>
+              <span class="verify-value">{{ pendingPhone }}</span>
+            </div>
+            @if (phoneVerified) {
+              <span class="chip chip-done"><mat-icon>check_circle</mat-icon> Verified</span>
             } @else {
-              <ng-container>Verify &amp; Continue</ng-container>
+              <span class="chip chip-todo">Required</span>
             }
-          </button>
-        </form>
-
-        <p class="auth-switch">
-          Didn't get it?
-          @if (resendCooldown > 0) {
-            <span>Resend in {{ resendCooldown }}s</span>
-          } @else {
-            <button type="button" class="link-btn" (click)="resendOtp()" [disabled]="resending">
-              {{ resending ? 'Sending…' : 'Resend code' }}
-            </button>
-          }
-        </p>
-        <p class="auth-switch">Wrong email? <a routerLink="/login">Back to sign in</a></p>
-      } @else if (stage === 'phone') {
-        <div class="auth-header">
-          <span class="auth-logo-mobile">ओजस</span>
-          <h2>Verify your phone</h2>
-          @if (phoneSubStage === 'send') {
-            <p>One last step - we'll send a 4-digit code to <strong>{{ pendingPhone }}</strong></p>
-          } @else {
-            <p>Enter the code we sent to <strong>{{ pendingPhone }}</strong></p>
-          }
-        </div>
-
-        @if (phoneUnavailable) {
-          <div class="error-banner" role="alert">
-            <mat-icon>error_outline</mat-icon>
-            <span>Phone verification isn't available right now. Please try again shortly.</span>
           </div>
-        }
 
-        @if (phoneError) {
-          <div class="error-banner" role="alert">
-            <mat-icon>error_outline</mat-icon>
-            <span>{{ phoneError }}</span>
-          </div>
-        }
-
-        @if (phoneSubStage === 'send') {
-          <!-- MSG91's captcha renders into this element (captchaRenderId) - it must already be
-               in the DOM before Msg91WidgetService.initialize() calls initSendOTP, which
-               switchToPhoneStage() guarantees by triggering only after this template renders. -->
-          <div [id]="phoneCaptchaElementId" class="msg91-captcha-slot"></div>
-
-          <button
-            mat-flat-button
-            class="submit-btn"
-            type="button"
-            (click)="sendPhoneCode()"
-            [disabled]="phoneBusy"
-          >
-            @if (phoneBusy) {
-              <mat-spinner diameter="20"></mat-spinner>
-            } @else {
-              <ng-container>Send code</ng-container>
+          @if (!phoneVerified) {
+            @if (phoneUnavailable) {
+              <div class="error-banner" role="alert">
+                <mat-icon>error_outline</mat-icon>
+                <span>Phone verification isn't available right now. Please try again shortly.</span>
+              </div>
             }
-          </button>
-        } @else {
-          <form (ngSubmit)="verifyPhoneCode()">
-            <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
-              <mat-label>Verification code</mat-label>
-              <input
-                matInput
-                [(ngModel)]="phoneCode"
-                name="phoneCode"
-                inputmode="numeric"
-                maxlength="4"
-                placeholder="4-digit code"
-                autocomplete="one-time-code"
-              />
-              <mat-icon matPrefix>pin</mat-icon>
-            </mat-form-field>
 
-            <button
-              mat-flat-button
-              class="submit-btn"
-              type="submit"
-              [disabled]="phoneBusy || phoneCode.trim().length !== 4"
-            >
-              @if (phoneBusy) {
-                <mat-spinner diameter="20"></mat-spinner>
+            @if (phoneError) {
+              <div class="error-banner" role="alert">
+                <mat-icon>error_outline</mat-icon>
+                <span>{{ phoneError }}</span>
+              </div>
+            }
+
+            <!-- MSG91 renders its captcha into this element by id, so it must be in the DOM
+                 before initialize() runs - openVerifyStage() flushes this template first. -->
+            <div [id]="phoneCaptchaElementId" class="msg91-captcha-slot"></div>
+
+            @if (phoneSubStage === 'send') {
+              @if (!widgetReady && !phoneUnavailable) {
+                <!-- Deliberately replaces the button rather than only disabling it. The widget's
+                     captcha is not armed yet, and a greyed-out button invites a customer to keep
+                     tapping it; saying what is happening does not. -->
+                <p class="verify-loading" role="status">
+                  <mat-spinner diameter="18"></mat-spinner>
+                  <span>Setting up secure verification…</span>
+                </p>
               } @else {
-                <ng-container>Verify &amp; Finish</ng-container>
+                <button
+                  mat-flat-button
+                  class="submit-btn"
+                  type="button"
+                  (click)="sendPhoneCode()"
+                  [disabled]="phoneBusy || phoneUnavailable"
+                >
+                  @if (phoneBusy) {
+                    <mat-spinner diameter="20"></mat-spinner>
+                  } @else {
+                    <ng-container>Send code</ng-container>
+                  }
+                </button>
               }
-            </button>
-          </form>
-        }
+            } @else {
+              <form (ngSubmit)="verifyPhoneCode()">
+                <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+                  <mat-label>Verification code</mat-label>
+                  <input
+                    matInput
+                    [(ngModel)]="phoneCode"
+                    name="phoneCode"
+                    inputmode="numeric"
+                    maxlength="4"
+                    placeholder="4-digit code"
+                    autocomplete="one-time-code"
+                  />
+                  <mat-icon matPrefix>pin</mat-icon>
+                </mat-form-field>
+
+                <button
+                  mat-flat-button
+                  class="submit-btn"
+                  type="submit"
+                  [disabled]="phoneBusy || phoneCode.trim().length !== 4"
+                >
+                  @if (phoneBusy) {
+                    <mat-spinner diameter="20"></mat-spinner>
+                  } @else {
+                    <ng-container>Verify &amp; Finish</ng-container>
+                  }
+                </button>
+              </form>
+            }
+          }
+        </section>
+
+        <!-- Email: optional. No code is sent unless the customer asks for one. -->
+        <section class="verify-row" [class.done]="emailVerified">
+          <div class="verify-row-head">
+            <mat-icon class="verify-ico">mail</mat-icon>
+            <div class="verify-what">
+              <span class="verify-label">Email address</span>
+              <span class="verify-value">{{ pendingEmail }}</span>
+            </div>
+            @if (emailVerified) {
+              <span class="chip chip-done"><mat-icon>check_circle</mat-icon> Verified</span>
+            } @else if (emailStage === 'idle') {
+              <button
+                type="button"
+                class="chip chip-action"
+                (click)="startEmailVerification()"
+                [disabled]="emailBusy"
+              >
+                Verify
+              </button>
+            } @else {
+              <span class="chip chip-todo">Not verified</span>
+            }
+          </div>
+
+          @if (!emailVerified && emailStage === 'code') {
+            @if (devCode) {
+              <div class="dev-code-hint">
+                <mat-icon>code</mat-icon>
+                <span>Dev mode — real email isn't configured yet. Your code is <strong>{{ devCode }}</strong></span>
+              </div>
+            }
+
+            @if (emailError) {
+              <div class="error-banner" role="alert">
+                <mat-icon>error_outline</mat-icon>
+                <span>{{ emailError }}</span>
+              </div>
+            }
+
+            <form (ngSubmit)="verifyEmailCode()">
+              <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+                <mat-label>Emailed code</mat-label>
+                <input
+                  matInput
+                  [(ngModel)]="emailCode"
+                  name="emailCode"
+                  inputmode="numeric"
+                  maxlength="6"
+                  placeholder="6-digit code"
+                  autocomplete="one-time-code"
+                />
+                <mat-icon matPrefix>pin</mat-icon>
+              </mat-form-field>
+
+              <button
+                mat-stroked-button
+                class="secondary-btn"
+                type="submit"
+                [disabled]="emailBusy || emailCode.trim().length !== 6"
+              >
+                @if (emailBusy) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <ng-container>Verify email</ng-container>
+                }
+              </button>
+            </form>
+
+            <p class="auth-switch">
+              Didn't get it?
+              @if (resendCooldown > 0) {
+                <span>Resend in {{ resendCooldown }}s</span>
+              } @else {
+                <button type="button" class="link-btn" (click)="resendEmailCode()" [disabled]="emailBusy">
+                  Resend code
+                </button>
+              }
+            </p>
+          }
+        </section>
+
+        <p class="verify-note">
+          You can confirm your email later from your profile — it isn't needed to start ordering.
+        </p>
+        <p class="auth-switch">Wrong details? <a routerLink="/login">Back to sign in</a></p>
       } @else {
         <div class="auth-header">
           <span class="auth-logo-mobile">ओजस</span>

@@ -249,6 +249,135 @@
   }
 }
 
+// ===== VERIFICATION SCREEN =====
+// One card per thing being verified, so the customer sees at a glance what is done and what is
+// still owed. The phone row carries the work; the email row is a status line that can expand.
+
+.verify-row {
+  border: 1px solid #ece5dd;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  transition: border-color 0.25s ease, background 0.25s ease;
+
+  &.done {
+    border-color: #cfe6d4;
+    background: #f6fbf7;
+  }
+}
+
+.verify-row-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.verify-ico {
+  color: var(--ojas-text-light);
+  flex-shrink: 0;
+}
+
+.verify-what {
+  display: flex;
+  flex-direction: column;
+  // Without this a long email address pushes the status chip off the row rather than ellipsing.
+  min-width: 0;
+  flex: 1;
+}
+
+.verify-label {
+  font-size: 0.76rem;
+  color: var(--ojas-text-light);
+  letter-spacing: 0.02em;
+}
+
+.verify-value {
+  font-weight: 600;
+  color: var(--ojas-text);
+  font-size: 0.94rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+
+  &.chip-done {
+    background: #e6f4ea;
+    color: #1e7a3c;
+  }
+
+  &.chip-todo {
+    background: #fdf1e6;
+    color: #a25a12;
+  }
+
+  &.chip-action {
+    background: var(--ojas-ink);
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+  }
+}
+
+.verify-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 14px;
+  color: var(--ojas-text-light);
+  font-size: 0.88rem;
+}
+
+.secondary-btn {
+  width: 100%;
+  height: 46px;
+  border-radius: 12px !important;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.verify-note {
+  margin: 4px 0 0;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--ojas-text-light);
+  text-align: center;
+}
+
+.msg91-captcha-slot {
+  display: flex;
+  justify-content: center;
+  // No min-height: hCaptcha's passive check usually renders nothing at all here, and reserving
+  // space for it would leave a permanent gap above the button on most visits.
+  margin: 10px 0 4px;
+}
+
 .turnstile-slot {
   display: flex;
   justify-content: center;

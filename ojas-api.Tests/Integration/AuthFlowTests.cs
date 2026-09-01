@@ -217,9 +217,9 @@ public class AuthFlowTests : IDisposable
         }
     }
 
-    /// <summary>Registers a throwaway verified account on _client and returns the refresh token
-    /// its session was issued. Registration is two verification steps now - the session only
-    /// exists once both are done.</summary>
+    /// <summary>Registers a throwaway account on _client and returns the refresh token its session
+    /// was issued. Verifying the phone is what issues that session; no email code is sent at
+    /// signup.</summary>
     private async Task<string> RegisterAndGetRefreshTokenAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
@@ -229,10 +229,7 @@ public class AuthFlowTests : IDisposable
         var registerRequest = new RegisterRequest(
             $"Test User {suffix}", $"user.{suffix}@example.com", phone, "Passw0rd123!", "test-turnstile-token");
         var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", registerRequest);
-        var pending = await registerResponse.Content.ReadFromJsonAsync<RegisterPendingResponse>();
-
-        await _client.PostAsJsonAsync(
-            "/api/auth/verify-email-otp", new VerifyEmailOtpRequest(pending!.Email, pending.DevCode!));
+        registerResponse.EnsureSuccessStatusCode();
 
         var verifyPhoneResponse = await _client.PostAsJsonAsync(
             "/api/auth/verify-phone-registration",

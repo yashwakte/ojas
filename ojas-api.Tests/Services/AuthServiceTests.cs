@@ -208,16 +208,18 @@ public class AuthServiceTests
         result.Auth!.User.Role.ShouldBe(UserRoles.Customer);
     }
 
+    /// <summary>Registration proves the phone, not the address, so nearly every real customer
+    /// account has an unverified email. Blocking on it would lock out the entire customer base.</summary>
     [Fact]
-    public async Task LoginAsync_ReturnsNeedsEmailVerification_WhenAccountIsUnverified()
+    public async Task LoginAsync_Succeeds_WhenTheEmailIsUnverified()
     {
         var user = MakeUser(password: "Passw0rd!", isEmailVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
         var result = await _sut.LoginAsync(new LoginRequest(user.Email, "Passw0rd!", "test-turnstile-token"), null);
 
-        result.Outcome.ShouldBe(LoginOutcome.NeedsEmailVerification);
-        result.Auth.ShouldBeNull();
+        result.Outcome.ShouldBe(LoginOutcome.Success);
+        result.Auth.ShouldNotBeNull();
     }
 
     /// <summary>The whole point of an identifier that can be either kind: an account whose
@@ -239,16 +241,17 @@ public class AuthServiceTests
     [Fact]
     public async Task LoginAsync_ReturnsTheAccountsRealEmail_NotTheTypedIdentifier_WhenUnverified()
     {
-        // Login was attempted by phone number, but the device/email-verification follow-up
-        // flows need a real email to act on - echoing back the phone number typed at login
-        // would be useless there.
-        var user = MakeUser(phone: "9123456789", isEmailVerified: false);
+        // Login was attempted by phone number, but the follow-up flow needs the account's real
+        // email to route the customer back into registration - echoing back the phone number
+        // they typed would be useless there.
+        var user = MakeUser(phone: "9123456789", isPhoneVerified: false);
         _usersMock.SetupFind(new List<User> { user });
 
         var result = await _sut.LoginAsync(new LoginRequest("9123456789", "Passw0rd!", "test-turnstile-token"), null);
 
-        result.Outcome.ShouldBe(LoginOutcome.NeedsEmailVerification);
+        result.Outcome.ShouldBe(LoginOutcome.NeedsPhoneVerification);
         result.Email.ShouldBe(user.Email);
+        result.Phone.ShouldBe(user.Phone);
     }
 
     [Fact]
@@ -368,8 +371,10 @@ public class AuthServiceTests
         result.Session.RawDeviceId.ShouldBeNull();
     }
 
+    /// <summary>The phone is the only proof registration requires, so verifying it issues the
+    /// session even though the address has never been confirmed.</summary>
     [Fact]
-    public async Task CompletePhoneVerificationAsync_WithholdsTheSession_WhenEmailIsNotYetVerified()
+    public async Task CompletePhoneVerificationAsync_IssuesTheSession_EvenWithAnUnverifiedEmail()
     {
         var user = MakeUser(isEmailVerified: false, isPhoneVerified: false);
         _usersMock.SetupFind(new List<User> { user });
@@ -378,7 +383,8 @@ public class AuthServiceTests
 
         result.ShouldNotBeNull();
         result!.PhoneVerified.ShouldBeTrue();
-        result.Session.ShouldBeNull();
+        result.EmailVerified.ShouldBeFalse();
+        result.Session.ShouldNotBeNull();
     }
 
     [Fact]

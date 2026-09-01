@@ -161,12 +161,15 @@ public class AuthService
         return await CompleteRegistrationStepAsync(user);
     }
 
-    /// <summary>Staff accounts are created with both flags already true (invite-accept is what
-    /// activates them, not this path), so this only ever gates on both for a fresh customer
-    /// registration. No device to bind either way - only staff are device-restricted.</summary>
+    /// <summary>The phone is what gates a session, not the email. Verifying a mobile number is
+    /// the meaningful check for this shop - it is how a customer is reached about a delivery, and
+    /// it is the harder of the two to fake in volume - whereas an unverified email costs the
+    /// customer only the ability to receive mail we send. Email verification is therefore offered
+    /// on demand rather than required up front. No device to bind either way; only staff are
+    /// device-restricted, and staff accounts are created with both flags already true.</summary>
     private async Task<RegistrationStepResult> CompleteRegistrationStepAsync(User user)
     {
-        var session = user.IsEmailVerified && user.IsPhoneVerified ? await IssueSessionAsync(user, null) : null;
+        var session = user.IsPhoneVerified ? await IssueSessionAsync(user, null) : null;
         return new RegistrationStepResult(session, user.IsEmailVerified, user.IsPhoneVerified, user.Email, user.Phone);
     }
 
@@ -176,12 +179,16 @@ public class AuthService
         if (user == null)
             return new LoginServiceResult(LoginOutcome.InvalidCredentials);
 
-        if (!user.IsEmailVerified)
-            return new LoginServiceResult(LoginOutcome.NeedsEmailVerification, Email: user.Email);
+        // No email-verified gate here on purpose: registration no longer sends an email code, so
+        // an ordinary customer's address is unverified until they choose to confirm it, and
+        // refusing them a login for that would lock out every account the new flow creates.
+        // LoginOutcome.NeedsEmailVerification is kept - the controller and the frontend still
+        // handle it - so that requiring email again is a one-line change here rather than a
+        // reconstruction of the path.
 
         // Staff are always created with IsPhoneVerified already true (invite-accept is what
         // activates them, not this flow), so this only ever gates a customer registration that
-        // was abandoned after the email step. Without it, that account could sign in with
+        // was abandoned before the phone step. Without it, that account could sign in with
         // password forever and never actually finish the phone verification registration
         // requires.
         if (!user.IsPhoneVerified)

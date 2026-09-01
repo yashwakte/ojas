@@ -7,13 +7,15 @@ using Shouldly;
 namespace OjasApi.Tests.Integration;
 
 /// <summary>
-/// Registration now requires two proofs - an emailed code and an MSG91-verified phone - before
-/// a session exists, completable in either order. Login afterwards takes either the email or the
-/// phone as the identifier and never touches MSG91 again, since both were already verified once
-/// at signup. Most of this flow is already exercised indirectly by every other integration test
-/// via AuthFlowExtensions.RegisterAsync (email-then-phone order); these tests cover the specific
-/// new behaviours that helper doesn't - the reverse order, an abandoned registration, a failed
-/// widget verification, and signing in with the phone identifier.
+/// Registration is verified by phone alone. Signing up sends no email code at all - the account is
+/// created with an unverified address the customer may confirm later, on demand - and it is the
+/// MSG91-verified phone that issues the session. Login afterwards takes either the email or the
+/// phone as the identifier and never touches MSG91 again.
+///
+/// The happy path is already exercised indirectly by every other integration test via
+/// AuthFlowExtensions.RegisterAsync; these tests cover what that helper doesn't - that email is
+/// genuinely optional in both directions, that an unfinished phone step still blocks a login, a
+/// failed widget verification, and signing in with the phone identifier.
 /// </summary>
 [Collection(MongoCollectionFixture.Name)]
 public class RegistrationTests : IDisposable
@@ -26,7 +28,7 @@ public class RegistrationTests : IDisposable
     private static string GeneratePhone(string leadingDigit = "9") =>
         $"{leadingDigit}{Math.Abs(Guid.NewGuid().GetHashCode()).ToString().PadLeft(9, '0')[..9]}";
 
-    private async Task<(string Email, string Phone, string DevCode)> RegisterPendingAsync(HttpClient client)
+    private async Task<(string Email, string Phone)> RegisterPendingAsync(HttpClient client)
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var email = $"user.{suffix}@example.com";
@@ -35,43 +37,80 @@ public class RegistrationTests : IDisposable
 
         var response = await client.PostAsJsonAsync("/api/auth/register", request);
         response.EnsureSuccessStatusCode();
-        var pending = await response.Content.ReadFromJsonAsync<RegisterPendingResponse>();
-        return (email, phone, pending!.DevCode!);
+        return (email, phone);
     }
 
-    [Fact]
-    public async Task VerifyingPhoneFirst_ThenEmail_AlsoCompletesRegistration()
+    /// <summary>Registration no longer hands back a code, so a test that wants to verify an email
+    /// asks for one the same way the customer's own "Verify" button does. The host runs in
+    /// Development, so the code comes back in the response instead of needing a real inbox.</summary>
+    private static async Task<string> RequestEmailCodeAsync(HttpClient client, string email)
     {
-        using var client = _factory.CreateClient();
-        var (email, phone, devCode) = await RegisterPendingAsync(client);
+        var response = await client.PostAsJsonAsync("/api/auth/resend-email-otp", new ResendEmailOtpRequest(email));
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<ResendResponse>();
+        return body!.DevCode!;
+    }
 
-        var phoneResponse = await client.PostAsJsonAsync(
+    private static async Task<HttpResponseMessage> VerifyPhoneAsync(HttpClient client, string phone) =>
+        await client.PostAsJsonAsync(
             "/api/auth/verify-phone-registration",
             new VerifyPhoneRegistrationRequest(phone, FakeMsg91WidgetHandler.TokenFor(phone)));
-        var phoneStep = await phoneResponse.Content.ReadFromJsonAsync<RegistrationStepResponse>();
-        phoneStep!.PhoneVerified.ShouldBeTrue();
-        phoneStep.EmailVerified.ShouldBeFalse();
-        phoneStep.Session.ShouldBeNull();
 
-        var emailResponse = await client.PostAsJsonAsync(
-            "/api/auth/verify-email-otp", new VerifyEmailOtpRequest(email, devCode));
-        var emailStep = await emailResponse.Content.ReadFromJsonAsync<RegistrationStepResponse>();
-        emailStep!.EmailVerified.ShouldBeTrue();
-        emailStep.PhoneVerified.ShouldBeTrue();
-        emailStep.Session.ShouldNotBeNull();
-        emailStep.Session!.Email.ShouldBe(email);
-    }
+    private record ResendResponse(string Message, string? DevCode);
+    private record NeedsPhoneVerificationResponse(bool NeedsPhoneVerification, string Email, string Phone);
 
-    /// <summary>Without this, an account could verify email, then log in with password forever
-    /// and never actually finish phone verification - silently defeating "verify both at
-    /// registration."</summary>
+    /// <summary>The whole of registration: no email code is sent, and verifying the phone is what
+    /// signs the customer in.</summary>
     [Fact]
-    public async Task AnAccountThatOnlyVerifiedEmail_CannotLogIn_AndIsToldToFinishPhoneVerification()
+    public async Task RegisteringSendsNoEmailCode_AndVerifyingThePhoneIssuesTheSession()
     {
         using var client = _factory.CreateClient();
-        var (email, phone, devCode) = await RegisterPendingAsync(client);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var email = $"user.{suffix}@example.com";
+        var phone = GeneratePhone();
 
-        await client.PostAsJsonAsync("/api/auth/verify-email-otp", new VerifyEmailOtpRequest(email, devCode));
+        var registerResponse = await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new RegisterRequest($"Test User {suffix}", email, phone, "Passw0rd123!", "test-turnstile-token"));
+        registerResponse.EnsureSuccessStatusCode();
+        var pending = await registerResponse.Content.ReadFromJsonAsync<RegisterPendingResponse>();
+        // Development would return a real code here if one had been sent; null is the proof that
+        // registration didn't send one.
+        pending!.DevCode.ShouldBeNull();
+
+        var phoneResponse = await VerifyPhoneAsync(client, phone);
+        var step = await phoneResponse.Content.ReadFromJsonAsync<RegistrationStepResponse>();
+
+        step!.PhoneVerified.ShouldBeTrue();
+        step.EmailVerified.ShouldBeFalse();
+        step.Session.ShouldNotBeNull();
+        step.Session!.Email.ShouldBe(email);
+    }
+
+    /// <summary>Email is optional, not an alternative - confirming the address without ever
+    /// proving the phone must not let anyone in.</summary>
+    [Fact]
+    public async Task VerifyingOnlyTheEmail_DoesNotIssueASession()
+    {
+        using var client = _factory.CreateClient();
+        var (email, _) = await RegisterPendingAsync(client);
+        var code = await RequestEmailCodeAsync(client, email);
+
+        var response = await client.PostAsJsonAsync("/api/auth/verify-email-otp", new VerifyEmailOtpRequest(email, code));
+        var step = await response.Content.ReadFromJsonAsync<RegistrationStepResponse>();
+
+        step!.EmailVerified.ShouldBeTrue();
+        step.PhoneVerified.ShouldBeFalse();
+        step.Session.ShouldBeNull();
+    }
+
+    /// <summary>Without this, an account could abandon the phone step, then log in with password
+    /// forever and never actually verify a number we can reach them on.</summary>
+    [Fact]
+    public async Task AnAccountThatNeverVerifiedItsPhone_CannotLogIn_AndIsToldWhy()
+    {
+        using var client = _factory.CreateClient();
+        var (email, phone) = await RegisterPendingAsync(client);
 
         var login = await client.PostAsJsonAsync(
             "/api/auth/login", new LoginRequest(email, "Passw0rd123!", "test-turnstile-token"));
@@ -82,33 +121,43 @@ public class RegistrationTests : IDisposable
         body.Phone.ShouldBe(phone);
     }
 
-    private record NeedsPhoneVerificationResponse(bool NeedsPhoneVerification, string Email, string Phone);
-
+    /// <summary>The counterpart of the test above, and the point of the whole change: an
+    /// unverified email address must never stand between a customer and their account.</summary>
     [Fact]
-    public async Task AnAccountThatOnlyVerifiedPhone_CannotLogIn_AndIsToldToFinishEmailVerification()
+    public async Task AnAccountWithAnUnverifiedEmail_CanStillSignIn()
     {
         using var client = _factory.CreateClient();
-        var (email, phone, _) = await RegisterPendingAsync(client);
-
-        await client.PostAsJsonAsync(
-            "/api/auth/verify-phone-registration",
-            new VerifyPhoneRegistrationRequest(phone, FakeMsg91WidgetHandler.TokenFor(phone)));
+        var (email, phone) = await RegisterPendingAsync(client);
+        await VerifyPhoneAsync(client, phone);
 
         var login = await client.PostAsJsonAsync(
             "/api/auth/login", new LoginRequest(email, "Passw0rd123!", "test-turnstile-token"));
 
-        login.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        var body = await login.Content.ReadFromJsonAsync<NeedsEmailVerificationResponse>();
-        body!.NeedsEmailVerification.ShouldBeTrue();
+        login.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    private record NeedsEmailVerificationResponse(bool NeedsEmailVerification, string Email);
+    /// <summary>The "Verify" button on the account screen: an address confirmed after the fact
+    /// still gets recorded, so the flag means the same thing however it was earned.</summary>
+    [Fact]
+    public async Task AnEmailCanBeVerifiedAfterSigningIn()
+    {
+        using var client = _factory.CreateClient();
+        var (email, phone) = await RegisterPendingAsync(client);
+        await VerifyPhoneAsync(client, phone);
+
+        var code = await RequestEmailCodeAsync(client, email);
+        var response = await client.PostAsJsonAsync("/api/auth/verify-email-otp", new VerifyEmailOtpRequest(email, code));
+        var step = await response.Content.ReadFromJsonAsync<RegistrationStepResponse>();
+
+        step!.EmailVerified.ShouldBeTrue();
+        step.PhoneVerified.ShouldBeTrue();
+    }
 
     [Fact]
     public async Task AFailedWidgetVerification_LeavesRegistrationIncomplete()
     {
         using var client = _factory.CreateClient();
-        var (_, phone, _) = await RegisterPendingAsync(client);
+        var (_, phone) = await RegisterPendingAsync(client);
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/verify-phone-registration",
@@ -121,11 +170,8 @@ public class RegistrationTests : IDisposable
     public async Task OnceRegistered_TheCustomerCanSignInWithTheirPhoneNumberInstead()
     {
         using var client = _factory.CreateClient();
-        var (email, phone, devCode) = await RegisterPendingAsync(client);
-        await client.PostAsJsonAsync("/api/auth/verify-email-otp", new VerifyEmailOtpRequest(email, devCode));
-        await client.PostAsJsonAsync(
-            "/api/auth/verify-phone-registration",
-            new VerifyPhoneRegistrationRequest(phone, FakeMsg91WidgetHandler.TokenFor(phone)));
+        var (email, phone) = await RegisterPendingAsync(client);
+        await VerifyPhoneAsync(client, phone);
 
         var login = await client.PostAsJsonAsync(
             "/api/auth/login", new LoginRequest(phone, "Passw0rd123!", "test-turnstile-token"));
@@ -139,11 +185,8 @@ public class RegistrationTests : IDisposable
     public async Task LoginWithThePhoneIdentifier_StillRequiresTheCorrectPassword()
     {
         using var client = _factory.CreateClient();
-        var (email, phone, devCode) = await RegisterPendingAsync(client);
-        await client.PostAsJsonAsync("/api/auth/verify-email-otp", new VerifyEmailOtpRequest(email, devCode));
-        await client.PostAsJsonAsync(
-            "/api/auth/verify-phone-registration",
-            new VerifyPhoneRegistrationRequest(phone, FakeMsg91WidgetHandler.TokenFor(phone)));
+        var (_, phone) = await RegisterPendingAsync(client);
+        await VerifyPhoneAsync(client, phone);
 
         var login = await client.PostAsJsonAsync(
             "/api/auth/login", new LoginRequest(phone, "WrongPassword1!", "test-turnstile-token"));

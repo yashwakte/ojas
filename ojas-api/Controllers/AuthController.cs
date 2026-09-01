@@ -236,9 +236,13 @@ public class AuthController : ControllerBase
             return Conflict(new { message, field = conflictField });
         }
 
-        var code = await _otpService.SendEmailOtpAsync(user.Email);
-        var devCode = _env.IsProduction() ? null : code;
-        return Ok(new RegisterPendingResponse(user.Email, "We've sent a 6-digit code to your email.", devCode));
+        // Deliberately sends no email code here. Registration is verified by phone alone: making a
+        // customer clear two separate OTPs to buy flour is the kind of friction that loses the
+        // sale, and this is a mobile-first shop where the number matters more than the address.
+        // The account is created with IsEmailVerified false and the customer can verify the
+        // address whenever they like from the account screen (resend-email-otp then
+        // verify-email-otp) - the endpoints for that are unchanged and still live.
+        return Ok(new RegisterPendingResponse(user.Email, "Now verify your mobile number.", null));
     }
 
     [HttpPost("verify-email-otp")]

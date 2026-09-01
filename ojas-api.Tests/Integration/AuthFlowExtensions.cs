@@ -15,13 +15,13 @@ namespace OjasApi.Tests.Integration;
 /// </summary>
 public static class AuthFlowExtensions
 {
-    /// <summary>Registration is now three steps - create the account, verify the emailed code,
-    /// and verify the phone via the MSG91 OTP Widget - completable in either order, with no
-    /// session until both are done. The test host runs in Development, so the register response
-    /// includes the email code directly (DevCode) instead of requiring a real inbox; the phone
-    /// step uses FakeMsg91WidgetHandler.TokenFor, a token this suite's fake widget transport
-    /// accepts without needing a reference to the OjasApiFactory that owns it - this helper is an
-    /// HttpClient extension with no way to reach the factory.</summary>
+    /// <summary>Registration is two steps - create the account, then verify the phone via the
+    /// MSG91 OTP Widget, which is what issues the session. No email code is sent at signup any
+    /// more, so accounts made by this helper have IsEmailVerified false, matching what a real
+    /// customer gets; tests that need a verified address should drive verify-email-otp themselves
+    /// or seed the user directly. The phone step uses FakeMsg91WidgetHandler.TokenFor, a token
+    /// this suite's fake widget transport accepts without needing a reference to the OjasApiFactory
+    /// that owns it - this helper is an HttpClient extension with no way to reach the factory.</summary>
     public static async Task<(AuthResponse Auth, string CsrfToken)> RegisterAsync(
         this HttpClient client, string? fullName = null, string? email = null, string? phone = null, string password = "Passw0rd123!")
     {
@@ -41,12 +41,6 @@ public static class AuthFlowExtensions
 
         var response = await client.PostAsJsonAsync("/api/auth/register", request);
         response.EnsureSuccessStatusCode();
-        var pending = await response.Content.ReadFromJsonAsync<RegisterPendingResponse>();
-
-        var verifyEmailResponse = await client.PostAsJsonAsync(
-            "/api/auth/verify-email-otp",
-            new VerifyEmailOtpRequest(pending!.Email, pending.DevCode!));
-        verifyEmailResponse.EnsureSuccessStatusCode();
 
         var verifyPhoneResponse = await client.PostAsJsonAsync(
             "/api/auth/verify-phone-registration",

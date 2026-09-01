@@ -1,6 +1,5 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { Register } from './register';
 import { AuthService } from '../../services/auth.service';
@@ -20,31 +19,23 @@ describe('Register', () => {
     role: 'customer',
   };
 
+  // Registration no longer sends an email code, so devCode is null on this response.
   const pendingResponse: RegisterPendingResponse = {
     email: 'jane@x.com',
-    message: "We've sent a 6-digit code to your email.",
-    devCode: '123456',
+    message: 'Now verify your mobile number.',
+    devCode: null,
   };
 
-  // Email verified, phone still outstanding - the ordinary path onSubmit -> verifyOtp takes.
-  const stepAwaitingPhone: RegistrationStepResponse = {
+  /** Phone verified - which is what issues the session - with the address still unconfirmed.
+   * This is the ordinary outcome for a real customer. */
+  const phoneVerifiedStep: RegistrationStepResponse = {
     message: 'ok',
-    emailVerified: true,
-    phoneVerified: false,
+    emailVerified: false,
+    phoneVerified: true,
     email: 'jane@x.com',
     phone: '9876543210',
-    session: null,
+    session: authResponse,
   };
-
-  // Both steps done - the session is issued.
-  const stepComplete = (session: AuthResponse): RegistrationStepResponse => ({
-    message: 'ok',
-    emailVerified: true,
-    phoneVerified: true,
-    email: session.email,
-    phone: session.phone,
-    session,
-  });
 
   function makeAuthServiceSpy() {
     const spy = jasmine.createSpyObj('AuthService', [
@@ -58,17 +49,24 @@ describe('Register', () => {
     ]);
     spy.checkEmail.and.returnValue(of({ exists: false }));
     spy.checkPhone.and.returnValue(of({ exists: false }));
-    spy.resendEmailOtp.and.returnValue(of({ message: 'ok' }));
+    spy.resendEmailOtp.and.returnValue(of({ message: 'ok', devCode: null }));
+    spy.register.and.returnValue(of(pendingResponse));
+    spy.verifyPhoneRegistration.and.returnValue(of(phoneVerifiedStep));
+    return spy;
+  }
+
+  function makeWidgetSpy() {
+    const spy = jasmine.createSpyObj('Msg91WidgetService', ['initialize', 'preload', 'sendOtp', 'verifyOtp'], {
+      captchaElementId: 'msg91-phone-captcha',
+    });
+    spy.initialize.and.returnValue(Promise.resolve());
+    spy.sendOtp.and.returnValue(Promise.resolve());
     return spy;
   }
 
   beforeEach(() => {
     authServiceSpy = makeAuthServiceSpy();
-
-    msg91WidgetServiceSpy = jasmine.createSpyObj('Msg91WidgetService', ['initialize', 'sendOtp', 'verifyOtp'], {
-      captchaElementId: 'msg91-phone-captcha',
-    });
-    msg91WidgetServiceSpy.initialize.and.returnValue(Promise.resolve());
+    msg91WidgetServiceSpy = makeWidgetSpy();
 
     TestBed.configureTestingModule({
       imports: [Register],
@@ -81,18 +79,11 @@ describe('Register', () => {
     router = TestBed.inject(Router);
   });
 
-  // See login.spec.ts: MatSnackBarModule provides its own MatSnackBar at the component's
-  // injector level, so a TestBed-level override is shadowed. Spy on the real instance instead.
-  // Everything in this file except the dedicated Turnstile tests below is testing other
-  // concerns, so treat "widget already solved" as the default baseline rather than making
-  // every single test set this explicitly.
   function create() {
     const fixture = TestBed.createComponent(Register);
     fixture.componentInstance.turnstileToken = 'test-turnstile-token';
     fixture.detectChanges();
-    const snackBar = fixture.debugElement.injector.get(MatSnackBar);
-    spyOn(snackBar, 'open').and.stub();
-    return { fixture, snackBar };
+    return { fixture };
   }
 
   function fillValidForm(fixture: ReturnType<typeof create>['fixture']) {
@@ -103,71 +94,25 @@ describe('Register', () => {
     form.get('phone')?.setValue('9876543210');
   }
 
+  /** Drives the form through to the verification screen. The async validators are debounced by
+   * 200ms, so the clock has to be advanced past that before the form counts as valid. */
+  function submitToVerifyStage(fixture: ReturnType<typeof create>['fixture']) {
+    fillValidForm(fixture);
+    jasmine.clock().tick(200);
+    fixture.componentInstance.onSubmit();
+    fixture.detectChanges();
+  }
+
   it('should create with an invalid, empty form', () => {
     const { fixture } = create();
     expect(fixture.componentInstance.registerForm.invalid).toBeTrue();
   });
 
-  it('arriving with a ?verify=email query param (redirected from login) shows the email OTP step without crashing', () => {
-    // Regression test: this used to call sendResend() - which calls cdr.detectChanges() -
-    // from the constructor, before the component's view existed, which threw and crashed
-    // the whole component. The router-outlet rendered blank with no error surfaced anywhere,
-    // since the header/footer live outside the outlet and kept rendering fine.
-    TestBed.resetTestingModule();
-    authServiceSpy = makeAuthServiceSpy();
-    authServiceSpy.resendEmailOtp.and.returnValue(of({ message: 'ok', devCode: '654321' }));
-
-    TestBed.configureTestingModule({
-      imports: [Register],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: authServiceSpy },
-        { provide: Msg91WidgetService, useValue: msg91WidgetServiceSpy },
-        {
-          provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: convertToParamMap({ verify: 'stuck@example.com' }) } },
-        },
-      ],
-    });
-
-    const fixture = TestBed.createComponent(Register);
-    expect(() => fixture.detectChanges()).not.toThrow();
-
-    const component = fixture.componentInstance;
-    expect(component.stage).toBe('email');
-    expect(component.pendingEmail).toBe('stuck@example.com');
-    expect(authServiceSpy.resendEmailOtp).toHaveBeenCalledWith({ email: 'stuck@example.com' });
-  });
-
-  it('arriving with a ?verifyPhone=...&email=... query param shows the phone step and initialises the widget', () => {
-    TestBed.resetTestingModule();
-    authServiceSpy = makeAuthServiceSpy();
-
-    TestBed.configureTestingModule({
-      imports: [Register],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: authServiceSpy },
-        { provide: Msg91WidgetService, useValue: msg91WidgetServiceSpy },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: {
-              queryParamMap: convertToParamMap({ verifyPhone: '9876543210', email: 'stuck@example.com' }),
-            },
-          },
-        },
-      ],
-    });
-
-    const fixture = TestBed.createComponent(Register);
-    expect(() => fixture.detectChanges()).not.toThrow();
-
-    const component = fixture.componentInstance;
-    expect(component.stage).toBe('phone');
-    expect(component.pendingPhone).toBe('9876543210');
-    expect(component.pendingEmail).toBe('stuck@example.com');
-    expect(msg91WidgetServiceSpy.initialize).toHaveBeenCalled();
+  it('starts downloading the widget script on load, not when the phone step is reached', () => {
+    // The script is the slowest part of the flow; fetching it while the form is being filled in
+    // is the only free window there is.
+    create();
+    expect(msg91WidgetServiceSpy.preload).toHaveBeenCalled();
   });
 
   it('fullName requires at least 2 characters', () => {
@@ -253,7 +198,6 @@ describe('Register', () => {
   });
 
   it('onSubmit includes the Turnstile token in the register request', () => {
-    authServiceSpy.register.and.returnValue(of(pendingResponse));
     const { fixture } = create();
 
     jasmine.clock().install();
@@ -261,7 +205,6 @@ describe('Register', () => {
       fillValidForm(fixture);
       jasmine.clock().tick(200);
       fixture.componentInstance.turnstileToken = 'solved-token';
-
       fixture.componentInstance.onSubmit();
 
       expect(authServiceSpy.register).toHaveBeenCalledWith(
@@ -288,201 +231,119 @@ describe('Register', () => {
     }
   });
 
-  it('onSubmit registers, then advances to the email OTP step instead of logging in directly', () => {
-    authServiceSpy.register.and.returnValue(of(pendingResponse));
+  it('registering goes straight to the verification screen and never asks for an email code', () => {
     const { fixture } = create();
 
     jasmine.clock().install();
     try {
-      fillValidForm(fixture);
-      jasmine.clock().tick(200);
+      submitToVerifyStage(fixture);
 
-      fixture.componentInstance.onSubmit();
-
-      expect(fixture.componentInstance.stage).toBe('email');
-      expect(fixture.componentInstance.pendingEmail).toBe(pendingResponse.email);
-      expect(fixture.componentInstance.loading).toBeFalse();
+      expect(fixture.componentInstance.stage).toBe('verify');
+      expect(fixture.componentInstance.pendingEmail).toBe('jane@x.com');
+      expect(fixture.componentInstance.pendingPhone).toBe('9876543210');
+      // The whole point of the change: no email is sent unless the customer asks for one.
+      expect(authServiceSpy.resendEmailOtp).not.toHaveBeenCalled();
       expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
     } finally {
       jasmine.clock().uninstall();
     }
   });
 
-  describe('email step', () => {
-    function toEmailStep(fixture: ReturnType<typeof create>['fixture']) {
-      jasmine.clock().tick(200);
-      fixture.componentInstance.onSubmit();
-    }
+  it('arriving with ?verifyPhone=...&email=... opens the verification screen directly', () => {
+    TestBed.resetTestingModule();
+    authServiceSpy = makeAuthServiceSpy();
+    msg91WidgetServiceSpy = makeWidgetSpy();
 
-    it('verifyOtp advances to the phone step when only email is now verified', () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      authServiceSpy.verifyEmailOtp.and.returnValue(of(stepAwaitingPhone));
-      const { fixture } = create();
-
-      jasmine.clock().install();
-      try {
-        fillValidForm(fixture);
-        toEmailStep(fixture);
-
-        fixture.componentInstance.otpCode = '123456';
-        fixture.componentInstance.verifyOtp();
-
-        expect(authServiceSpy.verifyEmailOtp).toHaveBeenCalledWith({
-          email: pendingResponse.email,
-          code: '123456',
-        });
-        expect(fixture.componentInstance.stage).toBe('phone');
-        expect(fixture.componentInstance.pendingPhone).toBe(stepAwaitingPhone.phone);
-        expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
-        expect(msg91WidgetServiceSpy.initialize).toHaveBeenCalled();
-      } finally {
-        jasmine.clock().uninstall();
-      }
+    TestBed.configureTestingModule({
+      imports: [Register],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authServiceSpy },
+        { provide: Msg91WidgetService, useValue: msg91WidgetServiceSpy },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({ verifyPhone: '9876543210', email: 'stuck@example.com' }),
+            },
+          },
+        },
+      ],
     });
 
-    it('verifyOtp completes registration immediately when phone was already verified', () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      authServiceSpy.verifyEmailOtp.and.returnValue(of(stepComplete(authResponse)));
-      spyOn(router, 'navigate');
-      const { fixture } = create();
+    const fixture = TestBed.createComponent(Register);
+    expect(() => fixture.detectChanges()).not.toThrow();
 
-      jasmine.clock().install();
-      try {
-        fillValidForm(fixture);
-        toEmailStep(fixture);
-
-        fixture.componentInstance.otpCode = '123456';
-        fixture.componentInstance.verifyOtp();
-
-        expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
-        expect(router.navigate).toHaveBeenCalledWith(['/']);
-      } finally {
-        jasmine.clock().uninstall();
-      }
-    });
-
-    it('verifyOtp surfaces an error message and does not advance on an invalid code', () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      authServiceSpy.verifyEmailOtp.and.returnValue(
-        throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
-      );
-      const { fixture } = create();
-
-      jasmine.clock().install();
-      try {
-        fillValidForm(fixture);
-        toEmailStep(fixture);
-
-        fixture.componentInstance.otpCode = '000000';
-        fixture.componentInstance.verifyOtp();
-
-        expect(fixture.componentInstance.otpError).toBe('That code is invalid or has expired.');
-        expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
-      } finally {
-        jasmine.clock().uninstall();
-      }
-    });
-
-    it('resendOtp calls the service and starts a cooldown', () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      const { fixture } = create();
-
-      jasmine.clock().install();
-      try {
-        fillValidForm(fixture);
-        toEmailStep(fixture);
-        authServiceSpy.resendEmailOtp.calls.reset();
-
-        fixture.componentInstance.resendCooldown = 0;
-        fixture.componentInstance.resendOtp();
-
-        expect(authServiceSpy.resendEmailOtp).toHaveBeenCalledWith({ email: pendingResponse.email });
-        expect(fixture.componentInstance.resendCooldown).toBeGreaterThan(0);
-      } finally {
-        jasmine.clock().uninstall();
-      }
-    });
-
-    it('resendOtp does nothing while a cooldown is active', () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      const { fixture } = create();
-
-      jasmine.clock().install();
-      try {
-        fillValidForm(fixture);
-        toEmailStep(fixture);
-        authServiceSpy.resendEmailOtp.calls.reset();
-
-        fixture.componentInstance.resendOtp();
-
-        expect(authServiceSpy.resendEmailOtp).not.toHaveBeenCalled();
-      } finally {
-        jasmine.clock().uninstall();
-      }
-    });
+    expect(fixture.componentInstance.stage).toBe('verify');
+    expect(fixture.componentInstance.pendingPhone).toBe('9876543210');
+    expect(fixture.componentInstance.pendingEmail).toBe('stuck@example.com');
+    expect(msg91WidgetServiceSpy.initialize).toHaveBeenCalled();
   });
 
-  describe('phone step', () => {
-    function toPhoneStep(fixture: ReturnType<typeof create>['fixture']) {
-      authServiceSpy.verifyEmailOtp.and.returnValue(of(stepAwaitingPhone));
-      jasmine.clock().tick(200);
-      fixture.componentInstance.onSubmit();
-      // Calling component methods directly, rather than through a (ngSubmit)-style event
-      // binding, bypasses zoneless Angular's automatic post-event change detection - flush each
-      // step's render explicitly, the way a real event-bound call would, rather than letting two
-      // unflushed transitions stack into one another.
-      fixture.detectChanges();
-      fixture.componentInstance.otpCode = '123456';
-      fixture.componentInstance.verifyOtp();
-      fixture.detectChanges();
-    }
+  describe('phone verification', () => {
+    it('holds the Send button back until the widget has actually initialised', async () => {
+      // A customer who taps before initSendOTP has run gets a failure that reads like a bad code
+      // when in fact nothing was ever sent - this is the guard against that.
+      let resolveInit!: () => void;
+      msg91WidgetServiceSpy.initialize.and.returnValue(new Promise<void>((r) => (resolveInit = r)));
+      const { fixture } = create();
 
-    it('shows "not available" when the widget itself fails to initialise', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
+      jasmine.clock().install();
+      submitToVerifyStage(fixture);
+      jasmine.clock().uninstall();
+
+      expect(fixture.componentInstance.widgetReady).toBeFalse();
+      fixture.componentInstance.sendPhoneCode();
+      expect(msg91WidgetServiceSpy.sendOtp).not.toHaveBeenCalled();
+
+      resolveInit();
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.widgetReady).toBeTrue();
+    });
+
+    it('shows "not available" when the widget fails to initialise', async () => {
       msg91WidgetServiceSpy.initialize.and.returnValue(Promise.reject(new Error('script blocked')));
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
       jasmine.clock().uninstall();
       await fixture.whenStable();
 
       expect(fixture.componentInstance.phoneUnavailable).toBeTrue();
+      expect(fixture.componentInstance.widgetReady).toBeFalse();
     });
 
-    it('sendPhoneCode asks the widget to send it, and advances to the code sub-stage', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      msg91WidgetServiceSpy.sendOtp.and.returnValue(Promise.resolve());
+    it('sending a code advances to the code sub-stage', async () => {
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
       jasmine.clock().uninstall();
+      await fixture.whenStable();
 
       fixture.componentInstance.sendPhoneCode();
       await fixture.whenStable();
 
-      expect(msg91WidgetServiceSpy.sendOtp).toHaveBeenCalledWith(stepAwaitingPhone.phone);
+      expect(msg91WidgetServiceSpy.sendOtp).toHaveBeenCalledWith('9876543210');
       expect(fixture.componentInstance.phoneSubStage).toBe('code');
     });
 
     it('surfaces the widget failure message when sending fails', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
       msg91WidgetServiceSpy.sendOtp.and.returnValue(
         Promise.reject(new Error('Too many attempts. Please wait a minute.')),
       );
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
       jasmine.clock().uninstall();
+      await fixture.whenStable();
 
       fixture.componentInstance.sendPhoneCode();
-      // Zoneless: a bare Promise.reject() settled before .then()/.catch() attach isn't tracked by
-      // whenStable()'s pending-task signal, so flush the microtask queue explicitly instead.
+      // Zoneless: a bare Promise.reject() settled before .catch() attaches isn't tracked by
+      // whenStable()'s pending-task signal, so flush the microtask queue explicitly.
       await Promise.resolve();
       await Promise.resolve();
 
@@ -490,14 +351,13 @@ describe('Register', () => {
       expect(fixture.componentInstance.phoneSubStage).toBe('send');
     });
 
-    it('verifyPhoneCode does nothing until a full 4-digit code is entered', () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
+    it('verifyPhoneCode does nothing until a full 4-digit code is entered', async () => {
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
       jasmine.clock().uninstall();
+      await fixture.whenStable();
 
       fixture.componentInstance.phoneCode = '12';
       fixture.componentInstance.verifyPhoneCode();
@@ -506,39 +366,82 @@ describe('Register', () => {
       expect(authServiceSpy.verifyPhoneRegistration).not.toHaveBeenCalled();
     });
 
-    it('a valid code verifies against the widget, completes registration, and navigates home', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
+    it('a valid code finishes registration and signs the customer in, unverified email and all', async () => {
       msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
-      authServiceSpy.verifyPhoneRegistration.and.returnValue(of(stepComplete(authResponse)));
       spyOn(router, 'navigate');
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
       jasmine.clock().uninstall();
+      await fixture.whenStable();
 
       fixture.componentInstance.phoneCode = '2468';
       fixture.componentInstance.verifyPhoneCode();
       await fixture.whenStable();
 
-      expect(msg91WidgetServiceSpy.verifyOtp).toHaveBeenCalledWith('2468');
       expect(authServiceSpy.verifyPhoneRegistration).toHaveBeenCalledWith({
-        phone: stepAwaitingPhone.phone,
+        phone: '9876543210',
         widgetToken: 'widget-access-token',
       });
       expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
       expect(router.navigate).toHaveBeenCalledWith(['/']);
     });
 
-    it('sends the customer back to finish email if it somehow still is not verified', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
+    it('shows the server message and stays put when the backend rejects the token', async () => {
       msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
       authServiceSpy.verifyPhoneRegistration.and.returnValue(
+        throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
+      );
+      const { fixture } = create();
+
+      jasmine.clock().install();
+      submitToVerifyStage(fixture);
+      jasmine.clock().uninstall();
+      await fixture.whenStable();
+
+      fixture.componentInstance.phoneCode = '0000';
+      fixture.componentInstance.verifyPhoneCode();
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
+      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('optional email verification', () => {
+    it('sends nothing until the customer presses Verify', async () => {
+      const { fixture } = create();
+
+      jasmine.clock().install();
+      submitToVerifyStage(fixture);
+      jasmine.clock().uninstall();
+      await fixture.whenStable();
+
+      expect(authServiceSpy.resendEmailOtp).not.toHaveBeenCalled();
+      expect(fixture.componentInstance.emailStage).toBe('idle');
+    });
+
+    it('pressing Verify requests a code and opens the code entry', async () => {
+      const { fixture } = create();
+
+      jasmine.clock().install();
+      submitToVerifyStage(fixture);
+      fixture.componentInstance.startEmailVerification();
+
+      expect(authServiceSpy.resendEmailOtp).toHaveBeenCalledWith({ email: 'jane@x.com' });
+      expect(fixture.componentInstance.emailStage).toBe('code');
+      expect(fixture.componentInstance.resendCooldown).toBeGreaterThan(0);
+      jasmine.clock().uninstall();
+      await fixture.whenStable();
+    });
+
+    it('a correct code marks the email verified without disturbing the phone step', async () => {
+      authServiceSpy.verifyEmailOtp.and.returnValue(
         of({
           message: 'ok',
-          emailVerified: false,
-          phoneVerified: true,
+          emailVerified: true,
+          phoneVerified: false,
           email: 'jane@x.com',
           phone: '9876543210',
           session: null,
@@ -547,60 +450,73 @@ describe('Register', () => {
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
+      fixture.componentInstance.startEmailVerification();
+      fixture.componentInstance.emailCode = '123456';
+      fixture.componentInstance.verifyEmailCode();
       jasmine.clock().uninstall();
 
-      fixture.componentInstance.phoneCode = '2468';
-      fixture.componentInstance.verifyPhoneCode();
-      await fixture.whenStable();
-
-      expect(fixture.componentInstance.stage).toBe('email');
+      expect(fixture.componentInstance.emailVerified).toBeTrue();
+      expect(fixture.componentInstance.emailStage).toBe('idle');
       expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
     });
 
-    it('shows the widget failure message when the entered code itself is wrong', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      msg91WidgetServiceSpy.verifyOtp.and.returnValue(
-        Promise.reject(new Error('That code is invalid or has expired.')),
+    it('verifying the email after the phone signs the customer in', async () => {
+      authServiceSpy.verifyEmailOtp.and.returnValue(
+        of({
+          message: 'ok',
+          emailVerified: true,
+          phoneVerified: true,
+          email: 'jane@x.com',
+          phone: '9876543210',
+          session: authResponse,
+        }),
       );
+      spyOn(router, 'navigate');
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
+      fixture.componentInstance.startEmailVerification();
+      fixture.componentInstance.emailCode = '123456';
+      fixture.componentInstance.verifyEmailCode();
       jasmine.clock().uninstall();
 
-      fixture.componentInstance.phoneCode = '0000';
-      fixture.componentInstance.verifyPhoneCode();
-      // Same zoneless caveat as the sendOtp failure test above.
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
-      expect(authServiceSpy.verifyPhoneRegistration).not.toHaveBeenCalled();
-      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+      expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
     });
 
-    it('shows the server message and stays put when the backend rejects an otherwise-valid token', async () => {
-      authServiceSpy.register.and.returnValue(of(pendingResponse));
-      msg91WidgetServiceSpy.verifyOtp.and.returnValue(Promise.resolve('widget-access-token'));
-      authServiceSpy.verifyPhoneRegistration.and.returnValue(
+    it('surfaces a bad email code without clearing the screen', async () => {
+      authServiceSpy.verifyEmailOtp.and.returnValue(
         throwError(() => ({ status: 400, error: { message: 'That code is invalid or has expired.' } })),
       );
       const { fixture } = create();
 
       jasmine.clock().install();
-      fillValidForm(fixture);
-      toPhoneStep(fixture);
+      submitToVerifyStage(fixture);
+      fixture.componentInstance.startEmailVerification();
+      fixture.componentInstance.emailCode = '000000';
+      fixture.componentInstance.verifyEmailCode();
       jasmine.clock().uninstall();
 
-      fixture.componentInstance.phoneCode = '0000';
-      fixture.componentInstance.verifyPhoneCode();
-      await fixture.whenStable();
+      expect(fixture.componentInstance.emailError).toBe('That code is invalid or has expired.');
+      expect(fixture.componentInstance.emailVerified).toBeFalse();
+      expect(fixture.componentInstance.emailStage).toBe('code');
+    });
 
-      expect(fixture.componentInstance.phoneError).toBe('That code is invalid or has expired.');
-      expect(authServiceSpy.saveAuth).not.toHaveBeenCalled();
+    it('will not resend while the cooldown is running', async () => {
+      const { fixture } = create();
+
+      jasmine.clock().install();
+      submitToVerifyStage(fixture);
+      fixture.componentInstance.startEmailVerification();
+      authServiceSpy.resendEmailOtp.calls.reset();
+
+      fixture.componentInstance.resendEmailCode();
+
+      expect(authServiceSpy.resendEmailOtp).not.toHaveBeenCalled();
+      jasmine.clock().uninstall();
+      await fixture.whenStable();
     });
   });
 

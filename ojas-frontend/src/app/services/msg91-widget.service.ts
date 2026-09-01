@@ -29,17 +29,18 @@ export class Msg91WidgetError extends Error {}
 @Injectable({ providedIn: 'root' })
 export class Msg91WidgetService {
   private initPromise: Promise<void> | null = null;
+  private scriptPromise: Promise<void> | null = null;
 
   get captchaElementId(): string {
     return CAPTCHA_ELEMENT_ID;
   }
 
+  /** Memoised on the promise, not on the presence of the script tag. Checking for the tag would
+   * make a second caller resolve the instant the *first* caller appended it - before onload has
+   * fired - and initSendOTP would then be called against a window that has no such function yet.
+   * That race is live now that preload() and initialize() both come through here. */
   private loadScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (document.getElementById('msg91-otp-widget-script')) {
-        resolve();
-        return;
-      }
+    return (this.scriptPromise ??= new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
       script.id = 'msg91-otp-widget-script';
       script.src = SCRIPT_URL;
@@ -47,11 +48,24 @@ export class Msg91WidgetService {
       script.onload = () => resolve();
       script.onerror = () => reject(new Msg91WidgetError('Could not load the verification widget.'));
       document.body.appendChild(script);
-    });
+    }));
   }
 
-  /** Loads the script and calls initSendOTP exactly once. Safe to call on every attempt to
-   * switch to phone login - subsequent calls reuse the same in-flight/completed promise. */
+  /** Starts fetching the widget script (and, transitively, the hCaptcha assets it pulls) without
+   * initialising it. Call this as early as the page knows phone verification is coming - the
+   * download is by far the slowest part of the flow and, left until the customer reaches the
+   * verification step, it is dead time they spend staring at a disabled button. Started while
+   * they are still filling in the form instead, it is usually finished before they get there.
+   *
+   * Deliberately swallows its own failure: a preload that could not reach MSG91 must not surface
+   * an error against a step the customer has not asked for yet. initialize() runs the same
+   * loadScript() promise later and reports the failure then, in context. */
+  preload(): void {
+    this.loadScript().catch(() => {});
+  }
+
+  /** Loads the script and calls initSendOTP exactly once. Safe to call repeatedly - subsequent
+   * calls reuse the same in-flight/completed promise. */
   initialize(): Promise<void> {
     this.initPromise ??= this.loadScript().then(
       () =>

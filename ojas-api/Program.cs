@@ -410,7 +410,17 @@ app.Use(async (context, next) =>
         path.StartsWithSegments("/api/auth/reset-password") ||
         path.StartsWithSegments("/api/auth/device/send-otp") ||
         path.StartsWithSegments("/api/auth/device/enroll") ||
-        path.StartsWithSegments("/api/auth/accept-invite");
+        path.StartsWithSegments("/api/auth/accept-invite") ||
+        // Email verification is anonymous by design and verify-email-otp can itself issue a
+        // session, so it belongs with the others above. It also has a second caller now: a
+        // customer who signed in with only their phone verified and later confirms their address
+        // from the account screen. Without this, the same endpoint would work signed out and 403
+        // signed in, which is exactly the kind of state-dependent surprise this list exists to
+        // remove. Neither endpoint gains anything from a CSRF token - both are callable with no
+        // session at all, so an attacker never needed the victim's cookie; the abuse control that
+        // does matter here is the rate limiter these sit behind.
+        path.StartsWithSegments("/api/auth/verify-email-otp") ||
+        path.StartsWithSegments("/api/auth/resend-email-otp");
 
     // Payment gateway callbacks are server-to-server and authenticated by the HMAC signature on
     // the request itself, never by a session. They happen to carry no auth cookie today, so the
