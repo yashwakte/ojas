@@ -54,6 +54,10 @@ const SLOW_CONFIRM_RETRY_MS = 6000;
  * webhook is the backstop for whenever it does land. */
 const MAX_PAYMENT_CONFIRM_ATTEMPTS = 48;
 
+/** How long an order linked to from an update message stays emphasised. Long enough to find it
+ * after the scroll settles, short enough that it fades rather than becoming permanent furniture. */
+const HIGHLIGHT_DURATION_MS = 6000;
+
 @Component({
   selector: 'app-my-orders',
   imports: [
@@ -86,6 +90,11 @@ export class MyOrders implements OnInit, OnDestroy {
   orders = signal<OrderResponse[]>([]);
   loading = signal(true);
   error = signal('');
+
+  /** The order an update message linked to (?order=<id>), emphasised until the customer has had
+   * a moment to see it. */
+  highlightedOrderId = signal<string | null>(null);
+  private highlightTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Id of the order currently open for editing, if any. */
   editingId = signal<string | null>(null);
@@ -250,7 +259,59 @@ export class MyOrders implements OnInit, OnDestroy {
       // history call rather than Router.navigate, since there's no route change to make here.
       window.history.replaceState({}, '', window.location.pathname);
     }
+
+    // ?order=<id> is what an order-update message links to. This page shows every order the
+    // customer has ever placed, so landing on it from a notification about one specific order
+    // and having to hunt for it defeats the point of the link.
+    const highlightOrderId = this.route.snapshot.queryParamMap.get('order');
+    if (highlightOrderId) {
+      this.highlightedOrderId.set(highlightOrderId);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     this.load();
+  }
+
+  /** Cleared on any interaction, so the emphasis reads as "here is the one you came for" rather
+   * than as a selection the customer now has to dismiss. */
+  dismissHighlight(): void {
+    this.highlightedOrderId.set(null);
+    this.clearHighlightTimer();
+  }
+
+  /** Scrolls the highlighted order into view once the list it lives in has rendered. Called from
+   * load()'s completion rather than ngOnInit, because at ngOnInit the orders have not arrived and
+   * there is nothing on the page to scroll to yet. */
+  private revealHighlightedOrder(): void {
+    const id = this.highlightedOrderId();
+    if (!id) return;
+
+    // If the order is not in the list at all - a stale link, or someone else's order id - drop
+    // the highlight rather than leaving an invisible one set.
+    if (!this.orders().some((order) => order.id === id)) {
+      this.highlightedOrderId.set(null);
+      return;
+    }
+
+    // A frame after the list renders, so the element exists to be scrolled to.
+    requestAnimationFrame(() => {
+      if (this.destroyed) return;
+      const element = document.getElementById(`order-${id}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    this.clearHighlightTimer();
+    this.highlightTimer = setTimeout(() => {
+      this.highlightedOrderId.set(null);
+      this.highlightTimer = null;
+    }, HIGHLIGHT_DURATION_MS);
+  }
+
+  private clearHighlightTimer(): void {
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = null;
+    }
   }
 
   dismissCashfreeBanner(): void {
@@ -347,6 +408,7 @@ export class MyOrders implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroyed = true;
     this.stopConfirming();
+    this.clearHighlightTimer();
   }
 
   /**
@@ -953,6 +1015,7 @@ export class MyOrders implements OnInit, OnDestroy {
         this.orders.set(orders);
         this.loading.set(false);
         this.resumeDraftIfAny();
+        this.revealHighlightedOrder();
         // Only ever *starts* the confirm run. A poll already under way owns its own schedule -
         // reloading mid-flight must not spawn a second chain alongside it.
         if (this.cashfreePaymentStatus() === 'checking' && this.confirmTimer === null) {

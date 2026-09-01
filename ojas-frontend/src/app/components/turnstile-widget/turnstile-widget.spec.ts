@@ -96,6 +96,46 @@ describe('TurnstileWidget', () => {
     expect(turnstileMock.remove).toHaveBeenCalledWith('widget-1');
   });
 
+  it('gives up only after 30s, and offers a retry rather than a dead end', () => {
+    // The old ceiling was 10s, which a slow mobile connection can exceed while still being
+    // perfectly capable of loading the script.
+    delete window.turnstile;
+    jasmine.clock().install();
+    try {
+      const fixture = create();
+
+      jasmine.clock().tick(29_000);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.turnstile-unavailable')).toBeNull();
+
+      jasmine.clock().tick(2_000);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.turnstile-retry')).not.toBeNull();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('retrying after the script finally arrives renders the widget', () => {
+    delete window.turnstile;
+    jasmine.clock().install();
+    try {
+      const fixture = create();
+      jasmine.clock().tick(31_000);
+      fixture.detectChanges();
+
+      // The script was merely slow, not blocked - it lands after we had given up.
+      window.turnstile = turnstileMock;
+      fixture.nativeElement.querySelector('.turnstile-retry').click();
+      fixture.detectChanges();
+
+      expect(turnstileMock.render).toHaveBeenCalledTimes(1);
+      expect(fixture.nativeElement.querySelector('.turnstile-unavailable')).toBeNull();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
   it('cancels a pending retry on destroy without ever rendering', () => {
     delete window.turnstile;
     jasmine.clock().install();

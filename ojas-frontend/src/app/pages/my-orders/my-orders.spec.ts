@@ -109,6 +109,58 @@ describe('MyOrders', () => {
     return create();
   }
 
+  describe('order deep link (?order=)', () => {
+    /** Simulates arriving from an order-update message that links to one specific order. */
+    function createWithOrderLink(orderId: string) {
+      TestBed.overrideProvider(ActivatedRoute, {
+        useValue: { snapshot: { queryParamMap: convertToParamMap({ order: orderId }) } },
+      });
+      return create();
+    }
+
+    it('highlights the linked order once the list has loaded', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+
+      const fixture = createWithOrderLink('o1');
+
+      expect(fixture.componentInstance.highlightedOrderId()).toBe('o1');
+    });
+
+    it('drops the highlight when the linked order is not in the list', () => {
+      // A stale link, or one for an order this account cannot see. Leaving the id set would mean
+      // an invisible highlight and a scroll to an element that does not exist.
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+
+      const fixture = createWithOrderLink('not-a-real-order');
+
+      expect(fixture.componentInstance.highlightedOrderId()).toBeNull();
+    });
+
+    it('fades the highlight on its own rather than leaving it set', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+
+      jasmine.clock().install();
+      try {
+        const fixture = createWithOrderLink('o1');
+        expect(fixture.componentInstance.highlightedOrderId()).toBe('o1');
+
+        jasmine.clock().tick(6001);
+
+        expect(fixture.componentInstance.highlightedOrderId()).toBeNull();
+      } finally {
+        jasmine.clock().uninstall();
+      }
+    });
+
+    it('does not highlight anything on an ordinary visit', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+
+      const fixture = create();
+
+      expect(fixture.componentInstance.highlightedOrderId()).toBeNull();
+    });
+  });
+
   it('loads orders on init and stops loading', () => {
     userServiceSpy.getMyOrders.and.returnValue(of([order]));
     const fixture = create();

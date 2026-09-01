@@ -207,7 +207,7 @@
         </section>
 
         <p class="verify-note">
-          You can confirm your email later from your profile — it isn't needed to start ordering.
+          Verifying your email is optional — it isn't needed to start ordering.
         </p>
         <p class="auth-switch">Wrong details? <a routerLink="/login">Back to sign in</a></p>
       } @else {
@@ -307,6 +307,10 @@
               <ng-container>Create Account</ng-container>
             }
           </button>
+
+          @if (slowConnection) {
+            <app-slow-hint />
+          }
         </form>
 
         <p class="auth-switch">Already have an account? <a routerLink="/login">Sign in</a></p>

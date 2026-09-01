@@ -15,6 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
+import { SlowHint } from '../../components/slow-hint/slow-hint';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
 import { Msg91WidgetService } from '../../services/msg91-widget.service';
@@ -22,6 +23,13 @@ import { AuthResponse } from '../../models/interfaces';
 import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
 
 const RESEND_COOLDOWN_SECONDS = 30;
+
+/** Matches the login form. A cold Render instance can take ~30s to answer its first request, and
+ * an 8s ceiling here used to fail registration outright on exactly the slow connections and cold
+ * starts this needs to survive - while login, on 35s, would have waited and succeeded. */
+const REQUEST_TIMEOUT_MS = 35_000;
+/** How long a request may run before the wait is acknowledged on screen. */
+const SLOW_REQUEST_MS = 5_000;
 
 @Component({
   selector: 'app-register',
@@ -35,6 +43,7 @@ const RESEND_COOLDOWN_SECONDS = 30;
     MatIconModule,
     MatProgressSpinnerModule,
     TurnstileWidget,
+    SlowHint,
   ],
   templateUrl: './register.html',
   styleUrl: './register.scss',
@@ -48,9 +57,11 @@ export class Register implements OnInit, OnDestroy {
 
   registerForm: FormGroup;
   loading = false;
+  slowConnection = false;
   hidePassword = true;
   serverError = '';
   turnstileToken: string | null = null;
+  private slowTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Two stages: the signup form, then one verification screen carrying both the phone and the
   // email. Only the phone is required - it is what issues the session - so the email row is an
@@ -182,20 +193,30 @@ export class Register implements OnInit, OnDestroy {
 
     this.serverError = '';
     this.loading = true;
+    this.slowConnection = false;
     this.cdr.detectChanges();
+
+    this.slowTimer = setTimeout(() => {
+      this.slowConnection = true;
+      this.cdr.detectChanges();
+    }, SLOW_REQUEST_MS);
 
     this.auth
       .register({ ...this.registerForm.value, turnstileToken: this.turnstileToken })
-      .pipe(timeout(8000))
+      .pipe(timeout(REQUEST_TIMEOUT_MS))
       .subscribe({
         next: (res) => {
+          this.clearSlowTimer();
           this.loading = false;
+          this.slowConnection = false;
           this.pendingEmail = res.email;
           this.pendingPhone = this.registerForm.value.phone;
           this.openVerifyStage();
         },
         error: (err) => {
+          this.clearSlowTimer();
           this.loading = false;
+          this.slowConnection = false;
           // A Turnstile token is single-use - whatever happened, this one is spent.
           this.turnstileToken = null;
           this.turnstileWidget()?.reset();
@@ -393,6 +414,13 @@ export class Register implements OnInit, OnDestroy {
     }
   }
 
+  private clearSlowTimer() {
+    if (this.slowTimer) {
+      clearTimeout(this.slowTimer);
+      this.slowTimer = null;
+    }
+  }
+
   private completeRegistration(session: AuthResponse) {
     this.clearResendTimer();
     this.auth.saveAuth(session);
@@ -402,5 +430,6 @@ export class Register implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.clearResendTimer();
+    this.clearSlowTimer();
   }
 }

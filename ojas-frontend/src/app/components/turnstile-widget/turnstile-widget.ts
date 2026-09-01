@@ -17,10 +17,15 @@ interface TurnstileRenderOptions {
   'error-callback'?: () => void;
 }
 
-/** Polling interval and ceiling for the Cloudflare script arriving. Ten seconds is generous
- * for a script tag that is already in index.html; past that it is not coming. */
+/** Polling interval and ceiling for the Cloudflare script arriving.
+ *
+ * Thirty seconds, not ten. Ten is plenty on a desk in an office and nowhere near enough on a
+ * phone with two bars, which is a large share of who shops here - and giving up early on a
+ * connection that was merely slow is indistinguishable, to the customer, from the site being
+ * broken. Nothing is lost by waiting: the button is disabled either way, and the wait now ends
+ * in a retry rather than a dead end. */
 const SCRIPT_POLL_MS = 100;
-const SCRIPT_WAIT_LIMIT_MS = 10_000;
+const SCRIPT_WAIT_LIMIT_MS = 30_000;
 
 declare global {
   interface Window {
@@ -43,10 +48,13 @@ declare global {
   template: `
     <div #container></div>
     @if (unavailable()) {
-      <p class="turnstile-unavailable" role="alert">
-        The security check couldn't load. It's usually a browser extension or a network that
-        blocks it — try disabling your ad blocker for this site, or use a different browser.
-      </p>
+      <div class="turnstile-unavailable" role="alert">
+        <p>
+          The security check couldn't load. That's usually a slow connection, or a browser
+          extension blocking it.
+        </p>
+        <button type="button" class="turnstile-retry" (click)="retry()">Try again</button>
+      </div>
     }
   `,
   styles: `
@@ -55,6 +63,23 @@ declare global {
       font-size: 0.85rem;
       line-height: 1.45;
       color: #b3261e;
+
+      p {
+        margin: 0 0 8px;
+      }
+    }
+
+    .turnstile-retry {
+      font: inherit;
+      font-weight: 600;
+      color: var(--ojas-ink);
+      background: none;
+      /* A real bordered control rather than a bare link: this is the only way forward from here,
+         and on a phone it needs a tap target, not a word in a sentence. */
+      border: 1px solid currentColor;
+      border-radius: 8px;
+      padding: 7px 16px;
+      cursor: pointer;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -87,6 +112,15 @@ export class TurnstileWidget implements AfterViewInit, OnDestroy {
     if (this.widgetId && window.turnstile) {
       window.turnstile.remove(this.widgetId);
     }
+  }
+
+  /** Starts the wait over from the beginning. The script may simply have been slower than the
+   * ceiling, in which case it has very likely arrived by now and this renders immediately; if it
+   * genuinely cannot load, the customer lands back here having lost nothing but the wait. */
+  protected retry(): void {
+    this.waitedMs = 0;
+    this.unavailable.set(false);
+    this.renderWidget();
   }
 
   /** Called by the parent after a failed submit - the spent token can't be reused. */

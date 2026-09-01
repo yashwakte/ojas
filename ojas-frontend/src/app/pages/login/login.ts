@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
+import { SlowHint } from '../../components/slow-hint/slow-hint';
 import { AuthService } from '../../services/auth.service';
 import { WelcomeService } from '../../services/welcome.service';
 import { timeout } from 'rxjs';
@@ -25,6 +26,7 @@ import { timeout } from 'rxjs';
     MatSnackBarModule,
     MatProgressSpinnerModule,
     TurnstileWidget,
+    SlowHint,
   ],
   templateUrl: './login.html',
   styleUrl: './login.scss',

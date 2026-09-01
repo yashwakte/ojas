@@ -319,10 +319,7 @@
         </button>
 
         @if (slowConnection) {
-          <p class="slow-connection-hint">
-            <mat-icon>hourglass_top</mat-icon>
-            Server is waking up, please wait…
-          </p>
+          <app-slow-hint />
         }
       </form>
 

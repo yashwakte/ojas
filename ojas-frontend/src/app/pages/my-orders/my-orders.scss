@@ -299,6 +299,14 @@
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
   }
 
+  // The order an update message linked to. A brief pulse rather than a static ring: the customer
+  // arrives mid-scroll, and movement is what the eye finds in a list of near-identical cards.
+  // It fades on its own (see HIGHLIGHT_DURATION_MS) so it never becomes a state to dismiss.
+  &--highlighted {
+    border-color: var(--ojas-orange);
+    animation: orderHighlightPulse 1.4s ease-out 2;
+  }
+
   &--editing {
     border-color: var(--ojas-orange);
     box-shadow:
@@ -1482,5 +1490,26 @@
   &.refund-status--pending {
     background: rgba(251, 191, 36, 0.14);
     color: #92400e;
+  }
+}
+
+@keyframes orderHighlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(242, 90, 26, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(242, 90, 26, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 90, 26, 0);
+  }
+}
+
+/* The pulse is a wayfinding cue, not information - a reader who has asked for less motion still
+   gets the border colour, which is what actually identifies the card. */
+@media (prefers-reduced-motion: reduce) {
+  .order-card--highlighted {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(242, 90, 26, 0.25);
   }
 }

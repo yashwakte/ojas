@@ -74,7 +74,12 @@
   } @else {
     <div class="orders-list">
       @for (order of sortedOrders(); track order.id) {
-        <div class="order-card" [class.order-card--editing]="editingId() === order.id">
+        <div
+          class="order-card"
+          [id]="'order-' + order.id"
+          [class.order-card--editing]="editingId() === order.id"
+          [class.order-card--highlighted]="highlightedOrderId() === order.id"
+        >
           <div class="order-header">
             <div class="order-meta">
               <span class="order-id">Order #{{ order.id.slice(-8).toUpperCase() }}</span>
