@@ -25,6 +25,16 @@ export const environment = {
   // trust level as a Cashfree App ID or Turnstile site key) - the real secret is
   // Msg91:WidgetAuthKey, which lives only on the API. msg91TokenAuth is the real value (from the
   // widget's Tokens section, named "ojasProduction").
+  //
+  // On secret scanners: GitGuardian flags msg91TokenAuth as a "Generic High Entropy Secret", and
+  // that finding will recur every time this file is touched. It is a true detection of a string
+  // shape and a false one about impact - the widget runs in the browser, so both of these values
+  // are served to anyone who opens the register page, exactly like a Turnstile site key. Pulling
+  // them into a build-time variable would hide them from the scanner while changing nothing about
+  // who can read them, at the cost of a build that fails open if the variable is ever unset.
+  // What actually limits the blast radius is MSG91-side: the widget's domain allow-list and its
+  // send limits, plus the wallet balance itself. The real secret is Msg91:WidgetAuthKey, which
+  // lives only in the API's configuration and is never sent to a browser.
   msg91WidgetId: '3668436b4156363032343133',
   msg91TokenAuth: '562938TjibpKmLOJku6a92d768P1',
 };
