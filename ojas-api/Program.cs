@@ -57,10 +57,36 @@ if (string.IsNullOrWhiteSpace(turnstileSecretKey))
 // Fails the deploy rather than the checkout when going live has been done only halfway.
 CashfreeService.EnsureCredentialsMatchEnvironment(builder.Configuration);
 
+// Frontend:BaseUrl is the origin Cashfree sends a paying customer back to
+// (CashfreeService's return_url) as well as the host in staff invite links. Getting it wrong is
+// uniquely nasty and completely silent: payment still succeeds, but the customer is returned to
+// a host their auth cookie was never set for, so they arrive signed out, cannot see the order
+// they just paid for, and reasonably conclude the money vanished. Nothing in the payment logs
+// looks wrong. So it is checked at startup, on the same "fail the deploy, not the checkout"
+// principle as the Cashfree credential check above - which matters most in exactly the window
+// this was written for, moving the site to a new domain.
+if (builder.Environment.IsProduction())
+{
+    var frontendBaseUrl = builder.Configuration["Frontend:BaseUrl"];
+    if (string.IsNullOrWhiteSpace(frontendBaseUrl))
+        throw new InvalidOperationException(
+            "Frontend:BaseUrl must be set in Production - it is the origin customers are returned "
+            + "to after paying, and the host in staff invite links.");
+
+    if (!Uri.TryCreate(frontendBaseUrl, UriKind.Absolute, out var parsed) || parsed.Scheme != Uri.UriSchemeHttps)
+        throw new InvalidOperationException(
+            $"Frontend:BaseUrl must be an absolute https:// URL, but was '{frontendBaseUrl}'. A "
+            + "relative or http value produces a return_url Cashfree cannot redirect to.");
+}
+
 var productionOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()
-    ?? ["https://ojas-atta.vercel.app"];
+    // Only reached when Cors:AllowedOrigins is unset. Browsers reach the API same-origin through
+    // the Vercel rewrite, so CORS is not on the ordinary path - this is the backstop for anything
+    // calling the API host directly, and it lists every origin the site is served from during the
+    // move to the custom domain rather than only the one it used to live at.
+    ?? ["https://ojasaata.com", "https://www.ojasaata.com", "https://ojas-atta.vercel.app"];
 
 var allowVercelPreviewOrigins = builder.Configuration.GetValue("Cors:AllowVercelPreviewOrigins", false);
 

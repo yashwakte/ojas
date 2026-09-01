@@ -43,10 +43,13 @@
     "FromName": "Ojas",
     "ReplyTo": "wecare@ojasaata.com"
   },
-  // Where staff invite links point. Must be the real site origin in Production, or the emailed
-  // "set up my account" link will send people to localhost.
+  // The origin the site is actually served from. Two things depend on it, and the second is the
+  // one that bites: staff invite links, and the return_url Cashfree sends a paying customer back
+  // to. Point it at a host the customer's auth cookie was not set for and they come back from a
+  // successful payment signed out, unable to see the order they just paid for. Startup refuses to
+  // boot in Production if this is missing or is not an absolute https URL.
   "Frontend": {
-    "BaseUrl": "https://ojas-atta.vercel.app"
+    "BaseUrl": "https://ojasaata.com"
   },
   // Outside Production, OTP emails are logged instead of sent - the code comes back in the API
   // response as devCode and the UI displays it. Set this to true only when you specifically want
@@ -78,8 +81,12 @@
   "Turnstile": {
     "SecretKey": "<turnstile-secret-key>"
   },
+  // List every origin the site is served from. While moving to the custom domain that is more
+  // than one, and dropping the old host too early breaks anything still pointing at it.
   "Cors": {
     "AllowedOrigins": [
+      "https://ojasaata.com",
+      "https://www.ojasaata.com",
       "https://ojas-atta.vercel.app"
     ],
     "AllowVercelPreviewOrigins": false

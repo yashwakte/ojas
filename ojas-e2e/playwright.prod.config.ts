@@ -21,7 +21,7 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 60_000,
   use: {
-    baseURL: process.env['OJAS_BASE_URL'] ?? 'https://ojas-atta.vercel.app',
+    baseURL: process.env['OJAS_BASE_URL'] ?? 'https://ojasaata.com',
     trace: 'retain-on-failure',
     // Render's free tier sleeps; the first request after idle can take ~50s to wake it.
     actionTimeout: 45_000,
