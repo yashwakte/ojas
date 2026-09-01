@@ -52,6 +52,15 @@
   </div>
 
   <div class="footer-bottom">
+    <!-- Legal links sit here rather than in the grid above because the grid is a fixed three
+         columns; this is also where a customer and a payment provider's compliance review both
+         expect to find them. -->
+    <nav class="footer-policies" aria-label="Policies">
+      <a routerLink="/contact">Contact Us</a>
+      <a routerLink="/terms">Terms and Conditions</a>
+      <a routerLink="/refunds">Refunds and Cancellations</a>
+      <a routerLink="/privacy">Privacy Policy</a>
+    </nav>
     <p>
       &copy; {{ currentYear }} Asha Marketing. All rights reserved. Ojas is a brand of Asha
       Marketing. Made with <span class="heart">❤</span> in Pune

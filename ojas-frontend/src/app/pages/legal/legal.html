@@ -1,0 +1,41 @@
+<div class="legal-page">
+  <article class="legal-card">
+    <header class="legal-head">
+      <h1>{{ doc.title }}</h1>
+      <p class="legal-updated">Last updated {{ lastUpdated }}</p>
+      <p class="legal-intro">{{ doc.intro }}</p>
+    </header>
+
+    @for (section of doc.sections; track section.heading) {
+      <section class="legal-section">
+        <h2>{{ section.heading }}</h2>
+
+        @for (paragraph of section.paragraphs; track paragraph) {
+          <p>{{ paragraph }}</p>
+        }
+
+        @if (section.bullets) {
+          <ul>
+            @for (bullet of section.bullets; track bullet) {
+              <li>{{ bullet }}</li>
+            }
+          </ul>
+        }
+
+        @if (section.footnote) {
+          <p>{{ section.footnote }}</p>
+        }
+      </section>
+    }
+
+    <footer class="legal-foot">
+      <p>
+        See also:
+        <a routerLink="/terms">Terms and Conditions</a>,
+        <a routerLink="/refunds">Refunds and Cancellations</a>,
+        <a routerLink="/privacy">Privacy Policy</a>,
+        <a routerLink="/contact">Contact Us</a>.
+      </p>
+    </footer>
+  </article>
+</div>

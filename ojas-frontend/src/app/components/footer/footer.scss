@@ -150,6 +150,26 @@
   .heart {
     color: #999;
   }
+
+  .footer-policies {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    // Column gap carries the visual separation; row gap only matters once these wrap onto
+    // two lines on a narrow phone.
+    gap: 6px 20px;
+    margin-bottom: 12px;
+
+    a {
+      color: #555;
+      font-weight: 500;
+
+      &:hover {
+        color: var(--ojas-ink);
+        text-decoration: underline;
+      }
+    }
+  }
 }
 
 @media (max-width: 768px) {

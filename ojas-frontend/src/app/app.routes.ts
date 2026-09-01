@@ -77,6 +77,29 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/about/about').then((m) => m.About),
     canActivate: [storefrontGuard],
   },
+  // Policy pages. Deliberately unguarded - a payment gateway's compliance reviewer opens these
+  // signed out, and a customer must be able to read the refund policy without an account. One
+  // component serves all four; `slug` selects the content (see legal-content.ts).
+  {
+    path: 'contact',
+    loadComponent: () => import('./pages/legal/legal').then((m) => m.Legal),
+    data: { slug: 'contact' },
+  },
+  {
+    path: 'terms',
+    loadComponent: () => import('./pages/legal/legal').then((m) => m.Legal),
+    data: { slug: 'terms' },
+  },
+  {
+    path: 'refunds',
+    loadComponent: () => import('./pages/legal/legal').then((m) => m.Legal),
+    data: { slug: 'refunds' },
+  },
+  {
+    path: 'privacy',
+    loadComponent: () => import('./pages/legal/legal').then((m) => m.Legal),
+    data: { slug: 'privacy' },
+  },
   {
     path: 'admin',
     loadComponent: () =>

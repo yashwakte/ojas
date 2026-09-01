@@ -1,0 +1,113 @@
+// Deliberately plain and text-first: these pages are read by customers looking for one specific
+// answer and by compliance reviewers checking the pages exist and say something real. Both are
+// served better by a comfortable measure and clear hierarchy than by decoration.
+
+.legal-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 20px 72px;
+}
+
+.legal-card {
+  background: #fff;
+  border: 1px solid #ece5dd;
+  border-radius: 18px;
+  padding: 40px;
+}
+
+.legal-head {
+  border-bottom: 1px solid #f0eae2;
+  padding-bottom: 24px;
+  margin-bottom: 8px;
+
+  h1 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    line-height: 1.2;
+    color: var(--ojas-text);
+    margin: 0 0 8px;
+  }
+}
+
+.legal-updated {
+  font-size: 0.85rem;
+  color: var(--ojas-text-light);
+  margin: 0 0 16px;
+}
+
+.legal-intro {
+  font-size: 1.02rem;
+  line-height: 1.7;
+  color: var(--ojas-text);
+  margin: 0;
+}
+
+.legal-section {
+  margin-top: 32px;
+
+  h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    // Comfortably larger than body text without competing with the page title.
+    font-size: 1.15rem;
+    color: var(--ojas-ink);
+    margin: 0 0 10px;
+  }
+
+  p {
+    // 1.75 rather than the usual 1.6: these are long, dense paragraphs and the extra leading is
+    // what keeps a full-width line from being hard to track back from.
+    line-height: 1.75;
+    color: var(--ojas-text);
+    margin: 0 0 12px;
+  }
+
+  ul {
+    margin: 0 0 12px;
+    padding-left: 22px;
+  }
+
+  li {
+    line-height: 1.75;
+    color: var(--ojas-text);
+    margin-bottom: 8px;
+  }
+}
+
+.legal-foot {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #f0eae2;
+
+  p {
+    font-size: 0.9rem;
+    color: var(--ojas-text-light);
+    margin: 0;
+    line-height: 1.7;
+  }
+
+  a {
+    color: var(--ojas-ink);
+    font-weight: 600;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .legal-page {
+    padding: 24px 14px 56px;
+  }
+
+  .legal-card {
+    padding: 24px 20px;
+    border-radius: 14px;
+  }
+
+  .legal-head h1 {
+    font-size: 1.6rem;
+  }
+}
