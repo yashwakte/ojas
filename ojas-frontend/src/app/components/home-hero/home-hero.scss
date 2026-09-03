@@ -485,21 +485,25 @@
   // away three quarters of the width — ten of the eighteen packs and both ends of the headline —
   // so the picture keeps its own shape and the copy sits directly beneath it.
   //
-  // The hero is sized to its CONTENT here, not to the screen. Stretching it to the full viewport
-  // was tried and was wrong: a 1.835:1 poster in a 0.5:1 window fills a fifth of the height, so
-  // the other four fifths became an empty out-of-focus field with the artwork marooned in the
-  // middle of it. Snug is better than full on a phone — the second the poster is surrounded by
-  // dead space the page reads as broken rather than immersive. The cap is "what the poster needs
-  // at this width, plus the copy", and the viewport is only the upper bound.
+  // The hero is sized to its CONTENT here — no declared height at all.
   //
-  // That upper bound subtracts the bottom navigation as well as the header: the nav is fixed
-  // over the page, so a hero measured against the raw viewport has its last 66px permanently
-  // covered. Fitting in the viewport is not the same as not being underneath something.
+  // Two earlier attempts both left dead space. Stretching it to the viewport marooned the poster
+  // in an empty field. Capping it at "the poster plus 230px" was closer but still a guess: the
+  // copy underneath is nowhere near 230px tall, so the difference showed up as a band of empty
+  // wash above the artwork and a bigger one below the trust line — which is exactly what it
+  // looked like, a hero with holes at both ends.
+  //
+  // `auto` cannot be wrong. The section is the poster plus the buttons plus their padding, and a
+  // phone screen is the one place where every wasted pixel is a pixel of product the shopper has
+  // to scroll past. Nothing here needs the viewport's height, so nothing asks for it.
   .hero {
-    height: min(
-      calc(100svh - 64px - var(--ojas-bottom-nav-clearance)),
-      calc(100vw / 1.835 + 230px)
-    );
+    height: auto;
+  }
+
+  // With no spare height there is nothing to centre, and `justify-content: center` on a stage
+  // that exactly fits its children would only reintroduce rounding gaps.
+  .hero-stage {
+    justify-content: flex-start;
   }
 
   .hero-art {

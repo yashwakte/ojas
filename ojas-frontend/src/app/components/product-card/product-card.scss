@@ -60,8 +60,20 @@
   cursor: pointer;
 }
 
+// 3:2, AND `contain` — matching the canvas the pack shots are written on by
+// tools/import-product-shots.mjs, so the whole pack is always visible with only a sliver of the
+// card's own wash at the sides.
+//
+// This well used to be a fixed 92px tall in a card about 170px wide, with `object-fit: cover`
+// over a square 1000x1000 studio photo. Cover scaled the pouch to the card's width and then cut
+// its top and bottom off, so every card showed a middle band with the brand mark above the crop
+// and the net weight below it — the packs looked enormously zoomed in.
+//
+// The aspect-ratio also replaces the three fixed heights that were set per breakpoint, so the
+// frame keeps its shape as the card grows instead of getting steadily wider and cropping harder
+// the bigger the screen.
 .pimg {
-  height: 92px;
+  aspect-ratio: 3 / 2;
   position: relative;
   overflow: hidden;
   // A warm tinted wash rather than flat grey. Pack shots are photographed on white, so a neutral
@@ -72,7 +84,7 @@
   img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
@@ -261,20 +273,12 @@
 }
 
 @media (min-width: 640px) {
-  .pimg {
-    height: 150px;
-  }
-
   .pbody-top h3 {
     font-size: 0.85rem;
   }
 }
 
 @media (min-width: 960px) {
-  .pimg {
-    height: 200px;
-  }
-
   .pbody {
     padding: 14px 16px;
   }

@@ -111,9 +111,11 @@
   cursor: zoom-in;
 
   img {
+    // `contain`: the pack shots are cut out on transparency at 3:2 and the whole product
+    // has to stay in frame. Cover cropped the top and bottom off every pouch.
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
     transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
     -webkit-user-drag: none;
@@ -296,9 +298,11 @@
   transition: border-color 0.2s ease;
 
   img {
+    // `contain`: the pack shots are cut out on transparency at 3:2 and the whole product
+    // has to stay in frame. Cover cropped the top and bottom off every pouch.
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
   }
 
@@ -1028,9 +1032,11 @@
   background: #f5f5f5;
 
   img {
+    // `contain`: the pack shots are cut out on transparency at 3:2 and the whole product
+    // has to stay in frame. Cover cropped the top and bottom off every pouch.
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }

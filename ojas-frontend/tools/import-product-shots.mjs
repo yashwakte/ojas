@@ -14,6 +14,7 @@
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { cutout } from './lib/cutout.mjs';
 
 let sharp;
 try {
@@ -25,8 +26,23 @@ try {
 
 const SRC = process.env.OJAS_SHOTS ?? 'C:/Users/Yash Wakte/Downloads/Images';
 const OUT = path.join(import.meta.dirname, '..', 'public', 'images');
-const SIZE = 1000;
-const QUALITY = 80;
+
+// 3:2 landscape with an alpha channel, close to the shape of a product card's image well so
+// `object-fit: contain` leaves only a sliver at the sides.
+//
+// The first cut of this import wrote 1000x1000 squares straight from the client's files and it
+// was wrong twice over. Square art in a 3:2 well meant `cover` cropped about half the height
+// away, so every card showed the middle band of a pouch with its brand mark and its net weight
+// both sliced off. And each one carried the studio's grey gradient, which on a warm cream page
+// reads as a grey box behind the product rather than as a photograph of it.
+//
+// So the backdrop is keyed out and the pack is placed on transparency: the card's own wash shows
+// through, nothing is cropped, and one product sits at the same scale as the next.
+const CANVAS_W = 1200;
+const CANVAS_H = 800;
+/** Leaves the pack a little air rather than letting it touch the edges of the well. */
+const PACK_H = Math.round(CANVAS_H * 0.9);
+const QUALITY = 82;
 
 /** slug -> [front file, back file] */
 const SHOTS = {
@@ -68,12 +84,22 @@ for (const [slug, [front, back]] of Object.entries(SHOTS)) {
       continue;
     }
     const output = path.join(OUT, `${slug}-${face}.webp`);
-    // `contain` on white rather than `cover`: these are pack shots, and cropping a square photo
-    // of a tall pouch to fill a square frame slices the top and bottom off the packaging — the
-    // brand mark on one end and the net weight on the other.
-    await sharp(source)
-      .resize(SIZE, SIZE, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
-      .webp({ quality: QUALITY })
+
+    // Keyed off the studio backdrop and trimmed to the product, then centred on the canvas. The
+    // pack is sized by HEIGHT so a tall pouch and a squat custard box end up looking like they
+    // were photographed for the same catalogue instead of at two different distances.
+    const { data: pack } = await cutout(sharp, source, { targetHeight: PACK_H });
+
+    await sharp({
+      create: {
+        width: CANVAS_W,
+        height: CANVAS_H,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite([{ input: pack, gravity: 'center' }])
+      .webp({ quality: QUALITY, alphaQuality: 100 })
       .toFile(output);
     written++;
   }
