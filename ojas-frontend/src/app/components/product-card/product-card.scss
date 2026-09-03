@@ -1,19 +1,55 @@
+@use '../../styles/liquid-glass' as glass;
+
 :host {
   display: flex;
   flex-direction: column;
   background: #fff;
-  border-radius: 16px;
+  border-radius: var(--ojas-radius);
   overflow: hidden;
-  box-shadow: 0 3px 14px rgba(45, 27, 15, 0.07);
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  // A hairline border is what makes a card read as a defined surface rather than a shadow smudge.
+  // It is the single biggest difference between this and the flat white rectangle it replaced,
+  // and it is what keeps the card legible on a cream page where a shadow alone almost vanishes.
+  border: 1px solid var(--ojas-border);
+  box-shadow: var(--ojas-shadow-sm);
+  transition:
+    transform var(--ojas-transition),
+    box-shadow var(--ojas-transition),
+    border-color var(--ojas-transition);
 
   &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 14px 32px rgba(45, 27, 15, 0.14);
+    // A shorter lift than before. Big travel on hover reads as bounce; a few pixels reads as the
+    // card acknowledging the pointer.
+    transform: translateY(-3px);
+    border-color: rgba(242, 90, 26, 0.28);
+    // The ring is drawn with a spread shadow rather than a border so it cannot shift layout by
+    // even a pixel on hover - a border that appears on hover nudges everything inside it.
+    box-shadow:
+      0 0 0 3px rgba(242, 90, 26, 0.09),
+      var(--ojas-shadow-md);
 
     .pimg img {
-      transform: scale(1.06);
+      transform: scale(1.04);
     }
+  }
+
+  &:focus-within {
+    border-color: rgba(242, 90, 26, 0.4);
+    box-shadow:
+      0 0 0 3px rgba(242, 90, 26, 0.16),
+      var(--ojas-shadow-md);
+  }
+}
+
+// A card that lifts on every hover is motion for its own sake to someone who asked for less of it.
+@media (prefers-reduced-motion: reduce) {
+  :host,
+  :host:hover {
+    transform: none;
+    transition: box-shadow 120ms linear, border-color 120ms linear;
+  }
+
+  .pimg img {
+    transition: none;
   }
 }
 
@@ -28,7 +64,10 @@
   height: 92px;
   position: relative;
   overflow: hidden;
-  background: #f5f5f5;
+  // A warm tinted wash rather than flat grey. Pack shots are photographed on white, so a neutral
+  // grey behind them makes the product look like it is floating on nothing; a faint warm gradient
+  // sits the product in the page and matches the rest of the palette.
+  background: linear-gradient(160deg, #fdf8f3 0%, #f6efe7 100%);
 
   img {
     width: 100%;
@@ -154,7 +193,7 @@
   justify-content: center;
   gap: 3px;
   padding: 7px 4px;
-  background: var(--ojas-orange);
+  background: var(--ojas-orange-glass);
   color: #fff;
   border: none;
   border-radius: 9px;
@@ -163,6 +202,9 @@
   font-size: 0.62rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  // A lighter specular than the full-size buttons carry. These sit about 28px tall, and a sheen
+  // tuned for a 48px button covers most of a small one rather than just its top edge.
+  @include glass.button('light', 0.18);
 
   mat-icon {
     font-size: 13px;
@@ -171,16 +213,16 @@
   }
 
   &:hover {
-    background: var(--ojas-orange-dark);
+    background: var(--ojas-orange-glass-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(242, 90, 26, 0.28);
+    box-shadow: var(--ojas-shadow-orange);
   }
 
   &.added {
-    background: #4caf50;
+    background: linear-gradient(180deg, #56b95b 0%, #43a047 58%, #388e3c 100%);
 
     &:hover {
-      background: #388e3c;
+      background: linear-gradient(180deg, #4aa94f 0%, #3c9440 58%, #2f7d33 100%);
     }
   }
 }
@@ -191,15 +233,18 @@
   justify-content: center;
   gap: 3px;
   padding: 7px 4px;
-  background: transparent;
-  color: var(--ojas-orange);
-  border: 1.5px solid var(--ojas-orange);
+  // A peach panel, matching the same pairing on the product detail page. A solid charcoal fill
+  // at this small size read as a plain black pill rather than glass.
+  background: linear-gradient(180deg, #ffe6d8 0%, #ffcdae 100%);
+  color: #c0430a;
+  border: 1px solid rgba(207, 68, 9, 0.4);
   border-radius: 9px;
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
   font-size: 0.62rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  @include glass.button('dark', 0.28);
 
   mat-icon {
     font-size: 13px;
@@ -208,10 +253,10 @@
   }
 
   &:hover {
-    background: var(--ojas-orange);
-    color: #fff;
+    background: linear-gradient(180deg, #ffd9c2 0%, #ffb98e 100%);
+    border-color: rgba(207, 68, 9, 0.55);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(242, 90, 26, 0.28);
+    box-shadow: var(--ojas-shadow-orange);
   }
 }
 

@@ -22,6 +22,7 @@ public class OrdersController : ControllerBase
     private readonly WalletService _walletService;
     private readonly OrderPaymentOutcomeService _paymentOutcome;
     private readonly OrderCancellationService _cancellation;
+    private readonly OrderStatusEmailService _statusEmail;
     private readonly ILogger<OrdersController> _logger;
 
     // Cash on Delivery was retired - every new order is paid online. Orders already stored with
@@ -40,6 +41,7 @@ public class OrdersController : ControllerBase
         WalletService walletService,
         OrderPaymentOutcomeService paymentOutcome,
         OrderCancellationService cancellation,
+        OrderStatusEmailService statusEmail,
         ILogger<OrdersController> logger)
     {
         _orderService = orderService;
@@ -50,6 +52,7 @@ public class OrdersController : ControllerBase
         _walletService = walletService;
         _paymentOutcome = paymentOutcome;
         _cancellation = cancellation;
+        _statusEmail = statusEmail;
         _logger = logger;
     }
 
@@ -792,6 +795,11 @@ public class OrdersController : ControllerBase
         if (!outcome.Cancelled)
             return Ok(new CancelOrderResponse(0m, 0m, outcome.Order?.ToResponse()));
 
+        // The customer already knows - they just pressed Cancel - but the email is the written
+        // record of what was handed back and where, which is the part they will want later.
+        if (outcome.Order != null)
+            await _statusEmail.SendStatusUpdateAsync(outcome.Order, "Cancelled");
+
         return Ok(new CancelOrderResponse(
             outcome.WalletCredited, outcome.SourceRefundQueued, outcome.Order?.ToResponse()));
     }
@@ -860,9 +868,16 @@ public class OrdersController : ControllerBase
                 orderId, CancellationInitiator.Admin, RefundDestinations.Source);
 
             if (outcome.Cancelled)
+            {
                 _logger.LogInformation(
                     "Admin {AdminId} cancelled order {OrderId}.",
                     User.FindFirstValue(ClaimTypes.NameIdentifier), orderId);
+
+                // After the cancellation has actually happened, never before - the email must not
+                // be able to tell a customer something the database does not say.
+                if (outcome.Order != null)
+                    await _statusEmail.SendStatusUpdateAsync(outcome.Order, "Cancelled");
+            }
 
             return Ok(new AdminStatusChangeResponse(
                 outcome.Order?.ToResponse(),
@@ -877,6 +892,12 @@ public class OrdersController : ControllerBase
             return NotFound(new { message = "Order not found." });
 
         var refreshed = await _orderService.GetOrderByIdAsync(orderId);
+
+        // Sent from the refreshed order so the email reports what was actually written, and only
+        // for statuses the customer can act on - SendStatusUpdateAsync decides that for itself.
+        if (refreshed != null)
+            await _statusEmail.SendStatusUpdateAsync(refreshed, normalizedStatus);
+
         return Ok(new AdminStatusChangeResponse(refreshed?.ToResponse(), 0m, 0m, 0m, null));
     }
 
@@ -977,6 +998,10 @@ public class OrdersController : ControllerBase
         var updated = await _orderService.UpdateOrderStatusAsync(orderId, "Delivered");
         if (!updated)
             return NotFound(new { message = "Order not found." });
+
+        // The early return above means this fires once, on the transition, not on every repeat tap
+        // of a partner's "mark delivered" button.
+        await _statusEmail.SendStatusUpdateAsync(order, "Delivered");
 
         return NoContent();
     }

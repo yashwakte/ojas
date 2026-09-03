@@ -92,7 +92,7 @@
       border: 1px solid rgba(242, 90, 26, 0.15);
       border-bottom: none;
       padding: 6px 6px 0;
-      box-shadow: 0 4px 20px rgba(242, 90, 26, 0.08);
+      box-shadow: var(--ojas-shadow-orange);
       margin-bottom: -1px;
 
       .mat-mdc-tab-list {
@@ -133,7 +133,7 @@
         &.mdc-tab--active {
           background: var(--ojas-orange);
           color: #fff;
-          box-shadow: 0 4px 16px rgba(242, 90, 26, 0.35);
+          box-shadow: var(--ojas-shadow-orange);
 
           .mdc-tab__text-label {
             color: #fff;

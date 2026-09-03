@@ -157,6 +157,15 @@
       @if (isCustomerArea()) {
         <a routerLink="/" (click)="toggleMenu()">Home</a>
         <a routerLink="/products" (click)="toggleMenu()">Products</a>
+        <!-- Categories used to be a tab in the bottom bar. It lives here now, because the sheet
+             it opens is the only way to browse by category on a phone and dropping the tab
+             without rehoming it would have stranded that whole route. -->
+        <a (click)="openCategoriesFromMenu()">
+          <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
+            >category</mat-icon
+          >
+          Shop by Category
+        </a>
         <a routerLink="/about" (click)="toggleMenu()">About Us</a>
         <a (click)="openChatSupport()">
           <mat-icon style="font-size: 1rem; vertical-align: middle; margin-right: 6px"
@@ -231,19 +240,22 @@
 <!-- Mobile-only fast-track bottom nav: one tap to every core destination, no hamburger needed -->
 @if (isCustomerArea()) {
   <nav class="mobile-bottom-nav" aria-label="Shop navigation">
+    <!-- Home leads: it is the one destination a shopper reaches for to start over, and it was
+         the only core route missing from the bar. Categories moved to the drawer to make room —
+         the home page already opens onto a category strip, so it was the least-used of the five. -->
+    <a
+      routerLink="/"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="bottom-nav-btn"
+    >
+      <mat-icon>home</mat-icon>
+      <span>Home</span>
+    </a>
     <a routerLink="/products" routerLinkActive="active" class="bottom-nav-btn">
       <mat-icon>grid_view</mat-icon>
       <span>Products</span>
     </a>
-    <button
-      type="button"
-      class="bottom-nav-btn"
-      [class.active]="categoriesSheetOpen()"
-      (click)="toggleCategoriesSheet()"
-    >
-      <mat-icon>category</mat-icon>
-      <span>Categories</span>
-    </button>
     <a routerLink="/cart" routerLinkActive="active" class="bottom-nav-btn" [class.cart-bounce]="cartBounce()">
       <span class="bottom-nav-icon">
         <mat-icon>shopping_cart</mat-icon>

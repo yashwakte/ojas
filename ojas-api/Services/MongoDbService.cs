@@ -32,6 +32,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
     public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
     public IMongoCollection<MediaAsset> MediaAssets => _database.GetCollection<MediaAsset>("media_assets");
+    public IMongoCollection<AppMigration> AppMigrations => _database.GetCollection<AppMigration>("app_migrations");
 
     private void TryEnsureIndexes()
     {

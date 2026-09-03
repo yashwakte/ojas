@@ -32,6 +32,7 @@ export class GuestWelcome {
 
   private readonly timers: ReturnType<typeof setTimeout>[] = [];
   private scheduled = false;
+  private holding = false;
 
   protected readonly open = signal(false);
   protected readonly closing = signal(false);
@@ -43,10 +44,18 @@ export class GuestWelcome {
       if (!this.shouldGreet()) return;
 
       this.scheduled = true;
+      // Claimed here rather than in reveal(): between deciding to greet and actually appearing
+      // there is most of a second, and that is precisely long enough for the home page's hero
+      // to start its own entrance underneath the dialog that is about to cover it.
+      this.holding = true;
+      this.welcome.holdStage();
       this.timers.push(setTimeout(() => this.reveal(), REVEAL_DELAY_MS));
     });
 
-    this.destroyRef.onDestroy(() => this.timers.forEach(clearTimeout));
+    this.destroyRef.onDestroy(() => {
+      this.timers.forEach(clearTimeout);
+      if (this.holding) this.welcome.releaseStage();
+    });
   }
 
   protected close(): void {
@@ -57,8 +66,16 @@ export class GuestWelcome {
         this.dialogRef()?.nativeElement.close();
         this.open.set(false);
         this.closing.set(false);
+        this.release();
       }, CLOSE_MS),
     );
+  }
+
+  /** Idempotent — the greeting can be stood down before it ever opens. */
+  private release(): void {
+    if (!this.holding) return;
+    this.holding = false;
+    this.welcome.releaseStage();
   }
 
   protected onBackdropClick(event: MouseEvent): void {
@@ -86,7 +103,10 @@ export class GuestWelcome {
     // signal, which flips during a sign-out while the navigation to /login is still pending, so
     // the URL it read was the page being left. Without this, a modal dialog opens on top of the
     // sign-in form and silently swallows every click on it.
-    if (!this.shouldGreet()) return;
+    if (!this.shouldGreet()) {
+      this.release();
+      return;
+    }
 
     this.welcome.markVisited();
     this.open.set(true);

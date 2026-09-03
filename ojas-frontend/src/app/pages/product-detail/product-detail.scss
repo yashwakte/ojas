@@ -1,3 +1,5 @@
+@use '../../styles/liquid-glass' as glass;
+
 .product-detail-page {
   min-height: 80vh;
   padding-top: 80px;
@@ -257,7 +259,7 @@
   font-size: 0.75rem;
   font-weight: 700;
   z-index: 2;
-  box-shadow: 0 4px 16px rgba(242, 90, 26, 0.4);
+  box-shadow: var(--ojas-shadow-orange);
 }
 
 .out-of-stock-badge {
@@ -715,6 +717,7 @@
   border-radius: 14px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  @include glass.press;
 
   mat-icon {
     font-size: 22px;
@@ -729,30 +732,42 @@
 }
 
 .detail-add-cart-btn {
-  background: var(--ojas-orange);
+  // Same glass treatment as the home page's primary call to action, from the same mixin, so
+  // the two pages cannot drift into looking like two different products.
+  background: var(--ojas-orange-glass);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(242, 90, 26, 0.3);
+  box-shadow: var(--ojas-shadow-orange);
+  @include glass.surface('light', 0.26);
+  @include glass.focus-ring;
 
   &:hover:not(:disabled) {
-    background: var(--ojas-orange-dark);
-    box-shadow: 0 6px 24px rgba(242, 90, 26, 0.4);
+    filter: brightness(1.06);
+    box-shadow: var(--ojas-shadow-orange);
     transform: translateY(-2px);
   }
 
   &.added {
-    background: #2e7d32;
+    background: linear-gradient(180deg, #3a9040 0%, #2e7d32 58%, #266b2a 100%);
     box-shadow: 0 4px 16px rgba(46, 125, 50, 0.3);
   }
 }
 
 .detail-buy-now-btn {
-  background: transparent;
-  color: var(--ojas-orange);
-  border: 2px solid var(--ojas-orange);
+  // A peach panel, not the charcoal it briefly became - a solid-dark fill on this button read
+  // as "gone black" rather than "more defined". Presence next to the saturated Add to Cart
+  // button comes from a deeper tint and the richened dark rim, not from blacking out the fill.
+  background: linear-gradient(180deg, #ffe6d8 0%, #ffcdae 100%);
+  color: #c0430a;
+  border: 1px solid rgba(207, 68, 9, 0.4);
+  box-shadow: 0 1px 2px rgba(180, 60, 10, 0.1), 0 8px 18px -10px rgba(207, 68, 9, 0.35);
+  @include glass.surface('dark', 0.32);
+  @include glass.focus-ring;
 
   &:hover:not(:disabled) {
-    background: var(--ojas-orange-bg);
+    background: linear-gradient(180deg, #ffd9c2 0%, #ffb98e 100%);
+    border-color: rgba(207, 68, 9, 0.55);
     transform: translateY(-2px);
+    box-shadow: var(--ojas-shadow-orange);
   }
 }
 

@@ -23,7 +23,7 @@
       type="image/webp"
       href="/images/hero-banner-1280.webp"
       imagesrcset="/images/hero-banner-640.webp 640w, /images/hero-banner-960.webp 960w, /images/hero-banner-1280.webp 1280w, /images/hero-banner-1600.webp 1600w"
-      imagesizes="(min-width: 901px) min(92vw, 1020px), 100vw"
+      imagesizes="100vw"
       fetchpriority="high"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -42,9 +42,8 @@
     />
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    <!-- Styles the pre-boot shell and the noscript fallback. Inline rather than in the stylesheet
-         because the app's CSS is a separate request that a reader with no JavaScript may never
-         make, and because this needs to be painted before that stylesheet arrives anyway. -->
+    <!-- Styles the noscript fallback only. Inline rather than in the stylesheet because the app's
+         CSS is a separate request that a reader with no JavaScript will never make. -->
     <style>
       .boot-shell {
         max-width: 640px;
@@ -61,14 +60,6 @@
         font-weight: 700;
         margin-bottom: 8px;
       }
-      .boot-name {
-        font-weight: 600;
-        margin: 0 0 12px;
-      }
-      .boot-desc {
-        color: #6b5d54;
-        font-size: 0.95rem;
-      }
       .boot-shell h1 {
         font-size: 1.4rem;
       }
@@ -78,24 +69,22 @@
     </style>
   </head>
   <body>
-    <!-- Content inside app-root shows until Angular boots, then is replaced. It is also the only
-         content present in the HTML as served, so it is what any client that does not execute
-         JavaScript sees: crawlers, link previewers, compliance checks. Kept short, since a real
-         visitor sees it briefly before the app takes over. -->
-    <app-root>
-      <div class="boot-shell">
-        <span class="boot-logo">ओजस</span>
-        <p class="boot-name">Ojas — शुद्ध आहार...शुद्ध विचार</p>
-        <p class="boot-desc">
-          Stone-ground flours and traditional food products, milled and packed in Pune by Asha
-          Marketing. Loading the shop…
-        </p>
-      </div>
-    </app-root>
+    <!-- Deliberately empty. An earlier version put the business description inside app-root, where
+         it rendered as a wall of unstyled text for the few hundred milliseconds before Angular
+         booted - a poor first impression on every single visit.
+
+         The noscript block below achieves the same thing without that cost. Its content is present
+         in the HTML as served, so anything that does not execute JavaScript still reads it -
+         crawlers, link previewers, and the payment gateway's compliance check that previously
+         rejected this domain as "inactive / not live" for having a literally empty body. A browser
+         with JavaScript on never renders it, so a real customer sees only the app.
+
+         Do not "simplify" this away: without it the served HTML has zero visible text again. -->
+    <app-root></app-root>
 
     <noscript>
       <div class="boot-shell">
-        <span class="boot-logo">ओजस</span>
+        <span class="boot-logo">ओजस्</span>
         <h1>Ojas — pure flours and traditional food products</h1>
         <p>
           Ojas is an online shop selling stone-ground atta, millet flours, besan, daliya and

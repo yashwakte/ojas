@@ -58,7 +58,20 @@ body {
 @media (max-width: 900px) {
   app-header.customer-area ~ .main-content,
   app-header.customer-area ~ app-footer {
-    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--ojas-bottom-nav-clearance);
+  }
+
+  // The cart pins a second bar above that navigation, and the footer knew nothing about it - so
+  // its last band, which carries the copyright, the "Ojas is a brand of Asha Marketing" line and
+  // the four policy links, sat underneath that bar with no way to scroll it into view. That band
+  // is what a customer looks for to find Contact or Refunds, and what a payment provider's
+  // compliance review checks for, so it cannot be unreachable on the one page a customer is most
+  // likely to be on when they go looking for it.
+  //
+  // Keyed off the bar actually being in the page rather than off the route, so any future page
+  // that pins a `.cart-bar` gets the clearance without anyone remembering to add it.
+  app-header.customer-area ~ .main-content:has(.cart-bar) ~ app-footer {
+    padding-bottom: calc(var(--ojas-bottom-nav-clearance) + var(--ojas-cart-bar-h));
   }
 }
 
@@ -96,13 +109,62 @@ mat-icon.mat-badge {
   --ojas-white: #ffffff;
   --ojas-text: #2d2d2d;
   --ojas-text-light: #6b6b6b;
-  --ojas-border: #e0e0e0;
-  --ojas-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --ojas-shadow-md: 0 8px 30px rgba(0, 0, 0, 0.08);
-  --ojas-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12);
-  --ojas-shadow-orange: 0 8px 30px rgba(242, 90, 26, 0.2);
-  --ojas-radius: 20px;
-  --ojas-radius-lg: 28px;
+  --ojas-border: #e7e2dc;
+
+  // Shadows are layered - a hairline contact shadow plus a wide soft one - rather than a single
+  // large blur. One big blur reads as a sticker floating over the page; two layers read as a
+  // surface resting on it, which is what makes a card feel solid rather than decorative.
+  // Deliberately much lighter than before: depth should be felt, not seen.
+  --ojas-shadow-sm: 0 1px 2px rgba(24, 18, 14, 0.05);
+  --ojas-shadow-md: 0 1px 2px rgba(24, 18, 14, 0.05), 0 6px 16px -6px rgba(24, 18, 14, 0.1);
+  --ojas-shadow-lg: 0 1px 3px rgba(24, 18, 14, 0.06), 0 14px 32px -12px rgba(24, 18, 14, 0.14);
+  // Kept for the primary CTA only. A coloured glow on every raised surface is what dates an
+  // interface fastest, so this is no longer used as a general elevation.
+  --ojas-shadow-orange: 0 1px 2px rgba(180, 60, 10, 0.16), 0 8px 20px -8px rgba(242, 90, 26, 0.4);
+  --ojas-shadow-ink: 0 1px 2px rgba(20, 16, 12, 0.24), 0 8px 20px -8px rgba(20, 16, 12, 0.5);
+
+  // The two fills every liquid-glass button is built from (see app/styles/_liquid-glass.scss).
+  // They live here as tokens rather than being written out on each page because six surfaces use
+  // them - home, product detail, the product card, the cart, its phone action bar and checkout -
+  // and a primary button that is a slightly different orange on one of them is the kind of thing
+  // nobody reports and everybody notices.
+  //
+  // Both are gradients rather than flat colour: the rim is meant to look like light bending
+  // through a curved edge, and a flat fill gives it nothing to bend.
+  // Deepened at the user's request - the first pass read as too bright/light for the display.
+  --ojas-orange-glass: linear-gradient(180deg, #e35a1e 0%, #d1480a 52%, #b53900 100%);
+  --ojas-orange-glass-hover: linear-gradient(180deg, #ea6428 0%, #d94f0f 52%, #bd3f02 100%);
+  // Ink, kept only for the one button that was already this dark before liquid glass existed
+  // (cart's empty-state "Explore Products", previously flat var(--ojas-ink)) - every glass
+  // secondary button reverted to a light panel instead, per the same feedback: a solid-charcoal
+  // fill read as "the background went black", when what was wanted was a darker *rim*, not a
+  // darker button.
+  --ojas-ink-glass: linear-gradient(180deg, #3a3630 0%, #262219 55%, #17140f 100%);
+  --ojas-ink-glass-hover: linear-gradient(180deg, #474239 0%, #322c22 55%, #201c15 100%);
+
+  // Tightened from 20px/28px. Large radii on large surfaces read as soft and consumer-toy;
+  // a smaller, consistent radius reads as considered. Kept as one scale so a button inside a
+  // card is visibly a smaller version of the same shape rather than an unrelated pill.
+  --ojas-radius-sm: 8px;
+  --ojas-radius: 14px;
+  --ojas-radius-lg: 18px;
+
+  // One easing for everything that moves. Motion should feel like the same hand drew it, and a
+  // single curve is what makes a hover, a sheet and a page transition feel related.
+  --ojas-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ojas-transition: 180ms var(--ojas-ease);
+
+  // The mobile bottom navigation's height, and the clearance anything fixed above it needs.
+  // These were previously written out by hand in two places that disagreed by 4px - the cart's
+  // checkout bar cleared 62px while page content padded for 66px, so the bar sat jammed into the
+  // navigation. Anything that needs to sit above the nav must read these rather than restate them.
+  --ojas-bottom-nav-h: 66px;
+  --ojas-bottom-nav-clearance: calc(var(--ojas-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+
+  // The cart's phone action bar, which is fixed directly above the bottom navigation. Anything
+  // that has to clear the whole stack - the cart page itself, and the footer below it - reads
+  // this rather than restating a number.
+  --ojas-cart-bar-h: 72px;
 
   // Neutral ink tones — used for nav, icons, badges, and other UI that
   // shouldn't compete with the brand orange reserved for cart/CTA actions.
@@ -262,17 +324,24 @@ body.intro-locked {
 // Paired with the ScrollRevealDirective ([appScrollReveal]) — an element
 // starts faded/offset and settles into place the first time it scrolls
 // into view.
+// The element starts pushed back and tipped away from the viewer, then rotates upright and
+// comes forward as it enters. A flat translateY fade is the animation every template ships
+// with; adding the rotateX and the push back on the Z axis costs the same single composited
+// transform and is the difference between content sliding up a page and content standing up
+// off it. The perspective lives in the transform itself rather than on a parent, so any
+// element anywhere can carry the class without its ancestors needing to know.
 .reveal {
   opacity: 0;
-  transform: translateY(28px);
+  transform: perspective(1200px) translate3d(0, 34px, -60px) rotateX(7deg) scale(0.975);
+  transform-origin: 50% 100%;
   transition:
-    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 .reveal-visible {
   opacity: 1;
-  transform: none;
+  transform: perspective(1200px) translate3d(0, 0, 0) rotateX(0deg) scale(1);
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal {
@@ -291,9 +360,18 @@ body.intro-locked {
 }
 
 // ===== SELECTION =====
+// A 15% wash of the text colour was effectively invisible - a customer dragging over a phone
+// number or an order id could not see what they had actually caught, which matters most on the
+// exact things people select in order to copy. Selection is feedback, so it is opaque and
+// high-contrast: brand tone behind, white on top.
 ::selection {
-  background: rgba(45, 45, 45, 0.15);
-  color: var(--ojas-text);
+  background: #d14500;
+  color: #fff;
+}
+
+::-moz-selection {
+  background: #d14500;
+  color: #fff;
 }
 
 // mat-select's option panel renders in a CDK overlay attached to <body>,
@@ -302,10 +380,21 @@ body.intro-locked {
 // (buttons, cards) show through.
 .mat-mdc-select-panel {
   background-color: #fff !important;
+  // A dropdown is a surface floating over the page, so it gets the same hairline-plus-soft-shadow
+  // treatment as every other raised surface rather than Material's default hard drop shadow.
+  border: 1px solid var(--ojas-border);
+  border-radius: var(--ojas-radius) !important;
+  box-shadow: var(--ojas-shadow-lg) !important;
+  padding: 4px !important;
 }
 
 .mat-mdc-option {
   background-color: #fff;
+  // Inset rounded rows rather than full-bleed bars - the row now reads as an item inside the
+  // panel, which is what makes a modern menu feel considered instead of like a list box.
+  border-radius: var(--ojas-radius-sm) !important;
+  min-height: 42px !important;
+  transition: background-color 120ms var(--ojas-ease);
 
   &.mdc-list-item--selected:not(.mat-mdc-option-multiple) {
     background-color: var(--ojas-orange-bg) !important;
@@ -313,6 +402,48 @@ body.intro-locked {
 
   &:hover:not(.mdc-list-item--disabled) {
     background-color: var(--ojas-ink-bg);
+  }
+}
+
+// ===== Buttons =====
+// Material's filled and outlined buttons keep their own radius and a hard elevation shadow. These
+// pull both onto the shared scale so a button, a card and a dropdown are visibly the same family,
+// and add the small press feedback that makes a control feel physical.
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-outlined-button,
+.mat-mdc-button {
+  border-radius: var(--ojas-radius-sm) !important;
+  letter-spacing: 0 !important;
+  transition:
+    transform var(--ojas-transition),
+    box-shadow var(--ojas-transition),
+    background-color var(--ojas-transition) !important;
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+}
+
+.mat-mdc-outlined-button:not(:disabled) {
+  border-color: var(--ojas-border) !important;
+}
+
+// Text fields pick up the same radius so an input and the button beside it agree.
+.mat-mdc-form-field .mdc-text-field--outlined {
+  --mdc-outlined-text-field-container-shape: var(--ojas-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mat-mdc-raised-button,
+  .mat-mdc-unelevated-button,
+  .mat-mdc-outlined-button,
+  .mat-mdc-button {
+    transition: background-color 120ms linear !important;
+
+    &:active:not(:disabled) {
+      transform: none;
+    }
   }
 }
 

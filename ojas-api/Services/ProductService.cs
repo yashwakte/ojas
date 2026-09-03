@@ -14,6 +14,13 @@ public record StockResult(bool Success, string? ProductName = null, int Availabl
 
 public class ProductService
 {
+    /// <summary>
+    /// Ledger key for the one-time alignment of every listing's price and net weight with the
+    /// printed pack. Changing this string would run that correction again and overwrite the
+    /// owner's own pricing, so it is a constant and must stay exactly as it is.
+    /// </summary>
+    private const string PackFactsMigrationId = "product-pack-facts-2026-09";
+
     private readonly IMongoDbService _db;
 
     public ProductService(IMongoDbService db)
@@ -237,7 +244,12 @@ public class ProductService
         }
     }
 
-    public async Task MigrateLegacyProductsAsync()
+    /// <param name="packData">
+    /// The catalogue as printed on the packs (<see cref="Data.SeedData.GetProducts"/>). Passed in
+    /// rather than referenced directly so this service keeps knowing nothing about seed data, and
+    /// so the same list is the single source of truth for both a fresh install and a backfill.
+    /// </param>
+    public async Task MigrateLegacyProductsAsync(List<Product>? packData = null)
     {
         var filter = Builders<Product>.Filter;
         var update = Builders<Product>.Update;
@@ -278,5 +290,165 @@ public class ProductService
         await _db.Products.UpdateManyAsync(
             filter.In(p => p.Name, fastingProductNames) & filter.Eq(p => p.Category, "Flour"),
             update.Set(p => p.Category, "Upwas"));
+
+        if (packData is not null)
+        {
+            await BackfillPackContentAsync(packData);
+        }
+    }
+
+    /// <summary>
+    /// Copies what is printed on each pack — ingredients, nutrition and directions, storage, and
+    /// the front and back photographs — onto products that already exist.
+    ///
+    /// Seeding cannot do this: <see cref="SeedAsync"/> only ever runs against an empty collection,
+    /// so a shop that has been live for a day never sees a change to the seed again. Every product
+    /// the client has since photographed and labelled would stay blank forever without this.
+    ///
+    /// It fills gaps and never overwrites real content. A field is considered a gap if it is empty
+    /// or still holds one of the generic placeholders written by the earlier migration above — an
+    /// admin who has typed their own copy keeps it. Likewise the image is only replaced while it is
+    /// still the old low-resolution .jpg mockup, so an uploaded photograph is never clobbered.
+    ///
+    /// Price and net weight are corrected too, but ONCE and only once — see
+    /// <see cref="PackFactsMigrationId"/>. Several live listings were priced above the MRP printed
+    /// on the pack and described as 500 g where the pack holds 200 g. The owner asked for both to
+    /// be brought in line with the labels.
+    /// </summary>
+    private async Task BackfillPackContentAsync(List<Product> packData)
+    {
+        // Price and weight are editable from the admin dashboard, so correcting them has to be a
+        // one-shot. Re-asserting the pack figures on every boot would silently undo an owner who
+        // repriced something in the dashboard — they would change a price, restart the API, and
+        // watch it spring back with no explanation. The ledger entry is what makes it one-shot.
+        var alreadyPriced = await _db.AppMigrations
+            .Find(m => m.Id == PackFactsMigrationId)
+            .AnyAsync();
+
+        // Written by the earlier migration for products that predate these fields. Treated as
+        // "still empty" — they say nothing, and leaving them would defeat the whole backfill.
+        string[] placeholders =
+        [
+            "See the product description for ingredient details.",
+            "See the product description for nutritional and usage benefits.",
+            "Store in a cool, dry place in an airtight container.",
+        ];
+
+        static bool IsGap(string? value, string[] placeholders) =>
+            string.IsNullOrWhiteSpace(value) || placeholders.Contains(value.Trim());
+
+        var existing = await _db.Products.Find(_ => true).ToListAsync();
+        var byName = packData.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+
+        var writes = new List<WriteModel<Product>>();
+        var repriced = new List<string>();
+        var reweighed = new List<string>();
+
+        foreach (var product in existing)
+        {
+            if (!byName.TryGetValue(product.Name, out var pack)) continue;
+
+            var sets = new List<UpdateDefinition<Product>>();
+
+            if (IsGap(product.Ingredients, placeholders) && !string.IsNullOrWhiteSpace(pack.Ingredients))
+                sets.Add(Builders<Product>.Update.Set(p => p.Ingredients, pack.Ingredients));
+
+            if (IsGap(product.Benefits, placeholders) && !string.IsNullOrWhiteSpace(pack.Benefits))
+                sets.Add(Builders<Product>.Update.Set(p => p.Benefits, pack.Benefits));
+
+            if (IsGap(product.StorageInfo, placeholders) && !string.IsNullOrWhiteSpace(pack.StorageInfo))
+                sets.Add(Builders<Product>.Update.Set(p => p.StorageInfo, pack.StorageInfo));
+
+            // Only upgrade the old bundled mockups. Anything else is a deliberate choice.
+            var onOldMockup =
+                string.IsNullOrWhiteSpace(product.ImageUrl)
+                || product.ImageUrl.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                || product.ImageUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+
+            if (onOldMockup && !string.IsNullOrWhiteSpace(pack.ImageUrl))
+                sets.Add(Builders<Product>.Update.Set(p => p.ImageUrl, pack.ImageUrl));
+
+            // The back of the pack is where ingredients and directions are printed, so it belongs
+            // in the gallery whatever the front image is. Added, not replaced: an admin may have
+            // uploaded other angles, and this must not throw them away.
+            var gallery = product.GalleryImageUrls ?? [];
+            var missingBacks = pack.GalleryImageUrls.Where(url => !gallery.Contains(url)).ToList();
+            if (missingBacks.Count > 0)
+                sets.Add(Builders<Product>.Update.Set(p => p.GalleryImageUrls, [.. gallery, .. missingBacks]));
+
+            if (!alreadyPriced)
+            {
+                // The printed MRP is the ceiling, so this only ever lowers a price. A discount
+                // set in the dashboard still applies on top, which keeps the selling price below
+                // MRP — exactly where it is allowed to be.
+                if (product.Price != pack.Price)
+                {
+                    repriced.Add($"{product.Name}: ₹{product.Price} -> ₹{pack.Price}");
+                    sets.Add(Builders<Product>.Update.Set(p => p.Price, pack.Price));
+                }
+
+                if (!string.Equals(product.Weight, pack.Weight, StringComparison.OrdinalIgnoreCase))
+                {
+                    reweighed.Add($"{product.Name}: {product.Weight} -> {pack.Weight}");
+                    sets.Add(Builders<Product>.Update.Set(p => p.Weight, pack.Weight));
+                }
+            }
+
+            if (sets.Count == 0) continue;
+
+            sets.Add(Builders<Product>.Update.Set(p => p.UpdatedAt, DateTime.UtcNow));
+            writes.Add(new UpdateOneModel<Product>(
+                Builders<Product>.Filter.Eq(p => p.Id, product.Id),
+                Builders<Product>.Update.Combine(sets)));
+        }
+
+        if (writes.Count > 0)
+        {
+            await _db.Products.BulkWriteAsync(writes);
+        }
+
+        if (!alreadyPriced)
+        {
+            // Written whether or not anything needed changing. The point of the ledger is "this
+            // correction has been considered", not "this correction changed rows" — recording it
+            // only when there was work to do would leave a fresh database eligible forever.
+            await _db.AppMigrations.InsertOneAsync(new AppMigration
+            {
+                Id = PackFactsMigrationId,
+                Note =
+                    $"Aligned price and net weight with the printed packs. "
+                    + $"{repriced.Count} repriced, {reweighed.Count} reweighed.",
+            });
+
+            // Logged in full: this changed what customers are charged, so there needs to be a
+            // record of exactly what moved and in which direction.
+            foreach (var line in repriced) Console.WriteLine($"   price   {line}");
+            foreach (var line in reweighed) Console.WriteLine($"   weight  {line}");
+            Console.WriteLine(
+                $"✅ Pack facts applied: {repriced.Count} prices, {reweighed.Count} weights.");
+        }
+        else
+        {
+            // The correction is spent, so from here this is pure drift detection: it reports a
+            // listing that has since been edited back above the printed MRP, or away from the
+            // printed net weight, and changes nothing. Worth saying out loud on every boot —
+            // selling above MRP is an offence under the Legal Metrology rules, and it is the kind
+            // of mistake that is invisible in the dashboard until someone complains.
+            foreach (var product in existing)
+            {
+                if (!byName.TryGetValue(product.Name, out var pack)) continue;
+
+                if (product.Price > pack.Price)
+                {
+                    Console.WriteLine(
+                        $"⚠️  '{product.Name}' is listed at ₹{product.Price} but the pack MRP is ₹{pack.Price}.");
+                }
+                if (!string.Equals(product.Weight, pack.Weight, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine(
+                        $"⚠️  '{product.Name}' is listed as {product.Weight} but the pack is {pack.Weight}.");
+                }
+            }
+        }
     }
 }

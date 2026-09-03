@@ -46,7 +46,7 @@
   }
 
   &:hover {
-    box-shadow: 0 12px 36px rgba(242, 90, 26, 0.32);
+    box-shadow: var(--ojas-shadow-orange);
   }
 
   &:active {

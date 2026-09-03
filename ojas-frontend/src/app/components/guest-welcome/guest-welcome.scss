@@ -186,7 +186,7 @@
 .gw-btn--primary {
   background: linear-gradient(135deg, var(--ojas-orange, #f25a1a), var(--ojas-orange-dark, #d14500));
   color: #fff;
-  box-shadow: 0 12px 32px rgba(242, 90, 26, 0.34);
+  box-shadow: var(--ojas-shadow-orange);
 
   // Light sheen sweeping across on hover.
   &::after {
@@ -205,7 +205,7 @@
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 18px 44px rgba(242, 90, 26, 0.42);
+    box-shadow: var(--ojas-shadow-orange);
 
     &::after {
       transform: translateX(130%);

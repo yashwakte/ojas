@@ -74,13 +74,83 @@
   animation: ringOut 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite both;
 }
 
-// ===== Login: a single ring draws itself once around the monogram, then
-// fades — a quiet "recognised" beat rather than a repeating pulse. =====
+// ===== Login =====
+// Three layers around the monogram, each with a different job: two still hairlines that frame it,
+// a band of light that travels around it, and a ring that draws itself once and fades. The
+// registration moment gets a whole field of motes; without these, login was one thin line and
+// read as the poor relation.
+
+// Concentric hairlines. Deliberately motionless - they are the frame the moving light is read
+// against, and a frame that also moves gives the eye nothing to hold.
+.cel-halo {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.halo {
+  grid-area: 1 / 1;
+  width: 216px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 196, 156, 0.2);
+  animation: haloSettle 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.halo-2 {
+  width: 310px;
+  border-color: rgba(255, 196, 156, 0.1);
+  animation-delay: 0.32s;
+}
+
+// A band of light travelling around the disc. The conic gradient is a full disc, and the radial
+// mask punches the middle out to leave only a ring - which is what lets a single rotating
+// element read as light moving along an edge rather than a spinning pinwheel.
+.cel-beam {
+  position: absolute;
+  width: 200px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 214, 178, 0) 0deg,
+    rgba(255, 214, 178, 0) 190deg,
+    rgba(255, 206, 166, 0.55) 300deg,
+    rgba(255, 245, 235, 0.95) 350deg,
+    rgba(255, 214, 178, 0) 360deg
+  );
+  mask: radial-gradient(closest-side, transparent 78%, #000 80%);
+  -webkit-mask: radial-gradient(closest-side, transparent 78%, #000 80%);
+  filter: blur(2px);
+  pointer-events: none;
+  animation:
+    beamSpin 2.4s linear infinite,
+    softIn 0.7s ease 0.2s both;
+}
+
 .cel-orbit {
   position: absolute;
   width: 168px;
   aspect-ratio: 1;
   pointer-events: none;
+}
+
+@keyframes haloSettle {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes beamSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .orbit-ring {

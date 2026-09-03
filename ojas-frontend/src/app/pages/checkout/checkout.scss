@@ -1,3 +1,5 @@
+@use '../../styles/liquid-glass' as glass;
+
 .checkout-page {
   min-height: 80vh;
   padding: 100px 24px 60px;
@@ -519,7 +521,7 @@
   justify-content: center;
   gap: 8px;
   padding: 15px 20px;
-  background: var(--ojas-orange);
+  background: var(--ojas-orange-glass);
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -528,6 +530,8 @@
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--ojas-shadow-orange);
+  @include glass.button('light', 0.26);
 
   mat-icon {
     font-size: 20px;
@@ -536,9 +540,9 @@
   }
 
   &:hover:not(:disabled) {
-    background: var(--ojas-orange-dark);
+    background: var(--ojas-orange-glass-hover);
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(242, 90, 26, 0.35);
+    box-shadow: var(--ojas-shadow-orange);
   }
 
   &:disabled {

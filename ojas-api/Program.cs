@@ -100,6 +100,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<OrderPaymentOutcomeService>();
 builder.Services.AddScoped<OrderCancellationService>();
+builder.Services.AddScoped<OrderStatusEmailService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
 builder.Services.AddScoped<OtpService>();
@@ -314,8 +315,11 @@ _ = Task.Run(async () =>
     {
         using var scope = app.Services.CreateScope();
         var productService = scope.ServiceProvider.GetRequiredService<ProductService>();
-        await productService.SeedAsync(SeedData.GetProducts());
-        await productService.MigrateLegacyProductsAsync();
+        // The same pack data does both jobs: it populates a fresh install, and it fills the gaps
+        // on a shop that is already live — where SeedAsync deliberately does nothing.
+        var packData = SeedData.GetProducts();
+        await productService.SeedAsync(packData);
+        await productService.MigrateLegacyProductsAsync(packData);
         Console.WriteLine("✅ Product seed data loaded successfully.");
     }
     catch (Exception ex)

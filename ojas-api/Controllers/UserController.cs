@@ -34,7 +34,9 @@ public class UserController : ControllerBase
         if (user == null) return NotFound();
 
         var addresses = (user.SavedAddresses ?? []).Select(a => new SavedAddressDto(a.Label, a.FullAddress, a.Latitude, a.Longitude, a.MapLink, a.IsDefault, a.Phone)).ToList();
-        return Ok(new UserProfileResponse(user.Id!, user.FullName, user.Email, user.Phone, user.CreatedAt, addresses));
+        return Ok(new UserProfileResponse(
+            user.Id!, user.FullName, user.Email, user.Phone, user.CreatedAt, addresses,
+            user.IsEmailVerified, user.IsPhoneVerified));
     }
 
     // PUT /api/user/profile
@@ -63,10 +65,25 @@ public class UserController : ControllerBase
                 return Conflict(new { message = "This phone number is already associated with another account.", field = "phone" });
         }
 
+        // Changing a contact detail throws away the proof attached to the old one. Without this,
+        // the phone gate registration is built on is bypassable from this form: verify a number
+        // you own through MSG91, then edit the profile to any number at all and IsPhoneVerified
+        // stays true, so the account keeps a "verified" number nobody ever proved. The same
+        // reasoning applies to the email. Re-proving is cheap - the phone re-verifies through the
+        // existing login gate, the email through the Verify button on the profile screen.
+        var emailChanged = !string.Equals(currentUser.Email, request.Email, StringComparison.OrdinalIgnoreCase);
+        var phoneChanged = !string.Equals(currentUser.Phone, request.Phone, StringComparison.OrdinalIgnoreCase);
+
         var update = Builders<User>.Update
             .Set(u => u.FullName, request.FullName)
             .Set(u => u.Email, request.Email)
             .Set(u => u.Phone, request.Phone);
+
+        if (emailChanged)
+            update = update.Set(u => u.IsEmailVerified, false);
+
+        if (phoneChanged)
+            update = update.Set(u => u.IsPhoneVerified, false);
 
         try
         {

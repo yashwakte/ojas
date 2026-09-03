@@ -1,3 +1,5 @@
+@use '../../styles/liquid-glass' as glass;
+
 .cart-page {
   min-height: 80vh;
   padding: 100px 24px 60px;
@@ -389,7 +391,7 @@
   justify-content: center;
   gap: 8px;
   padding: 14px 20px;
-  background: var(--ojas-orange);
+  background: var(--ojas-orange-glass);
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -399,6 +401,8 @@
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   margin-bottom: 12px;
+  box-shadow: var(--ojas-shadow-orange);
+  @include glass.button('light', 0.26);
 
   mat-icon {
     font-size: 20px;
@@ -406,10 +410,10 @@
     height: 20px;
   }
 
-  &:hover {
-    background: var(--ojas-orange-dark);
+  &:hover:not(:disabled) {
+    background: var(--ojas-orange-glass-hover);
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(242, 90, 26, 0.35);
+    box-shadow: var(--ojas-shadow-orange);
   }
 }
 
@@ -458,8 +462,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--ojas-ink);
-  color: #fff;
+  background: var(--ojas-ink-glass);
+  color: #f7f3ee;
   padding: 12px 28px;
   border-radius: 50px;
   font-family: 'Poppins', sans-serif;
@@ -469,11 +473,13 @@
   transition: all 0.25s ease;
   border: none;
   text-decoration: none;
+  box-shadow: var(--ojas-shadow-ink);
+  @include glass.button('light', 0.14);
 
   &:hover {
-    background: var(--ojas-ink-soft);
+    background: var(--ojas-ink-glass-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(45, 45, 45, 0.25);
+    box-shadow: var(--ojas-shadow-ink);
   }
 }
 
@@ -575,6 +581,12 @@
 @media (max-width: 900px) {
   .cart-layout {
     grid-template-columns: 1fr;
+    // The checkout bar is fixed above the bottom navigation, so the page has to clear both or the
+    // last cart row sits underneath it and cannot be reached. The global rule only accounts for
+    // the navigation; this adds the bar's own height on top of it. Reads the shared token, which
+    // the footer's clearance reads too - the two got 10px apart when this was a literal, and the
+    // footer's last band ended up under the bar again.
+    padding-bottom: var(--ojas-cart-bar-h);
   }
 
   .cart-sidebar {
@@ -590,10 +602,12 @@
     position: fixed;
     left: 0;
     right: 0;
-    // Clears the app's own bottom navigation, which is fixed at the foot of the screen.
-    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    // Sits directly on top of the app's own bottom navigation. Reads the shared token rather than
+    // restating the height: the two used to disagree by 4px, which is what made this bar look
+    // jammed into the navigation instead of stacked cleanly above it.
+    bottom: var(--ojas-bottom-nav-clearance);
     z-index: 900;
-    padding: 10px 14px;
+    padding: 12px 14px;
     background: rgba(255, 255, 255, 0.97);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -627,12 +641,16 @@
     padding: 13px 16px;
     border: none;
     border-radius: 12px;
-    background: linear-gradient(135deg, var(--ojas-orange), var(--ojas-orange-dark));
+    // Was a 135deg corner-to-corner gradient, which is the one direction a glass rim cannot
+    // agree with: the rim assumes light from above, so the fill has to run top to bottom too.
+    background: var(--ojas-orange-glass);
     color: #fff;
     font-family: 'Poppins', sans-serif;
     font-size: 0.92rem;
     font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--ojas-shadow-orange);
+    @include glass.button('light', 0.26);
 
     &:disabled {
       background: rgba(45, 45, 45, 0.22);

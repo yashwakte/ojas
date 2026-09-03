@@ -102,6 +102,17 @@ export class Header {
     }
   }
 
+  /**
+   * Opens the category sheet from the mobile drawer. Distinct from the toggle because the entry
+   * point differs: the drawer is already open, so this has to close it and open the sheet, and
+   * it must always open rather than toggle — tapping a menu item that sometimes closes the thing
+   * it names would be a coin flip from the shopper's side.
+   */
+  openCategoriesFromMenu(): void {
+    this.menuOpen = false;
+    this.categoriesSheetOpen.set(true);
+  }
+
   openDesktopCategoryMenu(): void {
     this.desktopCategoryOpen.set(true);
   }

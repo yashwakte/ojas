@@ -1,3 +1,14 @@
+// An Angular component host is an unknown element, so it defaults to `display: inline` - and
+// vertical padding on an inline box is painted but takes up no space. The global rule in
+// styles.scss that clears the fixed bottom navigation puts its padding here, which meant it did
+// nothing at all: the footer's last band - the copyright, the "Ojas is a brand of Asha Marketing"
+// line and the four policy links - sat underneath the navigation on every page, with no way to
+// scroll it into view. Those links are what a customer reaches for when an order has gone wrong,
+// and what a payment provider's compliance review looks for, so they cannot be unreachable.
+:host {
+  display: block;
+}
+
 .footer {
   background: #1a1a1a;
   color: #bbb;
@@ -145,10 +156,13 @@
   text-align: center;
   padding: 20px 24px;
   font-size: 0.82rem;
-  color: #666;
+  // #666 on this near-black footer is 3.0:1 - under the 4.5:1 WCAG AA needs for text this size,
+  // and in practice unreadable on a phone outdoors. This warm grey clears 6:1 while still sitting
+  // back from the content above it.
+  color: #a29b94;
 
   .heart {
-    color: #999;
+    color: #c0574a;
   }
 
   .footer-policies {
@@ -161,11 +175,13 @@
     margin-bottom: 12px;
 
     a {
-      color: #555;
+      // Was #555 - 2.4:1 on this background, effectively invisible. These are the pages a customer
+      // goes looking for when something has gone wrong with an order, so they have to be findable.
+      color: #cfc8c1;
       font-weight: 500;
 
       &:hover {
-        color: var(--ojas-ink);
+        color: #fff;
         text-decoration: underline;
       }
     }

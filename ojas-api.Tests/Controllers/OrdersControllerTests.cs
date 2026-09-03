@@ -93,7 +93,21 @@ public class OrdersControllerTests
                 cashfreeService,
                 paymentOutcome,
                 NullLogger<OrderCancellationService>.Instance),
+            // Real instance over a no-op sender: these tests assert order behaviour, and the point
+            // being protected is that emailing never affects it. A send that throws is swallowed
+            // by the service itself, so a controller test failing here would be a genuine
+            // regression of that guarantee rather than test plumbing.
+            new OrderStatusEmailService(
+                _dbMock.Object,
+                new NoOpEmailSender(),
+                new ConfigurationBuilder().Build(),
+                NullLogger<OrderStatusEmailService>.Instance),
             NullLogger<OrdersController>.Instance);
+    }
+
+    private sealed class NoOpEmailSender : IEmailSender
+    {
+        public Task SendAsync(string toEmail, string subject, string htmlBody) => Task.CompletedTask;
     }
 
     /// <summary>A controller whose Cashfree has no credentials — the state production sits in

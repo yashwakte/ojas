@@ -54,7 +54,18 @@ export class WelcomeCelebration {
   private exitTimer: ReturnType<typeof setTimeout> | null = null;
   private sprites: HTMLCanvasElement[] = [];
 
-  protected readonly celebration = this.welcome.celebration;
+  /**
+   * The celebration, but only once the branded intro curtain has finished.
+   *
+   * Signing in from a fresh tab sets a celebration while the curtain is still on screen, and both
+   * are full-viewport overlays — so the greeting rendered on top of the intro and the two played
+   * over each other. Gating the whole component on `introDone` makes them a sequence instead of a
+   * pile: the curtain lifts, and then the greeting arrives on the page it was meant to arrive on.
+   */
+  protected readonly celebration = computed(() =>
+    this.welcome.introDone() ? this.welcome.celebration() : null,
+  );
+
   protected readonly leaving = signal(false);
   protected readonly reducedMotion = WelcomeService.prefersReducedMotion();
 

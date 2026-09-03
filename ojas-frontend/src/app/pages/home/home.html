@@ -1,53 +1,4 @@
-<!-- HERO
-     The largest thing in the first screenful, so it decides how fast the site feels. It ships
-     as a WebP ladder rather than one big file: a phone downloads the 640px version (~43KB), a
-     desktop the 1280px one (~122KB). The original was a single 2.1MB PNG served to everyone.
-
-     width/height are the intrinsic size of the artwork. They don't constrain the rendered size
-     - the CSS still does that - they let the browser reserve the right shape before the picture
-     arrives, so the page below never jumps as it loads.
-
-     fetchpriority="high" tells the browser this is the one image worth fetching ahead of
-     everything else; it is paired with a preload in index.html so the download can start
-     before Angular has even booted. -->
-<section class="hero">
-  <picture>
-    <source
-      type="image/webp"
-      srcset="
-        /images/hero-banner-640.webp   640w,
-        /images/hero-banner-960.webp   960w,
-        /images/hero-banner-1280.webp 1280w,
-        /images/hero-banner-1600.webp 1600w
-      "
-      sizes="(min-width: 901px) min(92vw, 1020px), 100vw"
-    />
-    <img
-      src="/images/hero-banner-1280.jpg"
-      alt="Ojas - A Culinary Journey Through Generations"
-      class="hero-banner-img"
-      width="1717"
-      height="916"
-      fetchpriority="high"
-      decoding="async"
-    />
-  </picture>
-</section>
-
-<section class="hero-cta-section">
-  <div class="hero-cta">
-    <a routerLink="/products" class="btn-primary btn-lg"
-      >Explore Products <mat-icon>arrow_forward</mat-icon></a
-    >
-    <a routerLink="/register" class="btn-outline btn-lg">Join Our Journey</a>
-  </div>
-  <div class="trust-strip">
-    <span><mat-icon>eco</mat-icon> 100% Natural</span>
-    <span><mat-icon>verified</mat-icon> No Preservatives</span>
-    <span><mat-icon>local_shipping</mat-icon> Fresh Delivery</span>
-  </div>
-</section>
-
+<app-home-hero />
 <!-- QUICK CATEGORY NAV (mobile only — desktop already has the header dropdown) -->
 <nav class="quick-cats" aria-label="Shop by category">
   @for (c of categoryTiles; track c.name) {
@@ -79,9 +30,10 @@
         <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFeatured.scrollBy({ left: -320, behavior: 'smooth' })">
           <mat-icon>chevron_left</mat-icon>
         </button>
-        <div class="pscroll" #pscrollFeatured>
+        <div class="pscroll coverflow" #pscrollFeatured appCoverflow>
           @for (p of featuredProductsFor(c); track p.id) {
             <app-product-card
+              class="cf-item"
               [product]="p"
               badge="Featured"
               [justAdded]="justAdded() === p.id"
@@ -98,7 +50,9 @@
   }
 }
 
-<!-- MOST LOVED -->
+<!-- MOST LOVED — 3D coverflow: the centred card sits flat and full-size, its
+     neighbours rotate away into the distance as you scroll, à la a card deck fanned in
+     space rather than a flat list. -->
 <section class="section products-section" [appScrollReveal]="0">
   <div class="tag"><span>BESTSELLERS</span></div>
   <h2 class="stitle">Most Loved by Our Customers</h2>
@@ -108,9 +62,10 @@
       <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollBestsellers.scrollBy({ left: -320, behavior: 'smooth' })">
         <mat-icon>chevron_left</mat-icon>
       </button>
-      <div class="pscroll" #pscrollBestsellers>
+      <div class="pscroll coverflow" #pscrollBestsellers appCoverflow>
         @for (p of bestsellers(); track p.id) {
           <app-product-card
+            class="cf-item"
             [product]="p"
             badge="Bestseller"
             [justAdded]="justAdded() === p.id"
@@ -157,9 +112,10 @@
       <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFestive.scrollBy({ left: -320, behavior: 'smooth' })">
         <mat-icon>chevron_left</mat-icon>
       </button>
-      <div class="pscroll" #pscrollFestive>
+      <div class="pscroll coverflow" #pscrollFestive appCoverflow>
         @for (p of festiveSavings(); track p.id) {
           <app-product-card
+            class="cf-item"
             [product]="p"
             badge="Sale"
             [justAdded]="justAdded() === p.id"
@@ -169,6 +125,35 @@
         }
       </div>
       <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFestive.scrollBy({ left: 320, behavior: 'smooth' })">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+  </section>
+} @else if (everydayEssentials().length > 0) {
+  <!-- Nothing is on offer today. Rather than dropping a row and leaving a gap in the page,
+       the slot shows the staples — always in stock, and what most returning customers came
+       to reorder anyway. -->
+  <section class="section products-section festive-section" [appScrollReveal]="0">
+    <div class="tag"><span>KITCHEN STAPLES</span></div>
+    <h2 class="stitle">Everyday Essentials</h2>
+    <p class="section-subtitle">The flours that run out first — back in your kitchen in 1–2 days</p>
+
+    <div class="pscroll-wrap">
+      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollEssentials.scrollBy({ left: -320, behavior: 'smooth' })">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <div class="pscroll coverflow" #pscrollEssentials appCoverflow>
+        @for (p of everydayEssentials(); track p.id) {
+          <app-product-card
+            class="cf-item"
+            [product]="p"
+            [justAdded]="justAdded() === p.id"
+            (addToCart)="addToCart($event)"
+            (buyNow)="buyNow($event)"
+          />
+        }
+      </div>
+      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollEssentials.scrollBy({ left: 320, behavior: 'smooth' })">
         <mat-icon>chevron_right</mat-icon>
       </button>
     </div>
@@ -208,9 +193,10 @@
       <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollUpwas.scrollBy({ left: -320, behavior: 'smooth' })">
         <mat-icon>chevron_left</mat-icon>
       </button>
-      <div class="pscroll" #pscrollUpwas>
+      <div class="pscroll coverflow" #pscrollUpwas appCoverflow>
         @for (p of upwasSpecials(); track p.id) {
           <app-product-card
+            class="cf-item"
             [product]="p"
             [justAdded]="justAdded() === p.id"
             (addToCart)="addToCart($event)"

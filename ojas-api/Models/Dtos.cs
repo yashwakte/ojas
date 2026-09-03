@@ -179,7 +179,20 @@ public record SavedAddressDto(string Label, string FullAddress, double Latitude,
 /// want a different person reached at their office address than at home.</summary>
 public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault, [Required, MinLength(10), MaxLength(20)] string Phone);
 public record UpdateProfileRequest(string FullName, string Email, string Phone);
-public record UserProfileResponse(string Id, string FullName, string Email, string Phone, DateTime CreatedAt, List<SavedAddressDto> SavedAddresses);
+
+/// <summary>IsEmailVerified and IsPhoneVerified are carried so the profile screen can say which
+/// contact details have actually been proved and offer to verify the email. Registration verifies
+/// the phone only, so an ordinary customer arrives here with an unverified address and no other
+/// route to confirming it.</summary>
+public record UserProfileResponse(
+	string Id,
+	string FullName,
+	string Email,
+	string Phone,
+	DateTime CreatedAt,
+	List<SavedAddressDto> SavedAddresses,
+	bool IsEmailVerified = false,
+	bool IsPhoneVerified = false);
 
 /// <summary>ProductId is the only field here the server trusts. Name, price and weight are all
 /// re-read from the catalog — they are carried only so a request reads like what the browser

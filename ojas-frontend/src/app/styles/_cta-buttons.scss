@@ -1,0 +1,221 @@
+@use 'liquid-glass' as glass;
+
+// The angle the attention ring is drawn from. It has to be a registered custom property or it
+// cannot be animated — an unregistered one is just a string to the engine, so `from var(--angle)`
+// would jump between keyframes instead of sweeping.
+@property --ojas-ring-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes ojas-ring-spin {
+  to {
+    --ojas-ring-angle: 360deg;
+  }
+}
+
+/// An ink ring around a button with a warm highlight travelling around it, to pull the eye to
+/// the primary action on a busy photographic background.
+///
+/// Drawn with two backgrounds and a transparent border rather than a pseudo-element, because
+/// `glass.button` has already spent both `::before` and `::after` on the specular rim. The fill
+/// is painted to the padding box and the conic gradient to the border box, so the gradient is
+/// only ever visible in the border itself — the ring is the border.
+///
+/// It degrades honestly. Where `@property` is unsupported the angle stays at its initial value,
+/// the sweep simply doesn't move, and what remains is a solid dark ring — which is most of the
+/// point. Same under `prefers-reduced-motion`, deliberately: the ring is there to make the button
+/// findable, and that job does not require it to move.
+///
+/// @param {Color} $fill - what the button is filled with, painted inside the ring.
+@mixin spin-ring($fill, $thickness: 2px, $speed: 4.5s) {
+  border: $thickness solid transparent;
+  background:
+    $fill padding-box,
+    conic-gradient(
+        from var(--ojas-ring-angle),
+        rgba(24, 20, 16, 0.92) 0deg,
+        rgba(24, 20, 16, 0.92) 186deg,
+        rgba(255, 209, 158, 0.98) 250deg,
+        rgba(24, 20, 16, 0.92) 310deg,
+        rgba(24, 20, 16, 0.92) 360deg
+      )
+      border-box;
+  animation: ojas-ring-spin $speed linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+// The page CTA buttons — Explore Products, Join Our Journey, Create Account. They live here
+// rather than in home.scss because the hero is now its own component and needs the same two,
+// and a second hand-maintained copy of a glass button stack is exactly how two buttons that
+// are meant to be identical drift apart. Exposed as a mixin rather than plain rules so a
+// component opts in explicitly and nothing is emitted into stylesheets that never use them.
+@mixin cta-buttons {
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 11px 20px;
+    // A hair lighter at the top than at the bottom. Flat colour under a glass rim reads as a
+    // sticker laid on the page; the gradient is what gives the rim something to look like it is
+    // bending, and it is subtle enough that nobody will name it.
+    background: var(--ojas-orange-glass);
+    color: #fff;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-decoration: none;
+    box-shadow: var(--ojas-shadow-orange);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    @include glass.button('light', 0.26);
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      transition: transform 0.3s;
+    }
+    &:hover {
+      // Brightened rather than repainted: swapping the fill for a flat darker orange would drop
+      // the gradient the rim is reading, so the button would visibly flatten on hover.
+      filter: brightness(1.06);
+      transform: translateY(-3px);
+      box-shadow: var(--ojas-shadow-orange);
+      mat-icon {
+        transform: translateX(5px);
+      }
+    }
+    &.sm {
+      padding: 10px 20px;
+      font-size: 0.78rem;
+    }
+    &.btn-lg {
+      padding: 12px 24px;
+      font-size: 0.85rem;
+      border-radius: 13px;
+    }
+  }
+  
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    // Back to a light frosted panel - a solid charcoal fill read as "the button turned black",
+    // which wasn't the ask. The darker, more defined look instead comes from the rim itself: the
+    // ink half of `glass.button('dark', ...)` was deepened in _liquid-glass.scss, so the ring
+    // reads richer while the panel stays pale.
+    padding: 11px 20px;
+    background: rgba(255, 255, 255, 0.68);
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    color: var(--ojas-orange-dark);
+    border: 1px solid rgba(207, 68, 9, 0.35);
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    @include glass.button('dark', 0.3);
+    &:hover {
+      background: var(--ojas-orange-glass);
+      color: #fff;
+      border-color: transparent;
+      transform: translateY(-3px);
+      box-shadow: var(--ojas-shadow-orange);
+      // The rim has to flip with the fill: ink edges on a pale pane, white edges once the pane
+      // fills with orange. Left dark, the hover state would look smudged rather than lit.
+      &::after {
+        @include glass.rim('light');
+      }
+    }
+    &.btn-lg {
+      padding: 12px 24px;
+      font-size: 0.85rem;
+      border-radius: 13px;
+    }
+  }
+  
+  @media (min-width: 640px) {
+    .btn-primary,
+    .btn-outline {
+      gap: 10px;
+      padding: 14px 26px;
+      font-size: 0.92rem;
+      border-radius: 14px;
+  
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+  
+      &.btn-lg {
+        padding: 18px 36px;
+        font-size: 1.05rem;
+        border-radius: 18px;
+      }
+    }
+  }
+  
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    padding: 13px 26px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    color: var(--ojas-orange);
+    border: 1.5px solid rgba(242, 90, 26, 0.15);
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    &:hover {
+      background: #fff;
+      border-color: var(--ojas-orange);
+      transform: translateY(-2px);
+    }
+  }
+  
+  .btn-white {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 15px 30px;
+    background: linear-gradient(180deg, #ffffff 0%, #f6f1ea 100%);
+    color: var(--ojas-orange);
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    text-decoration: none;
+    // This one sits on the near-black CTA band, the only place on the site where an outer halo
+    // is visible at all - it is what lifts the pill off the panel rather than letting it sit
+    // flat against it.
+    box-shadow:
+      0 6px 24px rgba(0, 0, 0, 0.4),
+      0 0 24px rgba(255, 255, 255, 0.13);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    // Focus is ringed in white here rather than orange: an orange ring on a near-black band is
+    // close to invisible for anyone tabbing through.
+    @include glass.button('dark', 0, #fff);
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      transition: transform 0.3s;
+    }
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow:
+        0 12px 36px rgba(0, 0, 0, 0.5),
+        0 0 32px rgba(255, 255, 255, 0.18);
+      mat-icon {
+        transform: translateX(4px);
+      }
+    }
+  }
+  
+}

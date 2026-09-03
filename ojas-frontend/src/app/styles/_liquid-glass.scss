@@ -1,0 +1,114 @@
+// ============================================
+// LIQUID GLASS — shared button surface
+// ============================================
+// The whole effect comes from one thing: a rim.
+//
+// A piece of glass laid over a coloured surface catches light hardest just inside its edges —
+// a bright arc along the top-left, a second along the bottom-right where light wraps back
+// through it — and holds a faint haze inside the border before the fill reads clean again.
+// That is drawn here as a stack of inset shadows on a pseudo-element rather than as a border,
+// because a border sits outside the fill and reads as a stroke, while inset shadows read as
+// thickness. It is the difference between an outlined button and one that looks moulded.
+//
+// Deliberately NOT ported from the React original: its `backdrop-filter: url(#svg-filter)`
+// refraction. A displacement filter can only bend what is behind an element, and every button
+// on this site sits on a flat fill or a gradient — so it would buy nothing visible while
+// costing a full GPU pass on the cheap Android phones most of our customers shop on. Safari
+// does not support url() inside backdrop-filter at all, so it would also be inconsistent.
+// Plain `backdrop-filter: blur()` is used on the translucent variants, where it does show.
+
+// The rim itself. `light` draws it in white, for glass sitting on a saturated or dark fill;
+// `dark` draws it in ink, for glass sitting on a pale one.
+@mixin rim($tone: 'light', $intensity: 1) {
+  @if $tone == 'light' {
+    box-shadow:
+      inset 3px 3px 0.5px -3px rgba(255, 255, 255, 0.95 * $intensity),
+      inset -3px -3px 0.5px -3px rgba(255, 255, 255, 0.85 * $intensity),
+      inset 1px 1px 1px -0.5px rgba(255, 255, 255, 0.62 * $intensity),
+      inset -1px -1px 1px -0.5px rgba(255, 255, 255, 0.55 * $intensity),
+      inset 0 0 6px 6px rgba(255, 255, 255, 0.1 * $intensity),
+      inset 0 0 2px 2px rgba(255, 255, 255, 0.06 * $intensity);
+  } @else {
+    // Two-toned on purpose. Drawing both edges in ink makes a pale pane look merely recessed;
+    // real glass over a light surface keeps the lit edge white at the top-left and only turns
+    // to shadow where it curves away at the bottom-right. That asymmetry is the whole read.
+    // Deepened at the user's request ("just the rings colour dark and aesthetic") - the fill
+    // stays light, only the ink half of the rim goes richer, which is what reads as a darker,
+    // more defined button without darkening the button itself.
+    box-shadow:
+      inset 2px 2px 0.5px -2px rgba(255, 255, 255, 0.95 * $intensity),
+      inset -2px -2px 0.5px -2px rgba(24, 18, 14, 0.58 * $intensity),
+      inset 1px 1px 1px -0.5px rgba(255, 255, 255, 0.8 * $intensity),
+      inset -1px -1px 1px -0.5px rgba(24, 18, 14, 0.4 * $intensity),
+      inset 0 0 6px 6px rgba(24, 18, 14, 0.08 * $intensity),
+      inset 0 0 2px 2px rgba(24, 18, 14, 0.055 * $intensity);
+  }
+}
+
+// The rim plus the specular sheen, as two pseudo-elements behind the label.
+//
+// Both sit at z-index -1 under an `isolation: isolate` stacking context, which is what keeps
+// them above the element's own background but below its text — the same trick `organic-blobs`
+// in home.scss uses. Without it the rim's inner haze would veil the label.
+@mixin surface($tone: 'light', $specular: 0.22) {
+  position: relative;
+  isolation: isolate;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  // The sheen a curved top throws: strongest at the very top edge, gone by the middle. Static
+  // on purpose — a travelling shine is exactly what makes a button read as cheap rather than
+  // expensive, and this has to survive being looked at every day.
+  &::before {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, $specular) 0%,
+      rgba(255, 255, 255, $specular * 0.28) 42%,
+      rgba(255, 255, 255, 0) 62%
+    );
+  }
+
+  &::after {
+    @include rim($tone);
+  }
+}
+
+// Press physics, borrowed from the reference's metal button: a real button travels down and
+// shrinks very slightly, and it does that far faster than it comes back up. Equal timings in
+// both directions are what make a press feel like a CSS transition instead of a click.
+@mixin press($scale: 0.985) {
+  &:active:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(1px) scale($scale);
+    transition-duration: 90ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:active:not(:disabled):not([aria-disabled='true']) {
+      transform: none;
+    }
+  }
+}
+
+// These buttons lose their old outline once a rim is drawn inside them, so the keyboard ring
+// has to be restated explicitly rather than left to the browser default.
+@mixin focus-ring($color: var(--ojas-orange)) {
+  &:focus-visible {
+    outline: 2px solid $color;
+    outline-offset: 3px;
+  }
+}
+
+// The usual combination, for a button that wants all three.
+@mixin button($tone: 'light', $specular: 0.22, $focus: var(--ojas-orange)) {
+  @include surface($tone, $specular);
+  @include press;
+  @include focus-ring($focus);
+}

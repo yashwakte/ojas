@@ -827,7 +827,7 @@
   align-items: center;
   justify-content: center;
   background: var(--ojas-orange-light);
-  box-shadow: 0 6px 16px rgba(242, 90, 26, 0.18);
+  box-shadow: var(--ojas-shadow-orange);
   transition: box-shadow 0.2s ease;
 
   mat-icon {

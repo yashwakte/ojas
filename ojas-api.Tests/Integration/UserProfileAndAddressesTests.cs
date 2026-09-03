@@ -46,6 +46,96 @@ public class UserProfileAndAddressesTests : IDisposable
         profile.Email.ShouldBe(request.Email);
     }
 
+    /// <summary>Registration proves the phone and leaves the email unproved, and the profile
+    /// screen needs to be able to say so - otherwise it cannot show the Verify button that is a
+    /// customer's only route to confirming their address after signup.</summary>
+    [Fact]
+    public async Task GetProfile_ReportsWhichContactDetailsHaveBeenVerified()
+    {
+        using var client = _factory.CreateClient();
+        await client.RegisterAsync();
+
+        var profileResponse = await client.GetAsync("/api/user/profile");
+        var profile = await profileResponse.Content.ReadFromJsonAsync<UserProfileResponse>();
+
+        profile!.IsPhoneVerified.ShouldBeTrue();
+        profile.IsEmailVerified.ShouldBeFalse();
+    }
+
+    /// <summary>The phone gate the whole of registration rests on is worthless if this form can
+    /// swap the number while keeping the flag - a customer could verify a number they own, then
+    /// change it to one they do not and still count as verified.</summary>
+    [Fact]
+    public async Task UpdateProfile_ChangingThePhone_ClearsItsVerification()
+    {
+        using var client = _factory.CreateClient();
+        var (auth, csrf) = await client.RegisterAsync();
+
+        var differentPhone = $"9{Math.Abs(Guid.NewGuid().GetHashCode()).ToString().PadLeft(9, '0')[..9]}";
+        var request = new UpdateProfileRequest(auth.FullName, auth.Email, differentPhone);
+
+        var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profile = await (await client.GetAsync("/api/user/profile"))
+            .Content.ReadFromJsonAsync<UserProfileResponse>();
+        profile!.Phone.ShouldBe(differentPhone);
+        profile.IsPhoneVerified.ShouldBeFalse();
+    }
+
+    /// <summary>Same reasoning for the address: a verified flag must describe the value actually
+    /// held, not one that was replaced afterwards.</summary>
+    [Fact]
+    public async Task UpdateProfile_ChangingTheEmail_ClearsItsVerification()
+    {
+        using var client = _factory.CreateClient();
+        var (auth, csrf) = await client.RegisterAsync();
+
+        // Prove the address first, so there is a verification for the change to throw away.
+        var resend = await client.PostAsJsonAsync("/api/auth/resend-email-otp", new ResendEmailOtpRequest(auth.Email));
+        var devCode = (await resend.Content.ReadFromJsonAsync<ResendDevResponse>())!.DevCode!;
+        var verifyResponse = await client.PostAsJsonAsync(
+            "/api/auth/verify-email-otp", new VerifyEmailOtpRequest(auth.Email, devCode));
+
+        // Verifying the email re-issues the session, because the phone is already verified and
+        // CompleteRegistrationStepAsync issues one the moment both are true. That rotates the CSRF
+        // token, so the one captured at registration is now stale - the frontend has to swap in
+        // the returned session for exactly the same reason.
+        var step = await verifyResponse.Content.ReadFromJsonAsync<RegistrationStepResponse>();
+        var rotatedCsrf = step!.Session!.CsrfToken;
+
+        var verified = await (await client.GetAsync("/api/user/profile"))
+            .Content.ReadFromJsonAsync<UserProfileResponse>();
+        verified!.IsEmailVerified.ShouldBeTrue();
+
+        var request = new UpdateProfileRequest(
+            auth.FullName, $"changed.{Guid.NewGuid():N}@example.com".Replace("-", ""), auth.Phone);
+        var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, rotatedCsrf));
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profile = await (await client.GetAsync("/api/user/profile"))
+            .Content.ReadFromJsonAsync<UserProfileResponse>();
+        profile!.IsEmailVerified.ShouldBeFalse();
+    }
+
+    /// <summary>Editing only the name must not cost the customer their verifications.</summary>
+    [Fact]
+    public async Task UpdateProfile_LeavingContactDetailsAlone_KeepsTheirVerification()
+    {
+        using var client = _factory.CreateClient();
+        var (auth, csrf) = await client.RegisterAsync();
+
+        var request = new UpdateProfileRequest("Renamed Only", auth.Email, auth.Phone);
+        await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
+
+        var profile = await (await client.GetAsync("/api/user/profile"))
+            .Content.ReadFromJsonAsync<UserProfileResponse>();
+        profile!.FullName.ShouldBe("Renamed Only");
+        profile.IsPhoneVerified.ShouldBeTrue();
+    }
+
+    private record ResendDevResponse(string Message, string? DevCode);
+
     [Fact]
     public async Task UpdateProfile_EmailConflict_WithAnotherAccount_ReturnsConflict()
     {

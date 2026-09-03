@@ -9,11 +9,21 @@ import { CampaignBannerConfig, Product } from '../../models/interfaces';
 import { PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
 import { ProductCard } from '../../components/product-card/product-card';
 import { ScrollRevealDirective } from '../../directives/scroll-reveal.directive';
+import { CoverflowDirective } from '../../directives/coverflow.directive';
 import { CampaignBanner } from '../../components/campaign-banner/campaign-banner';
+import { HomeHero } from '../../components/home-hero/home-hero';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, MatIconModule, ProductCard, ScrollRevealDirective, CampaignBanner],
+  imports: [
+    RouterLink,
+    MatIconModule,
+    ProductCard,
+    ScrollRevealDirective,
+    CoverflowDirective,
+    CampaignBanner,
+    HomeHero,
+  ],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
@@ -48,6 +58,19 @@ export class Home implements OnInit {
     this.productService
       .products()
       .filter((p) => p.discount > 0 && p.isAvailable)
+      .slice(0, 8),
+  );
+
+  // Festive Savings only exists while something is discounted, and when nothing is the page
+  // used to lose a whole row and leave a visible hole between Why Ojas and Shop by Category.
+  // This stands in for it: the staples, which are always in the catalogue and are what most
+  // people are actually here to reorder. Deliberately excludes anything discounted (that is the
+  // other section's job, and showing the same product twice makes a small catalogue look
+  // smaller) and anything filed under Upwas, which has its own row further down.
+  readonly everydayEssentials = computed(() =>
+    this.productService
+      .products()
+      .filter((p) => p.isAvailable && p.discount === 0 && p.category !== 'Upwas')
       .slice(0, 8),
   );
 

@@ -23,7 +23,13 @@
           <span class="ring" style="animation-delay: 2140ms"></span>
         </div>
       } @else {
-        <!-- Login: one quiet ring draws itself around the monogram, then fades. -->
+        <!-- Login: light travels around the disc, two hairlines frame it, and a drawn ring
+             closes the moment. Layered rather than busy - each one is doing a different job. -->
+        <div class="cel-halo" aria-hidden="true">
+          <span class="halo"></span>
+          <span class="halo halo-2"></span>
+        </div>
+        <div class="cel-beam" aria-hidden="true"></div>
         <div class="cel-orbit" aria-hidden="true">
           <svg viewBox="0 0 120 120" class="orbit-ring">
             <circle cx="60" cy="60" r="57" pathLength="100" />
