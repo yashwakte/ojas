@@ -61,7 +61,9 @@
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    background 0.2s ease,
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
   &:hover {
     background: rgba(255, 255, 255, 0.22);
@@ -160,7 +162,9 @@
   -webkit-backdrop-filter: blur(6px);
   color: #fff;
   cursor: pointer;
-  transition: background 0.2s ease, opacity 0.2s ease;
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
 
   &:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.26);
