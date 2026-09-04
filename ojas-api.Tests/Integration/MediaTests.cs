@@ -177,10 +177,18 @@ public class MediaTests : IDisposable
         var response = await client.GetAsync("/api/products");
 
         // An authenticated response names the caller's account in X-Ojas-User. A shared cache
-        // storing one of those would serve one customer's identity to the next visitor.
+        // storing one of those would serve one customer's identity to the next visitor, so it is
+        // marked private - which is the directive that keeps it out of every cache except the
+        // customer's own browser.
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         response.Headers.CacheControl!.Public.ShouldBeFalse();
-        response.Headers.CacheControl.NoStore.ShouldBeTrue();
+        response.Headers.CacheControl.Private.ShouldBeTrue();
+
+        // ...and their own browser is explicitly allowed to keep it. Forbidding that too bought no
+        // privacy and made every catalogue read of a signed-in customer - the ones who browse most
+        // - travel all the way to the API.
+        response.Headers.CacheControl.NoStore.ShouldBeFalse();
+        response.Headers.CacheControl.MaxAge.ShouldNotBeNull();
     }
 
     [Fact]

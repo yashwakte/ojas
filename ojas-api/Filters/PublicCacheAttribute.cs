@@ -39,9 +39,20 @@ public sealed class PublicCacheAttribute : ActionFilterAttribute
         if (context.Exception != null || response.StatusCode is < 200 or >= 300)
             return;
 
+        // A signed-in caller's response may carry the X-Ojas-User header naming their account, so
+        // it must never reach a shared cache. "private" is precisely that instruction: the
+        // customer's own browser may keep it, nothing in between may.
+        //
+        // It used to say "no-store", which additionally forbids the *browser* from keeping it —
+        // and that is a real cost rather than extra safety. Signed-in customers are the ones who
+        // browse most, and every catalogue read of theirs went the whole way to the API on a
+        // shared instance: tapping into a product and back re-fetched the entire catalogue. The
+        // privacy property is carried by "private" alone, so this keeps it while letting a
+        // customer's second page view come out of their own cache.
         if (context.HttpContext.User?.Identity?.IsAuthenticated == true)
         {
-            response.Headers.CacheControl = "private, no-store";
+            response.Headers.CacheControl =
+                $"private, max-age={_maxAgeSeconds}, stale-while-revalidate={_staleWhileRevalidateSeconds}";
             return;
         }
 
