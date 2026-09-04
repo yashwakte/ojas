@@ -11,8 +11,15 @@ interface CashfreeConfig {
 }
 
 /** How long to wait for the browser to actually leave for the payment page before concluding it
- * is not going to. Only ever decides when to stop waiting; nothing is charged either way. */
-const HandOffWatchdogMs = 12_000;
+ * is not going to. Only ever decides when to stop waiting; nothing is charged either way.
+ *
+ * It only ever runs while this page is still on screen — the moment the browser starts leaving,
+ * the wait is abandoned rather than timed out (see whenHandOffFails). That is what lets it be
+ * generous: on a cheap phone on mobile data, fetching the config, code-splitting the SDK chunk and
+ * pulling Cashfree's own script can genuinely take longer than a dozen seconds, and cutting it off
+ * at that point put "We couldn't open the payment page" on screen moments before the payment page
+ * opened perfectly well. */
+const HandOffWatchdogMs = 20_000;
 
 /** Survives the round trip to Cashfree's page and back, including a Back press that rebuilds the
  * app from scratch. Session-scoped: it is meaningless in a new tab or a later visit. */
@@ -82,17 +89,51 @@ export class CashfreeCheckoutService {
    * this promise deliberately never settles. A rejection, or a resolved `{ error }`, is a real
    * failure and settles at once. The watchdog is the backstop for the case neither happens and
    * the navigation silently doesn't occur, so a customer is never left under a spinner forever.
+   *
+   * The remaining trap, and the reason for the listeners below: the watchdog outlives the handoff.
+   * Once the browser leaves for Cashfree this page is not destroyed, it is frozen — and pressing
+   * Back restores it from the back/forward cache with its timers intact. The pending countdown
+   * then resumes and fires, so a customer who reached the payment page, looked at it, and decided
+   * to come back was met with "We couldn't open the payment page" about a page they had just been
+   * standing on. The same thing happened to anyone whose SDK load simply ran long: the error
+   * appeared and the redirect followed it a moment later.
+   *
+   * So the wait is *abandoned*, not failed, the instant the browser starts leaving. `pagehide` is
+   * the precise signal for that and fires whether the document is discarded or frozen;
+   * `visibilitychange` backs it up on the in-app browsers where `pagehide` is unreliable. The
+   * watchdog therefore only ever fires on a page that has demonstrably stayed put — which is
+   * exactly the case it was written for and the only one it can be right about.
    */
   whenHandOffFails(paymentSessionId: string): Promise<void> {
     return new Promise<void>((resolve) => {
-      // Long enough that a slow redirect is never mistaken for a failure, short enough that a
-      // customer is not staring at a dead spinner. Nothing is charged either way - this only
-      // decides when to stop waiting and offer them a way out.
-      const watchdog = setTimeout(() => resolve(), HandOffWatchdogMs);
-      const failed = () => {
+      let settled = false;
+
+      const stopWaiting = () => {
+        settled = true;
         clearTimeout(watchdog);
+        window.removeEventListener('pagehide', abandon);
+        document.removeEventListener('visibilitychange', abandonIfHidden);
+      };
+
+      /** The browser is leaving (or freezing) this page, so the handoff took. Never report a
+       * failure from here — not now, and not when the page comes back from the cache. */
+      const abandon = () => {
+        if (!settled) stopWaiting();
+      };
+
+      const abandonIfHidden = () => {
+        if (document.visibilityState === 'hidden') abandon();
+      };
+
+      const failed = () => {
+        if (settled) return;
+        stopWaiting();
         resolve();
       };
+
+      const watchdog = setTimeout(failed, HandOffWatchdogMs);
+      window.addEventListener('pagehide', abandon);
+      document.addEventListener('visibilitychange', abandonIfHidden);
 
       this.loadSdk()
         .then((cashfree) => cashfree.checkout({ paymentSessionId, redirectTarget: '_self' }))

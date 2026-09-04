@@ -37,12 +37,13 @@ import {
 } from '../../constants/serviceable-locations';
 import {
   calculateCouponDiscount,
+  freeDeliveryNudgeFor,
   qualifiesForFreeDelivery,
   roundMoney,
   COUPONS,
   Coupon,
-  FREE_DELIVERY_CART_THRESHOLD,
 } from '../../constants/pricing';
+import { thumbnailPackShot } from '../../constants/pack-shots';
 
 @Component({
   selector: 'app-checkout',
@@ -113,6 +114,9 @@ export class Checkout implements OnInit {
   /** Exposed to the template so each line shows what it will actually be billed at. */
   effectivePrice = effectivePrice;
 
+  /** Summary rows are thumbnails; they load the card-sized pack shot. */
+  thumbnail = thumbnailPackShot;
+
   readonly totalAmount = computed(() =>
     roundMoney(
       this.checkoutService.items().reduce((sum, i) => sum + effectivePrice(i.product) * i.quantity, 0),
@@ -143,12 +147,13 @@ export class Checkout implements OnInit {
   );
 
   /** Nudges the customer toward free delivery — the one reward that's automatic rather
-   * than picked. Each coupon tile shows its own unlock progress. */
-  readonly freeDeliveryNudge = computed(() => {
-    const subtotal = this.totalAmount();
-    if (subtotal === 0 || subtotal >= FREE_DELIVERY_CART_THRESHOLD) return null;
-    return `Add ₹${roundMoney(FREE_DELIVERY_CART_THRESHOLD - subtotal).toFixed(2)} more to get FREE delivery`;
-  });
+   * than picked. Each coupon tile shows its own unlock progress. Measured against the *quoted*
+   * charge, not the effective one: a customer whose address is already inside the free-delivery
+   * radius has nothing to unlock, and offering it to them anyway invites them to spend more for
+   * something they already have. See freeDeliveryNudgeFor. */
+  readonly freeDeliveryNudge = computed(() =>
+    freeDeliveryNudgeFor(this.totalAmount(), this.deliveryCharge()),
+  );
 
   constructor(
     private cartService: CartService,
@@ -398,7 +403,12 @@ export class Checkout implements OnInit {
           this.maxRadiusKm.set(err.error.maxRadiusKm ?? this.maxRadiusKm());
           this.errorMsg.set(err.error.message ?? 'This address is outside our delivery area.');
         } else {
-          this.errorMsg.set('Failed to place order. Please try again.');
+          // The server's own words first. It routinely knows something worth saying that none of
+          // the branches above match - "We couldn't start the payment", for one, which is a
+          // different situation from a failed order and reads as one to the customer. Throwing
+          // that away for a blanket "failed to place order" is how a specific, accurate
+          // explanation became a vague and slightly wrong one.
+          this.errorMsg.set(err.error?.message ?? 'Failed to place order. Please try again.');
         }
       },
     });

@@ -114,5 +114,67 @@ describe('CashfreeCheckoutService', () => {
 
       expect(await settled(service.whenHandOffFails('session_abc'))).toBeTrue();
     });
+
+    /**
+     * The watchdog outlives the handoff, and that is the trap. Leaving for Cashfree does not
+     * destroy this page, it freezes it — pressing Back restores it with its timers intact, and the
+     * pending countdown then resumes and fires. A customer who reached the payment page, looked at
+     * it and came back was met with "We couldn't open the payment page" about a page they had just
+     * been standing on.
+     *
+     * So the wait is abandoned, never failed, the moment the browser starts leaving. Both signals
+     * are tested because `pagehide` is unreliable in some in-app browsers, which is exactly where
+     * a payment handoff is most likely to happen.
+     */
+    it('never reports a failure once the browser has started leaving the page', async () => {
+      jasmine.clock().install();
+      try {
+        stubSdk({ redirect: true });
+        const failure = service.whenHandOffFails('session_abc');
+
+        window.dispatchEvent(new PageTransitionEvent('pagehide'));
+        // Well past the watchdog: on a page that has gone, it must never fire.
+        jasmine.clock().tick(60_000);
+
+        expect(await settled(failure)).toBeFalse();
+      } finally {
+        jasmine.clock().uninstall();
+      }
+    });
+
+    it('never reports a failure once the page has been hidden', async () => {
+      jasmine.clock().install();
+      const hidden = spyOnProperty(document, 'visibilityState').and.returnValue('hidden');
+      try {
+        stubSdk({ redirect: true });
+        const failure = service.whenHandOffFails('session_abc');
+
+        document.dispatchEvent(new Event('visibilitychange'));
+        jasmine.clock().tick(60_000);
+
+        expect(await settled(failure)).toBeFalse();
+        expect(hidden).toHaveBeenCalled();
+      } finally {
+        jasmine.clock().uninstall();
+      }
+    });
+
+    /** The case the watchdog is actually for: the handoff silently did nothing and the customer is
+     * still sitting here, so they need telling rather than being left under a spinner. */
+    it('still reports a failure when the page stays put and nothing happens', async () => {
+      jasmine.clock().install();
+      try {
+        // Neither resolves nor rejects: the SDK simply never comes back.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (service as any).sdkPromise = new Promise(() => {});
+        const failure = service.whenHandOffFails('session_abc');
+
+        jasmine.clock().tick(60_000);
+
+        expect(await settled(failure)).toBeTrue();
+      } finally {
+        jasmine.clock().uninstall();
+      }
+    });
   });
 });

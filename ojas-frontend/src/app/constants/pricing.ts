@@ -44,3 +44,32 @@ export function calculateCouponDiscount(
 export function qualifiesForFreeDelivery(subtotal: number): boolean {
   return subtotal >= FREE_DELIVERY_CART_THRESHOLD;
 }
+
+/**
+ * The "add ₹X more and delivery is free" line, or null when there is nothing to say.
+ *
+ * There are two entirely separate ways delivery ends up free on Ojas, and the nudge is only ever
+ * about one of them. The cart-value threshold above waives a charge; the *distance* rules waive it
+ * too, for anyone inside the free radius (and will waive it for everyone once that radius is set
+ * to cover the whole delivery area). Offering to unlock something a customer already has reads as
+ * a shop that doesn't know its own prices — and it invites them to spend more for nothing, which
+ * is worse than merely wrong.
+ *
+ * So the nudge needs both halves: a cart below the threshold *and* a quoted delivery charge there
+ * is actually something to remove. Kept here rather than in each page so the cart, the checkout
+ * and the order-edit screen cannot drift apart on it.
+ *
+ * @param quotedDeliveryCharge what delivery costs for this address before any waiver — the
+ * server's quote, not the post-threshold figure, which would make this always-zero and the nudge
+ * never appear at all.
+ */
+export function freeDeliveryNudgeFor(
+  subtotal: number,
+  quotedDeliveryCharge: number,
+): string | null {
+  if (subtotal === 0 || qualifiesForFreeDelivery(subtotal)) return null;
+  if (quotedDeliveryCharge <= 0) return null;
+
+  const shortfall = roundMoney(FREE_DELIVERY_CART_THRESHOLD - subtotal);
+  return `Add ₹${shortfall.toFixed(2)} more to get FREE delivery`;
+}

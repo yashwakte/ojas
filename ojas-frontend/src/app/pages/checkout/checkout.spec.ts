@@ -426,6 +426,28 @@ describe('Checkout', () => {
     expect(fixture.componentInstance.errorMsg()).toBe('Failed to place order. Please try again.');
   });
 
+  /**
+   * A 502 from the order endpoint means the order record exists and only the payment handoff
+   * fell over, which is a different thing from the order having failed — and the server says so.
+   * Replacing that with "failed to place order" told the customer something both vaguer and
+   * slightly untrue about what had just happened to their basket.
+   */
+  it('placeOrder prefers what the server actually said over the generic message', () => {
+    orderServiceSpy.placeOrder.and.returnValue(
+      throwError(() => ({
+        status: 502,
+        error: { message: "We couldn't start the payment. Please try again." },
+      })),
+    );
+    const fixture = create();
+
+    fixture.componentInstance.placeOrder();
+
+    expect(fixture.componentInstance.errorMsg()).toBe(
+      "We couldn't start the payment. Please try again.",
+    );
+  });
+
   it('placeOrder surfaces the server message when Cashfree is not configured (503)', () => {
     orderServiceSpy.placeOrder.and.returnValue(
       throwError(() => ({ status: 503, error: { message: 'Online payment is unavailable.' } })),

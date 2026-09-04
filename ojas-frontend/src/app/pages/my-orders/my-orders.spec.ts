@@ -69,12 +69,20 @@ describe('MyOrders', () => {
     // Order lines resolve their pack shot from the live catalogue; an order for a product that
     // has since been withdrawn simply gets no image, which is the default here.
     productServiceSpy.getProduct.and.returnValue(undefined);
-    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', ['whenHandOffFails', 'clearAwaitingPayment']);
+    cashfreeCheckoutServiceSpy = jasmine.createSpyObj('CashfreeCheckoutService', [
+      'whenHandOffFails',
+      'markAwaitingPayment',
+      'awaitingPayment',
+      'clearAwaitingPayment',
+    ]);
     // whenHandOffFails settles ONLY when the handoff failed, so a successful one never settles.
     // Note this double now matches the SDK rather than a belief about it: cashfree.checkout()
     // does settle on success, and a double that never did could never have caught the bug where
     // success was treated as failure.
     cashfreeCheckoutServiceSpy.whenHandOffFails.and.returnValue(new Promise<void>(() => {}));
+    // No marker by default: an ordinary visit, not a return from the payment page. Tests about
+    // that return set it explicitly.
+    cashfreeCheckoutServiceSpy.awaitingPayment.and.returnValue(null);
     walletServiceSpy = jasmine.createSpyObj('WalletService', ['load'], { balance: signal(0) });
     walletServiceSpy.load.and.returnValue(of({ balance: 0, transactions: [] }));
     cartServiceSpy = jasmine.createSpyObj('CartService', ['removeFromCart']);
@@ -577,6 +585,43 @@ describe('MyOrders', () => {
     await flushMicrotasks();
 
     expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_topup');
+    // Remembered before the browser leaves, so that coming back by pressing Back rather than by
+    // paying is recognised as the end of the trip instead of looking like a fresh visit.
+    expect(cashfreeCheckoutServiceSpy.markAwaitingPayment).toHaveBeenCalledWith('o1');
+  });
+
+  /**
+   * Pressing Back from Cashfree's page restores this one from the back/forward cache, so ngOnInit
+   * never runs again. Without this the customer sat looking at a card still offering to take the
+   * payment they had just walked away from, with nothing telling them where they stood — and, on a
+   * page whose handoff watchdog was still counting down, an error about a payment page that had
+   * opened perfectly well.
+   */
+  it('checks with the gateway when the customer comes back from the payment page by pressing Back', () => {
+    userServiceSpy.getMyOrders.and.returnValue(of([order]));
+    orderServiceSpy.getCashfreePaymentStatus.and.returnValue(
+      of({ paymentStatus: 'Paid', paymentInstrument: 'upi', amendmentDiscarded: true }),
+    );
+    const fixture = create();
+    expect(orderServiceSpy.getCashfreePaymentStatus).not.toHaveBeenCalled();
+
+    cashfreeCheckoutServiceSpy.awaitingPayment.and.returnValue('o1');
+    fixture.componentInstance.onPageShow();
+
+    expect(orderServiceSpy.getCashfreePaymentStatus).toHaveBeenCalledWith('o1');
+    expect(fixture.componentInstance.cashfreePaymentStatus()).toBe('discarded');
+    // Cleared, or the marker would send them here again from their next visit to checkout.
+    expect(cashfreeCheckoutServiceSpy.clearAwaitingPayment).toHaveBeenCalled();
+  });
+
+  it('does nothing on a page restore that is not a return from paying', () => {
+    userServiceSpy.getMyOrders.and.returnValue(of([order]));
+    const fixture = create();
+
+    fixture.componentInstance.onPageShow();
+
+    expect(orderServiceSpy.getCashfreePaymentStatus).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.cashfreePaymentStatus()).toBeNull();
   });
 
   // ---------- changes that were never paid for ----------
@@ -663,12 +708,33 @@ describe('MyOrders', () => {
     const fixture = create();
 
     fixture.componentInstance.startEdit(oddPriced);
-    fixture.componentInstance.editDeliveryQuote.set(0);
+    // A quoted charge, because the nudge is about removing one - see the test below.
+    fixture.componentInstance.editDeliveryQuote.set(40);
 
     expect(fixture.componentInstance.editFreeDeliveryNudge()).toBe(
       'Add ₹24.29 more to get FREE delivery',
     );
     expect(fixture.componentInstance.editItemsTotal()).toBe(475.71);
+  });
+
+  it('does not offer free delivery to someone whose delivery is already free', () => {
+    // The customer is inside the free-delivery radius, so the quote is zero and there is nothing
+    // to unlock. Telling them to "add ₹24.29 more to get FREE delivery" reads as a shop that does
+    // not know its own prices, and invites them to spend more for something they already have.
+    // It matters more, not less, once the free radius is widened to cover the whole delivery area.
+    const oddPriced: OrderResponse = {
+      ...order,
+      items: [
+        { productId: 'p1', productName: 'Bajra Flour', price: 158.57, weight: '1kg', quantity: 3 },
+      ],
+    };
+    userServiceSpy.getMyOrders.and.returnValue(of([oddPriced]));
+    const fixture = create();
+
+    fixture.componentInstance.startEdit(oddPriced);
+    fixture.componentInstance.editDeliveryQuote.set(0);
+
+    expect(fixture.componentInstance.editFreeDeliveryNudge()).toBeNull();
   });
 
   it('reports no change to pay when the edited total matches what was paid', () => {

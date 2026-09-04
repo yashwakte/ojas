@@ -35,11 +35,12 @@ import { WalletService } from '../../services/wallet.service';
 import {
   COUPONS,
   Coupon,
-  FREE_DELIVERY_CART_THRESHOLD,
   calculateCouponDiscount,
+  freeDeliveryNudgeFor,
   qualifiesForFreeDelivery,
   roundMoney,
 } from '../../constants/pricing';
+import { thumbnailPackShot } from '../../constants/pack-shots';
 import { CashfreeCheckoutService } from '../../services/cashfree-checkout.service';
 
 /** Most payments answer on the very first call. These only matter for one the bank is still
@@ -71,6 +72,11 @@ const HIGHLIGHT_DURATION_MS = 6000;
   ],
   templateUrl: './my-orders.html',
   styleUrl: './my-orders.scss',
+  // Pressing Back from Cashfree's page restores this one from the browser's back/forward cache,
+  // which resumes the app without re-running ngOnInit. Without this a customer who walked away
+  // from paying for an edit came back to a card still offering to take that payment, with nothing
+  // telling them where they stood - see onPageShow.
+  host: { '(window:pageshow)': 'onPageShow()' },
 })
 export class MyOrders implements OnInit, OnDestroy {
   private readonly userService = inject(UserService);
@@ -179,12 +185,11 @@ export class MyOrders implements OnInit, OnDestroy {
    * difference that should be exactly zero can land on 0.0000000001 and read as "you owe more". */
   amountDifference = computed(() => roundMoney(this.newTotal() - this.originalSettledAmount()));
 
-  /** Nudges toward getting free delivery back when an edit has just lost it. */
-  readonly editFreeDeliveryNudge = computed(() => {
-    const subtotal = this.editItemsTotal();
-    if (subtotal === 0 || subtotal >= FREE_DELIVERY_CART_THRESHOLD) return null;
-    return `Add ₹${roundMoney(FREE_DELIVERY_CART_THRESHOLD - subtotal).toFixed(2)} more to get FREE delivery`;
-  });
+  /** Nudges toward getting free delivery back when an edit has just lost it — and only then. See
+   * freeDeliveryNudgeFor: there is nothing to unlock for an address that is already free. */
+  readonly editFreeDeliveryNudge = computed(() =>
+    freeDeliveryNudgeFor(this.editItemsTotal(), this.editDeliveryQuote()),
+  );
 
   /** Id awaiting cancel confirmation — avoids an accidental one-click cancel. */
   confirmingCancelId = signal<string | null>(null);
@@ -247,11 +252,16 @@ export class MyOrders implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Reaching this page is the end of the round trip to the payment gateway, however it went -
-    // paid and redirected back, or backed out of. Left set, the marker would bounce the customer
+    // paid and redirected back, or backed out of. Read before clearing: the marker is what tells
+    // a customer who pressed Back apart from one arriving fresh, and left set it would bounce them
     // here from their *next* visit to checkout.
+    const awaiting = this.cashfreeCheckout.awaitingPayment();
     this.cashfreeCheckout.clearAwaitingPayment();
 
-    const cashfreeOrderId = this.route.snapshot.queryParamMap.get('cashfreeOrderId');
+    // The redirect back from Cashfree names the order in the URL, which is the better signal
+    // because it is only ever set by actually completing the round trip. The marker is the
+    // fallback for the customer who came back some other way.
+    const cashfreeOrderId = this.route.snapshot.queryParamMap.get('cashfreeOrderId') ?? awaiting;
     if (cashfreeOrderId) {
       this.pendingCashfreeOrderId.set(cashfreeOrderId);
       this.cashfreePaymentStatus.set('checking');
@@ -270,6 +280,25 @@ export class MyOrders implements OnInit, OnDestroy {
     }
 
     this.load();
+  }
+
+  /**
+   * Back from Cashfree's page onto this one, restored from the back/forward cache rather than
+   * rebuilt — so ngOnInit never ran and nothing above has happened.
+   *
+   * A customer who reached the payment page for an edit and then decided against it is exactly as
+   * finished as one who was redirected back, and needs the same answer: nothing was charged, and
+   * here is what happened to your changes. Left alone they sat looking at a card still offering to
+   * take the payment, with no way to know whether the trip had done anything.
+   */
+  onPageShow(): void {
+    const orderId = this.cashfreeCheckout.awaitingPayment();
+    if (!orderId) return;
+
+    this.cashfreeCheckout.clearAwaitingPayment();
+    this.pendingCashfreeOrderId.set(orderId);
+    this.cashfreePaymentStatus.set('checking');
+    this.confirmCashfreePayment();
   }
 
   /** Cleared on any interaction, so the emphasis reads as "here is the one you came for" rather
@@ -643,8 +672,13 @@ export class MyOrders implements OnInit, OnDestroy {
             this.showSuccess(
               `Almost there — pay ₹${result.topUpAmount?.toFixed(2)} to confirm your changes.`,
             );
-            // Runs only when the handoff really failed - see whenHandOffFails.
+            // Remembered so that coming back by pressing Back, rather than by paying, is
+            // recognised as the end of the trip instead of looking like a fresh visit.
+            this.cashfreeCheckout.markAwaitingPayment(order.id);
+            // Runs only when the handoff really failed and the customer is still sitting here —
+            // never when they reached the payment page and came back. See whenHandOffFails.
             const handoffDidNotTake = () => {
+              this.cashfreeCheckout.clearAwaitingPayment();
               this.showError(
                 `We couldn't open the payment page for the extra ₹${result.topUpAmount?.toFixed(2)}. Your order is unchanged — use "Pay" on it to try again.`,
               );
@@ -693,7 +727,9 @@ export class MyOrders implements OnInit, OnDestroy {
     // joined by a second one for the same changes.
     if (this.paymentInFlightFor(order.id)) return;
 
+    this.cashfreeCheckout.markAwaitingPayment(order.id);
     const handoffDidNotTake = () => {
+      this.cashfreeCheckout.clearAwaitingPayment();
       this.showError(
         `We couldn't open the payment page for ₹${amendment.topUpAmount.toFixed(2)}. Your order is unchanged — please try again.`,
       );
@@ -757,7 +793,11 @@ export class MyOrders implements OnInit, OnDestroy {
           this.productService.loadProducts();
 
           if (placed.paymentSessionId) {
+            // The *new* order's id — the retry is what the customer is now paying for, and it is
+            // that one they need an answer about if they come back without paying.
+            this.cashfreeCheckout.markAwaitingPayment(placed.id);
             const handoffDidNotTake = () => {
+              this.cashfreeCheckout.clearAwaitingPayment();
               this.showError(
                 "We couldn't open the payment page, so nothing was charged. Please try again.",
               );
@@ -795,7 +835,10 @@ export class MyOrders implements OnInit, OnDestroy {
    * rather than a broken image.
    */
   itemImage(item: OrderItem): string | null {
-    return this.productService.getProduct(item.productId)?.imageUrl ?? null;
+    const url = this.productService.getProduct(item.productId)?.imageUrl;
+    // Order rows are small thumbnails, and a customer with a dozen orders on screen would
+    // otherwise be loading dozens of full-resolution pack shots to draw them.
+    return url ? thumbnailPackShot(url) : null;
   }
 
   /** Exposed to the template: what an order still owes, and whether paying it is the next move. */
@@ -846,7 +889,9 @@ export class MyOrders implements OnInit, OnDestroy {
           return;
         }
 
+        this.cashfreeCheckout.markAwaitingPayment(order.id);
         const handoffDidNotTake = () => {
+          this.cashfreeCheckout.clearAwaitingPayment();
           this.showError(
             `We couldn't open the payment page for ₹${result.amountDue.toFixed(2)}. Your order is unchanged — please try again.`,
           );
