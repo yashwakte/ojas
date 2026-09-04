@@ -29,6 +29,10 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
         /// <summary>Knocked off by an offer on Cashfree's own page, so the customer is charged
         /// less than the order was raised for while Cashfree still reports the order PAID.</summary>
         public decimal Discount { get; set; }
+
+        /// <summary>The payment window closed with nothing paid, so Cashfree reports the order
+        /// itself as EXPIRED rather than ACTIVE.</summary>
+        public bool Expired { get; set; }
     }
 
     private readonly ConcurrentDictionary<string, GatewayOrder> _orders = new();
@@ -40,6 +44,17 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
     /// <summary>Set to make every refund be refused, so the "the payout didn't go through" path
     /// is exercised rather than assumed.</summary>
     public bool FailRefunds { get; set; }
+
+    /// <summary>
+    /// Makes every read answer the way a gateway does when it is having a bad minute: a 502.
+    ///
+    /// This is the condition that must never cost a customer their order. A read that fails is not
+    /// evidence that nothing was paid, and the difference between those two is the difference
+    /// between an order the customer paid for and a cancelled one with the goods put back.
+    /// Creation is left working so a test can set up an order, pay it, and only then take the
+    /// gateway away.
+    /// </summary>
+    public bool ReadsFail { get; set; }
 
     private readonly List<(string GatewayOrderId, decimal Amount)> _refunds = [];
 
@@ -107,9 +122,40 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
             order.PaymentStatus = "FAILED";
     }
 
+    /// <summary>
+    /// Puts a gateway order into the fake without it having been created through the API, for
+    /// tests that start from a webhook rather than from a checkout.
+    ///
+    /// Needed because standing an order down now requires Cashfree to <em>agree</em> that no money
+    /// is coming, and a gateway order this double has never heard of answers 404 — which is
+    /// correctly read as "we could not ask" rather than "it was never paid". A real FAILED webhook
+    /// is always about an order Cashfree knows, so seeding one is the faithful simulation; the
+    /// alternative would be a test that only passed because the double was less capable than the
+    /// thing it stands in for.
+    /// </summary>
+    public void Seed(string gatewayOrderId, decimal amount, string? paymentStatus = null)
+    {
+        _orders[gatewayOrderId] = new GatewayOrder(amount) { PaymentStatus = paymentStatus };
+        lock (_createdOrderIds) _createdOrderIds.Add(gatewayOrderId);
+    }
+
+    /// <summary>Cashfree's own terminal state for an order nobody paid before the window closed —
+    /// the authoritative "no money is coming from this one", as opposed to our inferring it from
+    /// an empty payments list.</summary>
+    public void ExpireAllOutstanding()
+    {
+        foreach (var order in _orders.Values.Where(o => o.PaymentStatus is null))
+            order.Expired = true;
+    }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var path = request.RequestUri!.AbsolutePath;
+
+        // Reads only: an order still has to be creatable so a test can get to the state it wants
+        // to see survive the gateway going away.
+        if (ReadsFail && request.Method == HttpMethod.Get)
+            return Json(HttpStatusCode.BadGateway, """{"message":"simulated gateway outage"}""");
 
         if (path.EndsWith("/payments", StringComparison.Ordinal))
             return Payments(path);
@@ -141,9 +187,11 @@ public sealed class FakeCashfreeHandler : HttpMessageHandler
         var status = order.PaymentStatus switch
         {
             "SUCCESS" => "PAID",
+            // A failed attempt does not close the order - the customer can try again on the same
+            // page, which is exactly why a FAILED payment must never be read as a failed order.
             "PENDING" => "ACTIVE",
             "FAILED" => "ACTIVE",
-            _ => "ACTIVE",
+            _ => order.Expired ? "EXPIRED" : "ACTIVE",
         };
 
         var amount = order.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture);

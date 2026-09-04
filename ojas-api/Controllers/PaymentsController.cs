@@ -48,7 +48,8 @@ public class PaymentsController : ControllerBase
         // Short enough that flipping the environment takes effect within a minute, long enough
         // that a busy checkout page isn't asking on every visit.
         Response.Headers.CacheControl = "public, max-age=60";
-        return Ok(new CashfreeConfigResponse(_cashfreeService.Mode, _cashfreeService.IsConfigured));
+        return Ok(new CashfreeConfigResponse(
+            _cashfreeService.Mode, _cashfreeService.IsConfigured, _cashfreeService.FrontendBaseUrl));
     }
 
     /// <summary>Asks Cashfree directly how a payment went, for the customer who has just been
@@ -70,35 +71,11 @@ public class PaymentsController : ControllerBase
         if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
             return Forbid();
 
-        // Already settled or already stood down, with no unpaid edit riding on it - nothing
-        // outstanding to ask Cashfree about. The stored failure reason comes back too, so a
-        // customer returning to an order that already failed still gets told why.
-        if (order.PendingAmendment == null && (order.PaymentStatus == "Paid" || order.Status == "Cancelled"))
-            return Ok(new CashfreePaymentStatusResponse(
-                order.PaymentStatus, order.PaymentInstrument, false, order.PaymentFailureReason,
-                order.ToResponse(),
-                order.PaymentStatus == "Failed"
-                    ? PaymentAttemptOutcomes.Failed
-                    : PaymentAttemptOutcomes.Paid));
-
-        // Every gateway order recorded against this one, not just the first: an edit that raised
-        // the total is charged as its own gateway order, and asking only about the original is
-        // exactly how a paid top-up ends up invisible. Older orders predate the attempts list,
-        // so fall back to the order id, which is what their single gateway order was called.
-        var attempts = order.PaymentAttempts.Count > 0
-            ? order.PaymentAttempts.Select(a => a.CashfreeOrderId).ToList()
-            : [orderId];
-
-        var anyRecorded = false;
-
-        // Tracked per gateway order, because the original payment and a pending edit's top-up have
-        // entirely separate fates: a top-up going unpaid drops the edit, while the *original*
-        // going unpaid stands the whole order down. Judging both off one combined flag is how an
-        // abandoned top-up could look like an abandoned order, and vice versa.
+        // The gateway order the customer's *own* order was raised against, as opposed to the
+        // top-ups an edit charges separately. It is the order's own id, and the distinction is
+        // load-bearing below: only this one going unpaid can stand the order down.
+        var ownGatewayOrderId = orderId;
         var amendmentOrderId = order.PendingAmendment?.CashfreeOrderId;
-        var amendmentLive = false;
-        var originalLive = false;
-        string? originalFailureReason = null;
 
         // The customer has just come back from paying one specific thing: the most recent gateway
         // order raised against this one. Its fate is what the banner has to report - the order's
@@ -106,64 +83,70 @@ public class PaymentsController : ControllerBase
         // left pending at the bank got announced as "payment successful".
         var latestAttempt = order.PaymentAttempts.Count > 0
             ? order.PaymentAttempts[^1].CashfreeOrderId
-            : orderId;
-        var latestSucceeded = false;
-        var latestPending = false;
-        string? latestFailureReason = null;
+            : ownGatewayOrderId;
 
-        foreach (var cashfreeOrderId in attempts)
+        // Already stood down, or settled with nothing newer to report on. Nothing outstanding to
+        // ask Cashfree about, so answer from what we already know. Deliberately *not* taken when
+        // the last thing the customer did was pay a top-up: the order being "Paid" says nothing
+        // about how that top-up went, and answering with the order's own status there is what told
+        // a customer who had just abandoned an edit that their payment was successful.
+        if (order.PendingAmendment == null &&
+            (string.Equals(order.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+             (order.PaymentStatus == "Paid" && latestAttempt == ownGatewayOrderId)))
         {
-            var isAmendment = cashfreeOrderId == amendmentOrderId;
-            var isLatest = cashfreeOrderId == latestAttempt;
+            return Ok(new CashfreePaymentStatusResponse(
+                order.PaymentStatus, order.PaymentInstrument, false, order.PaymentFailureReason,
+                order.ToResponse(),
+                order.PaymentStatus == "Failed"
+                    ? PaymentAttemptOutcomes.Failed
+                    : order.PaymentStatus == "Paid"
+                        ? PaymentAttemptOutcomes.Paid
+                        : PaymentAttemptOutcomes.Discarded));
+        }
 
-            var payments = await _cashfreeService.GetPaymentsAsync(cashfreeOrderId);
+        var anyRecorded = false;
+        var lookups = new Dictionary<string, CashfreeOrderLookup>(StringComparer.Ordinal);
+
+        foreach (var cashfreeOrderId in GatewayOrdersToCheck(order))
+        {
+            // One answer covering the gateway order's own status and every payment beneath it -
+            // and, crucially, whether the asking worked at all. A read that failed used to look
+            // exactly like an order nobody had paid, which is how a customer who had just paid was
+            // told their payment never happened and had their order cancelled underneath them.
+            var lookup = await _cashfreeService.LookUpAsync(cashfreeOrderId);
+            lookups[cashfreeOrderId] = lookup;
+
+            if (!lookup.Reachable)
+            {
+                _logger.LogWarning(
+                    "Could not read Cashfree gateway order {CashfreeOrderId} for order {OrderId}. " +
+                    "Nothing will be decided on this - the customer keeps whatever they have.",
+                    cashfreeOrderId, orderId);
+                continue;
+            }
 
             // Ask Cashfree about the gateway order itself, not only the payments beneath it. When
             // an offer applies, the customer is charged less than the order was raised for and
             // Cashfree still reports it PAID - so the shortfall is a discount that settles the
             // order, not an amount the customer still owes.
-            var gatewayOrder = await _cashfreeService.GetOrderStatusAsync(cashfreeOrderId);
-            if (gatewayOrder is { IsPaid: true })
+            if (lookup.Order is { IsPaid: true } gatewayOrder)
             {
-                var charged = payments.Where(p => p.IsSuccess).Sum(p => p.Amount);
+                var charged = lookup.Payments.Where(p => p.IsSuccess).Sum(p => p.Amount);
                 anyRecorded |= await _orderService.TryRecordGatewayDiscountAsync(
                     orderId, cashfreeOrderId, gatewayOrder.OrderAmount - charged);
             }
 
-            foreach (var payment in payments)
+            foreach (var payment in lookup.Payments.Where(p => p.IsSuccess))
             {
-                if (payment.IsSuccess)
+                // Recorded by Cashfree's payment id, so asking again - or a webhook arriving
+                // for the same payment - can't count the same money twice.
+                anyRecorded |= await _orderService.TryRecordPaymentAsync(orderId, new OrderPayment
                 {
-                    // Recorded by Cashfree's payment id, so asking again - or a webhook arriving
-                    // for the same payment - can't count the same money twice.
-                    anyRecorded |= await _orderService.TryRecordPaymentAsync(orderId, new OrderPayment
-                    {
-                        CfPaymentId = payment.CfPaymentId,
-                        CashfreeOrderId = payment.CashfreeOrderId,
-                        Amount = payment.Amount,
-                        Instrument = payment.PaymentGroup,
-                    });
-                }
-
-                // "Live" means this gateway order may still yield money - it succeeded, or the
-                // bank hasn't finished deciding. Anything else is over.
-                var live = payment.IsSuccess || payment.IsInFlight;
-                if (isAmendment)
-                {
-                    amendmentLive |= live;
-                }
-                else
-                {
-                    originalLive |= live;
-                    originalFailureReason ??= payment.IsFailed ? payment.FailureReason : null;
-                }
-
-                if (isLatest)
-                {
-                    latestSucceeded |= payment.IsSuccess;
-                    latestPending |= payment.IsInFlight;
-                    latestFailureReason ??= payment.IsFailed ? payment.FailureReason : null;
-                }
+                    CfPaymentId = payment.CfPaymentId,
+                    CashfreeOrderId = payment.CashfreeOrderId,
+                    Amount = payment.Amount,
+                    Instrument = payment.PaymentGroup,
+                });
             }
         }
 
@@ -172,28 +155,55 @@ public class PaymentsController : ControllerBase
         // paying, so those changes are dropped now rather than hanging over the order. This is the
         // difference between an honest "nothing was charged, your order is unchanged" and the
         // customer being told to keep refreshing a page that will never resolve.
+        //
+        // A lookup we could not complete drops nothing. The customer keeps their pending edit and
+        // the Pay button that goes with it, which is strictly better than throwing away changes
+        // they may well have just paid for because the gateway was briefly unreachable.
         var amendmentDiscarded = false;
-        if (amendmentOrderId != null && !amendmentLive)
-            amendmentDiscarded = await _paymentOutcome.DiscardAsync(orderId, amendmentOrderId);
-        else if (amendmentOrderId != null)
-            await _paymentOutcome.ApplyIfPaidAsync(orderId);
+        if (amendmentOrderId != null &&
+            lookups.TryGetValue(amendmentOrderId, out var amendmentLookup) &&
+            amendmentLookup.Reachable)
+        {
+            if (amendmentLookup.IsPaid || amendmentLookup.AnyLive)
+                await _paymentOutcome.ApplyIfPaidAsync(orderId);
+            else
+                amendmentDiscarded = await _paymentOutcome.DiscardAsync(orderId, amendmentOrderId);
+        }
 
         var refreshed = await _orderService.RefreshPaymentStateAsync(orderId) ?? order;
 
         // The same reasoning applied to the order's *own* payment. An order the customer never
         // paid for shouldn't sit in their list saying "payment pending" forever, holding stock and
         // any wallet credit it spent - it has failed, and saying so is the only way they know to
-        // try again. Guarded on the order not being settled so a wallet-covered order, which never
-        // reaches the gateway at all and so has no payments to find, is never caught by this.
+        // try again.
+        //
+        // Three things have to line up before that happens, and every one of them is a positive
+        // statement rather than an absence: the order holds no money of its own, Cashfree answered
+        // when asked about the order's gateway order, and what it said was either "this is dead"
+        // (expired, terminated, or every attempt failed) or "still open and nobody ever tried" -
+        // which, for someone who has demonstrably come back from that page, means they walked
+        // away. FailIfGatewayAgreesAsync then asks once more before acting.
         var settled = string.Equals(refreshed.PaymentStatus, "Paid", StringComparison.Ordinal);
-        if (!settled && !originalLive &&
+        var ownLookup = lookups.GetValueOrDefault(ownGatewayOrderId);
+        var ownIsFinished = ownLookup is { IsDefinitivelyUnpaid: true } or { OpenAndUnattempted: true };
+
+        if (!settled && ownIsFinished &&
             !string.Equals(refreshed.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
         {
-            await _paymentOutcome.FailOrderAsync(orderId, originalFailureReason ?? NotAttemptedReason);
-            var failed = await _orderService.GetOrderByIdAsync(orderId);
-            return Ok(new CashfreePaymentStatusResponse(
-                "Failed", null, amendmentDiscarded, failed?.PaymentFailureReason,
-                failed?.ToResponse(), PaymentAttemptOutcomes.Failed));
+            var stoodDown = await _paymentOutcome.FailIfGatewayAgreesAsync(
+                orderId, ownGatewayOrderId, ownLookup!.LastFailureReason ?? NotAttemptedReason);
+
+            if (stoodDown)
+            {
+                var failed = await _orderService.GetOrderByIdAsync(orderId);
+                return Ok(new CashfreePaymentStatusResponse(
+                    "Failed", null, amendmentDiscarded, failed?.PaymentFailureReason,
+                    failed?.ToResponse(), PaymentAttemptOutcomes.Failed));
+            }
+
+            // The confirmation disagreed - money has landed, or the gateway went quiet. Fall
+            // through and report honestly rather than announcing a failure that was just refused.
+            refreshed = await _orderService.RefreshPaymentStateAsync(orderId) ?? refreshed;
         }
 
         // A top-up whose changes are no longer pending is money we're holding for nothing.
@@ -210,16 +220,49 @@ public class PaymentsController : ControllerBase
         // Reported against the attempt the customer just made, not the order as a whole. A bank
         // still deciding on a top-up leaves the order fully paid for what it currently holds, so
         // announcing "successful" there would invite them to pay a second time for the same change.
+        var latest = lookups.GetValueOrDefault(latestAttempt);
+        var latestFailureReason = latest?.LastFailureReason;
         var outcome =
-            latestSucceeded ? PaymentAttemptOutcomes.Paid
-            : latestPending ? PaymentAttemptOutcomes.Pending
+            // Unreadable, so we genuinely do not know yet. "Keep checking" is the only honest
+            // answer - never a success, and never a failure.
+            latest is null or { Reachable: false } ? PaymentAttemptOutcomes.Pending
+            : latest.IsPaid || latest.Payments.Any(p => p.IsSuccess) ? PaymentAttemptOutcomes.Paid
+            : latest.AnyInFlight ? PaymentAttemptOutcomes.Pending
             : amendmentDiscarded ? PaymentAttemptOutcomes.Discarded
             : latestFailureReason != null ? PaymentAttemptOutcomes.Failed
-            : PaymentAttemptOutcomes.Paid;
+            : latest.OpenAndUnattempted ? PaymentAttemptOutcomes.Discarded
+            : PaymentAttemptOutcomes.Pending;
 
         return Ok(new CashfreePaymentStatusResponse(
             refreshed.PaymentStatus, refreshed.PaymentInstrument, amendmentDiscarded,
             refreshed.PaymentFailureReason ?? latestFailureReason, refreshed.ToResponse(), outcome));
+    }
+
+    /// <summary>
+    /// Which gateway orders this check needs to ask Cashfree about.
+    ///
+    /// Always the order's own — its fate is the order's fate — plus the pending edit's and the one
+    /// the customer has just come back from, since those are what the answer has to describe. Then
+    /// the most recent few attempts, so a top-up that landed late is still picked up.
+    ///
+    /// Bounded on purpose. Every edit that raises a total adds an attempt permanently, and Get
+    /// Payments is rate-limited per account (100/min), so an order edited a dozen times would
+    /// otherwise turn one page load into a dozen gateway calls. Anything older than this window is
+    /// still swept by the webhook and by the full reconciliation on the Pay path.
+    /// </summary>
+    private static IEnumerable<string> GatewayOrdersToCheck(Order order)
+    {
+        const int RecentAttempts = 3;
+
+        var wanted = new List<string> { order.Id! };
+        if (order.PendingAmendment?.CashfreeOrderId is { } amendment)
+            wanted.Add(amendment);
+
+        wanted.AddRange(order.PaymentAttempts
+            .TakeLast(RecentAttempts)
+            .Select(a => a.CashfreeOrderId));
+
+        return wanted.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal);
     }
 
     /// <summary>What to tell a customer who reached the payment page and left without picking a
@@ -252,13 +295,42 @@ public class PaymentsController : ControllerBase
             return Unauthorized();
         }
 
-        using var doc = JsonDocument.Parse(rawBody);
+        // Every read of this payload is defensive, and deliberately so. The endpoint is registered
+        // at webhook version 2025-01-01 while our API calls are pinned to 2023-08-01 — which is
+        // legal, the two are configured independently — but Cashfree has published no field-level
+        // delta between those versions, so the exact shape of what arrives here is not something
+        // that can be known from the documentation. Tolerating an unexpected shape is therefore
+        // the only defensible posture.
+        //
+        // It matters more than it looks: an exception escaping this method is a 500, Cashfree
+        // reads a 500 as "not delivered" and retries indefinitely, and the retries arrive faster
+        // than they are shed. One malformed payload used to be enough to start that. Anything we
+        // cannot make sense of is acknowledged and logged instead, because retrying will not make
+        // an unparseable body parseable.
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(rawBody);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Cashfree sent a webhook body that is not JSON; acknowledging it.");
+            return Ok();
+        }
+
+        using (doc)
+        {
         var root = doc.RootElement;
-        var type = root.GetProperty("type").GetString();
+        var type = root.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
         var cashfreeOrderId = WebhookOrderId(root);
 
-        if (string.IsNullOrWhiteSpace(cashfreeOrderId))
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(cashfreeOrderId))
+        {
+            _logger.LogWarning(
+                "A Cashfree webhook arrived without a type or an order id (type: {Type}). " +
+                "Acknowledged - retrying would deliver the same thing.", type ?? "none");
             return Ok(); // Nothing to act on - acknowledge so Cashfree doesn't keep retrying.
+        }
 
         // A top-up carries a suffixed Cashfree order id; both it and the original resolve back
         // to the same Ojas order.
@@ -272,8 +344,22 @@ public class PaymentsController : ControllerBase
                 var order = await _orderService.GetOrderByIdAsync(orderId);
                 if (order == null) break;
 
-                var payment = root.GetProperty("data").GetProperty("payment");
-                var cfPaymentId = payment.GetProperty("cf_payment_id").ToString();
+                // The payment id is the whole basis of not counting money twice, so a success we
+                // cannot identify is worse than useless - the status check will find that payment
+                // by asking Cashfree directly, and record it exactly once.
+                if (!TryGetNode(root, "data", "payment", out var payment) ||
+                    !payment.TryGetProperty("cf_payment_id", out var idElement))
+                {
+                    _logger.LogError(
+                        "A Cashfree success webhook for order {OrderId} carried no identifiable payment. " +
+                        "Acknowledged; the status check will reconcile it.", orderId);
+                    break;
+                }
+
+                // ToString rather than GetString: Cashfree made these ids strings in 2023-08-01,
+                // but they were integers before it and this endpoint is registered at a different
+                // version than our API calls use.
+                var cfPaymentId = idElement.ToString();
                 var instrument = payment.TryGetProperty("payment_group", out var group) ? group.GetString() : null;
                 var amount = payment.TryGetProperty("payment_amount", out var amt) && amt.TryGetDecimal(out var parsed)
                     ? parsed
@@ -313,8 +399,10 @@ public class PaymentsController : ControllerBase
                 // — a closed account, a cancelled card — and the customer is then never credited.
                 // Without this the order would go on showing money as handed back that it still
                 // holds, which is the same lie as not refunding at all, only harder to notice.
-                var refundNode = root.GetProperty("data").GetProperty("refund");
-                var refundId = refundNode.TryGetProperty("refund_id", out var rid) ? rid.GetString() : null;
+                if (!TryGetNode(root, "data", "refund", out var refundNode))
+                    break;
+
+                var refundId = refundNode.TryGetProperty("refund_id", out var rid) ? rid.ToString() : null;
                 var refundStatus = refundNode.TryGetProperty("refund_status", out var rst) ? rst.GetString() : null;
 
                 if (string.IsNullOrWhiteSpace(refundId))
@@ -362,12 +450,46 @@ public class PaymentsController : ControllerBase
                 // The reason Cashfree gives is carried through verbatim so the customer is told
                 // what actually happened. Standing the order down is itself guarded against
                 // running twice, so Cashfree retrying this webhook is harmless.
-                await _paymentOutcome.FailOrderAsync(orderId, WebhookFailureReason(root, type));
+                //
+                // Cashfree is asked to confirm first, because one failed *attempt* is not a failed
+                // order. A customer whose first try times out and who then pays on the same page
+                // produces both a FAILED and a SUCCESS webhook, delivery order is not guaranteed,
+                // and Cashfree retries until it gets a 2xx - so this callback routinely arrives
+                // about an order that has since been paid for.
+                var reason = WebhookFailureReason(root, type);
+                if (!await _paymentOutcome.FailIfGatewayAgreesAsync(orderId, cashfreeOrderId, reason))
+                {
+                    _logger.LogInformation(
+                        "Cashfree {Type} for order {OrderId} did not stand it down - the gateway says " +
+                        "money is coming or has come, or it could not be reached.", type, orderId);
+                }
+
                 break;
             }
         }
 
         return Ok();
+        }
+    }
+
+    /// <summary>Walks a nested object path, answering false rather than throwing at any step that
+    /// is missing or is not an object. Every read of a webhook payload goes through this or
+    /// TryGetProperty, because a shape we did not expect must never become a 500 - Cashfree reads
+    /// that as a failed delivery and retries it forever.</summary>
+    private static bool TryGetNode(JsonElement root, string first, string second, out JsonElement node)
+    {
+        node = default;
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty(first, out var outer) ||
+            outer.ValueKind != JsonValueKind.Object ||
+            !outer.TryGetProperty(second, out var inner) ||
+            inner.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        node = inner;
+        return true;
     }
 
     /// <summary>The gateway order a webhook is about. Payment events carry it under data.order;
@@ -375,44 +497,64 @@ public class PaymentsController : ControllerBase
     /// threw on a refund webhook, which Cashfree sees as a 500 and retries indefinitely.</summary>
     private static string? WebhookOrderId(JsonElement root)
     {
-        if (!root.TryGetProperty("data", out var data))
-            return null;
-
-        if (data.TryGetProperty("order", out var order) &&
+        // ValueKind is checked at every step, not just presence. TryGetProperty *throws* when the
+        // element it is called on is not an object, so "data" arriving as a string - which is
+        // exactly the kind of thing an unpublished version delta or an error page can produce -
+        // would otherwise escape as a 500 and put Cashfree into an endless retry.
+        if (TryGetNode(root, "data", "order", out var order) &&
             order.TryGetProperty("order_id", out var fromOrder))
+        {
             return fromOrder.GetString();
+        }
 
-        return data.TryGetProperty("refund", out var refund) &&
+        return TryGetNode(root, "data", "refund", out var refund) &&
             refund.TryGetProperty("order_id", out var fromRefund)
                 ? fromRefund.GetString()
                 : null;
     }
 
-    /// <summary>Digs the human-readable reason out of a failure webhook. Cashfree puts it in
-    /// error_details.error_description, falling back to the payment's own message; a customer who
-    /// simply walked away gets that said plainly, since the payload has nothing to explain.</summary>
+    /// <summary>
+    /// Digs the human-readable reason out of a failure webhook, so the customer is told what
+    /// actually happened rather than a guess about banks.
+    ///
+    /// It looks for <c>error_details</c> in two places on purpose. Cashfree documents it under
+    /// <c>data</c>, but nests it under <c>data.payment</c> in the payments API, and this endpoint
+    /// is registered at a webhook version whose field-level differences Cashfree has never
+    /// published. Checking both costs one lookup and is the difference between quoting the
+    /// gateway and falling back to "the payment was declined" on a payload that told us exactly
+    /// why. Display only, either way — nothing branches on this text.
+    /// </summary>
     private static string WebhookFailureReason(JsonElement root, string? type)
     {
         if (string.Equals(type, "PAYMENT_USER_DROPPED_WEBHOOK", StringComparison.Ordinal))
             return "You left the payment page before the payment went through.";
 
-        var data = root.GetProperty("data");
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("data", out var data))
+            return DeclinedReason;
 
-        if (data.TryGetProperty("error_details", out var details) &&
-            details.ValueKind == JsonValueKind.Object &&
-            details.TryGetProperty("error_description", out var description) &&
-            !string.IsNullOrWhiteSpace(description.GetString()))
+        data.TryGetProperty("payment", out var payment);
+
+        foreach (var container in new[] { data, payment })
         {
-            return description.GetString()!.Trim();
+            if (container.ValueKind == JsonValueKind.Object &&
+                container.TryGetProperty("error_details", out var details) &&
+                details.ValueKind == JsonValueKind.Object &&
+                details.TryGetProperty("error_description", out var description) &&
+                !string.IsNullOrWhiteSpace(description.GetString()))
+            {
+                return description.GetString()!.Trim();
+            }
         }
 
-        if (data.TryGetProperty("payment", out var payment) &&
+        if (payment.ValueKind == JsonValueKind.Object &&
             payment.TryGetProperty("payment_message", out var message) &&
             !string.IsNullOrWhiteSpace(message.GetString()))
         {
             return message.GetString()!.Trim();
         }
 
-        return "The payment was declined.";
+        return DeclinedReason;
     }
+
+    private const string DeclinedReason = "The payment was declined.";
 }

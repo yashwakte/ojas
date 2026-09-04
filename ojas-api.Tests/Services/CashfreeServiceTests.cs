@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -209,6 +210,87 @@ public class CashfreeServiceTests
         captured.Headers.GetValues("x-client-id").ShouldContain("test-client-id");
         captured.Headers.GetValues("x-client-secret").ShouldContain(ClientSecret);
         captured.Headers.GetValues("x-api-version").ShouldContain("2023-08-01");
+    }
+
+    /// <summary>
+    /// The payment window is what turns an abandoned gateway order into an authoritative EXPIRED
+    /// instead of something we have to infer from an empty payments list — and inferring failure
+    /// from absence is what cancelled orders customers had paid for.
+    ///
+    /// It is asserted at the wire rather than trusted because the blast radius is the whole
+    /// storefront: Cashfree rejects a malformed order_expiry_time outright, so a bad format string
+    /// does not break one payment, it breaks every payment. The date is parsed back rather than
+    /// string-matched, which is what actually proves Cashfree can read it.
+    /// </summary>
+    /// <summary>
+    /// The regression test for a bug that stopped every order being placed.
+    ///
+    /// In a .NET custom format string <c>:</c> means "the current culture's time separator", not a
+    /// colon. Under en-IN — the locale this shop is actually developed and run in — that is a full
+    /// stop, so the expiry went out as <c>2026-09-04T18.00.33+00:00</c>, Cashfree rejected it with
+    /// <c>order_expiry_time_invalid</c>, and checkout failed for everyone.
+    ///
+    /// The cultures below are the point of the test. The earlier version of it asserted the same
+    /// property but ran under whatever culture the test host happened to use, so it passed against
+    /// code that was broken on a real machine. A format claiming to be culture-independent has to
+    /// be tested under a culture that would expose it.
+    /// </summary>
+    [Theory]
+    [InlineData("en-IN")]   // time separator '.', and the one that actually bit us
+    [InlineData("fi-FI")]   // time separator '.'
+    [InlineData("en-US")]
+    [InlineData("ar-SA")]   // non-Gregorian calendar
+    public void FormatExpiry_IsIso8601_WhateverTheMachinesLocale(string culture)
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo(culture);
+            var moment = new DateTimeOffset(2026, 9, 4, 18, 0, 33, TimeSpan.Zero);
+
+            CashfreeService.FormatExpiry(moment).ShouldBe("2026-09-04T18:00:33Z");
+
+            // Any offset, normalised to UTC — so the string never depends on the server's zone
+            // either, and never contains a '+' for a JSON encoder to escape into something
+            // Cashfree rejects.
+            var ist = new DateTimeOffset(2026, 9, 4, 23, 30, 33, TimeSpan.FromHours(5.5));
+            CashfreeService.FormatExpiry(ist).ShouldBe("2026-09-04T18:00:33Z");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    [Fact]
+    public async Task CreateOrderAsync_AsksForAPaymentWindowCashfreeCanParse()
+    {
+        string? body = null;
+        var service = MakeService(req =>
+        {
+            body = req.Content!.ReadAsStringAsync().Result;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"cf_order_id":"cf_order_1","payment_session_id":"session_abc"}""",
+                    Encoding.UTF8, "application/json"),
+            };
+        });
+
+        await service.CreateOrderAsync(MakeOrder());
+
+        using var payload = System.Text.Json.JsonDocument.Parse(body!);
+        var expiry = payload.RootElement.GetProperty("order_expiry_time").GetString();
+
+        DateTimeOffset.TryParse(
+            expiry, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
+            .ShouldBeTrue($"Cashfree could not have parsed '{expiry}'.");
+
+        // Cashfree requires at least fifteen minutes; ours is thirty, matching how long an unpaid
+        // edit is held so a top-up and the changes it pays for die together.
+        var window = parsed - DateTimeOffset.UtcNow;
+        window.ShouldBeGreaterThan(TimeSpan.FromMinutes(15));
+        window.ShouldBeLessThanOrEqualTo(CashfreeService.PaymentWindow);
     }
 
     [Fact]

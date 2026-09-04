@@ -29,7 +29,12 @@ public class OrderPaymentOutcomeService(
     /// that hasn't finished deciding may still take the money, so raising a second payment then is
     /// how a customer pays twice for the same order.
     /// </summary>
-    public record GatewayReconciliation(Order Order, bool AnyInFlight, string? LastFailureReason);
+    /// <param name="Reachable">False when Cashfree could not be asked about at least one of the
+    /// gateway orders. Callers about to raise a <em>new</em> payment must refuse on this: "we
+    /// don't know whether money is already coming" has to be treated as "it might be", or the
+    /// customer is invited to pay for the same thing twice.</param>
+    public record GatewayReconciliation(
+        Order Order, bool AnyInFlight, string? LastFailureReason, bool Reachable = true);
 
     /// <summary>
     /// Asks Cashfree what actually happened to every payment recorded against an order, and writes
@@ -58,25 +63,37 @@ public class OrderPaymentOutcomeService(
             : [orderId];
 
         var anyInFlight = false;
+        var reachable = true;
         string? lastFailureReason = null;
 
         foreach (var cashfreeOrderId in attempts)
         {
-            var payments = await cashfreeService.GetPaymentsAsync(cashfreeOrderId);
+            // Order status and payments together, in one answer that says whether the asking
+            // worked. A lookup we could not complete must not read as "nothing here" - that is
+            // how an order with money against it gets treated as unpaid.
+            var lookup = await cashfreeService.LookUpAsync(cashfreeOrderId);
+            if (!lookup.Reachable)
+            {
+                reachable = false;
+                logger.LogWarning(
+                    "Could not reach Cashfree about gateway order {CashfreeOrderId} on order {OrderId}; " +
+                    "treating it as possibly still live rather than as unpaid.",
+                    cashfreeOrderId, orderId);
+                continue;
+            }
 
             // Cashfree is the authority on whether the order it created was paid, not our sum of
             // the payments beneath it. An offer applied on the payment page charges the customer
             // less than the order was raised for while Cashfree still reports it PAID, and that
             // shortfall settles the order rather than being money still owed.
-            var gatewayOrder = await cashfreeService.GetOrderStatusAsync(cashfreeOrderId);
-            if (gatewayOrder is { IsPaid: true })
+            if (lookup.Order is { IsPaid: true } gatewayOrder)
             {
-                var charged = payments.Where(p => p.IsSuccess).Sum(p => p.Amount);
+                var charged = lookup.Payments.Where(p => p.IsSuccess).Sum(p => p.Amount);
                 await orderService.TryRecordGatewayDiscountAsync(
                     orderId, cashfreeOrderId, gatewayOrder.OrderAmount - charged);
             }
 
-            foreach (var payment in payments)
+            foreach (var payment in lookup.Payments)
             {
                 if (payment.IsSuccess)
                 {
@@ -98,7 +115,7 @@ public class OrderPaymentOutcomeService(
             ?? await orderService.GetOrderByIdAsync(orderId)
             ?? order;
 
-        return new GatewayReconciliation(refreshed, anyInFlight, lastFailureReason);
+        return new GatewayReconciliation(refreshed, anyInFlight, lastFailureReason, reachable);
     }
 
     /// <summary>
@@ -196,11 +213,60 @@ public class OrderPaymentOutcomeService(
         if (order == null)
             return false;
 
+        // An order the gateway has taken money for has not failed, whatever prompted this call.
+        // Two real sequences end up here on a perfectly good order, and both used to cancel it:
+        //
+        //  - the customer's first attempt failed and the second succeeded on the same page.
+        //    Cashfree fires a webhook per attempt and retries until it gets a 2xx, so the FAILED
+        //    one can be delivered *after* the SUCCESS one.
+        //  - a status check that could not read the gateway (see CashfreeOrderLookup) mistook
+        //    silence for "never paid".
+        //
+        // Measured from the payment records themselves, not from AmountPaid: that figure includes
+        // wallet credit, and an order the wallet part-paid whose card leg never went through is
+        // exactly the order this method exists to stand down and hand the credit back for. What
+        // must never be written off is money that actually reached the gateway.
+        //
+        // Re-read rather than trusting the caller's copy: the whole point is that a webhook and a
+        // browser check race here, so the money may have landed since whoever called us looked.
+        var gatewayMoney = order.Payments.Sum(p => p.Amount) + order.GatewayDiscountTotal;
+        if (gatewayMoney > 0)
+        {
+            logger.LogWarning(
+                "Refused to stand order {OrderId} down ({Reason}): the gateway has settled {Gateway} " +
+                "against it. A failed attempt on an order another attempt paid is not a failed order.",
+                orderId, reason ?? "no reason given", gatewayMoney);
+            return false;
+        }
+
+        // Covered without the gateway ever being involved — a wallet-funded order. There is no
+        // payment to have failed, so a callback claiming one is about something else entirely.
+        if (order.TotalAmount > 0 && order.SettledAmount >= order.TotalAmount)
+        {
+            logger.LogWarning(
+                "Refused to stand order {OrderId} down ({Reason}): it is already settled in full.",
+                orderId, reason ?? "no reason given");
+            return false;
+        }
+
+        // Past Confirmed the order is being picked, packed or is already with a customer, and a
+        // late gateway callback has no business cancelling it. Whatever happened to the money is
+        // an admin's problem to settle, not something to resolve by silently voiding a live order.
+        if (!OrderService.IsCustomerEditable(order.Status))
+        {
+            logger.LogWarning(
+                "Refused to stand order {OrderId} down ({Reason}): it is already {Status}.",
+                orderId, reason ?? "no reason given", order.Status);
+            return false;
+        }
+
         // Whatever the customer was part-way through buying dies with the order.
         await DiscardAsync(orderId);
 
-        if (!await orderService.TryCancelAsync(orderId))
-            return false; // Already cancelled — somebody else has done all of this.
+        // Scoped to the same statuses checked above, so the eligibility rule is enforced by the
+        // write that claims the right to act rather than by the read a moment ago.
+        if (!await orderService.TryCancelAsync(orderId, OrderService.CustomerCancellableStatuses))
+            return false; // Already cancelled, or moved on — somebody else has done all of this.
 
         await orderService.MarkPaymentFailedAsync(orderId, reason);
         await productService.RestoreStockAsync(order.Items.Select(i => (i.ProductId, i.Quantity)));
@@ -226,6 +292,47 @@ public class OrderPaymentOutcomeService(
             orderId, reason ?? "no reason given", order.WalletAmountApplied);
 
         return true;
+    }
+
+    /// <summary>
+    /// Stands an order down only after asking Cashfree, one more time, whether any money is
+    /// coming — and does nothing at all if it cannot get an answer.
+    ///
+    /// This is the gate every automatic cancellation goes through, and it exists because
+    /// cancelling a real order is the most destructive thing in this system: it puts the goods
+    /// back, hands the wallet share back, and tells a customer who has just paid that they
+    /// haven't. The evidence for doing it therefore has to be positive and current, never the
+    /// absence of a record we might simply have failed to read.
+    ///
+    /// The second read is not paranoia about the same call twice. It happens after the caller has
+    /// already recorded everything the first read found, so it is a fresh answer from a gateway
+    /// that has had a moment longer to settle — which is exactly the window in which a payment
+    /// authorised seconds ago becomes visible. Combined with the settled-amount guard inside
+    /// <see cref="FailOrderAsync"/>, a paid order has to defeat three independent checks to be
+    /// cancelled by mistake.
+    /// </summary>
+    public async Task<bool> FailIfGatewayAgreesAsync(string orderId, string cashfreeOrderId, string? reason)
+    {
+        var confirmation = await cashfreeService.LookUpAsync(cashfreeOrderId);
+
+        if (!confirmation.Reachable)
+        {
+            logger.LogWarning(
+                "Not standing order {OrderId} down: Cashfree did not answer when asked to confirm " +
+                "that gateway order {CashfreeOrderId} was never paid.", orderId, cashfreeOrderId);
+            return false;
+        }
+
+        if (confirmation.IsPaid || confirmation.AnyLive)
+        {
+            logger.LogWarning(
+                "Not standing order {OrderId} down: gateway order {CashfreeOrderId} is {Status} with " +
+                "{PaymentCount} payment(s) against it. Money is coming or has come.",
+                orderId, cashfreeOrderId, confirmation.Order?.Status, confirmation.Payments.Count);
+            return false;
+        }
+
+        return await FailOrderAsync(orderId, reason ?? confirmation.LastFailureReason);
     }
 
     /// <summary>Drops amendments nobody ever paid for, so an abandoned edit stops holding stock.

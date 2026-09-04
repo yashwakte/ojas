@@ -376,7 +376,13 @@ public record ResumePaymentResponse(
 ///
 /// <paramref name="Configured"/> reports whether credentials exist at all, so an unconfigured
 /// gateway can be said out loud rather than discovered when a customer tries to pay.</summary>
-public record CashfreeConfigResponse(string Mode, bool Configured);
+/// <paramref name="ReturnOrigin"/> is the origin Cashfree hands a paying customer back to. It is
+/// reported so that a domain move can be verified in one request instead of by making a real
+/// payment: point it at the old host and payments still succeed, but customers land on an origin
+/// their auth cookie was never set for, arrive signed out, cannot see the order they just paid
+/// for, and reasonably conclude the money vanished. Nothing secret - it is a public website
+/// address, and it appears in the payment page's own URL bar on the way back.
+public record CashfreeConfigResponse(string Mode, bool Configured, string ReturnOrigin = "");
 
 /// <summary>The server's verdict after asking the gateway directly. AmendmentDiscarded reports
 /// that the customer left the payment page without paying, so the edit they were paying for has

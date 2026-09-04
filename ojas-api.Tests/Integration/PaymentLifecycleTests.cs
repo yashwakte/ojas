@@ -654,6 +654,152 @@ public class PaymentLifecycleTests : IDisposable
         mine!.Select(o => o.Id).ShouldContain(live.Id);
     }
 
+    // ---------- Silence from the gateway is not a "no" ----------
+    //
+    // Every test below is about one rule: an order is only ever stood down on a positive statement
+    // from Cashfree that no money is coming. Inferring that from a read we could not complete is
+    // what cancelled orders customers had paid for, and it did it intermittently — the same steps
+    // worked a minute later — which is the hardest kind of bug to be told about and believe.
+
+    /// <summary>
+    /// The one that bit us in production. A customer pays, lands back on the site, and the status
+    /// check cannot reach Cashfree. Their order must be left exactly as it was, still payable and
+    /// still theirs — not cancelled with the stock put back and a "the payment wasn't completed"
+    /// against it.
+    /// </summary>
+    [Fact]
+    public async Task AGatewayThatCannotBeRead_NeverCancelsTheOrder()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6));
+
+        _factory.Cashfree.PayAllOutstanding();
+        _factory.Cashfree.ReadsFail = true;
+
+        // Honest: we do not know yet. Never "Failed", and never "Paid".
+        var checkedOrder = await CheckPaymentAsync(order.Id);
+        checkedOrder.Outcome.ShouldBe(PaymentAttemptOutcomes.Pending);
+
+        (await GetOrderAsync(order.Id)).Status.ShouldNotBe("Cancelled");
+
+        // And once the gateway comes back, the payment is found and the order settles itself with
+        // no intervention - which is the whole point of not having thrown it away.
+        _factory.Cashfree.ReadsFail = false;
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+    }
+
+    /// <summary>
+    /// A failed attempt is not a failed order. Cashfree fires one webhook per attempt and retries
+    /// each until it gets a 2xx, so a FAILED callback routinely arrives about an order a later
+    /// attempt has already paid for. Acting on it cancels a live order and hands back stock that
+    /// has been sold.
+    /// </summary>
+    [Fact]
+    public async Task AFailureWebhookArrivingAfterThePayment_LeavesThePaidOrderAlone()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6));
+
+        _factory.Cashfree.PayAllOutstanding();
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+
+        // The straggler for the attempt that failed before the one that worked.
+        await DeliverFailureWebhookAsync(order.Id);
+
+        var after = await GetOrderAsync(order.Id);
+        after.Status.ShouldNotBe("Cancelled");
+        after.PaymentStatus.ShouldBe("Paid");
+        after.AmountPaid.ShouldBe(600m);
+    }
+
+    /// <summary>
+    /// The same rule for the browser's own check: money recorded against the order means the
+    /// order is not a failed one, whatever a single gateway read happens to say.
+    /// </summary>
+    [Fact]
+    public async Task AnUnreadableGateway_DoesNotDiscardAnEditTheCustomerMayHaveJustPaidFor()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6));
+        _factory.Cashfree.PayAllOutstanding();
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+
+        var edited = await EditOrderAsync(order.Id, Items(9));
+        edited.TopUpAmount.ShouldBe(300m);
+
+        // They pay the top-up, and the gateway goes dark before we can confirm it.
+        _factory.Cashfree.PayAllOutstanding();
+        _factory.Cashfree.ReadsFail = true;
+
+        var checkedOrder = await CheckPaymentAsync(order.Id);
+        checkedOrder.AmendmentDiscarded.ShouldBeFalse();
+        (await GetOrderAsync(order.Id)).PendingAmendment.ShouldNotBeNull();
+
+        // Nothing was thrown away, so when the gateway answers again the edit simply applies.
+        _factory.Cashfree.ReadsFail = false;
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+
+        var settled = await GetOrderAsync(order.Id);
+        settled.TotalAmount.ShouldBe(900m);
+        settled.AmountPaid.ShouldBe(900m);
+        settled.PendingAmendment.ShouldBeNull();
+    }
+
+    /// <summary>
+    /// A customer who abandons a top-up must be told their changes were dropped — not congratulated
+    /// on a successful payment. The order itself is still fully paid for what it holds, and
+    /// reporting *that* is how "Payment successful! Your order is confirmed." ended up on screen
+    /// for someone who had just backed out.
+    /// </summary>
+    [Fact]
+    public async Task AbandoningATopUp_IsReportedAsDiscarded_NotAsSuccess()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6));
+        _factory.Cashfree.PayAllOutstanding();
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Paid");
+
+        await EditOrderAsync(order.Id, Items(9));
+
+        // They reach the payment page for the top-up and leave without paying, so Cashfree's own
+        // webhook drops the edit before the browser gets back and asks.
+        await DeliverTopUpFailureWebhookAsync(order.Id);
+        (await GetOrderAsync(order.Id)).PendingAmendment.ShouldBeNull();
+
+        var checkedOrder = await CheckPaymentAsync(order.Id);
+        checkedOrder.Outcome.ShouldNotBe(PaymentAttemptOutcomes.Paid);
+
+        // The order itself is untouched and still paid - only the edit is gone.
+        var after = await GetOrderAsync(order.Id);
+        after.Status.ShouldNotBe("Cancelled");
+        after.TotalAmount.ShouldBe(600m);
+        after.AmountPaid.ShouldBe(600m);
+    }
+
+    /// <summary>An order Cashfree reports as EXPIRED is a definite dead end, and standing it down
+    /// is exactly right — this is the behaviour the guards above must not have broken.</summary>
+    [Fact]
+    public async Task AnExpiredGatewayOrder_StillStandsTheOrderDown()
+    {
+        await SetUpAsync();
+        var order = await PlaceOrderAsync(Items(6));
+
+        _factory.Cashfree.ExpireAllOutstanding();
+
+        (await CheckPaymentStatusAsync(order.Id)).ShouldBe("Failed");
+        (await GetOrderAsync(order.Id)).Status.ShouldBe("Cancelled");
+    }
+
+    /// <summary>The failure webhook for a top-up names the top-up's own gateway order id, which is
+    /// the order id with a timestamp suffix.</summary>
+    private async Task DeliverTopUpFailureWebhookAsync(string orderId)
+    {
+        var topUpGatewayOrderId = _factory.Cashfree.CreatedOrderIds
+            .Last(id => id.StartsWith(orderId + "_", StringComparison.Ordinal));
+
+        await DeliverFailureWebhookAsync(topUpGatewayOrderId, "You left the payment page.");
+    }
+
     private async Task<OrderResponse> PlaceRetryAsync(List<OrderItemDto> items, string retryOfOrderId)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/orders")

@@ -32,4 +32,56 @@ public class OrderPricingTests
     {
         OrderPricing.QualifiesForFreeDelivery(subtotal).ShouldBe(expected);
     }
+
+    /// <summary>Verified against Cashfree's sandbox: ₹0.99 comes back
+    /// <c>order_amount_invalid</c> and ₹1.00 is accepted.</summary>
+    [Theory]
+    [InlineData(0.01, false)]
+    [InlineData(0.99, false)]
+    [InlineData(1, true)]
+    [InlineData(200.50, true)]
+    public void IsChargeable_MatchesWhatTheGatewayWillActuallyAccept(decimal amount, bool expected)
+    {
+        OrderPricing.IsChargeable(amount).ShouldBe(expected);
+    }
+
+    /// <summary>
+    /// The wallet must never leave a remainder the gateway refuses.
+    ///
+    /// This is a real failure, not a theoretical one: an order for ₹200.50 against a ₹200 balance
+    /// left ₹0.50 to charge, Cashfree rejected it as <c>order_amount_invalid</c>, and the customer
+    /// got a created order holding stock that they could never pay for. A balance lands on an odd
+    /// figure exactly when a refund has put it there — which is what cancelling and re-ordering
+    /// does, so the window is narrower than it is rare.
+    ///
+    /// It is always resolved by spending *less* credit, so nobody is charged more than the order.
+    /// </summary>
+    [Theory]
+    // Nothing to adjust: the balance covers the whole thing.
+    [InlineData(500, 200.50, 200.50, 0)]
+    // Would have left 50 paise for the gateway; holds back enough to leave a payable rupee.
+    [InlineData(200, 200.50, 199.50, 1)]
+    // Would have left a single paisa.
+    [InlineData(200.49, 200.50, 199.50, 1)]
+    // Comfortably above the minimum already.
+    [InlineData(100, 200.50, 100, 100.50)]
+    // No balance at all.
+    [InlineData(0, 200.50, 0, 200.50)]
+    public void ApplicableAmount_NeverLeavesAnUnchargeableRemainder(
+        decimal balance, decimal orderTotal, decimal expectedApplied, decimal expectedDue)
+    {
+        var applied = WalletService.ApplicableAmount(balance, orderTotal);
+
+        applied.ShouldBe(expectedApplied);
+        (orderTotal - applied).ShouldBe(expectedDue);
+
+        // The property that actually matters, stated directly: whatever is left is either nothing
+        // or something Cashfree will take.
+        var due = orderTotal - applied;
+        (due == 0 || OrderPricing.IsChargeable(due)).ShouldBeTrue($"₹{due} cannot be charged.");
+
+        // And never more credit than the order is worth.
+        applied.ShouldBeLessThanOrEqualTo(orderTotal);
+        applied.ShouldBeLessThanOrEqualTo(balance);
+    }
 }

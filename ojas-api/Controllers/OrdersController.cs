@@ -517,7 +517,10 @@ public class OrdersController : ControllerBase
         // collected online. Cashfree can't amend an existing order's amount, so the difference is
         // charged as its own payment against a suffixed order id — and the edit itself waits: the
         // order keeps describing what the customer has actually paid for until that money lands.
-        if (settled > 0 && outstanding > 0)
+        // Anything the gateway cannot accept is not collected. An edit whose coupon or delivery
+        // change leaves a few paise owing would otherwise create a top-up Cashfree refuses, and the
+        // customer's change would be stuck behind a payment that can never be made.
+        if (settled > 0 && outstanding > 0 && OrderPricing.IsChargeable(outstanding))
         {
             var topUpOrderId = CashfreeService.TopUpOrderId(orderId);
             CashfreeOrderResult session;
@@ -713,6 +716,18 @@ public class OrdersController : ControllerBase
 
         var due = Math.Round(order.TotalAmount - order.SettledAmount, 2, MidpointRounding.AwayFromZero);
 
+        // A balance too small for the gateway to accept is treated as settled. Left as "still
+        // owing" it is a dead end: the Pay button raises an order Cashfree refuses, so the customer
+        // is stuck on a page that cannot be completed and cannot be dismissed. The most this
+        // forgives is 99 paise.
+        if (due > 0 && !OrderPricing.IsChargeable(due))
+        {
+            _logger.LogInformation(
+                "Order {OrderId} is short by {Due}, which is below the gateway minimum; treating it as settled.",
+                orderId, due);
+            due = 0;
+        }
+
         if (due <= 0)
         {
             _logger.LogInformation(
@@ -720,8 +735,21 @@ public class OrdersController : ControllerBase
             return Ok(new ResumePaymentResponse(order.ToResponse(), 0m, AlreadyPaid: true));
         }
 
-        if (reconciled.AnyInFlight)
+        // "We could not ask the gateway" has to be answered the same way as "a payment is still
+        // with the bank". Raising a fresh payment on an order whose existing attempts we failed to
+        // read is how a customer pays twice for the same order - the surplus would come back to
+        // their wallet, but taking it at all is the thing to avoid.
+        if (reconciled.AnyInFlight || !reconciled.Reachable)
+        {
+            if (!reconciled.Reachable)
+            {
+                _logger.LogWarning(
+                    "Refused to raise a new payment on order {OrderId}: Cashfree could not be reached to " +
+                    "confirm nothing is already in flight.", orderId);
+            }
+
             return Ok(new ResumePaymentResponse(order.ToResponse(), due, PaymentInFlight: true));
+        }
 
         // Its own gateway order id: Cashfree refuses a reused one, and every later status check
         // has to be able to ask about this attempt specifically.
