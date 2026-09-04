@@ -1,7 +1,7 @@
 <a class="pcard-link" [routerLink]="['/products', product().id]">
   <div class="pimg">
     <img
-      [src]="product().imageUrl"
+      [src]="thumbnail()"
       [alt]="product().name"
       loading="lazy"
       decoding="async"

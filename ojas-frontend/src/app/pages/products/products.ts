@@ -13,6 +13,7 @@ import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../mode
 import { DecimalPipe } from '@angular/common';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
+import { thumbnailPackShot } from '../../constants/pack-shots';
 
 @Component({
   selector: 'app-products',
@@ -21,6 +22,9 @@ import { OrderPickingBanner } from '../../components/order-picking-banner/order-
   styleUrl: './products.scss',
 })
 export class Products {
+  /** Product tiles show a card-sized pack shot, not the full-resolution one. */
+  thumbnail = thumbnailPackShot;
+
   /** The shared definition, so a tile advertises exactly what the cart will charge. */
   readonly effectivePrice = effectivePrice;
   readonly isOutOfStock = isOutOfStock;

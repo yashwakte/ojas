@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe } from '@angular/common';
 import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../models/interfaces';
+import { thumbnailPackShot } from '../../constants/pack-shots';
 
 @Component({
   selector: 'app-product-card',
@@ -28,6 +29,11 @@ export class ProductCard {
 
   readonly purchasable = computed(() => isPurchasable(this.product()));
   readonly outOfStock = computed(() => isOutOfStock(this.product()));
+
+  /** The card is a couple of hundred pixels wide, so it loads the small variant rather than the
+   * full-size pack shot. On a grid of thirty products that is the difference between roughly two
+   * megabytes of photography and four hundred kilobytes. */
+  readonly thumbnail = computed(() => thumbnailPackShot(this.product().imageUrl));
 
   onImgError(event: Event): void {
     const img = event.target as HTMLImageElement;

@@ -8,6 +8,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { Product, deliveryBetweenLabel, effectivePrice } from '../../models/interfaces';
 import { roundMoney } from '../../constants/pricing';
+import { thumbnailPackShot } from '../../constants/pack-shots';
 
 @Component({
   selector: 'app-cart',
@@ -16,6 +17,9 @@ import { roundMoney } from '../../constants/pricing';
   styleUrl: './cart.scss',
 })
 export class Cart implements OnInit {
+  /** Cart rows are small; they load the card-sized pack shot. */
+  thumbnail = thumbnailPackShot;
+
   /** Exposed to the template so each line shows what it will actually be billed at. */
   effectivePrice = effectivePrice;
 

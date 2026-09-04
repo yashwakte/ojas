@@ -11,15 +11,12 @@
   // and it is what keeps the card legible on a cream page where a shadow alone almost vanishes.
   border: 1px solid var(--ojas-border);
   box-shadow: var(--ojas-shadow-sm);
-  transition:
-    transform var(--ojas-transition),
-    box-shadow var(--ojas-transition),
-    border-color var(--ojas-transition);
+  // Depth and the travelling rim light, both from the shared glass system so the cards, the
+  // buttons and the product page all speak the same language.
+  @include glass.card-depth(5px, 0.7deg);
+  @include glass.card-ring;
 
   &:hover {
-    // A shorter lift than before. Big travel on hover reads as bounce; a few pixels reads as the
-    // card acknowledging the pointer.
-    transform: translateY(-3px);
     border-color: rgba(242, 90, 26, 0.28);
     // The ring is drawn with a spread shadow rather than a border so it cannot shift layout by
     // even a pixel on hover - a border that appears on hover nudges everything inside it.
@@ -60,25 +57,28 @@
   cursor: pointer;
 }
 
-// 3:2, AND `contain` — matching the canvas the pack shots are written on by
-// tools/import-product-shots.mjs, so the whole pack is always visible with only a sliver of the
-// card's own wash at the sides.
+// 4:3, matching the shape the pack shots are published in.
 //
-// This well used to be a fixed 92px tall in a card about 170px wide, with `object-fit: cover`
-// over a square 1000x1000 studio photo. Cover scaled the pouch to the card's width and then cut
-// its top and bottom off, so every card showed a middle band with the brand mark above the crop
-// and the net weight below it — the packs looked enormously zoomed in.
+// The shape has been wrong in both directions, which is why it is spelled out. It began as a
+// fixed 92px band with `object-fit: cover` over a square studio photo, so the pouch was scaled to
+// the card's width and then had its top and bottom cut off. Later the pack shots were flattened
+// onto a 1200x800 canvas and the well became 3:2 with `contain`, which framed them correctly but
+// small. When the photographs were re-published untouched — square, as the client shot them — a
+// square well made the picture as tall as the card was wide, and most of that extra height was
+// empty backdrop down either side.
 //
-// The aspect-ratio also replaces the three fixed heights that were set per breakpoint, so the
-// frame keeps its shape as the card grows instead of getting steadily wider and cropping harder
-// the bigger the screen.
+// The packs are portrait objects: a pouch fills about 83% of its photograph's height. So no
+// landscape *crop* can hold one, and the image is widened rather than shortened — see
+// PACK_SHOT_ASPECT in tools/optimize-images.mjs, which extends each photograph sideways with a
+// copy of its own backdrop. This well matches that 4:3, so the picture is full-bleed: nothing
+// letterboxed, nothing cropped, and the pack renders slightly larger than it did at 3:2 while the
+// card stays a quarter shorter than it was at 1:1.
 .pimg {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
-  // A warm tinted wash rather than flat grey. Pack shots are photographed on white, so a neutral
-  // grey behind them makes the product look like it is floating on nothing; a faint warm gradient
-  // sits the product in the page and matches the rest of the palette.
+  // A warm tinted wash rather than flat grey, for the moment before the picture arrives and for
+  // any pack shot that does not happen to be square.
   background: linear-gradient(160deg, #fdf8f3 0%, #f6efe7 100%);
 
   img {
@@ -125,14 +125,16 @@
 }
 
 .pbody-top {
-  padding: 8px 9px 0;
+  // Tightened when the picture went square: the height the well gained is taken back here,
+  // so a bigger product does not cost a longer card.
+  padding: 6px 9px 0;
 
   h3 {
     font-weight: 600;
     font-size: 0.7rem;
     color: var(--ojas-text);
-    margin-bottom: 4px;
-    line-height: 1.3;
+    margin-bottom: 2px;
+    line-height: 1.25;
     display: -webkit-box;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
@@ -141,7 +143,7 @@
 }
 
 .pbody {
-  padding: 0 9px 9px;
+  padding: 0 9px 8px;
   margin-top: auto;
 }
 
@@ -149,7 +151,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 
   span {
     font-size: 0.6rem;

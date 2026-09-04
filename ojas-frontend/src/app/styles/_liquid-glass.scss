@@ -112,3 +112,105 @@
   @include press;
   @include focus-ring($focus);
 }
+
+// ============================================
+// CARD — depth, and a light that travels the rim
+// ============================================
+// The same idea as the buttons above — the rim carries the effect, the fill is left alone — but
+// applied to a card, and with the light moving.
+//
+// `card-depth` is the 3D: an actual perspective transform rather than a drop shadow pretending to
+// be one, so the card tips fractionally toward the viewer and its shadow lengthens with it. The
+// rotation is deliberately under a degree. Past that it stops reading as a solid object catching
+// the light and starts reading as a novelty tile, and this sits under a whole grid of products at
+// once, where a novelty compounds.
+//
+// `card-ring` is the travelling light: a soft highlight that drifts around the border, brightening
+// and dimming as it passes, the way a real edge does under a moving light.
+//
+// The ring is drawn as an overlay rather than as a layer behind the card, and that is not
+// incidental. The pack shot runs full-bleed to the card's top edge, so a ring painted underneath
+// would be hidden everywhere the picture covers and would appear only around the text — a rim
+// down three sides, which looks like a bug rather than an effect. Overlaying it and masking out
+// everything but the hairline keeps it continuous the whole way round. `pointer-events: none`
+// because it sits over the card's own links.
+@property --ojas-ring-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@mixin card-ring(
+  $thickness: 1.25px,
+  $duration: 9s,
+  $highlight: rgba(255, 255, 255, 0.92),
+  $shade: rgba(176, 98, 48, 0.3)
+) {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    border-radius: inherit;
+    padding: $thickness;
+
+    // One bright arc and one soft shade with long transparent runs between them, so what travels
+    // is a highlight passing by rather than a spinning wheel of colour. The shade is a warm brown
+    // rather than a grey: it is the palette's own ink, dimmed, so the dark half of the sweep still
+    // belongs to the page.
+    background: conic-gradient(
+      from var(--ojas-ring-angle),
+      transparent 0deg,
+      $highlight 24deg,
+      transparent 62deg,
+      transparent 184deg,
+      $shade 212deg,
+      transparent 248deg,
+      transparent 360deg
+    );
+
+    // Keeps the padding box and discards the middle, which is what turns a full-face gradient
+    // into a hairline. Both spellings: Safari still wants the prefixed pair.
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+
+    animation: ojas-card-ring $duration linear infinite;
+  }
+
+  // A rim that turns on its own is exactly the motion someone asking for less of it means. The
+  // ring stays drawn — it simply stops moving — so the card keeps its edge rather than losing it.
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@keyframes ojas-card-ring {
+  to {
+    --ojas-ring-angle: 360deg;
+  }
+}
+
+@mixin card-depth($lift: 6px, $tilt: 0.8deg) {
+  transform: perspective(1200px);
+  transition:
+    transform 0.55s var(--ojas-ease),
+    box-shadow 0.55s var(--ojas-ease),
+    border-color var(--ojas-transition);
+
+  &:hover,
+  &:focus-within {
+    // Lifted, and tipped back just enough that the top edge catches more light than the bottom.
+    transform: perspective(1200px) translateY(-$lift) rotateX($tilt) scale(1.012);
+  }
+}

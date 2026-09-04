@@ -1,3 +1,5 @@
+@use '../../styles/liquid-glass' as glass;
+
 .products-page {
   min-height: 80vh;
 }
@@ -75,7 +77,7 @@
   font-weight: 700;
   font-size: 2.5rem;
   color: var(--ojas-text);
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .page-header p {
@@ -131,8 +133,11 @@
 // ===== PRODUCTS GRID =====
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 28px;
+  // Four across on a wide screen rather than three. The cards were reading as oversized panels
+  // with a lot of white inside them; a narrower column makes the grid scan as a catalogue and
+  // brings the whole card down in both dimensions at once.
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
 }
 
 // ===== PRODUCT CARD — PREMIUM =====
@@ -144,7 +149,7 @@
 }
 
 .product-info-top {
-  padding: 20px 20px 0;
+  padding: 14px 15px 0;
 }
 
 .product-card {
@@ -155,11 +160,12 @@
   overflow: hidden;
   background: #fff;
   box-shadow: var(--ojas-shadow-sm);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  // Depth and the travelling rim light, shared with the home page cards.
+  @include glass.card-depth(6px, 0.8deg);
+  @include glass.card-ring;
 
   &:hover {
-    transform: translateY(-8px);
     box-shadow: var(--ojas-shadow-lg);
 
     .product-image img {
@@ -171,16 +177,28 @@
   }
 }
 
+// Square and `contain`, matching the shape the pack shots are actually photographed in.
+//
+// This was a fixed 220px band with `object-fit: cover`. Against a square photograph, cover scales
+// the picture to the card's width and then throws away whatever will not fit vertically — so
+// every pack lost its top and its bottom, and the grid showed a strip of each pouch with the
+// brand mark cut off above and the net weight cut off below. A shopper scanning the page could
+// not tell one 500g pouch from another.
+//
+// aspect-ratio rather than a fixed height, so the frame keeps its shape as the column grows
+// instead of cropping harder the wider the screen gets.
 .product-image {
-  height: 220px;
+  aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
-  background: #f5f5f5;
+  // The same warm wash the home page cards use, rather than a flat grey that makes a pack shot
+  // look like it is floating on nothing.
+  background: linear-gradient(160deg, #fdf8f3 0%, #f6efe7 100%);
 
   img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
@@ -235,13 +253,13 @@
 }
 
 .product-info {
-  padding: 0 20px 20px;
+  padding: 0 15px 15px;
   margin-top: auto;
 }
 
 .product-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 
   > button {
     flex: 1;
@@ -252,7 +270,7 @@
 .product-name {
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 0.98rem;
   color: var(--ojas-text);
   margin-bottom: 8px;
   white-space: nowrap;
@@ -261,10 +279,10 @@
 }
 
 .product-desc {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--ojas-text-light);
   line-height: 1.6;
-  margin-bottom: 16px;
+  margin-bottom: 11px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -275,9 +293,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 9px;
   border-top: 1px solid #f0f0f0;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .product-price {
@@ -295,7 +313,7 @@
   }
 
   .sale-price {
-    font-size: 1.2rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--ojas-ink);
   }
@@ -320,9 +338,9 @@
   font-weight: 500;
 
   mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
   }
 }
 
@@ -330,22 +348,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 5px;
+  padding: 9px 8px;
+  // The card is narrower now. Without this "Add to Cart" breaks after "to", which makes one
+  // button two lines tall and the pair beside it uneven.
+  white-space: nowrap;
   background: var(--ojas-orange);
   color: #fff;
   border: none;
   border-radius: 12px;
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
   mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
   }
 
   &:hover {
@@ -384,22 +405,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 5px;
+  padding: 9px 8px;
+  // The card is narrower now. Without this "Add to Cart" breaks after "to", which makes one
+  // button two lines tall and the pair beside it uneven.
+  white-space: nowrap;
   background: transparent;
   color: var(--ojas-orange);
   border: 1.5px solid var(--ojas-orange);
   border-radius: 12px;
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
   mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
   }
 
   &:hover {
@@ -491,6 +515,14 @@
 }
 
 // ===== RESPONSIVE =====
+// A step between four and two, so a tablet does not jump straight from a catalogue to two
+// oversized panels — which is the shape the cards were being complained about in.
+@media (max-width: 1240px) {
+  .products-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 992px) {
   .products-grid {
     grid-template-columns: repeat(2, 1fr);

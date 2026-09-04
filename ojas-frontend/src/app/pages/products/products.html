@@ -38,7 +38,7 @@
           <a class="product-link" [routerLink]="['/products', product.id]">
             <div class="product-image">
               <img
-                [src]="product.imageUrl"
+                [src]="thumbnail(product.imageUrl)"
                 [alt]="product.name"
                 loading="lazy"
                 decoding="async"
