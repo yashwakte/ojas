@@ -344,11 +344,14 @@
               <mat-icon>local_shipping</mat-icon>
               <div>
                 <strong>Delivery Charge</strong>
-                @if (freeDeliveryUpToKm(); as freeKm) {
-                  <span>Free within {{ freeKm }} km of our warehouse, then a small per-km charge</span>
-                } @else {
-                  <span>Calculated at checkout based on your delivery address</span>
-                }
+                <!-- Delivery is priced from the delivery pincode, not from a distance ring, and the
+                     one way to get it free is the cart threshold. This used to promise "free within
+                     N km of our warehouse", which stopped being true when pincode pricing replaced
+                     distance pricing - see DeliveryChargesService.QuoteByPincode. -->
+                <span>
+                  Free on orders over ₹{{ freeDeliveryThreshold }}. Below that it depends on your
+                  delivery pincode and is shown at checkout.
+                </span>
               </div>
             </div>
             <div class="delivery-item">

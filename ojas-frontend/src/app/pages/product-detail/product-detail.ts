@@ -17,7 +17,7 @@ import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
-import { DeliveryChargesService } from '../../services/delivery-charges.service';
+import { FREE_DELIVERY_CART_THRESHOLD } from '../../constants/pricing';
 import { DeliveryAddressService } from '../../services/delivery-address.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
 import {
@@ -47,13 +47,14 @@ export class ProductDetail {
   private checkoutService = inject(CheckoutService);
   private auth = inject(AuthService);
   private router = inject(Router);
-  private deliveryChargesService = inject(DeliveryChargesService);
   private orderEditDraft = inject(OrderEditDraftService);
   // Public so the template can show the "Deliver to" bar and open the picker.
   readonly deliveryAddress = inject(DeliveryAddressService);
   readonly picking = this.orderEditDraft.picking;
 
-  freeDeliveryUpToKm = computed(() => this.deliveryChargesService.config()?.freeDeliveryUpToKm ?? null);
+  /** The one rule that actually makes delivery free. Everything else is priced from the delivery
+   * pincode by the server, which is why this page no longer quotes a free-distance ring. */
+  readonly freeDeliveryThreshold = FREE_DELIVERY_CART_THRESHOLD;
 
   changeDeliveryAddress(): void {
     this.deliveryAddress.openPicker();

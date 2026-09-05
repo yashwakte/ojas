@@ -7,6 +7,7 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
+import { FREE_DELIVERY_CART_THRESHOLD } from '../../constants/pricing';
 import {
   Product,
   DeliveryChargesConfig,
@@ -195,20 +196,28 @@ describe('ProductDetail', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
   });
 
-  it('freeDeliveryUpToKm reads from delivery charges config', () => {
+  // Delivery is priced from the delivery pincode, so the page must not promise a free distance
+  // ring - the free-delivery rule customers can actually rely on is the cart threshold.
+  it('states the free-delivery threshold rather than a free distance from the warehouse', () => {
     deliveryChargesServiceSpy.config.set({
       id: 'c1',
       warehouseAddress: 'x',
       warehouseLatitude: 1,
       warehouseLongitude: 1,
-      freeDeliveryUpToKm: 7,
+      freeDeliveryUpToKm: 3,
       perKmChargeAfterFree: 10,
       isActive: true,
       createdAt: '',
       updatedAt: '',
     });
     const fixture = create();
-    expect(fixture.componentInstance.freeDeliveryUpToKm()).toBe(7);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.freeDeliveryThreshold).toBe(FREE_DELIVERY_CART_THRESHOLD);
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(`Free on orders over ₹${FREE_DELIVERY_CART_THRESHOLD}`);
+    expect(text).not.toContain('km of our warehouse');
   });
 
   it('highlights include category-specific entries for Flour', () => {
