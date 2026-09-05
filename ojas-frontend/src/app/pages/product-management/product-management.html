@@ -16,7 +16,7 @@
   }
 
 @if (showForm()) {
-    <mat-card class="product-form-card">
+    <mat-card class="product-form-card" id="product-form">
       <mat-card-header>
         <mat-card-title>{{ editingProduct() ? 'Edit Product' : 'Add New Product' }}</mat-card-title>
         <mat-card-subtitle>Fill in all details carefully. Fields marked with * are required.</mat-card-subtitle>
@@ -357,7 +357,11 @@
         } @else {
         <div class="products-grid">
           @for (product of filteredProducts(); track product.id) {
-            <mat-card class="product-card">
+            <mat-card
+              class="product-card"
+              [id]="'product-' + product.id"
+              [class.just-saved]="justSavedId() === product.id"
+            >
               <div class="product-image">
                 <img [src]="product.imageUrl" [alt]="product.name" loading="lazy" decoding="async" />
                 @if (!product.isAvailable) {

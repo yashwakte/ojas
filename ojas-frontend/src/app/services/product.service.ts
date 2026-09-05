@@ -23,10 +23,22 @@ export class ProductService {
     this.loadProducts();
   }
 
-  loadProducts(): void {
+  /**
+   * Loads the catalogue into the shared signal.
+   *
+   * `bypassCache` is for the admin console. The catalogue is served with `public, max-age=60,
+   * stale-while-revalidate=300` to anonymous visitors, and a shared cache that has stored one of
+   * those copies will keep answering with it for minutes - including to an admin who has just
+   * saved an edit, because their own `no-store` response header only governs responses the origin
+   * actually gets asked for. A one-off query parameter is a different cache key, so the request
+   * cannot be answered from any stored copy at any layer. It is deliberately NOT the default:
+   * customers are the traffic this cache exists for.
+   */
+  loadProducts(options?: { bypassCache?: boolean }): void {
     this._loading.set(true);
     this._error.set(null);
-    this.http.get<Product[]>(this.apiUrl).subscribe({
+    const params = options?.bypassCache ? { _: Date.now() } : undefined;
+    this.http.get<Product[]>(this.apiUrl, { params }).subscribe({
       next: (products) => {
         this._products.set(products.map((product) => this.normalizeProduct(product)));
         this._loading.set(false);

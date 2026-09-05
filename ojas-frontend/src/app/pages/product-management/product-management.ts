@@ -60,6 +60,8 @@ export class ProductManagement implements OnInit {
   }
 
   readonly showForm = signal(false);
+  /** The product just created or edited, so its card can be found and briefly marked. */
+  readonly justSavedId = signal<string | null>(null);
   readonly editingProduct = signal<Product | null>(null);
   readonly submitting = signal(false);
   readonly previewImage = signal<string | null>(null);
@@ -93,7 +95,9 @@ export class ProductManagement implements OnInit {
   });
 
   ngOnInit(): void {
-    this.productService.loadProducts();
+    // The admin writes this data and judges a save by what this list shows, so their read must
+    // never be answered from a cached copy of the catalogue. See ProductService.loadProducts.
+    this.productService.loadProducts({ bypassCache: true });
   }
 
   private populateForm(product: Product): void {
@@ -121,6 +125,7 @@ export class ProductManagement implements OnInit {
     this.editingProduct.set(null);
     this.resetForm();
     this.showForm.set(true);
+    this.scrollTo('product-form', 'start');
   }
 
   editProduct(product: Product): void {
@@ -130,6 +135,9 @@ export class ProductManagement implements OnInit {
     this.populateForm(product);
     this.editingProduct.set(product);
     this.showForm.set(true);
+    // The form renders above the grid, so editing a card further down would otherwise open it
+    // off-screen and look as though the button did nothing.
+    this.scrollTo('product-form', 'start');
   }
 
   closeForm(): void {
@@ -323,11 +331,15 @@ export class ProductManagement implements OnInit {
     if (this.editingProduct()) {
       const request: UpdateProductRequest = { id: this.editingProduct()!.id, ...sanitizedData };
       this.productService.updateProduct(request).subscribe({
-        next: () => {
+        next: (product) => {
           this.showSuccess('Product updated successfully');
           this.closeForm();
-          this.productService.loadProducts();
+          // No re-fetch here on purpose. The PATCH response IS the saved product and the service
+          // has already swapped it into the list; re-reading the catalogue straight afterwards
+          // only opens the door to a cached, pre-save body overwriting it - which is exactly the
+          // "I have to refresh two or three times before my edit shows" report this came from.
           this.submitting.set(false);
+          this.revealProduct(product);
         },
         error: (err) => {
           this.showError(err?.error?.message ?? 'Failed to update product');
@@ -336,11 +348,11 @@ export class ProductManagement implements OnInit {
       });
     } else {
       this.productService.createProduct(sanitizedData).subscribe({
-        next: () => {
+        next: (product) => {
           this.showSuccess('Product created successfully');
           this.closeForm();
-          this.productService.loadProducts();
           this.submitting.set(false);
+          this.revealProduct(product);
         },
         error: (err) => {
           this.showError(err?.error?.message ?? 'Failed to create product');
@@ -358,7 +370,6 @@ export class ProductManagement implements OnInit {
     this.productService.deleteProduct(product.id).subscribe({
       next: () => {
         this.showSuccess('Product deleted successfully');
-        this.productService.loadProducts();
       },
       error: (err) => {
         this.showError(err?.error?.message ?? 'Failed to delete product');
@@ -369,13 +380,60 @@ export class ProductManagement implements OnInit {
   toggleAvailability(product: Product): void {
     const request: UpdateProductRequest = { id: product.id, isAvailable: !product.isAvailable };
     this.productService.updateProduct(request).subscribe({
-      next: () => {
-        this.productService.loadProducts();
-      },
+      // The response carries the product as it now stands and the service has already applied it;
+      // re-reading the catalogue here would risk replacing it with a stale copy.
       error: (err) => {
         this.showError(err?.error?.message ?? 'Failed to update availability');
       },
     });
+  }
+
+  /**
+   * Scrolls an element into view once it has actually been rendered.
+   *
+   * Retried across a few frames rather than scrolled on the next one, because the element is
+   * usually created by the same signal write that requested the scroll - a card that has just
+   * been added, or one revealed by the form above it collapsing. Whether Angular's render lands
+   * before or after our first callback is not something to rely on, and giving up on frame one
+   * silently does nothing. Smooth unless the reader has asked for less motion, in which case it
+   * jumps: the point is arriving, not the travel.
+   */
+  private scrollTo(elementId: string, block: ScrollLogicalPosition, attemptsLeft = 5): void {
+    requestAnimationFrame(() => {
+      const target = document.getElementById(elementId);
+      if (!target) {
+        if (attemptsLeft > 1) this.scrollTo(elementId, block, attemptsLeft - 1);
+        return;
+      }
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+      target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block });
+    });
+  }
+
+  /**
+   * Puts the admin back on the product they just saved.
+   *
+   * Closing the form removes a very tall element from the top of the page, and the browser keeps
+   * the scroll offset it already had - which on a page this long lands somewhere past the end of
+   * the grid, at the footer. Scrolling to the saved card is both the fix for that and the more
+   * useful destination: it is the row whose change they want to see.
+   *
+   * The card only exists if the current category filter includes it, so a product moved to
+   * another category widens the filter rather than scrolling to nothing.
+   */
+  private revealProduct(product: Product): void {
+    if (this.categoryFilter() !== 'All' && this.categoryFilter() !== product.category) {
+      this.categoryFilter.set('All');
+    }
+
+    this.justSavedId.set(product.id);
+
+    // After the next paint, so the form has collapsed and the (possibly new) card exists.
+    this.scrollTo(`product-${product.id}`, 'center');
+
+    setTimeout(() => {
+      if (this.justSavedId() === product.id) this.justSavedId.set(null);
+    }, 2500);
   }
 
   private sanitizeFormData(data: CreateProductRequest): CreateProductRequest {

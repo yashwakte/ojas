@@ -227,7 +227,7 @@ export class AdminDashboard implements OnInit {
       // Refresh implies "start fresh" — an open add/edit form with unsaved
       // changes would otherwise sit there showing data that's now stale.
       this.productManagement()?.closeForm();
-      this.productService.loadProducts();
+      this.productService.loadProducts({ bypassCache: true });
     } else if (tab === 'delivery-charges') {
       this.deliveryChargesService.loadConfig();
     } else if (tab === 'campaign-banner') {
@@ -325,7 +325,7 @@ export class AdminDashboard implements OnInit {
         // Cancelling restores stock server-side; refresh so the products
         // list and low-stock widget don't show stale availability.
         if (nextStatus === 'Cancelled') {
-          this.productService.loadProducts();
+          this.productService.loadProducts({ bypassCache: true });
           this.loadLowStock();
           if (result.refundError && result.sourceRefundQueued > 0) {
             this.ordersError.set(

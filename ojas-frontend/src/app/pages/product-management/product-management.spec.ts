@@ -87,10 +87,11 @@ describe('ProductManagement', () => {
     };
   }
 
-  it('should create and load products on init', () => {
+  it('should create and load products on init, bypassing any cached catalogue', () => {
     const { fixture } = create();
     expect(fixture.componentInstance).toBeTruthy();
-    expect(productServiceSpy.loadProducts).toHaveBeenCalled();
+    // The admin judges a save by this list, so it must not be answered from a cached copy.
+    expect(productServiceSpy.loadProducts).toHaveBeenCalledWith({ bypassCache: true });
   });
 
   it('filteredProducts returns all when filter is All, or the matching category otherwise', () => {
@@ -241,6 +242,67 @@ describe('ProductManagement', () => {
       'Close',
       jasmine.any(Object),
     );
+  });
+
+  // The PATCH/POST response is the saved product and the service has already applied it. Reading
+  // the catalogue again straight afterwards is what let a cached, pre-save body overwrite it and
+  // made the admin refresh two or three times before their edit appeared.
+  it('does not re-read the catalogue after a save', () => {
+    productServiceSpy.updateProduct.and.returnValue(of(product));
+    const { fixture } = create();
+    fixture.componentInstance.editProduct(product);
+    fixture.componentInstance.formData.set(validFormData());
+    productServiceSpy.loadProducts.calls.reset();
+
+    fixture.componentInstance.submitForm();
+
+    expect(productServiceSpy.loadProducts).not.toHaveBeenCalled();
+  });
+
+  it('does not re-read the catalogue after a create, a delete, or an availability toggle', () => {
+    spyOn(window, 'confirm').and.returnValue(true);
+    productServiceSpy.createProduct.and.returnValue(of(product));
+    productServiceSpy.deleteProduct.and.returnValue(of(undefined));
+    productServiceSpy.updateProduct.and.returnValue(of({ ...product, isAvailable: false }));
+    const { fixture } = create();
+    fixture.componentInstance.formData.set(validFormData());
+    productServiceSpy.loadProducts.calls.reset();
+
+    fixture.componentInstance.submitForm();
+    fixture.componentInstance.deleteProduct(product);
+    fixture.componentInstance.toggleAvailability(product);
+
+    expect(productServiceSpy.loadProducts).not.toHaveBeenCalled();
+  });
+
+  // Closing the tall form leaves the scroll offset past the end of the grid, at the footer. The
+  // saved card is both the fix and the place the admin actually wants to be.
+  it('marks the saved product so its card can be found after the form closes', () => {
+    productServiceSpy.updateProduct.and.returnValue(of(product));
+    const { fixture } = create();
+    fixture.componentInstance.editProduct(product);
+    fixture.componentInstance.formData.set(validFormData());
+
+    fixture.componentInstance.submitForm();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.justSavedId()).toBe('p1');
+    const card = (fixture.nativeElement as HTMLElement).querySelector('#product-p1');
+    expect(card).not.toBeNull();
+    expect(card!.classList).toContain('just-saved');
+  });
+
+  it('widens the category filter when the saved product no longer matches it', () => {
+    productServiceSpy.updateProduct.and.returnValue(of(product)); // product.category === 'Flour'
+    const { fixture } = create();
+    fixture.componentInstance.selectCategoryFilter('Grains');
+    fixture.componentInstance.editProduct(product);
+    fixture.componentInstance.formData.set(validFormData());
+
+    fixture.componentInstance.submitForm();
+
+    // Otherwise there would be no card to scroll to and the save would look like it vanished.
+    expect(fixture.componentInstance.categoryFilter()).toBe('All');
   });
 
   it('deleteProduct does nothing if the confirmation dialog is declined', () => {

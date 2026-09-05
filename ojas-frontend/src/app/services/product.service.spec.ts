@@ -86,6 +86,24 @@ describe('ProductService', () => {
     expect(service.loading()).toBeFalse();
   });
 
+  // Anonymous catalogue reads are cached publicly for minutes. An admin who has just saved must
+  // not be answered from one of those stored copies, so their read carries a one-off query
+  // parameter - a different cache key, which no layer can satisfy from what it already holds.
+  it('bypassCache sends a one-off parameter so no stored copy can answer the read', () => {
+    flushInitialLoad();
+
+    service.loadProducts({ bypassCache: true });
+    const busted = httpMock.expectOne((r) => r.url === environment.apiUrl + '/products');
+    expect(busted.request.params.has('_')).toBeTrue();
+    busted.flush([]);
+
+    // The default stays cacheable: customers are the traffic that cache exists for.
+    service.loadProducts();
+    const plain = httpMock.expectOne(environment.apiUrl + '/products');
+    expect(plain.request.params.keys().length).toBe(0);
+    plain.flush([]);
+  });
+
   it('clearError resets error to null', () => {
     flushInitialLoad();
     service.loadProducts();
