@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Filters;
+using OjasApi.Models;
 
 namespace OjasApi.Filters;
 
@@ -51,6 +52,21 @@ public sealed class PublicCacheAttribute : ActionFilterAttribute
         // customer's second page view come out of their own cache.
         if (context.HttpContext.User?.Identity?.IsAuthenticated == true)
         {
+            // An admin is the one caller who *writes* this data, and they judge whether a write
+            // landed by what the list shows them straight afterwards. Letting their browser keep
+            // the catalogue means the re-fetch that follows a save is answered out of the cache
+            // with the pre-save body - and with stale-while-revalidate on top, it keeps being
+            // answered that way for minutes. The admin sees their edit snap back and concludes
+            // the save failed, which is exactly how a correct write gets reported as a bug.
+            //
+            // There is nothing to buy here anyway: admins are a handful of people, not the
+            // traffic this cache exists for.
+            if (context.HttpContext.User.IsInRole(UserRoles.Admin))
+            {
+                response.Headers.CacheControl = "no-store";
+                return;
+            }
+
             response.Headers.CacheControl =
                 $"private, max-age={_maxAgeSeconds}, stale-while-revalidate={_staleWhileRevalidateSeconds}";
             return;

@@ -192,6 +192,24 @@ public class MediaTests : IDisposable
     }
 
     [Fact]
+    public async Task Catalog_IsNotCachedAtAllForAnAdmin()
+    {
+        using var client = _factory.CreateClient();
+        await _factory.SeedAndLoginAsStaffAsync(client, UserRoles.Admin);
+
+        var response = await client.GetAsync("/api/products");
+
+        // The admin is the caller who edits the catalogue and judges a save by what the list
+        // shows immediately afterwards. If their browser may keep this response, the re-fetch
+        // that follows a save is answered with the pre-save body and a correct write looks like
+        // it was silently discarded.
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Headers.CacheControl!.NoStore.ShouldBeTrue();
+        response.Headers.CacheControl.Public.ShouldBeFalse();
+        response.Headers.CacheControl.MaxAge.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task MigrateDataUrl_MovesAnInlineBase64ImageIntoTheStoreAndIsSafeToRerun()
     {
         var media = _factory.Services.GetRequiredService<MediaService>();
