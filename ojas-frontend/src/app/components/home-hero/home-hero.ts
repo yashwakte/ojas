@@ -102,13 +102,6 @@ export class HomeHero {
   private readonly deckRef = viewChild<ElementRef<HTMLElement>>('deck');
 
   /**
-   * The dwell, published to the stylesheet so the slow push-in on the active picture lasts
-   * exactly as long as the slide is on screen. Two places holding the same number is how a
-   * timing change ends up half-applied.
-   */
-  readonly dwellMs = AUTOPLAY_MS;
-
-  /**
    * The doors swing apart. Starts closed on both server and client render so there is no
    * SSR/hydration mismatch.
    */

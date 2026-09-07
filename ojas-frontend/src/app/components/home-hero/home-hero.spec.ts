@@ -171,11 +171,6 @@ describe('HomeHero', () => {
 
       expect(hero.activeIndex()).toBe(0);
     });
-
-    it('publishes the dwell to the stylesheet so the drift lasts exactly one slide', () => {
-      const hero = setup();
-      expect(hero.dwellMs).toBe(AUTOPLAY_MS);
-    });
   });
 
   describe('autoplay', () => {

@@ -132,6 +132,28 @@
   min-width: 0;
   min-height: 0;
   display: grid;
+
+  // BOTH TRACKS ARE EXPLICIT, and that is load-bearing rather than tidiness.
+  //
+  // A grid whose single row is `auto` sizes that row from its content - so a child asking for
+  // `height: 100%` is asking about a height the row is still trying to derive from that child.
+  // The percentage cannot resolve, the image silently falls back to its natural size, and on a
+  // short desktop window the poster grows past the deck and paints straight over the buttons
+  // and the trust line below it. `minmax(0, 1fr)` makes the track definite whenever the deck
+  // has a definite height, so `height: 100%` down the chain resolves the way the fitted desktop
+  // layout assumes; where the hero is content-sized (phones) 1fr is content-sized too, so
+  // nothing changes there.
+  //
+  // The `0` minimum matters as much as the `1fr`: a bare `1fr` floors at min-content, which for
+  // a picture is its natural height, which is the same overflow by another route.
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+
+  // And a hard backstop. The scroll container this replaced clipped its contents as a side
+  // effect of being scrollable, so nothing inside it could ever paint over the copy however
+  // wrong its size was. That accident was doing real work; this does it on purpose.
+  overflow: hidden;
+
   // A horizontal drag is the carousel's; a vertical one is still the page's. Without this the
   // browser claims both and a swipe scrolls the page instead of changing the picture.
   touch-action: pan-y;
@@ -141,6 +163,7 @@
   grid-area: 1 / 1;
   position: relative;
   min-width: 0;
+  min-height: 0;
   display: flex;
   // Pictures of different shapes share one cell - a 1.835:1 poster and a 1.50:1 one - so the
   // shorter of the two is centred in the deck's height rather than pinned to its top.
@@ -163,12 +186,18 @@
   opacity: 0;
   visibility: hidden;
   transform: scale(0.985);
-  filter: blur(10px) saturate(0.85);
+  // A breath of softness, not a defocus. This was 10px, which was heavy enough to read as the
+  // picture going out of focus and back - an effect in its own right, competing with the
+  // dissolve rather than supporting it. At 3px it is felt rather than seen: it takes the edge
+  // off the outgoing poster so the two are distinguishable while they overlap, and nothing more.
+  // The saturation drop went entirely; draining the colour out of a poster mid-fade was the
+  // other half of what made the transition feel like it was doing something to the picture.
+  filter: blur(3px);
   transition:
-    opacity 900ms var(--ojas-ease),
-    transform 1100ms var(--ojas-ease),
-    filter 900ms ease,
-    visibility 0s 900ms;
+    opacity 800ms var(--ojas-ease),
+    transform 900ms var(--ojas-ease),
+    filter 800ms var(--ojas-ease),
+    visibility 0s 800ms;
   will-change: opacity, transform, filter;
 }
 
@@ -181,25 +210,20 @@
   z-index: 1;
 }
 
-// THE SLOW PUSH-IN. The picture on top keeps moving for as long as it is on screen - a very slow
-// drift forward over the whole dwell, which the component publishes as --hero-dwell so the two
-// can never disagree about how long a slide lasts.
+// THERE IS DELIBERATELY NO SLOW ZOOM ON THE ACTIVE SLIDE.
 //
-// This is the difference between a photograph being looked at and a slideshow. It is deliberately
-// under 3% of travel: enough that the frame is never quite still, far too little to notice as
-// movement, and small enough that no part of the poster is pushed out of the frame.
-.hero-slide--active .hero-slide-inner {
-  animation: heroDrift var(--hero-dwell, 5000ms) linear both;
-}
-
-@keyframes heroDrift {
-  from {
-    transform: scale(1);
-  }
-  to {
-    transform: scale(1.028);
-  }
-}
+// One was tried - a 2.8% push-in across the dwell, the usual way to keep a hero from feeling
+// frozen - and it had to come out, because it cannot coexist with the rule that governs this
+// hero: the poster is shown WHOLE, never cropped. These are composed posters with a headline,
+// a wordmark and a row of packs, and on a landscape desktop the fitted picture is constrained by
+// the window's HEIGHT, with the warm margins at the sides. There is therefore no vertical slack
+// to zoom into: scaling past 1 pushes the top and bottom of the artwork straight out of the
+// frame, which the deck's overflow then clips. Measured at 1920x870 it was cutting about 7px off
+// the poster, growing over the five seconds it was on screen.
+//
+// The arrival settle below is safe for the same reason reversed - it scales UP TO 1 and never
+// past it - so the motion in this carousel is entirely in the transition, where it belongs, and
+// a slide that has arrived holds perfectly still.
 
 // The tap target for a slide that has somewhere to go. Laid over the picture rather than wrapped
 // around it, so the focus ring stays square with the frame while the artwork drifts underneath.
@@ -904,8 +928,8 @@
       visibility 0s 200ms;
   }
 
-  .hero-slide--active .hero-slide-inner {
-    animation: none;
+  .hero-slide-inner {
+    transform: none;
   }
 
   .hero-dot-fill,

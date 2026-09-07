@@ -47,10 +47,10 @@
            between them is a crossfade rather than a slide. That is the whole change: sliding
            announces the mechanism - here is a strip of pictures, watch it move - while a
            dissolve announces the picture. The outgoing poster softens and falls back as the
-           incoming one arrives, so for a moment both are in the same space, and the arriving
-           one keeps drifting slowly forward for as long as it is on screen. A picture that is
-           still moving, barely, reads as a photograph being looked at; one that snaps into
-           place and freezes reads as a slideshow.
+           incoming one arrives, so for a moment both are in the same space. All of the
+           movement lives in the transition: a slide that has arrived holds perfectly still,
+           because these posters are shown whole and there is nowhere to drift to that would
+           not crop one.
 
            A swipe still works - see the pointer handlers - it simply no longer drives the
            animation, so the transition is the same considered one however it was asked for. -->
@@ -60,7 +60,6 @@
         role="region"
         aria-roledescription="carousel"
         aria-label="Ojas featured artwork"
-        [style.--hero-dwell]="dwellMs + 'ms'"
       >
         @for (slide of slides(); track slide.key; let i = $index; let first = $first) {
           <div
