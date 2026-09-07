@@ -12,31 +12,29 @@
     <meta name="theme-color" content="#F25A1A" />
     <link rel="icon" type="image/png" href="images/logo.png" />
     <link rel="apple-touch-icon" href="images/logo.png" />
-    <!-- The FIRST slide of the home page hero, started before Angular has parsed a line of
-         JavaScript. Without this the browser cannot discover the image until the app has booted
-         and rendered the home route, which pushes the largest paint back by the whole cost of
-         that bootstrap. imagesrcset must mirror the first entry of SHIPPED_HERO_SLIDES in
-         home-hero.ts, or the preload fetches a file the page then does not use.
+    <!-- THERE IS DELIBERATELY NO HERO PRELOAD HERE ANY MORE.
 
-         Only the first slide is preloaded. The rest of the deck is lazy: a poster that has not
-         come up yet must not compete for bandwidth with the one being looked at.
+         There used to be one, for /images/hero-banner-1280.webp, and its reasoning was sound while
+         the hero was a fixed picture in the bundle: the browser cannot discover the largest paint
+         on the home page until Angular has booted and rendered the home route, so naming it in the
+         markup bought the whole cost of that bootstrap.
 
-         WORTH KNOWING: once the owner publishes hero slides of their own from the admin console,
-         their first slide replaces this one on the rail and this preload becomes a wasted ~50KB
-         on the first visit. It is left in because the shipped artwork is what the overwhelming
-         majority of visits will see, and because the alternative - no preload at all - costs
-         every one of those visits the whole bootstrap before the largest paint can even start.
-         If managed slides become the normal case, this should move to a server-rendered
-         preload of whichever picture is actually first. -->
-    <link
-      rel="preload"
-      as="image"
-      type="image/webp"
-      href="/images/hero-banner-1280.webp"
-      imagesrcset="/images/hero-banner-640.webp 640w, /images/hero-banner-960.webp 960w, /images/hero-banner-1280.webp 1280w, /images/hero-banner-1600.webp 1600w"
-      imagesizes="100vw"
-      fetchpriority="high"
-    />
+         It stopped being true the moment the owner published hero slides of their own. Verified
+         against production on 2026-09-07: /api/hero-slides returns two admin-uploaded slides, so
+         the shipped poster is not what anybody sees, and the preload was fetching ~190KB of a
+         picture that is never drawn - on EVERY page load, product pages and checkout included,
+         competing for bandwidth with the image that actually is the largest paint. A preload of
+         the wrong file is worse than no preload at all.
+
+         What replaces it: the first hero slide's <img> already carries fetchpriority="high" and a
+         srcset (see home-hero.html), and /api/media responses are now cacheable at Vercel's edge
+         (see MediaController), so the real picture is prioritised the moment it is known and comes
+         from the edge rather than from the API instance.
+
+         If the hero ever goes back to being a fixed picture in the bundle, a preload of that file
+         belongs here again. Doing better than that for managed slides needs the first slide's URL
+         to be known at document-serve time, which means server-rendering this file - a bigger
+         change than it is worth today. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Phone verification pulls the MSG91 widget, which in turn pulls hCaptcha from two further

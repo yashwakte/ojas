@@ -11,6 +11,15 @@ export interface Product {
   galleryImageUrls: string[];
   weight: string;
   isAvailable: boolean;
+  /**
+   * Whether customers can see this product at all.
+   *
+   * Distinct from `isAvailable`, which means "we sell this, but not today" and is shown to the
+   * customer as Out of Stock. Unlisted means the product is not ready to be sold — normally a new
+   * pack that has photographs and copy but no price yet — and the API filters those out of every
+   * public response, so a customer never receives one. Only the admin console ever sees `false`.
+   */
+  isListed: boolean;
   /** Units on hand. null means stock isn't tracked for this product yet. */
   stockQuantity: number | null;
   lowStockThreshold: number;
@@ -59,6 +68,7 @@ export interface CreateProductRequest {
   galleryImageUrls: string[];
   weight: string;
   isAvailable: boolean;
+  isListed?: boolean;
   stockQuantity?: number | null;
   lowStockThreshold?: number;
   ingredients: string;

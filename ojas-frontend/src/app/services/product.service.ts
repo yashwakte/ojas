@@ -7,6 +7,7 @@ import {
   CreateProductRequest,
   UpdateProductRequest,
 } from '../models/interfaces';
+import { packShotSrc } from '../constants/pack-shots';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
@@ -14,6 +15,10 @@ export class ProductService {
   private readonly _products = signal<Product[]>([]);
   private readonly _loading = signal(false);
   private readonly _error = signal<string | null>(null);
+  /** Ids the API has told us do not exist, so a product page can say so instead of waiting. */
+  private readonly _unknown = signal<ReadonlySet<string>>(new Set());
+  /** Ids already fetched individually, so a page that re-renders does not re-request them. */
+  private readonly _requested = new Set<string>();
 
   readonly products = this._products.asReadonly();
   readonly loading = this._loading.asReadonly();
@@ -52,6 +57,43 @@ export class ProductService {
 
   getProduct(id: string): Product | undefined {
     return this._products().find((p) => p.id === id);
+  }
+
+  /**
+   * Makes sure one product is in hand, fetching just that one if the catalogue has not arrived.
+   *
+   * A product page opened directly — a shared link, a bookmark, a search result — used to render
+   * "Product Not Found" while the catalogue request was still in flight, and only then flip to the
+   * real page. The product was never missing; the page simply could not tell "we have not looked
+   * yet" apart from "we looked and there is nothing", because both are an absence from a list.
+   *
+   * So there are three states now, not two, and this drives them. Asking for one product by id is
+   * also markedly less to wait for than the whole catalogue on a phone: the page can be drawn from
+   * a single small response while the full list arrives behind it for the rail at the bottom.
+   */
+  ensureProduct(id: string): void {
+    if (!id || this.getProduct(id) || this._requested.has(id)) return;
+    this._requested.add(id);
+
+    this.http.get<Product>(`${this.apiUrl}/${id}`).subscribe({
+      next: (product) => {
+        const normalized = this.normalizeProduct(product);
+        this._products.update((products) =>
+          products.some((p) => p.id === normalized.id)
+            ? products.map((p) => (p.id === normalized.id ? normalized : p))
+            : [...products, normalized],
+        );
+      },
+      // A 404 is an answer: this id is not a product, and the page should say so rather than
+      // spinning forever. Anything else is treated the same way — after a failed direct fetch
+      // there is nothing further this page can do but tell the truth.
+      error: () => this._unknown.update((ids) => new Set(ids).add(id)),
+    });
+  }
+
+  /** True once we have asked the API about this id and been told there is no such product. */
+  isUnknown(id: string): boolean {
+    return this._unknown().has(id);
   }
 
   getByCategory(category: string): Product[] {
@@ -103,9 +145,16 @@ export class ProductService {
     return {
       ...product,
       discount: product.discount ?? 0,
-      imageUrl: product.imageUrl ?? '',
-      galleryImageUrls: product.galleryImageUrls ?? [],
+      // Stamped with the pack-shot revision here, at the single point every product enters the
+      // app, so a re-shoot reaches customers who already have the old file cached. Every screen
+      // that shows a product — card, detail page, lightbox, cart, checkout, orders, admin — reads
+      // its image from this list, so doing it once here is doing it everywhere. See packShotSrc.
+      imageUrl: packShotSrc(product.imageUrl ?? ''),
+      galleryImageUrls: (product.galleryImageUrls ?? []).map(packShotSrc),
       isAvailable: product.isAvailable ?? true,
+      // Absent on every document written before listing existed, and those are all real products
+      // the shop has been selling — so the default has to be "listed", never the other way round.
+      isListed: product.isListed ?? true,
       // undefined (field absent on older documents) must normalise to null —
       // "not tracked" — and never to 0, which would read as out of stock.
       stockQuantity: product.stockQuantity ?? null,

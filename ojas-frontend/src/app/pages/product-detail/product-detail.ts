@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   ElementRef,
+  afterRenderEffect,
   input,
   computed,
   signal,
@@ -31,6 +32,11 @@ import {
   isPurchasable,
 } from '../../models/interfaces';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
+import { packShotSrcset, thumbnailPackShot } from '../../constants/pack-shots';
+
+/** How many products the "You May Also Like" rail carries at most. Enough that the rail is worth
+ * scrolling on a wide screen and still a bounded number of images to fetch. */
+const SIMILAR_RAIL_SIZE = 12;
 
 @Component({
   selector: 'app-product-detail',
@@ -86,6 +92,18 @@ export class ProductDetail {
 
   product = computed(() => this.productService.getProduct(this.id()));
 
+  /**
+   * True while it is not yet known whether this product exists.
+   *
+   * The template has three branches, not two. Without this one, a page opened directly rendered
+   * "Product Not Found" for as long as the catalogue took to arrive and then replaced it with the
+   * product — which reads as a broken link followed by a flicker, and is the single worst thing a
+   * shared product link can do.
+   */
+  readonly resolving = computed(
+    () => !this.product() && !this.productService.isUnknown(this.id()),
+  );
+
   /** The shared definition, so this page advertises exactly what the cart will charge. */
   readonly effectivePrice = effectivePrice;
 
@@ -119,13 +137,27 @@ export class ProductDetail {
 
   activeImageIndex = signal(0);
 
+  /**
+   * What to show under "You May Also Like".
+   *
+   * Products from the same category first, because those are the genuinely comparable ones — then
+   * the rest of the catalogue to fill the rail out. The section used to be same-category only and
+   * capped at six, which meant a product in a thin category (or the only product in one) got an
+   * empty rail and the page just stopped, with no way onward except the browser's Back button. A
+   * dead end at the bottom of a product page is the one place a shop can least afford one.
+   *
+   * The fill is not padding for its own sake: everything in it is a real product a customer can
+   * buy, and the same-category matches always come first, so relevance is never traded away — the
+   * rail only reaches for the rest of the shop once it has run out of close matches.
+   */
   similarProducts = computed(() => {
     const p = this.product();
     if (!p) return [];
-    return this.productService
-      .getByCategory(p.category)
-      .filter((sp) => sp.id !== p.id)
-      .slice(0, 6);
+    const all = this.productService.products();
+    const others = all.filter((sp) => sp.id !== p.id);
+    const sameCategory = others.filter((sp) => sp.category === p.category);
+    const rest = others.filter((sp) => sp.category !== p.category);
+    return [...sameCategory, ...rest].slice(0, SIMILAR_RAIL_SIZE);
   });
 
   highlights = computed(() => {
@@ -147,7 +179,52 @@ export class ProductDetail {
       this.expandedSections.set(new Set());
       this.activeImageIndex.set(0);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Fetch this one product straight away rather than waiting on the whole catalogue. On a
+      // deep link that is the difference between one small response and the entire product list.
+      this.productService.ensureProduct(this.id());
     });
+
+    // The rail's own controls depend on how much of it fits, which is not known until it has been
+    // laid out. Re-read after every render rather than once: the product can change under the same
+    // component instance, and the rail is often still empty on the first pass because the
+    // catalogue has not arrived yet.
+    afterRenderEffect(() => {
+      this.similarProducts();
+      this.onSimilarScroll();
+    });
+  }
+
+  /** The "You May Also Like" rail, so its arrows know how far to move it and its edge fades know
+   * which end still has products behind them. */
+  private readonly similarScroll = viewChild<ElementRef<HTMLElement>>('similarScroll');
+  readonly similarCanScrollLeft = signal(false);
+  readonly similarCanScrollRight = signal(false);
+
+  /**
+   * Moves the rail by one screenful, in whichever direction.
+   *
+   * A screenful rather than one card: the rail is a scroll container with snap points, so the
+   * browser settles it on a card boundary itself, and matching the step to what is visible is what
+   * makes a click feel like turning a page rather than nudging a list.
+   */
+  scrollSimilar(direction: -1 | 1): void {
+    const rail = this.similarScroll()?.nativeElement;
+    if (!rail) return;
+    rail.scrollBy({ left: direction * rail.clientWidth * 0.85, behavior: 'smooth' });
+  }
+
+  /** Keeps the edge fades and the arrows honest about which way there is more to see. */
+  onSimilarScroll(): void {
+    const rail = this.similarScroll()?.nativeElement;
+    if (!rail) return;
+    // A pixel of slack: sub-pixel layout means scrollLeft rarely lands exactly on either end, and
+    // without it the arrow at the end of the rail never quite goes away.
+    const slack = 2;
+    this.similarCanScrollLeft.set(rail.scrollLeft > slack);
+    this.similarCanScrollRight.set(
+      rail.scrollLeft + rail.clientWidth < rail.scrollWidth - slack,
+    );
   }
 
   /** The scrolling strip the photos live in. Scroll position is the source of truth for which
@@ -238,6 +315,14 @@ export class ProductDetail {
   toggleDescription(): void {
     this.descExpanded.update((v) => !v);
   }
+
+  /** Widths the browser may choose between for the main gallery image. */
+  readonly srcset = packShotSrcset;
+
+  /** The card-sized file, for the thumbnail strip and the "You May Also Like" rail — neither of
+   * which is ever drawn larger than a couple of hundred pixels. The rail alone was pulling twelve
+   * full-size pack shots to draw twelve small cards. */
+  readonly thumbnail = thumbnailPackShot;
 
   onImgError(event: Event): void {
     const img = event.target as HTMLImageElement;

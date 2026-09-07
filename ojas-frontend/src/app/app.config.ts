@@ -4,6 +4,7 @@ import {
   withComponentInputBinding,
   withInMemoryScrolling,
   withNavigationErrorHandler,
+  withPreloading,
 } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -11,6 +12,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
 import { AppRecoveryService } from './services/app-recovery.service';
+import { StorefrontPreloadStrategy } from './preload-storefront';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -19,6 +21,10 @@ export const appConfig: ApplicationConfig = {
       routes,
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
+      // Fetches the storefront's screens while the browser is idle, so clicking Products, a
+      // product, or the cart renders immediately instead of waiting on a chunk. See
+      // StorefrontPreloadStrategy for what it will and will not fetch.
+      withPreloading(StorefrontPreloadStrategy),
       // A lazy route that will not load is the failure that used to leave a blank page between
       // the header and the footer, with nothing on screen to explain it and nothing to click.
       // The Router catches that rejection itself, so this - not a global unhandledrejection

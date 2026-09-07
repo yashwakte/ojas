@@ -66,18 +66,34 @@
 }
 
 // ─── Image Section ───
+// Sticky, so the photograph stays with the reader as they go down a long specification column.
+//
+// This block used to declare `position: sticky` and then `position: relative` immediately after
+// it, which is not two properties but one: the later declaration wins, so the column was never
+// sticky — and `top: 100px`, which does nothing to a static element and something very visible to
+// a relative one, pushed the whole photograph a hundred pixels down its own column. That is the
+// band of empty space that sat above the product on every desktop screen. Sticky also establishes
+// a containing block, so the discount and out-of-stock badges positioned against this still work.
 .image-section {
   position: sticky;
   top: 100px;
-  position: relative;
+  align-self: start;
 }
 
+// 4:3, because that is the shape the pack shots are published in — see the pack-shot pass in
+// tools/optimize-images.mjs, and the product card and products grid, which already match it.
+//
+// This well was square. A 4:3 photograph inside a square frame with `object-fit: contain` is
+// letterboxed by an eighth of the frame's height at the top and another eighth at the bottom, so
+// on a desktop the picture rendered 576x432 inside a 576x576 grey box and the product looked small
+// in a frame that was mostly empty. Nothing was wrong with the photograph; the frame was the wrong
+// shape for it. Whenever the published aspect changes, this and .similar-img change with it.
 .image-wrapper {
   position: relative;
   border-radius: var(--ojas-radius);
   overflow: hidden;
   background: #f5f5f5;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   box-shadow: var(--ojas-shadow-md);
 }
 
@@ -111,8 +127,9 @@
   cursor: zoom-in;
 
   img {
-    // `contain`: the pack shots are cut out on transparency at 3:2 and the whole product
-    // has to stay in frame. Cover cropped the top and bottom off every pouch.
+    // `contain` rather than `cover`: the well matches the pack shots' 4:3, so nothing is
+    // letterboxed, and anything an admin uploads at another shape stays whole rather than being
+    // cropped through the middle of the product.
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -285,10 +302,12 @@
   padding-bottom: 2px;
 }
 
+// 4:3 to match the photographs, like the well above it. A square thumbnail letterboxed a 4:3
+// picture inside 64px, which at that size is most of the tile given over to grey.
 .thumbnail-btn {
   flex-shrink: 0;
-  width: 64px;
-  height: 64px;
+  width: 84px;
+  aspect-ratio: 4 / 3;
   border-radius: 10px;
   overflow: hidden;
   border: 2px solid transparent;
@@ -298,8 +317,6 @@
   transition: border-color 0.2s ease;
 
   img {
-    // `contain`: the pack shots are cut out on transparency at 3:2 and the whole product
-    // has to stay in frame. Cover cropped the top and bottom off every pouch.
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -988,6 +1005,12 @@
   }
 }
 
+// The rail and its controls. The row must never wrap onto a second line however many products
+// are in it — it is one horizontal strip that scrolls, the way every large storefront does this.
+.similar-rail {
+  position: relative;
+}
+
 .similar-scroll {
   display: flex;
   gap: 20px;
@@ -996,9 +1019,91 @@
   -webkit-overflow-scrolling: touch;
   padding-bottom: 12px;
   scrollbar-width: none;
+  // Horizontal panning only, so a diagonal swipe down the rail still scrolls the page.
+  touch-action: pan-x pinch-zoom;
+  overscroll-behavior-x: contain;
 
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+// A soft fade at whichever end still has products behind it. This is the whole reason a viewer
+// knows the row continues: a card cut cleanly by the container edge reads as the end of the list,
+// and the fade reads as more to come.
+.similar-rail::before,
+.similar-rail::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 12px;
+  width: 56px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.similar-rail::before {
+  left: 0;
+  background: linear-gradient(to right, var(--ojas-white, #fff), transparent);
+}
+
+.similar-rail::after {
+  right: 0;
+  background: linear-gradient(to left, var(--ojas-white, #fff), transparent);
+}
+
+.similar-rail.can-scroll-left::before,
+.similar-rail.can-scroll-right::after {
+  opacity: 1;
+}
+
+.similar-nav {
+  position: absolute;
+  top: calc(50% - 6px);
+  translate: 0 -50%;
+  z-index: 3;
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--ojas-border);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--ojas-shadow-sm);
+  color: var(--ojas-text);
+  cursor: pointer;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &.prev {
+    left: -8px;
+  }
+
+  &.next {
+    right: -8px;
+  }
+
+  &:hover {
+    transform: translateY(-50%) scale(1.06);
+  }
+
+  mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+}
+
+// Pointer only. On a touch screen the gesture is already the natural one, and a button sitting on
+// the rail would be in its way.
+@media (hover: hover) and (pointer: fine) {
+  .similar-rail.can-scroll-left .similar-nav.prev,
+  .similar-rail.can-scroll-right .similar-nav.next {
+    display: grid;
   }
 }
 
@@ -1027,13 +1132,11 @@
 
 .similar-img {
   position: relative;
-  height: 160px;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   background: #f5f5f5;
 
   img {
-    // `contain`: the pack shots are cut out on transparency at 3:2 and the whole product
-    // has to stay in frame. Cover cropped the top and bottom off every pouch.
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -1227,12 +1330,100 @@
     flex: 0 0 160px;
   }
 
-  .similar-img {
-    height: 120px;
-  }
-
   .similar-products {
     margin-top: 40px;
     padding-top: 32px;
   }
+}
+
+
+// ─── Loading skeleton ───
+//
+// Shown only while it is still unknown whether the product exists — see `resolving` in the
+// component. It mirrors the real layout's geometry so that when the product lands nothing moves:
+// the image well is the same 4:3 box, the info column the same stack of blocks. A spinner would
+// have been less code and worse, because a spinner tells the customer to wait without telling
+// them what for, and it leaves the page to jump into place around it afterwards.
+.skeleton-block {
+  display: block;
+  border-radius: var(--ojas-radius-sm);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.045) 0%,
+      rgba(0, 0, 0, 0.075) 40%,
+      rgba(0, 0, 0, 0.045) 80%
+    )
+    0 0 / 300% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+.detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .skeleton-chip {
+    width: 88px;
+    height: 22px;
+    border-radius: 999px;
+  }
+
+  .skeleton-title {
+    width: 70%;
+    height: 34px;
+  }
+
+  .skeleton-price {
+    width: 140px;
+    height: 28px;
+  }
+
+  .skeleton-line {
+    width: 100%;
+    height: 14px;
+
+    &.short {
+      width: 60%;
+    }
+  }
+
+  .skeleton-button {
+    width: 100%;
+    max-width: 320px;
+    height: 48px;
+    border-radius: var(--ojas-radius);
+    margin-top: 8px;
+  }
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+// The sweep is decoration, not information. Anyone who has asked for less motion still gets the
+// blocks, which is the part that actually holds the layout.
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+}
+
+// The one thing on the skeleton that carries meaning: what a screen reader announces while the
+// page is still resolving. There is no app-wide utility for this, so it lives with its one use.
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

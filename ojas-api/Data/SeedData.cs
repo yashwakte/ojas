@@ -282,6 +282,227 @@ public static class SeedData
             Ingredients = "Corn (maize) flour. Manufactured in a facility that also handles wheat, milk, soy and nuts.",
             Benefits = "Thickens without clouding the flavour, and keeps bakes light and tender. For 1 cup (250 ml) of soup or gravy, mix 1 heaped tablespoon (20 g) with a little cold water to a smooth slurry, stir out any lumps, then add it to the pan while stirring. Also used for puddings and creamy desserts and for a crisp marinade coating.",
             StorageInfo = BoxStorage
+        },
+
+        // ===== Awaiting the owner's prices =====
+        //
+        // Photographed, transcribed off the back of the pack, and deliberately NOT on sale: every
+        // product below carries Price = 0 and IsListed = false, so the storefront never shows it
+        // and no customer can ever be charged a price the owner did not set. They are here rather
+        // than absent so the owner has something to open, price and publish in the admin console
+        // instead of retyping a pack's whole label from scratch.
+        //
+        // Publishing one is two fields in the admin console: set the price, tick Listed.
+
+        // ----- Kitchen-essentials cartons -----
+        new Product
+        {
+            Name = "Baking Powder",
+            Description = "Highly pure baking powder for everyday baking - cakes, pancakes, quick breads and other baked mixtures. No anticaking agent added.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "50g",
+            ImageUrl = "/images/baking-powder-front.webp",
+            GalleryImageUrls = ["/images/baking-powder-back.webp"],
+            Ingredients = "Baking powder. Contains no common allergens such as gluten, nuts, soy, dairy or eggs.",
+            Benefits = "The raising agent for cakes, pancakes, quick breads and other baked mixtures. Per 100 g: sodium 330 mg, calcium 252 mg.",
+            StorageInfo = "Store in a cool, hygienic and dry place. Keep away from sunlight. Do not consume if the pack is unsealed. Best before 12 months from packing."
+        },
+        new Product
+        {
+            Name = "Baking Soda",
+            Description = "Highly pure baking soda (sodium bicarbonate) for baking and around the house. Lump formation is natural - no anticaking agent has been added.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "100g",
+            ImageUrl = "/images/baking-soda-front.webp",
+            GalleryImageUrls = ["/images/baking-soda-back.webp"],
+            Ingredients = "Baking soda (sodium bi-carbonate). Contains no common allergens such as gluten, nuts, soy, dairy or eggs.",
+            Benefits = "Beyond baking: exfoliates skin and clears clogged pores, soothes an itchy scalp, whitens teeth used sparingly, temporarily neutralises acid reflux when diluted, and works as a natural deodorant or foot soak.",
+            StorageInfo = "Store in a cool, dry and hygienic place. Keep away from direct sunlight."
+        },
+        new Product
+        {
+            Name = "Rock Salt",
+            Description = "Premium pink rock salt (sendha namak) for daily cooking - one of the purest salts there is, and the salt traditionally eaten during a fast.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "100g",
+            ImageUrl = "/images/rock-salt-front.webp",
+            GalleryImageUrls = ["/images/rock-salt-back.webp"],
+            Ingredients = "Premium pink rock salt. Contains iodine. Allergy advice: contains tree nuts.",
+            Benefits = "A premium grade pink rock salt for the finest gourmet food preparation, and one of the purest salts, providing minerals essential for your body. Per 100 g: sodium 24 g.",
+            StorageInfo = "Store in a cool, dry and hygienic place. Keep away from direct sunlight. Once opened, keep the product in an airtight container."
+        },
+        new Product
+        {
+            Name = "Black Salt",
+            Description = "Premium black salt (kala namak) - the sulphurous, faintly smoky salt that finishes chaat, raita, buttermilk and cut fruit.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "100g",
+            ImageUrl = "/images/black-salt-front.webp",
+            Ingredients = "Premium black salt (kala namak).",
+            Benefits = "The finishing salt for chaat, raita, buttermilk and cut fruit, where its sulphurous note is the whole point.",
+            StorageInfo = "Store in a cool, dry and hygienic place. Keep away from direct sunlight. Once opened, keep the product in an airtight container."
+        },
+        new Product
+        {
+            Name = "Cocoa Powder",
+            Description = "Unsweetened cocoa powder, 99.75% cocoa solids, for baking, hot chocolate and chocolate sauce.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/cocoa-powder-front.webp",
+            GalleryImageUrls = ["/images/cocoa-powder-back.webp"],
+            Ingredients = "Cocoa solids 99.75%, added flavour (nature identical and artificial flavouring substance - chocolate). May contain milk, nuts and mustard.",
+            Benefits = "For a rich chocolate sauce: mix 15 g cocoa powder, 15 g corn flour, 30 g sugar and 15 g butter with 300 ml milk to a smooth paste, then boil to thicken, stirring continuously.",
+            StorageInfo = "Store in a cool, dry and hygienic place. Keep away from direct sunlight. Once opened, keep the product in an airtight container."
+        },
+        new Product
+        {
+            Name = "Citric Acid",
+            Description = "Citric acid (limbu satva) - the sharpener for soft drinks, squashes, jams, jellies, instant dhokla, idli and dosa.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/citric-acid-front.webp",
+            GalleryImageUrls = ["/images/citric-acid-back.webp"],
+            Ingredients = "Citric acid. May contain traces of wheat (gluten), milk and nuts.",
+            Benefits = "Used in soft drinks, fruit squashes, sauces, jams, jellies, instant dhokla, instant idli and instant dosa, and as a fruit salt with baking soda. For relief from acidity and heartburn: take a glass of water, add half a teaspoon of citric acid and one teaspoon of sodium bicarbonate, stir and drink.",
+            StorageInfo = "Store in a cool and dry place. Once opened, transfer to an airtight container. Do not buy if the packet is damaged or tampered with. Best before 12 months from the date of packing."
+        },
+        new Product
+        {
+            Name = "Monosodium Glutamate",
+            Description = "Monosodium glutamate (MSG, E621) - the flavour enhancer that adds savoury depth to soups, sauces, seasonings and instant snacks.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/monosodium-glutamate-front.webp",
+            GalleryImageUrls = ["/images/monosodium-glutamate-back.webp"],
+            Ingredients = "Monosodium glutamate (MSG, INS 621). May contain traces of wheat (gluten), milk and nuts. Not to be added to any food meant for infants below 2 years.",
+            Benefits = "Adds flavour to soups, sauces, seasonings and instant snacks. A taste enhancer, imparting the savoury sixth sense described as umami, alongside sweet, spicy, bitter, sour and salty. May be added at any stage of cooking.",
+            StorageInfo = "Store in a cool and dry place. Once opened, transfer to an airtight container. Do not buy if the packet is damaged or tampered with. Best before 12 months from the date of packing."
+        },
+        new Product
+        {
+            Name = "Dry Ginger Powder",
+            Description = "Dry ginger powder (sunth) - woody notes with a sweet undertone, hot and pungent, at home in most curries and Indian dishes.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/dry-ginger-powder-front.webp",
+            GalleryImageUrls = ["/images/dry-ginger-powder-back.webp"],
+            Ingredients = "Ground dry ginger. May contain traces of wheat (gluten), milk and nuts. No preservatives, no added colours or flavours.",
+            Benefits = "Packs in the goodness of the oriental spice that makes it a base addition in most curries and Indian dishes. Per 100 g: energy 335 kcal, protein 4 g, carbohydrate 67 g, fibre 12 g, calcium 110 mg, iron 19 mg.",
+            StorageInfo = "Store in a cool and dry place. Once opened, transfer to an airtight container. Do not buy if the packet is damaged or tampered with. Best before 12 months from the date of packing."
+        },
+        new Product
+        {
+            Name = "Cinnamon Powder",
+            Description = "Natural cinnamon (dalchini) powder, finely ground - a spice and a folk medicine both, and one of the warmest things you can put in a bake.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/cinnamon-powder-front.webp",
+            GalleryImageUrls = ["/images/cinnamon-powder-back.webp"],
+            Ingredients = "Cinnamon (dalchini). May contain traces of wheat (gluten), milk and nuts.",
+            Benefits = "Used for centuries as a spice and a folk medicine for cough and sore throat. Improves digestion, boosts immunity, has anti-inflammatory properties and is loaded with antioxidants. Per 100 g: energy 375 kcal, protein 3.9 g, carbohydrate 77.2 g, fat 22.7 g, sodium 3 g.",
+            StorageInfo = "Store in a cool and dry place. Once opened, transfer to an airtight container. Do not buy if the packet is damaged or tampered with. Best before 12 months from the date of packing."
+        },
+        new Product
+        {
+            Name = "Jeshthamadh (Sweet Root) Powder",
+            Description = "Jeshthamadh - mulethi, or liquorice root - finely ground from carefully selected dried roots, with no preservatives, colours or additives.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/jeshthamadh-powder-front.webp",
+            GalleryImageUrls = ["/images/jeshthamadh-powder-back.webp"],
+            Ingredients = "Jeshthamadh (sweet root) powder. May contain traces of wheat (gluten), milk and nuts. No added preservatives, colours or additives.",
+            Benefits = "Also known as mulethi, a natural herbal ingredient widely used in traditional wellness practices. Add half a teaspoon to warm water or milk, use in herbal teas (kadha), mix with honey for throat soothing, or use in Ayurvedic preparations.",
+            StorageInfo = "Store in a cool and dry place. Once opened, transfer to an airtight container. Do not buy if the packet is damaged or tampered with. Best before 9 months from the date of packing."
+        },
+        new Product
+        {
+            Name = "Active Dry Yeast",
+            Description = "Active dry yeast, crafted for perfect baking - for bread, rolls, cakes and any type of risen bread, naan or roti.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Powder Box",
+            Weight = "25g",
+            ImageUrl = "/images/active-dry-yeast-front.webp",
+            GalleryImageUrls = ["/images/active-dry-yeast-back.webp"],
+            Ingredients = "Yeast, sorbitan monostearate (INS 491), ascorbic acid (INS 300). May contain traces of wheat (gluten), milk and nuts.",
+            Benefits = "To activate: measure the water called for in the recipe into a measuring cup, lukewarm at about 32-43 degrees C - warm on the wrist, never hot enough to burn. Add a pinch of sugar, stir the yeast in vigorously and cover for ten minutes. When it is bubbly and foamy it is active and ready to use. Per 100 g: energy 333 kcal, protein 45 g, carbohydrate 34 g.",
+            StorageInfo = "Store in a cool and dry place. Once opened, transfer to an airtight container. Do not buy if the packet is damaged or tampered with. Best before 12 months from the date of packing."
+        },
+
+        // ----- Pouches -----
+        new Product
+        {
+            Name = "Amboli (Ghavan) Flour",
+            Description = "Ready flour for amboli and ghavan - the soft, lacy Konkani rice pancake, fermented overnight and eaten with coconut chutney.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Flour",
+            Weight = "200g",
+            ImageUrl = "/images/amboli-flour-front.webp",
+            Ingredients = "Rice flour blend for amboli and ghavan.",
+            Benefits = "Tasty, crisp and nutritious - the Konkani breakfast pancake with nothing to grind or blend at home.",
+            StorageInfo = PouchStorage(6)
+        },
+        new Product
+        {
+            Name = "Thalipeeth Bhajani",
+            Description = "Thalipeeth multigrain flour with millet - the roasted, spiced Maharashtrian blend that makes a thalipeeth in minutes.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Flour",
+            Weight = "200g",
+            ImageUrl = "/images/thalipeeth-bhajani-front.webp",
+            Ingredients = "Roasted multigrain blend with millet.",
+            Benefits = "Tasty, crisp and nutritious, and rich in fibre. One flour, one pan, and breakfast is done.",
+            StorageInfo = PouchStorage(6)
+        },
+        new Product
+        {
+            Name = "Bhagar (Varai) Peeth",
+            Description = "Little millet (bhagar, varai) flour with sago - the fasting flour for upvas thalipeeth and bhakri, ready to use.",
+            Price = 0,
+            IsListed = false,
+            IsAvailable = false,
+            Category = "Upwas",
+            Weight = "500g",
+            ImageUrl = "/images/bhagar-peeth-front.webp",
+            GalleryImageUrls = ["/images/bhagar-peeth-back.webp"],
+            Ingredients = "Little millet (varai) flour, sago flour.",
+            Benefits = "Fasting-friendly and ready to use: the upvas thalipeeth flour without soaking, drying and grinding varai at home.",
+            StorageInfo = PouchStorage(6)
         }
     ];
 }

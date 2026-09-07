@@ -34,13 +34,18 @@
     <!-- Products Grid -->
     <div class="products-grid">
       @for (product of filteredProducts(); track product.id; let i = $index) {
-        <div class="product-card" [style.animation-delay]="i * 0.06 + 's'">
+        <div class="product-card" [style.animation-delay]="cardDelay(i)">
           <a class="product-link" [routerLink]="['/products', product.id]">
             <div class="product-image">
+              <!-- The first row is the page. Left to `loading="lazy"`, the browser will not even
+                   begin fetching the photographs a customer is already looking at until layout has
+                   settled, which shows as a grid of empty cards filling in late. Everything below
+                   is lazy, which is where lazy actually pays. -->
               <img
                 [src]="thumbnail(product.imageUrl)"
                 [alt]="product.name"
-                loading="lazy"
+                [attr.loading]="i < eagerImageCount ? null : 'lazy'"
+                [attr.fetchpriority]="i < eagerImageCount ? 'high' : null"
                 decoding="async"
                 (error)="onImgError($event)"
               />

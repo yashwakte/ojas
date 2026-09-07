@@ -28,11 +28,30 @@ public class ProductService
         _db = db;
     }
 
-    public async Task<List<Product>> GetAllAsync() =>
-        await _db.Products.Find(_ => true).ToListAsync();
+    /// <param name="includeUnlisted">
+    /// Admin only. An unlisted product is one the owner has not finished setting up — typically a
+    /// new pack that has photographs and copy but no price yet — and it must never reach a
+    /// customer, because the only price it could be shown at is zero. The admin console is the one
+    /// caller that has to see them, which is the whole point of them existing.
+    /// </param>
+    public async Task<List<Product>> GetAllAsync(bool includeUnlisted = false) =>
+        await _db.Products.Find(includeUnlisted ? Builders<Product>.Filter.Empty : Listed).ToListAsync();
 
-    public async Task<Product?> GetByIdAsync(string id) =>
-        await _db.Products.Find(p => p.Id == id).FirstOrDefaultAsync();
+    /// <inheritdoc cref="GetAllAsync"/>
+    public async Task<Product?> GetByIdAsync(string id, bool includeUnlisted = true) =>
+        await _db.Products
+            .Find(includeUnlisted
+                ? Builders<Product>.Filter.Eq(p => p.Id, id)
+                : Builders<Product>.Filter.Eq(p => p.Id, id) & Listed)
+            .FirstOrDefaultAsync();
+
+    /// <summary>
+    /// Products a customer may see. Written as "not explicitly unlisted" rather than "isListed is
+    /// true" so that every document written before the field existed still matches — a plain
+    /// equality filter would hide the entire live catalogue the moment this shipped.
+    /// </summary>
+    private static FilterDefinition<Product> Listed =>
+        Builders<Product>.Filter.Ne(p => p.IsListed, false);
 
     /// <summary>
     /// What a product actually sells for: its list price less the discount advertised against it.
@@ -63,7 +82,9 @@ public class ProductService
     }
 
     public async Task<List<Product>> GetByCategoryAsync(string category) =>
-        await _db.Products.Find(p => p.Category == category).ToListAsync();
+        await _db.Products
+            .Find(Builders<Product>.Filter.Eq(p => p.Category, category) & Listed)
+            .ToListAsync();
 
     public async Task<Product> CreateAsync(Product product)
     {
@@ -86,6 +107,7 @@ public class ProductService
         if (request.GalleryImageUrls != null) product.GalleryImageUrls = request.GalleryImageUrls;
         if (request.Weight != null) product.Weight = request.Weight;
         if (request.IsAvailable.HasValue) product.IsAvailable = request.IsAvailable.Value;
+        if (request.IsListed.HasValue) product.IsListed = request.IsListed.Value;
         if (request.StockQuantity.HasValue) product.StockQuantity = request.StockQuantity.Value;
         if (request.LowStockThreshold.HasValue) product.LowStockThreshold = request.LowStockThreshold.Value;
         if (request.Ingredients != null) product.Ingredients = request.Ingredients;
@@ -119,7 +141,7 @@ public class ProductService
         {
             var productId = doc["_id"].AsString;
             if (!ObjectId.TryParse(productId, out _)) continue;
-            var product = await GetByIdAsync(productId);
+            var product = await GetByIdAsync(productId, includeUnlisted: false);
             if (product != null && product.IsAvailable)
                 products.Add(product);
         }
@@ -133,7 +155,7 @@ public class ProductService
             {
                 if (products.Count >= limit) break;
                 if (!ObjectId.TryParse(productId, out _)) continue;
-                var product = await GetByIdAsync(productId);
+                var product = await GetByIdAsync(productId, includeUnlisted: false);
                 if (product != null && product.IsAvailable && products.All(p => p.Id != productId))
                     products.Add(product);
             }
@@ -143,7 +165,7 @@ public class ProductService
         {
             var excludeIds = products.Select(p => p.Id).ToHashSet();
             var backfill = await _db.Products
-                .Find(p => p.IsAvailable && !excludeIds.Contains(p.Id))
+                .Find(Builders<Product>.Filter.Where(p => p.IsAvailable && !excludeIds.Contains(p.Id)) & Listed)
                 .SortByDescending(p => p.CreatedAt)
                 .Limit(limit - products.Count)
                 .ToListAsync();
@@ -293,7 +315,48 @@ public class ProductService
 
         if (packData is not null)
         {
+            await IntroduceNewProductsAsync(packData);
             await BackfillPackContentAsync(packData);
+        }
+    }
+
+    /// <summary>
+    /// Inserts catalogue products that the live database has never seen.
+    ///
+    /// <see cref="SeedAsync"/> cannot do this — it only ever runs against an empty collection, so
+    /// a shop that has been open for a day will never see another product added to the seed again.
+    /// Every pack the client photographs from now on would have to be retyped into the admin
+    /// console by hand, label and all, which is exactly the work the seed already did once.
+    ///
+    /// Matching is by name and insert-only: a product that exists is left completely alone, so
+    /// this can never overwrite the owner's pricing, copy or photography. New arrivals normally
+    /// come in unlisted and unpriced (Price = 0, IsListed = false), which keeps them off the
+    /// storefront until the owner sets a price — see the tail of SeedData.
+    /// </summary>
+    private async Task IntroduceNewProductsAsync(List<Product> packData)
+    {
+        var existing = await _db.Products
+            .Find(_ => true)
+            .Project(p => p.Name)
+            .ToListAsync();
+        var known = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
+
+        var arrivals = packData.Where(p => !known.Contains(p.Name)).ToList();
+        if (arrivals.Count == 0) return;
+
+        // Ids come from the seed objects as null, so Mongo assigns them; CreatedAt is stamped by
+        // the model. Nothing here is reused between boots, so a partial failure just means the
+        // remainder arrive on the next start.
+        await _db.Products.InsertManyAsync(arrivals);
+
+        var unpriced = arrivals.Count(p => p.Price == 0);
+        Console.WriteLine(
+            $"✅ {arrivals.Count} new product(s) added to the catalogue"
+            + (unpriced > 0 ? $", {unpriced} of them unlisted and awaiting a price." : "."));
+        foreach (var product in arrivals)
+        {
+            Console.WriteLine($"   new     {product.Name} ({product.Weight})"
+                + (product.Price == 0 ? "  — needs a price before it can be listed" : ""));
         }
     }
 
@@ -376,7 +439,10 @@ public class ProductService
             if (missingBacks.Count > 0)
                 sets.Add(Builders<Product>.Update.Set(p => p.GalleryImageUrls, [.. gallery, .. missingBacks]));
 
-            if (!alreadyPriced)
+            // A pack price of zero means the owner has not set one yet, not that the pack is free.
+            // Neither the one-off correction nor the drift warning below has anything to say about
+            // a product in that state.
+            if (!alreadyPriced && pack.Price > 0)
             {
                 // The printed MRP is the ceiling, so this only ever lowers a price. A discount
                 // set in the dashboard still applies on top, which keeps the selling price below
@@ -437,6 +503,7 @@ public class ProductService
             foreach (var product in existing)
             {
                 if (!byName.TryGetValue(product.Name, out var pack)) continue;
+                if (pack.Price <= 0) continue;
 
                 if (product.Price > pack.Price)
                 {

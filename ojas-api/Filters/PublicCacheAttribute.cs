@@ -26,11 +26,37 @@ public sealed class PublicCacheAttribute : ActionFilterAttribute
 {
     private readonly int _maxAgeSeconds;
     private readonly int _staleWhileRevalidateSeconds;
+    private readonly int _sharedMaxAgeSeconds;
 
-    public PublicCacheAttribute(int maxAgeSeconds, int staleWhileRevalidateSeconds)
+    /// <param name="maxAgeSeconds">How long a browser may reuse the response without asking.</param>
+    /// <param name="staleWhileRevalidateSeconds">
+    /// How long past that a cache may keep answering from what it has while it refreshes behind
+    /// the scenes. This is what means nobody ever waits on the API instance waking up.
+    /// </param>
+    /// <param name="sharedMaxAgeSeconds">
+    /// How long a SHARED cache — the CDN in front of this API — may reuse the response, or 0 to
+    /// use <paramref name="maxAgeSeconds"/> for that too.
+    ///
+    /// This is not decoration. The storefront is served from Vercel, which proxies /api to this
+    /// application, and Vercel's CDN decides what to cache from <c>s-maxage</c> specifically: a
+    /// response carrying only <c>max-age</c> is passed straight through to the browser and cached
+    /// at the edge not at all. So without this every catalogue read from every visitor travelled
+    /// the whole way to a small shared instance — including the first read after that instance had
+    /// been idle long enough to be spun down, which is the several-second wait on a cold start.
+    ///
+    /// A separate number rather than one shared one because the two caches want different answers.
+    /// A browser holding the catalogue for a long time means one customer seeing a stale price for
+    /// that long; an edge holding it means one origin request serving everybody, which is the whole
+    /// point, and it can be given a longer leash because it revalidates centrally.
+    /// </param>
+    public PublicCacheAttribute(
+        int maxAgeSeconds,
+        int staleWhileRevalidateSeconds,
+        int sharedMaxAgeSeconds = 0)
     {
         _maxAgeSeconds = maxAgeSeconds;
         _staleWhileRevalidateSeconds = staleWhileRevalidateSeconds;
+        _sharedMaxAgeSeconds = sharedMaxAgeSeconds > 0 ? sharedMaxAgeSeconds : maxAgeSeconds;
     }
 
     public override void OnActionExecuted(ActionExecutedContext context)
@@ -73,7 +99,8 @@ public sealed class PublicCacheAttribute : ActionFilterAttribute
         }
 
         response.Headers.CacheControl =
-            $"public, max-age={_maxAgeSeconds}, stale-while-revalidate={_staleWhileRevalidateSeconds}";
+            $"public, max-age={_maxAgeSeconds}, s-maxage={_sharedMaxAgeSeconds}, "
+            + $"stale-while-revalidate={_staleWhileRevalidateSeconds}";
 
         // Appended, never assigned. CORS puts "Origin" in Vary on cross-origin responses, and
         // overwriting that on a response we have just made publicly cacheable would let a shared

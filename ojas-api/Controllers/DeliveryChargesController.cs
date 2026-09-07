@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using OjasApi.Filters;
 using OjasApi.Models;
 using OjasApi.Services;
 
@@ -18,7 +19,12 @@ public class DeliveryChargesController : ControllerBase
         _deliveryChargesService = deliveryChargesService;
     }
 
+    // Fetched at app boot on every visit — DeliveryChargesService loads it in its constructor —
+    // and it changes when the owner edits the delivery rules, which is a handful of times a year.
+    // Answering that from the edge rather than from the origin takes one request off the instance
+    // per visitor, and takes it off the critical path of a cold start entirely.
     [HttpGet]
+    [PublicCache(maxAgeSeconds: 300, staleWhileRevalidateSeconds: 3600, sharedMaxAgeSeconds: 600)]
     public async Task<ActionResult<DeliveryCharges>> GetConfig()
     {
         var config = await _deliveryChargesService.GetAsync();

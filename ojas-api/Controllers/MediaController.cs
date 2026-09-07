@@ -37,6 +37,15 @@ public class MediaController : ControllerBase
     /// <para>The extension in <paramref name="key"/> is cosmetic for us but not for everyone
     /// else - several CDNs decide what is cacheable by looking at the file extension before they
     /// look at the headers, so the URL ends in .webp rather than in a bare hash.</para>
+    ///
+    /// <para><c>s-maxage</c> is not a duplicate of <c>max-age</c>. The paragraph above says every
+    /// cache in between is free to answer on our behalf, and Vercel's edge - the one that matters,
+    /// because it is what the storefront's /api rewrite passes through - was not, because it
+    /// decides what to cache from <c>s-maxage</c> specifically and this response only carried
+    /// <c>max-age</c>. So every first-time visitor's images came the whole way from this instance,
+    /// including the home page's hero, which is both the largest paint on the site and, now that
+    /// the owner publishes hero slides from the admin console, served from here rather than from
+    /// the static bundle.</para>
     /// </summary>
     [HttpGet("{key}")]
     [AllowAnonymous]
@@ -55,7 +64,8 @@ public class MediaController : ControllerBase
 
         var etag = new EntityTagHeaderValue($"\"{asset.Hash}\"");
 
-        Response.Headers.CacheControl = $"public, max-age={OneYearSeconds}, immutable";
+        Response.Headers.CacheControl =
+            $"public, max-age={OneYearSeconds}, s-maxage={OneYearSeconds}, immutable";
         Response.Headers.ETag = etag.ToString();
         // The bytes are identical for everyone, but say so explicitly: without it a shared cache
         // could key an image on whichever request headers happened to differ.

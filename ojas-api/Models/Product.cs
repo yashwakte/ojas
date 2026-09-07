@@ -38,6 +38,20 @@ public class Product
     public bool IsAvailable { get; set; } = true;
 
     /// <summary>
+    /// Whether customers can see this product at all.
+    ///
+    /// Distinct from <see cref="IsAvailable"/>, which means "we sell this but it is out of stock
+    /// today" and is shown to customers as exactly that. Unlisted means the product is not ready
+    /// to be sold — the usual case being a new pack that has been photographed and described but
+    /// not yet priced by the owner. Those must not appear on the storefront at any price, least of
+    /// all at zero, so the public endpoints filter them out entirely and only an admin sees them.
+    ///
+    /// Defaults to true so every product that predates this field stays visible.
+    /// </summary>
+    [BsonElement("isListed")]
+    public bool IsListed { get; set; } = true;
+
+    /// <summary>
     /// Units on hand. Null means stock is not tracked for this product yet — it
     /// stays purchasable and is never decremented. That keeps every pre-existing
     /// product buyable after this feature ships, so the shop doesn't go dark;
@@ -93,6 +107,8 @@ public sealed class CreateProductRequest
 
     public bool IsAvailable { get; init; } = true;
 
+    public bool IsListed { get; init; } = true;
+
     [Range(0, 1_000_000)]
     public int? StockQuantity { get; init; }
 
@@ -135,6 +151,8 @@ public sealed class UpdateProductRequest
     public string? Weight { get; init; }
 
     public bool? IsAvailable { get; init; }
+
+    public bool? IsListed { get; init; }
 
     [Range(0, 1_000_000)]
     public int? StockQuantity { get; init; }

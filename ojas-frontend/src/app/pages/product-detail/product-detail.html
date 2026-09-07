@@ -36,8 +36,13 @@
                   (click)="openLightbox($index)"
                   [attr.aria-label]="'Open photo ' + ($index + 1) + ' of ' + p.name + ' full screen'"
                 >
+                  <!-- srcset, so the well is filled by the smallest file that still looks sharp
+                       in it rather than by the 2000px one the lightbox needs. `sizes` describes
+                       the well: full width on a phone, half of the 1200px container above 900. -->
                   <img
                     [src]="img"
+                    [attr.srcset]="srcset(img) || null"
+                    sizes="(max-width: 900px) 100vw, 576px"
                     [alt]="p.name + ' photo ' + ($index + 1)"
                     [attr.fetchpriority]="$index === 0 ? 'high' : null"
                     [attr.loading]="$index === 0 ? null : 'lazy'"
@@ -100,7 +105,13 @@
                   [attr.aria-label]="'View image ' + ($index + 1)"
                   [attr.aria-current]="activeImageIndex() === $index"
                 >
-                  <img [src]="img" [alt]="p.name + ' thumbnail ' + ($index + 1)" (error)="onImgError($event)" />
+                  <img
+                    [src]="thumbnail(img)"
+                    [alt]="p.name + ' thumbnail ' + ($index + 1)"
+                    loading="lazy"
+                    decoding="async"
+                    (error)="onImgError($event)"
+                  />
                 </button>
               }
             </div>
@@ -383,12 +394,33 @@
             <span class="label-line"></span>
           </div>
           <h2>You May Also Like</h2>
-          <div class="similar-scroll">
+          <div
+            class="similar-rail"
+            [class.can-scroll-left]="similarCanScrollLeft()"
+            [class.can-scroll-right]="similarCanScrollRight()"
+          >
+            <button
+              type="button"
+              class="similar-nav prev"
+              (click)="scrollSimilar(-1)"
+              aria-label="Show previous products"
+            >
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <button
+              type="button"
+              class="similar-nav next"
+              (click)="scrollSimilar(1)"
+              aria-label="Show more products"
+            >
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+            <div #similarScroll class="similar-scroll" (scroll)="onSimilarScroll()">
             @for (sp of similarProducts(); track sp.id) {
               <a class="similar-card" [routerLink]="['/products', sp.id]">
                 <div class="similar-img">
                   <img
-                    [src]="sp.imageUrl"
+                    [src]="thumbnail(sp.imageUrl)"
                     [alt]="sp.name"
                     loading="lazy"
                     decoding="async"
@@ -414,6 +446,7 @@
                 </div>
               </a>
             }
+            </div>
           </div>
         </section>
       }
@@ -428,6 +461,28 @@
         (closed)="closeLightbox()"
       />
     }
+  </section>
+} @else if (resolving()) {
+  <!-- Still finding out whether this product exists. A skeleton in the shape of the real page,
+       so the layout does not jump when it arrives, and — crucially — never the words "Product
+       Not Found", which is a lie until the API has actually answered. -->
+  <section class="product-detail-page" aria-busy="true">
+    <div class="detail-container">
+      <div class="detail-layout">
+        <div class="image-section">
+          <div class="image-wrapper skeleton-block"></div>
+        </div>
+        <div class="info-section detail-skeleton">
+          <span class="skeleton-block skeleton-chip"></span>
+          <span class="skeleton-block skeleton-title"></span>
+          <span class="skeleton-block skeleton-price"></span>
+          <span class="skeleton-block skeleton-line"></span>
+          <span class="skeleton-block skeleton-line short"></span>
+          <span class="skeleton-block skeleton-button"></span>
+        </div>
+      </div>
+    </div>
+    <span class="visually-hidden">Loading product…</span>
   </section>
 } @else {
   <!-- Product Not Found -->

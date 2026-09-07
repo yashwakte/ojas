@@ -1,4 +1,11 @@
-import { PACK_SHOT_THUMBNAIL_WIDTH, thumbnailPackShot } from './pack-shots';
+import {
+  PACK_SHOT_MEDIUM_WIDTH,
+  PACK_SHOT_REVISION,
+  PACK_SHOT_THUMBNAIL_WIDTH,
+  packShotSrc,
+  packShotSrcset,
+  thumbnailPackShot,
+} from './pack-shots';
 
 describe('thumbnailPackShot', () => {
   it('points a committed pack shot at its card-sized variant', () => {
@@ -43,9 +50,75 @@ describe('thumbnailPackShot', () => {
     expect(thumbnailPackShot(variant)).toBe(variant);
   });
 
-  /** The width here and PACK_SHOT_WIDTH in tools/optimize-images.mjs name the same files. If they
-   * ever disagree, every thumbnail on the site 404s, so it is worth one assertion. */
-  it('asks for the width the image tool actually publishes', () => {
+  /** The widths here and PACK_SHOT_WIDTH / PACK_SHOT_MEDIUM_WIDTH in tools/optimize-images.mjs
+   * name the same files. If they ever disagree, every thumbnail on the site 404s, so it is worth
+   * two assertions. */
+  it('asks for the widths the image tool actually publishes', () => {
     expect(PACK_SHOT_THUMBNAIL_WIDTH).toBe(420);
+    expect(PACK_SHOT_MEDIUM_WIDTH).toBe(900);
+  });
+
+  /**
+   * Products carry a revision on their image URL (see packShotSrc), and the thumbnail has to be
+   * the small file at the SAME revision — not the full-size one because a query string was in the
+   * way, which is what a regex anchored on the end of the string would have done.
+   */
+  it('keeps the revision when it swaps in the small variant', () => {
+    expect(thumbnailPackShot(packShotSrc('/images/bajra-flour-front.webp'))).toBe(
+      '/images/bajra-flour-front-420.webp?v=' + PACK_SHOT_REVISION,
+    );
+  });
+});
+
+describe('packShotSrc', () => {
+  /**
+   * The pack shots keep stable filenames because those URLs are stored against every product in
+   * the database. Without a revision, replacing what one of those files CONTAINS is invisible to
+   * every customer who has been to the shop in the last day — and, behind the
+   * stale-while-revalidate window, for up to a week after that. New photography that most visitors
+   * cannot see is not shipped photography.
+   */
+  it('stamps a committed pack shot with the current revision', () => {
+    expect(packShotSrc('/images/bajra-flour-front.webp')).toBe(
+      '/images/bajra-flour-front.webp?v=' + PACK_SHOT_REVISION,
+    );
+    expect(packShotSrc('/images/bajra-flour-front-420.webp')).toBe(
+      '/images/bajra-flour-front-420.webp?v=' + PACK_SHOT_REVISION,
+    );
+  });
+
+  /** Admin uploads are already content-addressed by hash, so a revision on one of those would
+   * throw away a year of caching to solve a problem it does not have. */
+  it('leaves anything that is not a committed pack shot alone', () => {
+    const uploaded = '/api/media/' + 'a'.repeat(64) + '.webp';
+    expect(packShotSrc(uploaded)).toBe(uploaded);
+    expect(packShotSrc('/images/placeholder.svg')).toBe('/images/placeholder.svg');
+    expect(packShotSrc('https://example.com/pack-front.webp')).toBe(
+      'https://example.com/pack-front.webp',
+    );
+    expect(packShotSrc(null)).toBe('');
+  });
+});
+
+describe('packShotSrcset', () => {
+  /** The well on the product page is a few hundred pixels wide; the 2000px file exists so the
+   * lightbox can be zoomed into. Offering the browser the middle width is what stops it spending
+   * 120KB on a box that a third of that fills. */
+  it('offers every published width, carrying the revision on each', () => {
+    const v = PACK_SHOT_REVISION;
+    expect(packShotSrcset(packShotSrc('/images/bajra-flour-front.webp'))).toBe(
+      '/images/bajra-flour-front-420.webp?v=' + v + ' 420w, ' +
+        '/images/bajra-flour-front-900.webp?v=' + v + ' 900w, ' +
+        '/images/bajra-flour-front.webp?v=' + v + ' 2000w',
+    );
+  });
+
+  /** Empty, not a guess. An admin upload has no generated widths, and naming files that were
+   * never written would have the browser fetch a 404 in preference to the picture that exists. */
+  it('answers empty for anything without generated widths', () => {
+    expect(packShotSrcset('/api/media/' + 'a'.repeat(64) + '.webp')).toBe('');
+    expect(packShotSrcset('/images/placeholder.svg')).toBe('');
+    expect(packShotSrcset('')).toBe('');
+    expect(packShotSrcset(null)).toBe('');
   });
 });

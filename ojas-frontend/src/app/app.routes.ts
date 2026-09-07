@@ -8,6 +8,16 @@ import {
   storefrontGuard,
 } from './guards/role.guard';
 
+/**
+ * `data.preload` marks the screens StorefrontPreloadStrategy fetches ahead of time, once the
+ * browser is idle. It is the storefront a customer moves between — browse, product, cart,
+ * checkout — plus login, which is the gate in front of checkout.
+ *
+ * Deliberately NOT marked: the admin console and the delivery screens, which are the two largest
+ * chunks in the build and are reachable by a handful of people, and the legal pages, which are
+ * read once if ever. Preloading those would spend a customer's bandwidth on code they will
+ * never run.
+ */
 export const routes: Routes = [
   {
     path: '',
@@ -18,16 +28,19 @@ export const routes: Routes = [
     path: 'products/:id',
     loadComponent: () =>
       import('./pages/product-detail/product-detail').then((m) => m.ProductDetail),
+    data: { preload: true },
     canActivate: [storefrontGuard],
   },
   {
     path: 'products',
     loadComponent: () => import('./pages/products/products').then((m) => m.Products),
+    data: { preload: true },
     canActivate: [storefrontGuard],
   },
   {
     path: 'login',
     loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+    data: { preload: true },
     canActivate: [storefrontGuard],
   },
   {
@@ -45,11 +58,13 @@ export const routes: Routes = [
     path: 'cart',
     // Guests may build a cart freely; the login gate is at checkout.
     loadComponent: () => import('./pages/cart/cart').then((m) => m.Cart),
+    data: { preload: true },
     canActivate: [storefrontGuard],
   },
   {
     path: 'checkout',
     loadComponent: () => import('./pages/checkout/checkout').then((m) => m.Checkout),
+    data: { preload: true },
     canActivate: [authGuard, customerGuard],
   },
   {
@@ -60,6 +75,7 @@ export const routes: Routes = [
   {
     path: 'my-orders',
     loadComponent: () => import('./pages/my-orders/my-orders').then((m) => m.MyOrders),
+    data: { preload: true },
     canActivate: [authGuard, customerGuard],
   },
   {
@@ -70,6 +86,7 @@ export const routes: Routes = [
   {
     path: 'offers',
     loadComponent: () => import('./pages/offers/offers').then((m) => m.Offers),
+    data: { preload: true },
     canActivate: [storefrontGuard],
   },
   {

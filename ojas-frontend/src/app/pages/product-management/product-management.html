@@ -297,6 +297,20 @@
               (ngModelChange)="formData.update(d => ({...d, isAvailable: $event}))">
               <span>Product is available for purchase</span>
             </label>
+            <label class="checkbox-control">
+              <input type="checkbox"
+              name="isListed"
+              [ngModel]="formData().isListed"
+              (ngModelChange)="formData.update(d => ({...d, isListed: $event}))">
+              <span>Show this product on the shop</span>
+            </label>
+            @if (!formData().isListed) {
+              <p class="checkbox-note">
+                <mat-icon>visibility_off</mat-icon>
+                Hidden from customers entirely — not even as out of stock. Use this until the price
+                is right, then tick it to put the product on sale.
+              </p>
+            }
           </div>
 
           <div class="form-actions">
@@ -364,7 +378,9 @@
             >
               <div class="product-image">
                 <img [src]="product.imageUrl" [alt]="product.name" loading="lazy" decoding="async" />
-                @if (!product.isAvailable) {
+                @if (!product.isListed) {
+                  <span class="unlisted-badge">Not on the shop</span>
+                } @else if (!product.isAvailable) {
                   <span class="unavailable-badge">Unavailable</span>
                 }
                 @if (product.discount > 0) {

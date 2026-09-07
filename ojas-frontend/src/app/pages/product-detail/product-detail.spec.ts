@@ -29,6 +29,7 @@ describe('ProductDetail', () => {
     galleryImageUrls: ['/images/p1b.jpg'],
     weight: '500g',
     isAvailable: true,
+    isListed: true,
     stockQuantity: null,
     lowStockThreshold: 5,
     ingredients: 'Bajra',
@@ -47,9 +48,21 @@ describe('ProductDetail', () => {
   let router: Router;
 
   beforeEach(() => {
-    productServiceSpy = jasmine.createSpyObj('ProductService', ['getProduct', 'getByCategory']);
+    productServiceSpy = jasmine.createSpyObj('ProductService', [
+      'getProduct',
+      'getByCategory',
+      'ensureProduct',
+      'isUnknown',
+    ]);
     productServiceSpy.getProduct.and.returnValue(product);
     productServiceSpy.getByCategory.and.returnValue([product, similarProduct]);
+    productServiceSpy.isUnknown.and.returnValue(false);
+    // The rail reads the whole catalogue now, so that it can fall back to other products when the
+    // category is thin. See ProductDetail.similarProducts.
+    (productServiceSpy as unknown as { products: unknown }).products = signal([
+      product,
+      similarProduct,
+    ]);
 
     cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
@@ -107,10 +120,32 @@ describe('ProductDetail', () => {
     expect(fixture.componentInstance.galleryImages()).toEqual(['/images/p1.jpg', '/images/p1b.jpg']);
   });
 
-  it('similarProducts excludes the current product and reads from getByCategory', () => {
+  it('similarProducts excludes the current product', () => {
     const fixture = create();
     expect(fixture.componentInstance.similarProducts()).toEqual([similarProduct]);
-    expect(productServiceSpy.getByCategory).toHaveBeenCalledWith('Flour');
+  });
+
+  /**
+   * The rail used to be same-category only, which left a product in a thin category — or the only
+   * product in one — with an empty section and no way onward but the browser Back button. It now
+   * falls back to the rest of the catalogue, and the thing that must not regress is the ORDER:
+   * genuine category matches first, everything else behind them.
+   */
+  it('similarProducts falls back to other categories, with same-category matches first', () => {
+    const otherCategory: Product = {
+      ...similarProduct,
+      id: '3',
+      name: 'Custard Powder',
+      category: 'Powder Box',
+    };
+    (productServiceSpy as unknown as { products: unknown }).products = signal([
+      product,
+      otherCategory,
+      similarProduct,
+    ]);
+
+    const fixture = create();
+    expect(fixture.componentInstance.similarProducts()).toEqual([similarProduct, otherCategory]);
   });
 
   it('selectImage sets the active image index', () => {

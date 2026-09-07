@@ -16,6 +16,7 @@
 
 import { readdir, stat, mkdir } from 'node:fs/promises';
 import { PACK_SHOT_SOURCES } from './pack-shot-sources.mjs';
+import { findMrpValue, maskMrp } from './lib/mrp-mask.mjs';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
@@ -39,6 +40,16 @@ const PACK_SOURCE_DIR = packsFlag !== -1 && process.argv[packsFlag + 1]
   ? path.resolve(process.argv[packsFlag + 1])
   : path.join(SOURCE_DIR, 'pack-shots');
 const OUTPUT_DIR = path.join(import.meta.dirname, '..', 'public', 'images');
+
+/**
+ * `--force` re-encodes everything regardless of timestamps.
+ *
+ * The mtime check below asks "is the source newer than the output", which answers the question it
+ * was written for — someone dropped in a new photograph — and quietly answers nothing at all when
+ * what changed is this script. Removing the printed MRP changed how every pack shot is produced
+ * while leaving every source file untouched, so without this the whole pass was a no-op.
+ */
+const FORCE = process.argv.includes('--force');
 
 // Which widths each picture is published at. The hero is full-bleed and needs to look right on
 // a desktop monitor as well as a phone, so it gets a ladder for the browser to choose from;
@@ -100,19 +111,85 @@ const PACK_SHOT_FULL_WIDTH = 2000;
  */
 const PACK_SHOT_ASPECT = 4 / 3;
 
-/** How much of each photograph's outer edge is discarded before the backdrop is continued
- * outwards. One pixel: just enough to drop the bright export artefact several of the carton
- * photographs carry in their outermost column, and far too little to touch anything real. */
-const EDGE_ARTEFACT_PX = 1;
+/**
+ * How much of each photograph's outer edge is discarded before the backdrop is continued outwards,
+ * measured per photograph rather than assumed.
+ *
+ * A fixed one pixel was enough for the carton photographs, which carry a single bright column at
+ * the frame edge as an export artefact. It was not enough for the June 2026 delivery, which came
+ * out of the studio with a four-pixel RED rule drawn around the whole frame. One pixel in from
+ * that is still red, so the pack shot was published with a 250px crimson band down each side —
+ * invisible in the original, glaring the moment the edge column is the one replicated outwards.
+ *
+ * So the trim is measured: walk in from each edge for as long as the line there does not match the
+ * backdrop a little further in, and cut that much. The cap keeps a mistake cheap — a photograph
+ * whose pack runs to the frame edge loses at most this fraction rather than losing the product.
+ */
+const MAX_EDGE_TRIM = 0.02;
+/** How different a line has to be from the reference before it counts as border rather than
+ * backdrop. Comfortably above sensor noise and JPEG ringing, far below a printed rule. */
+const EDGE_TOLERANCE = 12;
+
+async function detectEdgeTrim(source, meta) {
+  const { data, info } = await sharp(source)
+    .resize({ width: Math.min(meta.width, 400) })
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const scale = meta.width / w;
+  const at = (x, y) => data[y * w + x];
+
+  const limit = Math.max(2, Math.round(Math.min(w, h) * MAX_EDGE_TRIM));
+  const differs = (a, b) => Math.abs(a - b) > EDGE_TOLERANCE;
+
+  // Compare whole lines against a reference line just inside the widest trim we would ever take.
+  const lineDiff = (get, ref) => {
+    let total = 0;
+    const n = get.length;
+    for (let i = 0; i < n; i++) total += Math.abs(get[i] - ref[i]);
+    return total / n;
+  };
+  const col = (x) => Array.from({ length: h }, (_, y) => at(x, y));
+  const row = (y) => Array.from({ length: w }, (_, x) => at(x, y));
+
+  const walk = (line, ref) => {
+    let n = 0;
+    while (n < limit && differs(lineDiff(line(n), ref), 0)) n++;
+    return n;
+  };
+
+  const trim = Math.max(
+    walk(col, col(limit + 2)),
+    walk((n) => col(w - 1 - n), col(w - 1 - limit - 2)),
+    walk(row, row(limit + 2)),
+    walk((n) => row(h - 1 - n), row(h - 1 - limit - 2)),
+  );
+  // Round up a pixel: an anti-aliased rule fades rather than stopping dead.
+  return Math.min(Math.round(trim * scale) + 1, Math.round(meta.width * MAX_EDGE_TRIM));
+}
 
 /** What a product card actually needs. Roughly 12 KB against 200 KB for the full size. */
 const PACK_SHOT_WIDTH = 420;
 
+/**
+ * What the product page's image well actually needs.
+ *
+ * The full size exists so the lightbox can be zoomed into and still be showing the pack's own
+ * printing. The well on the page behind it is nothing like that big — about 576px on a desktop and
+ * under 400 on a phone — and it was being handed the 2000px file regardless: a hundred and twenty
+ * kilobytes to fill a box that four times less would have filled, on the one screen a customer
+ * reaches by tapping and then waits on. 900px covers the well at 2x on a phone and at better than
+ * 1.5x on a desktop, for roughly a third of the bytes.
+ */
+const PACK_SHOT_MEDIUM_WIDTH = 900;
+
 const PACK_SHOT_QUALITY = 82;
 const PACK_SHOT_CARD_QUALITY = 78;
+const PACK_SHOT_MEDIUM_QUALITY = 80;
 
-export function packShotVariantName(fileName) {
-  return fileName.replace(/\.webp$/i, `-${PACK_SHOT_WIDTH}.webp`);
+export function packShotVariantName(fileName, width = PACK_SHOT_WIDTH) {
+  return fileName.replace(/\.webp$/i, `-${width}.webp`);
 }
 
 /**
@@ -142,21 +219,31 @@ async function optimizePackShots(sourceDir) {
 
       const full = path.join(OUTPUT_DIR, `${product}-${side}.webp`);
       const card = path.join(OUTPUT_DIR, packShotVariantName(`${product}-${side}.webp`));
-      if (!(await isStale(source, full)) && !(await isStale(source, card))) continue;
+      const medium = path.join(
+        OUTPUT_DIR,
+        packShotVariantName(`${product}-${side}.webp`, PACK_SHOT_MEDIUM_WIDTH),
+      );
+      if (
+        !(await isStale(source, full))
+        && !(await isStale(source, card))
+        && !(await isStale(source, medium))
+      ) continue;
 
       const meta = await sharp(source).metadata();
 
-      // Shave the outermost pixel off before anything else. Several of the carton photographs
-      // carry a single bright column right at the frame edge — 246 against a backdrop of 234, an
-      // artefact of however they were exported — and it is invisible in the original. It stops
-      // being invisible the moment that column is the one replicated outwards: it became a
-      // 250px panel of the wrong shade down one side, which read as the picture sitting
-      // off-centre in its card. One pixel in from the edge the backdrop is true.
-      const bleed = EDGE_ARTEFACT_PX * 2;
-      const trimmed = await sharp(source)
+      // The one alteration these photographs are allowed. The printed MRP is fixed at print time
+      // while the real one moves, so a pack shot that shows "MRP : 65/-" is a price promise the
+      // shop may not be able to keep. Only the value goes; see lib/mrp-mask.mjs.
+      const mrp = await findMrpValue(sharp, source, fileName);
+      const original = mrp ? await maskMrp(sharp, source, mrp) : source;
+
+      // Shave the frame's own border off before anything else — see detectEdgeTrim.
+      const edge = await detectEdgeTrim(original, meta);
+      const bleed = edge * 2;
+      const trimmed = await sharp(original)
         .extract({
-          left: EDGE_ARTEFACT_PX,
-          top: EDGE_ARTEFACT_PX,
+          left: edge,
+          top: edge,
           width: meta.width - bleed,
           height: meta.height - bleed,
         })
@@ -185,9 +272,15 @@ async function optimizePackShots(sourceDir) {
         .webp({ quality: PACK_SHOT_CARD_QUALITY })
         .toFile(card);
 
+      const mediumInfo = await sharp(framed)
+        .resize({ width: Math.min(PACK_SHOT_MEDIUM_WIDTH, framedWidth) })
+        .webp({ quality: PACK_SHOT_MEDIUM_QUALITY })
+        .toFile(medium);
+
       console.log(
-        `${(product + '-' + side).padEnd(26)} ${String(meta.width).padStart(4)}px source  ->  ` +
+        `${(product + '-' + side).padEnd(26)} ${String(meta.width).padStart(4)}px source${mrp ? ' (mrp removed)' : '             '}  ->  ` +
         `${fullWidth}px ${(fullInfo.size / 1024).toFixed(0)}KB  +  ` +
+        `${PACK_SHOT_MEDIUM_WIDTH}px ${(mediumInfo.size / 1024).toFixed(0)}KB  +  ` +
         `${PACK_SHOT_WIDTH}px ${(cardInfo.size / 1024).toFixed(0)}KB`,
       );
     }
@@ -195,7 +288,7 @@ async function optimizePackShots(sourceDir) {
 }
 
 async function isStale(source, output) {
-  if (!existsSync(output)) return true;
+  if (FORCE || !existsSync(output)) return true;
   const [a, b] = await Promise.all([stat(source), stat(output)]);
   return a.mtimeMs > b.mtimeMs;
 }

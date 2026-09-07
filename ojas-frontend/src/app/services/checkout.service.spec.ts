@@ -22,6 +22,7 @@ describe('CheckoutService', () => {
     galleryImageUrls: [],
     weight: '500g',
     isAvailable: true,
+    isListed: true,
     stockQuantity: null,
     lowStockThreshold: 5,
     ingredients: '',

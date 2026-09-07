@@ -20,24 +20,39 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
     public async Task<ActionResult<List<Product>>> GetAll()
     {
-        var products = await _productService.GetAllAsync();
+        // Admins get the drafts too: the admin console is where an unlisted product gets its price
+        // and is put on sale, so it is the one caller that must be able to see one. PublicCache
+        // already sends no-store to an authenticated admin, so this never lands in a shared cache.
+        var products = await _productService.GetAllAsync(includeUnlisted: IsAdmin);
         return Ok(products);
     }
 
+    /// <summary>
+    /// Whether the caller may see products that are not on sale yet.
+    ///
+    /// Reached through HttpContext with a null check rather than through <c>User</c> directly:
+    /// <c>ControllerBase.User</c> dereferences HttpContext, which is null when the controller is
+    /// constructed outside a request — as it is in unit tests — and an unauthenticated answer is
+    /// the right one there as well as the safe one.
+    /// </summary>
+    private bool IsAdmin =>
+        HttpContext?.User?.Identity?.IsAuthenticated == true
+        && HttpContext.User.IsInRole(UserRoles.Admin);
+
     [HttpGet("{id}")]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
     public async Task<ActionResult<Product>> GetById(string id)
     {
-        var product = await _productService.GetByIdAsync(id);
+        var product = await _productService.GetByIdAsync(id, includeUnlisted: IsAdmin);
         if (product == null) return NotFound();
         return Ok(product);
     }
 
     [HttpGet("category/{category}")]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
     public async Task<ActionResult<List<Product>>> GetByCategory(string category)
     {
         var products = await _productService.GetByCategoryAsync(category);
@@ -45,7 +60,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("bestsellers")]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300)]
+    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
     public async Task<ActionResult<List<Product>>> GetBestsellers([FromQuery] int limit = 6)
     {
         var clampedLimit = Math.Clamp(limit, 1, 24);
@@ -76,6 +91,7 @@ public class ProductsController : ControllerBase
             GalleryImageUrls = CleanGallery(request.GalleryImageUrls),
             Weight = Clean(request.Weight),
             IsAvailable = request.IsAvailable,
+            IsListed = request.IsListed,
             StockQuantity = request.StockQuantity,
             LowStockThreshold = request.LowStockThreshold ?? 5,
             Ingredients = Clean(request.Ingredients),
@@ -108,6 +124,7 @@ public class ProductsController : ControllerBase
             GalleryImageUrls = request.GalleryImageUrls is null ? null : CleanGallery(request.GalleryImageUrls),
             Weight = request.Weight is null ? null : Clean(request.Weight),
             IsAvailable = request.IsAvailable,
+            IsListed = request.IsListed,
             StockQuantity = request.StockQuantity,
             LowStockThreshold = request.LowStockThreshold,
             Ingredients = request.Ingredients is null ? null : Clean(request.Ingredients),
@@ -143,6 +160,7 @@ public class ProductsController : ControllerBase
         request.Name != null || request.Description != null || request.Price.HasValue ||
         request.Discount.HasValue || request.Category != null || request.ImageUrl != null ||
         request.GalleryImageUrls != null || request.Weight != null || request.IsAvailable.HasValue ||
+        request.IsListed.HasValue ||
         request.StockQuantity.HasValue || request.LowStockThreshold.HasValue ||
         request.Ingredients != null || request.Benefits != null || request.StorageInfo != null;
 

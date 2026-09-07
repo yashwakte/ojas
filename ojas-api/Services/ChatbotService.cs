@@ -130,7 +130,7 @@ public class ChatbotService
 
     private async Task<ChatbotResponse> AnswerStockForProductAsync(string productId)
     {
-        var product = await _products.GetByIdAsync(productId);
+        var product = await _products.GetByIdAsync(productId, includeUnlisted: false);
         if (product == null)
         {
             return new ChatbotResponse(

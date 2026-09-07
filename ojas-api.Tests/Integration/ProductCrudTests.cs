@@ -21,7 +21,10 @@ public class ProductCrudTests : IDisposable
         _factory.Dispose();
     }
 
-    private static CreateProductRequest MakeValidRequest(string category, string name = "Bajra Flour") => new()
+    private static CreateProductRequest MakeValidRequest(
+        string category,
+        string name = "Bajra Flour",
+        bool isListed = true) => new()
     {
         Name = name,
         Description = "An integration-test product description that is long enough.",
@@ -32,6 +35,7 @@ public class ProductCrudTests : IDisposable
         GalleryImageUrls = [],
         Weight = "500g",
         IsAvailable = true,
+        IsListed = isListed,
         Ingredients = "Bajra grain",
         Benefits = "Good source of fiber",
         StorageInfo = "Store in a cool, dry place.",
@@ -129,5 +133,80 @@ public class ProductCrudTests : IDisposable
         underLimitResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         var underLimitProducts = await underLimitResponse.Content.ReadFromJsonAsync<List<Product>>();
         underLimitProducts!.Count.ShouldBe(1);
+    }
+
+    /// <summary>
+    /// A product that has not been listed must be invisible to customers everywhere — the
+    /// catalogue, its own page, and its category — while staying fully visible to the admin who
+    /// has to price it and put it on sale.
+    ///
+    /// This is the guarantee that lets the September 2026 photography ship ahead of its prices.
+    /// Fourteen new packs went into the catalogue with Price = 0 so the owner would have something
+    /// to open and price rather than a blank form; if any of them leaked onto the storefront, the
+    /// shop would be offering food at nothing, which is worse than not offering it at all.
+    /// </summary>
+    [Fact]
+    public async Task UnlistedProduct_IsHiddenFromCustomersAndVisibleToAdmin()
+    {
+        var category = $"IntegrationTest-{Guid.NewGuid():N}";
+        var (admin, csrf) = await CreateAdminClientAsync();
+
+        var request = MakeValidRequest(category, "Awaiting A Price", isListed: false);
+        var createResponse = await admin.SendAsync(Json(HttpMethod.Post, "/api/products", request, csrf));
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await createResponse.Content.ReadFromJsonAsync<Product>();
+        created.ShouldNotBeNull();
+        created!.IsListed.ShouldBeFalse();
+
+        // A customer — here, anyone not signed in as an admin — must not find it anywhere.
+        var anonymous = _factory.CreateClient();
+
+        var catalogue = await anonymous.GetFromJsonAsync<List<Product>>("/api/products");
+        catalogue.ShouldNotBeNull();
+        catalogue!.ShouldNotContain(p => p.Id == created.Id);
+
+        var byCategory = await anonymous.GetFromJsonAsync<List<Product>>($"/api/products/category/{category}");
+        byCategory.ShouldNotBeNull();
+        byCategory!.ShouldBeEmpty();
+
+        // Its own page 404s rather than rendering at a price nobody set.
+        var direct = await anonymous.GetAsync($"/api/products/{created.Id}");
+        direct.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        // The admin still sees it, which is the entire point of it existing.
+        var adminCatalogue = await admin.GetFromJsonAsync<List<Product>>("/api/products");
+        adminCatalogue.ShouldNotBeNull();
+        adminCatalogue!.ShouldContain(p => p.Id == created.Id);
+
+        var adminDirect = await admin.GetAsync($"/api/products/{created.Id}");
+        adminDirect.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    /// <summary>
+    /// Listing a product is what puts it on sale, and it has to work from the admin console's
+    /// ordinary update — one PATCH, no special endpoint.
+    /// </summary>
+    [Fact]
+    public async Task ListingAProduct_PutsItOnTheStorefront()
+    {
+        var category = $"IntegrationTest-{Guid.NewGuid():N}";
+        var (admin, csrf) = await CreateAdminClientAsync();
+
+        var request = MakeValidRequest(category, "Ready When Priced", isListed: false);
+        var created = await (await admin.SendAsync(Json(HttpMethod.Post, "/api/products", request, csrf)))
+            .Content.ReadFromJsonAsync<Product>();
+        created.ShouldNotBeNull();
+
+        var patch = await admin.SendAsync(Json(
+            HttpMethod.Patch,
+            $"/api/products/{created!.Id}",
+            new UpdateProductRequest { Price = 75, IsListed = true },
+            csrf));
+        patch.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var anonymous = _factory.CreateClient();
+        var byCategory = await anonymous.GetFromJsonAsync<List<Product>>($"/api/products/category/{category}");
+        byCategory.ShouldNotBeNull();
+        byCategory!.ShouldContain(p => p.Id == created.Id);
     }
 }

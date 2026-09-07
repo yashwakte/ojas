@@ -15,6 +15,12 @@ import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
 import { thumbnailPackShot } from '../../constants/pack-shots';
 
+/** The last card that gets a stagger delay; everything after it arrives with this one. */
+const STAGGER_CARDS = 7;
+/** How far apart consecutive cards arrive. Short enough to read as one movement rather than a
+ * queue. */
+const STAGGER_STEP_S = 0.04;
+
 @Component({
   selector: 'app-products',
   imports: [RouterLink, MatButtonModule, MatIconModule, DecimalPipe, OrderPickingBanner],
@@ -82,7 +88,30 @@ export class Products {
     this.router.navigate(['/checkout']);
   }
 
-  onImgError(event: Event) {
+  /**
+   * How much later than the card before it each card fades in.
+   *
+   * The stagger used to be a flat 60ms per card with no ceiling, which was fine when the shop had
+   * a dozen products and is not fine now that it has more than thirty: the last card in the grid
+   * did not start appearing until nearly two seconds after the page, and `animation-fill-mode:
+   * both` means it is genuinely invisible until then, not merely faint. A customer who lands on
+   * the browse page and scrolls sees empty space and concludes the site is slow — which, in the
+   * only sense that matters to them, it was.
+   *
+   * So the stagger applies to roughly the first screenful and then stops. That keeps the effect
+   * where it is doing its job — a row of cards arriving in sequence reads as deliberate — and
+   * takes it off every card the customer would otherwise have to wait on.
+   */
+  cardDelay(index: number): string {
+    return `${Math.min(index, STAGGER_CARDS) * STAGGER_STEP_S}s`;
+  }
+
+  /** How many photographs are fetched at normal priority rather than lazily. About a first
+   * screenful on a desktop grid; on a phone it is more than one, which costs a few kilobytes and
+   * buys the next flick of the thumb. */
+  readonly eagerImageCount = 6;
+
+  onImgError(event: Event): void {
     const img = event.target as HTMLImageElement;
     img.src = '/images/placeholder.svg';
   }
