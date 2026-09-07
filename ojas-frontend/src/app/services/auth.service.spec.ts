@@ -28,6 +28,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     // The app is zoneless, so fakeAsync/tick aren't available - Jasmine's own clock is what
     // stands in for the delay between the switch notice appearing and the page reloading.
     // It has to be installed before any setTimeout this suite cares about is scheduled.
@@ -38,6 +39,7 @@ describe('AuthService', () => {
   });
 
   afterEach(() => {
+    sessionStorage.clear();
     jasmine.clock().uninstall();
     httpMock?.verify();
     localStorage.clear();
@@ -361,6 +363,110 @@ describe('AuthService', () => {
 
     jasmine.clock().tick(SESSION_SWITCH_NOTICE_MS);
     expect(reloadPage).toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------------------
+  // Signing into a second account and straight back into the first.
+  //
+  // All three of these came out of a real report: a tab left sitting on "Switching to <name>"
+  // that never resolved. It was not one hang but a reload loop - the notice reappearing on every
+  // fresh load - and the engine driving it was a stale identity header being acted on after the
+  // situation it described had already been undone.
+  // ---------------------------------------------------------------------------------------
+
+  it('onServerIdentity() does not switch when the server says this tab was right all along', () => {
+    setup();
+    service.saveAuth(authResponse);
+
+    // A response served for another account arrives - true when it was sent, but the user has
+    // signed back into this account by the time we can ask about it.
+    service.onServerIdentity('someone-else');
+    httpMock
+      .expectOne(`${environment.apiUrl}/auth/session`)
+      .flush({ ...authResponse, csrfToken: 'csrf-rotated' });
+
+    // Nothing to adopt: no notice, and above all no reload. Acting here is what looped.
+    expect(service.sessionChange()).toBeNull();
+    expect(service.user()?.id).toBe(authResponse.id);
+    // The newer CSRF token is still taken - that is the one thing the response did know better.
+    expect(service.user()?.csrfToken).toBe('csrf-rotated');
+
+    jasmine.clock().tick(SESSION_SWITCH_NOTICE_MS + 50);
+    expect(reloadPage).not.toHaveBeenCalled();
+  });
+
+  it('a sign-in arriving during the sign-out notice supersedes it', () => {
+    setup();
+    service.saveAuth(authResponse);
+
+    // The login screen clears the session and writes the new one back to back, well inside the
+    // 1.6s notice window.
+    service.onOtherTabSessionChange(null);
+    expect(service.sessionChange()).toEqual({ kind: 'signed-out' });
+
+    const rajesh = { ...authResponse, id: 'u2', fullName: 'Rajesh Kumar' };
+    service.onOtherTabSessionChange(JSON.stringify(rajesh));
+
+    // The later event wins. Dropping it used to send a browser that had just signed in to the
+    // login screen instead, signed out.
+    expect(service.sessionChange()).toEqual({ kind: 'switched', name: 'Rajesh' });
+
+    jasmine.clock().tick(SESSION_SWITCH_NOTICE_MS + 50);
+    expect(reloadPage).toHaveBeenCalled();
+  });
+
+  it('a second switch during the notice reloads into the latest account, not the first', () => {
+    setup();
+    service.saveAuth(authResponse);
+
+    service.onOtherTabSessionChange(JSON.stringify({ ...authResponse, id: 'u2', fullName: 'Rajesh Kumar' }));
+    expect(service.sessionChange()).toEqual({ kind: 'switched', name: 'Rajesh' });
+
+    // They switch again before the first reload has fired.
+    jasmine.clock().tick(400);
+    service.onOtherTabSessionChange(JSON.stringify({ ...authResponse, id: 'u3', fullName: 'Leena Kulkarni' }));
+    expect(service.sessionChange()).toEqual({ kind: 'switched', name: 'Leena' });
+
+    // The reload is re-armed from the later change, so it is still pending at the point the
+    // first one would have fired.
+    jasmine.clock().tick(SESSION_SWITCH_NOTICE_MS - 500);
+    expect(reloadPage).not.toHaveBeenCalled();
+
+    jasmine.clock().tick(600);
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on reloading rather than cycling forever', () => {
+    setup();
+    service.saveAuth(authResponse);
+    const navigate = spyOn(router, 'navigateByUrl');
+
+    // Stand in for a tab that has already reloaded its way to the ceiling without ever settling.
+    sessionStorage.setItem('ojas_resync_streak', '3');
+
+    service.onOtherTabSessionChange(JSON.stringify({ ...authResponse, id: 'u2', fullName: 'Rajesh Kumar' }));
+    jasmine.clock().tick(SESSION_SWITCH_NOTICE_MS + 50);
+
+    // A screen that says "Switching to ..." while the tab reloads behind it is a worse failure
+    // than the mismatch it is fixing, because nothing the visitor does can escape it. The login
+    // screen is somewhere they can actually act.
+    expect(reloadPage).not.toHaveBeenCalled();
+    expect(service.sessionChange()).toBeNull();
+    expect(service.user()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/login');
+    expect(sessionStorage.getItem('ojas_resync_streak')).toBeNull();
+  });
+
+  it('retires the resync streak once the server confirms who this tab is', () => {
+    setup();
+    service.saveAuth(authResponse);
+    sessionStorage.setItem('ojas_resync_streak', '2');
+
+    service.syncSession(true);
+    httpMock.expectOne(`${environment.apiUrl}/auth/session`).flush(authResponse);
+
+    // The reload that got here worked, so an unrelated switch weeks later must start from zero.
+    expect(sessionStorage.getItem('ojas_resync_streak')).toBeNull();
   });
 
   it('onOtherTabSessionChange() resynchronises when another tab signs in as someone else', () => {

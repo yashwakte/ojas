@@ -52,10 +52,18 @@ const SESSION_SYNC_MIN_INTERVAL_MS = 30_000;
 /** Ceiling on how long a logout may block on the server before it completes locally anyway. */
 const LOGOUT_TIMEOUT_MS = 6000;
 
+/**
+ * How many times a tab may reload to resolve a session disagreement before giving up and going
+ * to the login screen instead. Three is generous: a genuine switch is settled by the first one.
+ */
+const MAX_CONSECUTIVE_RESYNCS = 3;
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly apiUrl = `${environment.apiUrl}/auth`;
   private readonly USER_KEY = 'ojas_user';
+  /** Per-tab count of consecutive resync reloads, used only to break a reload loop. */
+  private readonly RESYNC_STREAK_KEY = 'ojas_resync_streak';
   private readonly _user = signal<AuthResponse | null>(this.loadUser());
   private readonly _sessionChange = signal<SessionChange | null>(null);
 
@@ -71,6 +79,8 @@ export class AuthService {
   /** Latched once a resync has been decided on, so the storage event, the identity header and
    * the periodic check can't each start their own. */
   private resyncing = false;
+  /** The pending switch outcome, so a later change can replace it rather than run alongside it. */
+  private resyncTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSyncAt = 0;
 
   constructor(
@@ -185,6 +195,11 @@ export class AuthService {
       return;
     }
 
+    // The server agrees with this tab about who it is, which is proof that whatever reload got
+    // us here did its job. Retire the loop-breaker streak so an unrelated switch later in this
+    // same tab starts from zero rather than inching toward the ceiling.
+    this.clearResyncStreak();
+
     // Same person, so no reload is warranted - but the server may still know something newer
     // than the cache does (a profile edited on another device, a role changed by an admin).
     const changed =
@@ -215,6 +230,25 @@ export class AuthService {
           this.adoptSession('');
           return;
         }
+
+        // ASK AGAIN BEFORE ACTING. The header that raised this is a snapshot of one response;
+        // by the time /session answers, the truth may have moved on - and in the case that
+        // matters it has moved back. Signing into a second account and straight back into the
+        // first leaves responses in flight that were served for the middle account, and each one
+        // reports an identity this tab no longer disagrees with by the time we can check.
+        //
+        // Acting on the stale header regardless is what made the switch notice appear over a
+        // session that was never wrong, reload, and then do it again on the next page's own
+        // in-flight response - a tab stuck on "Switching to ..." that is in fact reloading in a
+        // loop. If the server says this tab is who it already thought it was, there is nothing
+        // to adopt: take whatever the response knows that the cache does not (the CSRF token
+        // rotates on every refresh) and carry on without touching the page.
+        const cachedNow = this._user();
+        if (cachedNow && cachedNow.id === session.id) {
+          this.saveAuth({ ...cachedNow, ...session });
+          return;
+        }
+
         this.saveAuth({ ...session });
         this.adoptSession(session.fullName);
       },
@@ -224,30 +258,116 @@ export class AuthService {
     });
   }
 
-  /** This browser now belongs to someone else. Say so, then rebuild the app from scratch. */
+  /**
+   * This browser now belongs to someone else. Say so, then rebuild the app from scratch.
+   *
+   * An adoption already under way is upgraded rather than ignored. The notice window is 1.6s and
+   * a person switching accounts can easily beat that, so "a resync is already pending" must not
+   * mean "ignore what just happened": the pending one is aimed at an account that is no longer
+   * the answer. The reload is re-armed from now, so the last thing to happen is the thing the
+   * tab reloads into.
+   */
   private adoptSession(name: string): void {
-    if (this.resyncing) return;
     this.resyncing = true;
     this._sessionChange.set({ kind: 'switched', name: name.trim().split(/\s+/)[0] ?? '' });
-    setTimeout(() => this.reloadPage(), SESSION_SWITCH_NOTICE_MS);
+    this.rearmResync(() => this.completeResync());
   }
 
-  /** The one place the page is reloaded, kept as its own method so tests can stand in for it -
-   * a real reload inside a test runner takes the whole suite down with it. */
+  /**
+   * The notice window has closed: rebuild the app on the new session.
+   *
+   * THE LOOP BREAKER lives here. Reloading to resolve a disagreement about who is signed in only
+   * works if the reloaded page agrees; if it does not, it reloads again, and the visitor is left
+   * on a screen that says "Switching to ..." forever while the tab cycles behind it. That is a
+   * far worse failure than the mismatch it is trying to fix, because there is no way out of it
+   * from the inside - every reload throws away whatever they were about to do.
+   *
+   * So the attempts are counted, in sessionStorage because it is per-tab and survives a reload,
+   * and after a few in quick succession this stops trying to be clever: drop the local session
+   * and go to the login screen, which is a state the app can definitely reach and which they can
+   * definitely act on. The counter is retired as soon as the server confirms this tab's identity
+   * (see clearResyncStreak), so an ordinary account switch never inches toward the ceiling.
+   */
+  private completeResync(): void {
+    const attempts = this.readResyncStreak() + 1;
+
+    if (attempts > MAX_CONSECUTIVE_RESYNCS) {
+      this.clearResyncStreak();
+      this.resyncing = false;
+      this._sessionChange.set(null);
+      this.clearLocalSession();
+      this.router.navigateByUrl('/login');
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(this.RESYNC_STREAK_KEY, String(attempts));
+    } catch {
+      // A browser refusing session storage is no reason not to reload; it only means this tab
+      // cannot count, and the reload itself is still the right move.
+    }
+
+    this.reloadPage();
+  }
+
+  /** The one place the page is reloaded, kept as its own method - and deliberately as nothing
+   * but the reload - so tests can stand in for it. A real reload inside a test runner takes the
+   * whole suite down with it, so anything put in here is anything the tests stop exercising. */
   private reloadPage(): void {
     window.location.reload();
   }
 
-  /** Another tab signed this browser out. */
+  private readResyncStreak(): number {
+    try {
+      return Number(sessionStorage.getItem(this.RESYNC_STREAK_KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Called once the app has settled without needing to resync. Reaching this proves the previous
+   * reload did its job, so the streak that led here is finished and must not count toward the
+   * ceiling for an unrelated switch later in the same tab.
+   */
+  clearResyncStreak(): void {
+    try {
+      sessionStorage.removeItem(this.RESYNC_STREAK_KEY);
+    } catch {
+      // Nothing to clear if it could never be written.
+    }
+  }
+
+  /**
+   * Another tab signed this browser out.
+   *
+   * Like adoptSession, this supersedes rather than defers to whatever was already pending - and
+   * it is superseded in turn. Signing out and straight back in is one gesture on the login
+   * screen, and the two events land well inside the notice window: the sign-out arrives first,
+   * and if the sign-in that follows were dropped this tab would finish by sending a perfectly
+   * signed-in browser to the login page. Whichever event is last is the one that is true.
+   */
   private abandonSession(): void {
-    if (this.resyncing) return;
     this.resyncing = true;
     this._sessionChange.set({ kind: 'signed-out' });
     this.clearLocalSession();
-    setTimeout(() => {
+    this.rearmResync(() => {
       this._sessionChange.set(null);
       this.resyncing = false;
       this.router.navigateByUrl('/login');
+    });
+  }
+
+  /**
+   * Holds the notice up for its window and then runs the outcome, replacing any outcome that was
+   * already waiting. One timer, so two changes in quick succession settle on the later one
+   * instead of racing each other to act on the page.
+   */
+  private rearmResync(outcome: () => void): void {
+    if (this.resyncTimer !== null) clearTimeout(this.resyncTimer);
+    this.resyncTimer = setTimeout(() => {
+      this.resyncTimer = null;
+      outcome();
     }, SESSION_SWITCH_NOTICE_MS);
   }
 
