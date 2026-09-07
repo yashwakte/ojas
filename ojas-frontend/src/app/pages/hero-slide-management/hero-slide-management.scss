@@ -1,0 +1,287 @@
+// Deliberately built from the same measurements as campaign-banner-management: both are admin
+// panes for "a picture on the home page", they sit two tabs apart, and one of them looking
+// hand-made next to the other is what makes a console feel assembled rather than designed.
+
+.hero-slide-management {
+  min-height: 0;
+  padding: 24px 20px 40px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+
+  .eyebrow {
+    display: inline-block;
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ojas-orange);
+    margin: 0 0 8px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 2rem;
+    color: var(--ojas-text);
+  }
+
+  .subtitle {
+    margin: 8px 0 0;
+    max-width: 60ch;
+    color: var(--ojas-text-light);
+  }
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 60px 20px;
+  color: var(--ojas-text-light);
+}
+
+// ----- "Nothing of yours is live" -----
+// Informational, not an error: the home page is fine, it is simply showing the shipped artwork.
+// Coloured as a note rather than a warning so it does not read as something to be fixed.
+.fallback-note {
+  display: flex;
+  gap: 14px;
+  padding: 18px;
+  margin-bottom: 22px;
+  border: 1px solid rgba(242, 90, 26, 0.22);
+  border-radius: 14px;
+  background: #fffaf7;
+
+  > mat-icon {
+    flex: 0 0 auto;
+    color: var(--ojas-orange);
+  }
+
+  p {
+    margin: 0;
+    color: var(--ojas-text-light);
+    font-size: 0.9rem;
+  }
+}
+
+.fallback-note-title {
+  color: var(--ojas-text) !important;
+  font-weight: 600;
+  margin-bottom: 4px !important;
+}
+
+.fallback-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+
+  img {
+    width: 168px;
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(84, 48, 22, 0.12);
+  }
+}
+
+// ----- The list -----
+.slide-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+}
+
+// The card the admin just saved. Scrolling to it is what puts them back on their own change;
+// this is what makes it obvious which row that was once they arrive. Matches the product admin.
+.slide-card.just-saved {
+  border: 1px solid var(--ojas-orange);
+  animation: heroSlideSavedPulse 1.4s ease-out 2;
+}
+
+@keyframes heroSlideSavedPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(242, 90, 26, 0.42);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(242, 90, 26, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-card.just-saved {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(242, 90, 26, 0.25);
+  }
+}
+
+.slide-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+
+// The rail's running order, at a glance. The sort number is also printed in the meta line, but a
+// list whose order you have to reconstruct from a column of numbers is a list you have to read
+// twice.
+.slide-order {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(242, 90, 26, 0.12);
+  color: var(--ojas-orange-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.slide-thumb {
+  flex: 0 0 auto;
+  width: 132px;
+  height: 74px;
+  // `contain` here for the same reason the hero uses it: these posters are different shapes, and
+  // a thumbnail that crops one of them tells the owner the wrong thing about what will ship.
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid rgba(84, 48, 22, 0.12);
+  background: #fdf6ef;
+}
+
+.slide-info {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.slide-alt {
+  margin: 0;
+  color: var(--ojas-text);
+  font-weight: 600;
+  font-size: 0.92rem;
+  // Two lines, then an ellipsis. These descriptions run long by design and a card that grows to
+  // fit one turns the list into a wall.
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slide-meta {
+  margin: 4px 0 0;
+  color: var(--ojas-text-light);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.slide-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+// ----- The form -----
+.slide-form-card {
+  padding: 22px;
+}
+
+.form-row {
+  margin-bottom: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.form-block-label {
+  display: block;
+  font-weight: 600;
+  color: var(--ojas-text);
+  margin-bottom: 4px;
+}
+
+.field-hint {
+  display: block;
+  max-width: 68ch;
+  margin-bottom: 12px;
+  color: var(--ojas-text-light);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.image-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.image-preview {
+  margin: 16px 0 0;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(84, 48, 22, 0.12);
+    background: #fdf6ef;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    color: var(--ojas-text-light);
+    font-size: 0.8rem;
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+
+  mat-spinner {
+    display: inline-block;
+    margin-right: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .slide-thumb {
+    width: 96px;
+    height: 56px;
+  }
+
+  // On a narrow card the buttons were being pushed onto their own line by `margin-left: auto`
+  // and then sitting flush right under a full-width description, which read as unrelated to it.
+  .slide-actions {
+    margin-left: 0;
+  }
+}

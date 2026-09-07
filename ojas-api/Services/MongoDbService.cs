@@ -26,6 +26,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<Order> Orders => _database.GetCollection<Order>("orders");
     public IMongoCollection<DeliveryCharges> DeliveryCharges => _database.GetCollection<DeliveryCharges>("delivery_charges");
     public IMongoCollection<CampaignBanner> CampaignBanners => _database.GetCollection<CampaignBanner>("campaign_banner");
+    public IMongoCollection<HeroSlide> HeroSlides => _database.GetCollection<HeroSlide>("hero_slides");
     public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");

@@ -103,6 +103,7 @@ builder.Services.AddScoped<OrderCancellationService>();
 builder.Services.AddScoped<OrderStatusEmailService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
+builder.Services.AddScoped<HeroSlideService>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<StaffInviteService>();

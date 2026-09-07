@@ -10,6 +10,7 @@ public interface IMongoDbService
     IMongoCollection<Order> Orders { get; }
     IMongoCollection<DeliveryCharges> DeliveryCharges { get; }
     IMongoCollection<CampaignBanner> CampaignBanners { get; }
+    IMongoCollection<HeroSlide> HeroSlides { get; }
     IMongoCollection<OtpCode> OtpCodes { get; }
     IMongoCollection<RefreshToken> RefreshTokens { get; }
     IMongoCollection<StaffDevice> StaffDevices { get; }

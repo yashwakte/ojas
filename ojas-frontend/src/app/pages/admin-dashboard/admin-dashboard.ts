@@ -17,9 +17,11 @@ import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
+import { HeroSlideService } from '../../services/hero-slide.service';
 import { ProductManagement } from '../product-management/product-management';
 import { DeliveryChargesManagement } from '../delivery-charges-management/delivery-charges-management';
 import { CampaignBannerManagement } from '../campaign-banner-management/campaign-banner-management';
+import { HeroSlideManagement } from '../hero-slide-management/hero-slide-management';
 import {
   AdminStatusChangeResponse,
   CancellationPreviewResponse,
@@ -36,7 +38,13 @@ import {
   paymentLabel,
 } from '../../models/interfaces';
 
-type AdminTab = 'orders' | 'products' | 'delivery-partners' | 'delivery-charges' | 'campaign-banner';
+type AdminTab =
+  | 'orders'
+  | 'products'
+  | 'delivery-partners'
+  | 'delivery-charges'
+  | 'hero-images'
+  | 'campaign-banner';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -60,6 +68,7 @@ type AdminTab = 'orders' | 'products' | 'delivery-partners' | 'delivery-charges'
     ProductManagement,
     DeliveryChargesManagement,
     CampaignBannerManagement,
+    HeroSlideManagement,
   ],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.scss',
@@ -76,6 +85,7 @@ export class AdminDashboard implements OnInit {
   private productService = inject(ProductService);
   private deliveryChargesService = inject(DeliveryChargesService);
   private campaignBannerService = inject(CampaignBannerService);
+  private heroSlideService = inject(HeroSlideService);
   private snackBar = inject(MatSnackBar);
   /** Lets a header Refresh discard an in-progress add/edit form instead of leaving it open with stale data. */
   private readonly productManagement = viewChild(ProductManagement);
@@ -85,6 +95,7 @@ export class AdminDashboard implements OnInit {
     { id: 'products', label: 'Products', shortLabel: 'Products', icon: 'inventory_2' },
     { id: 'delivery-partners', label: 'Delivery Partners', shortLabel: 'Partners', icon: 'delivery_dining' },
     { id: 'delivery-charges', label: 'Delivery Charges', shortLabel: 'Charges', icon: 'local_shipping' },
+    { id: 'hero-images', label: 'Hero Images', shortLabel: 'Hero', icon: 'photo_library' },
     { id: 'campaign-banner', label: 'Campaign Banner', shortLabel: 'Banners', icon: 'campaign' },
   ] as const;
 
@@ -230,6 +241,8 @@ export class AdminDashboard implements OnInit {
       this.productService.loadProducts({ bypassCache: true });
     } else if (tab === 'delivery-charges') {
       this.deliveryChargesService.loadConfig();
+    } else if (tab === 'hero-images') {
+      this.heroSlideService.loadSlides({ bypassCache: true });
     } else if (tab === 'campaign-banner') {
       this.campaignBannerService.loadCampaigns();
     }

@@ -4,18 +4,22 @@
      viewport edge to edge and top to bottom, and the call to action lives inside it instead of
      in a separate band below, so the first screen is one thing rather than three stacked strips.
 
-     The artwork is 1699x926 (1.835:1) — the client's own composed poster, headline and all.
-     A landscape desktop viewport is close enough to that shape for `cover` to trim only a
-     little, and the trim is aimed away from the headline (see object-position in the SCSS).
-     Phones are the other way round entirely, so below 901px the image keeps its own shape and
-     the copy takes the space underneath — cropping a poster with the wordmark and eighteen pack
-     shots baked into it down to a portrait window would throw away the picture.
+     The artwork is now a RAIL rather than a single file: the client's composed posters, each
+     complete with its own headline and wordmark, on a horizontal scroll-snap track that the
+     visitor can swipe and that advances itself between times. Which pictures are on it is the
+     owner's to decide from the admin console; the two committed posters are what shows until
+     they publish their own, and if the API cannot be reached at all.
 
-     It ships as a WebP ladder rather than one big file: a phone downloads the 640px version
-     (~48KB), a desktop the 1280px one (~142KB). width/height are the artwork's intrinsic size —
+     Every poster is shown WHOLE — `contain`, never cropped — so slides of different shapes sit
+     on the same rail without one of them losing its bottom row of packs. What the shape leaves
+     over is the hero's own warm gradient.
+
+     The shipped artwork ships as a WebP ladder rather than one big file: a phone downloads the
+     640px version, a desktop the 1280px one. width/height are the artwork's intrinsic size —
      they don't constrain the rendered size, they let the browser reserve the right shape before
      the picture arrives so the page below never jumps. fetchpriority + the preload in index.html
-     start the download before Angular has booted. -->
+     start the FIRST slide's download before Angular has booted; the rest are lazy, because a
+     picture the visitor has not swiped to yet must not compete with the one they are looking at. -->
 <section
   class="hero"
   appHeroParallax
@@ -33,32 +37,94 @@
 
   <div class="hero-stage">
     <!-- There is deliberately no second, blurred copy of the poster behind this one. An
-         out-of-focus fill used to sit here to hide the fact that a 1.835:1 banner cannot fill
-         a window of any other shape. It was the wrong answer twice over: it read as a smear
-         behind the buttons, and it cost a second decode plus a 46px blur pass on every frame
-         of the hero's parallax. The margins are simply the hero's own warm gradient now. -->
+         out-of-focus fill used to sit here to hide the fact that a banner cannot fill a window of
+         any other shape. It was the wrong answer twice over: it read as a smear behind the
+         buttons, and it cost a second decode plus a 46px blur pass on every frame of the hero's
+         parallax. The margins are simply the hero's own warm gradient now. -->
     <div class="hero-art">
-      <picture class="hero-art-main">
-        <source
-          type="image/webp"
-          srcset="
-            /images/hero-banner-640.webp   640w,
-            /images/hero-banner-960.webp   960w,
-            /images/hero-banner-1280.webp 1280w,
-            /images/hero-banner-1600.webp 1600w
-          "
-          sizes="100vw"
-        />
-        <img
-          src="/images/hero-banner-1280.jpg"
-          alt="Ojas - A Culinary Journey Through Generations"
-          class="hero-banner-img"
-          width="1699"
-          height="926"
-          fetchpriority="high"
-          decoding="async"
-        />
-      </picture>
+      <!-- A DECK, not a filmstrip.
+           Every picture occupies the same grid cell, stacked one on top of another, and moving
+           between them is a crossfade rather than a slide. That is the whole change: sliding
+           announces the mechanism - here is a strip of pictures, watch it move - while a
+           dissolve announces the picture. The outgoing poster softens and falls back as the
+           incoming one arrives, so for a moment both are in the same space, and the arriving
+           one keeps drifting slowly forward for as long as it is on screen. A picture that is
+           still moving, barely, reads as a photograph being looked at; one that snaps into
+           place and freezes reads as a slideshow.
+
+           A swipe still works - see the pointer handlers - it simply no longer drives the
+           animation, so the transition is the same considered one however it was asked for. -->
+      <div
+        class="hero-deck"
+        #deck
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="Ojas featured artwork"
+        [style.--hero-dwell]="dwellMs + 'ms'"
+      >
+        @for (slide of slides(); track slide.key; let i = $index; let first = $first) {
+          <div
+            class="hero-slide"
+            [class.hero-slide--active]="activeIndex() === i"
+            role="group"
+            aria-roledescription="slide"
+            [attr.aria-label]="'Slide ' + (i + 1) + ' of ' + slides().length"
+            [attr.aria-hidden]="activeIndex() === i ? null : 'true'"
+          >
+            <picture class="hero-art-main hero-slide-inner">
+              @if (slide.srcset) {
+                <source type="image/webp" [srcset]="slide.srcset" sizes="100vw" />
+              }
+              <img
+                [src]="slide.src"
+                [alt]="slide.alt"
+                class="hero-banner-img"
+                [attr.width]="slide.width || null"
+                [attr.height]="slide.height || null"
+                [attr.fetchpriority]="first ? 'high' : 'low'"
+                [attr.loading]="first ? 'eager' : 'lazy'"
+                decoding="async"
+              />
+            </picture>
+
+            <!-- A slide with a destination gets a hit area laid over it rather than the picture
+                 being wrapped in an anchor. Wrapping would put the link inside the element that
+                 drifts, so its focus ring would drift with it; this stays square with the frame.
+                 Slides that are not on top are taken out of the tab order - a keyboard user must
+                 not land on a link that is invisible. -->
+            @if (slide.link) {
+              <a
+                class="hero-slide-hit"
+                [routerLink]="slide.link"
+                [attr.aria-label]="slide.alt"
+                [attr.tabindex]="activeIndex() === i ? null : -1"
+              ></a>
+            }
+          </div>
+        }
+      </div>
+
+      @if (slides().length > 1) {
+        <!-- On the warm margin beside the poster, never over it — `contain` leaves that margin at
+             every landscape size, so these cost no product. Hidden on phones, where a swipe is
+             the obvious gesture and a tap target floating on a 375px-wide picture is not. -->
+        <button
+          type="button"
+          class="hero-nav hero-nav--prev"
+          aria-label="Previous slide"
+          (click)="previous()"
+        >
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <button
+          type="button"
+          class="hero-nav hero-nav--next"
+          aria-label="Next slide"
+          (click)="next()"
+        >
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      }
     </div>
 
     <!-- THE DOORS. Two panels hinged on the outer edges of the stage that swing open in real
@@ -85,10 +151,33 @@
       </div>
     </div>
 
-    <!-- A frosted panel that sits ON the photograph, blurring whatever it happens to be over.
-         On desktop it floats near the foot of the full-bleed image; on phones, where covering
-         the artwork would hide most of the product, it sits below it instead. Each line rises
-         out of its own mask on a stagger once the doors are gone. -->
+    <!-- The dots sit between the artwork and the copy, on the hero's own wash. They are the one
+         piece of carousel furniture that has to be visible at every size, so they get their own
+         band rather than floating on the picture. Each is a real button: the visitor's way back
+         to a slide the rail has moved on from. -->
+    @if (slides().length > 1) {
+      <div class="hero-dots">
+        @for (slide of slides(); track slide.key; let i = $index) {
+          <button
+            type="button"
+            class="hero-dot"
+            [class.hero-dot--active]="activeIndex() === i"
+            [attr.aria-label]="'Show slide ' + (i + 1)"
+            [attr.aria-current]="activeIndex() === i ? 'true' : null"
+            (click)="select(i)"
+          >
+            <!-- The fill is a child rather than the button itself so the tap target can stay a
+                 comfortable 28px while the visible dot stays small. -->
+            <span class="hero-dot-fill"></span>
+          </button>
+        }
+      </div>
+    }
+
+    <!-- In flow underneath the poster, on the hero's own warm wash — never floated over the
+         picture. Laying the controls on the photograph was tried at every size and failed the
+         same way twice: the buttons covered the bottom row of pack shots, which are the product,
+         and the small print underneath landed on printed packaging and became unreadable. -->
     <div class="hero-copy">
       <div class="hero-copy-panel">
         <div class="hero-cta">

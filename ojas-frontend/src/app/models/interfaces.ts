@@ -151,6 +151,32 @@ export interface UpdateCampaignBannerRequest {
   fallbackBestsellerProductIds?: string[];
 }
 
+/**
+ * One picture in the home page's hero carousel, as the API stores it.
+ *
+ * There is deliberately no title or subtitle: these posters are composed artwork that already
+ * carries its own headline and wordmark, and a second headline laid over one reads as a mistake.
+ */
+export interface HeroSlideConfig {
+  id: string;
+  imageUrl: string;
+  altText: string;
+  /** Empty means the picture is not a link. */
+  linkUrl: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateHeroSlideRequest {
+  imageUrl?: string;
+  altText?: string;
+  linkUrl?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
 export interface AuthResponse {
   id: string;
   fullName: string;

@@ -12,11 +12,22 @@
     <meta name="theme-color" content="#F25A1A" />
     <link rel="icon" type="image/png" href="images/logo.png" />
     <link rel="apple-touch-icon" href="images/logo.png" />
-    <!-- The home page hero, started before Angular has parsed a line of JavaScript. Without
-         this the browser cannot discover the image until the app has booted and rendered the
-         home route, which pushes the largest paint back by the whole cost of that bootstrap.
-         imagesrcset must mirror the <picture> in home.html or the preload fetches a file the
-         page then does not use. -->
+    <!-- The FIRST slide of the home page hero, started before Angular has parsed a line of
+         JavaScript. Without this the browser cannot discover the image until the app has booted
+         and rendered the home route, which pushes the largest paint back by the whole cost of
+         that bootstrap. imagesrcset must mirror the first entry of SHIPPED_HERO_SLIDES in
+         home-hero.ts, or the preload fetches a file the page then does not use.
+
+         Only the first slide is preloaded. The rest of the deck is lazy: a poster that has not
+         come up yet must not compete for bandwidth with the one being looked at.
+
+         WORTH KNOWING: once the owner publishes hero slides of their own from the admin console,
+         their first slide replaces this one on the rail and this preload becomes a wasted ~50KB
+         on the first visit. It is left in because the shipped artwork is what the overwhelming
+         majority of visits will see, and because the alternative - no preload at all - costs
+         every one of those visits the whole bootstrap before the largest paint can even start.
+         If managed slides become the normal case, this should move to a server-rendered
+         preload of whichever picture is actually first. -->
     <link
       rel="preload"
       as="image"
@@ -89,7 +100,8 @@
         <p>
           Ojas is an online shop selling stone-ground atta, millet flours, besan, daliya and
           custard powders, milled and packed in Pune. Ojas is a brand owned and operated by Asha
-          Marketing, a licensed food business under FSSAI, and we deliver across Pune in 1–2 days.
+          Marketing, a licensed food business under FSSAI (Lic. No. 11526082000125), and we deliver
+          across Pune in 1–2 days.
         </p>
         <p>
           This shop needs JavaScript to run. Please enable it, or contact us directly and we will
@@ -102,7 +114,8 @@
                real address rather than an escape sequence. -->
           Email: <a href="mailto:wecare@ojasaata.com">wecare@ojasaata.com</a><br />
           Asha Marketing, Near Chhatrapati Shivaji Maharaj Udyan, Madhuban Society Lane No. 9,
-          Old Sanghvi, Pune – 411027, Maharashtra, India
+          Old Sanghvi, Pune – 411027, Maharashtra, India<br />
+          Instagram: <a href="https://www.instagram.com/ojas.aata/">@ojas.aata</a>
         </p>
         <p>
           <a href="/contact">Contact Us</a> ·

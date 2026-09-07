@@ -1,0 +1,226 @@
+<section class="hero-slide-management">
+  <header class="page-header" id="hero-slide-list-top">
+    <div>
+      <p class="eyebrow">Home Page</p>
+      <h1>Hero Images</h1>
+      <p class="subtitle">
+        The pictures at the very top of the home page. Add more than one and they become a
+        carousel customers can swipe, which also advances on its own every few seconds.
+      </p>
+    </div>
+    @if (editingId() === null) {
+      <button mat-flat-button color="primary" (click)="startCreate()">
+        <mat-icon>add</mat-icon>
+        Add Hero Image
+      </button>
+    }
+  </header>
+
+  @if (loading() && slides().length === 0) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading hero images…</p>
+    </div>
+  } @else if (editingId() === null) {
+    <!-- Zero live slides is a real, reachable state - turn them all off and this is what happens -
+         so it is spelled out rather than left for the owner to discover on the home page. -->
+    @if (liveCount() === 0) {
+      <div class="fallback-note">
+        <mat-icon>info</mat-icon>
+        <div>
+          <p class="fallback-note-title">
+            The home page is showing the {{ shippedSlides.length }} pictures that ship with the
+            site.
+          </p>
+          <p>
+            That is what customers see whenever nothing here is switched on. Add an image below and
+            it takes over.
+          </p>
+          <div class="fallback-thumbs">
+            @for (s of shippedSlides; track s.key) {
+              <img [src]="s.src" [alt]="s.alt" />
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (slides().length > 0) {
+      <ul class="slide-list">
+        @for (s of slides(); track s.id; let i = $index) {
+          <li>
+            <mat-card
+              class="slide-card"
+              [id]="'hero-slide-' + s.id"
+              [class.just-saved]="justSavedId() === s.id"
+            >
+              <div class="slide-row">
+                <span class="slide-order" aria-hidden="true">{{ i + 1 }}</span>
+                <img class="slide-thumb" [src]="s.imageUrl" [alt]="s.altText" />
+                <div class="slide-info">
+                  <p class="slide-alt">{{ s.altText || 'No description' }}</p>
+                  <p class="slide-meta">
+                    Position {{ s.sortOrder }}
+                    @if (s.linkUrl) {
+                      · Links to {{ s.linkUrl }}
+                    } @else {
+                      · Not a link
+                    }
+                  </p>
+                </div>
+                @if (s.isActive) {
+                  <mat-chip color="primary" selected>Live</mat-chip>
+                } @else {
+                  <mat-chip color="warn" selected>Hidden</mat-chip>
+                }
+                <div class="slide-actions">
+                  <button
+                    mat-icon-button
+                    (click)="toggleActive(s)"
+                    [attr.aria-label]="s.isActive ? 'Hide this slide' : 'Show this slide'"
+                  >
+                    <mat-icon>{{ s.isActive ? 'visibility_off' : 'visibility' }}</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="startEdit(s)" aria-label="Edit this slide">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button
+                    mat-icon-button
+                    color="warn"
+                    (click)="deleteSlide(s)"
+                    aria-label="Remove this slide"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </mat-card>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <mat-card class="slide-form-card" id="hero-slide-form">
+      <form (ngSubmit)="save()" #slideForm="ngForm">
+        <div class="form-row">
+          <span class="form-block-label">Picture</span>
+          <span class="field-hint">
+            A wide, landscape image works best — the whole picture is always shown, never cropped,
+            so nothing gets cut off whatever screen it lands on. Upload the best-quality original
+            you have, up to 12MB, and please don't shrink or compress it first: it's resized and
+            converted automatically, and starting from the full-quality file gives a sharper
+            result.
+          </span>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Image URL</mat-label>
+            <input
+              matInput
+              name="imageUrl"
+              [ngModel]="formData().imageUrl"
+              (ngModelChange)="formData.update(d => ({ ...d, imageUrl: $event }))"
+              placeholder="Upload below, or paste a URL"
+            />
+            @if (hasError('imageUrl')) {
+              <mat-error>{{ getError('imageUrl') }}</mat-error>
+            }
+          </mat-form-field>
+
+          <div class="image-actions">
+            <input type="file" accept="image/*" (change)="onImageSelected($event)" hidden #fileInput />
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="uploadingImage()"
+              (click)="fileInput.click()"
+            >
+              <mat-icon>upload</mat-icon>
+              {{ uploadingImage() ? 'Optimising…' : 'Upload Image' }}
+            </button>
+            @if (formData().imageUrl) {
+              <button type="button" mat-button color="warn" (click)="clearImage()">
+                <mat-icon>close</mat-icon>
+                Remove
+              </button>
+            }
+          </div>
+
+          @if (formData().imageUrl) {
+            <figure class="image-preview">
+              <img [src]="formData().imageUrl" [alt]="formData().altText || 'Hero image preview'" />
+              <figcaption>Exactly what customers will see, whole and uncropped.</figcaption>
+            </figure>
+          }
+        </div>
+
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Describe the picture</mat-label>
+            <textarea
+              matInput
+              rows="2"
+              name="altText"
+              [ngModel]="formData().altText"
+              (ngModelChange)="formData.update(d => ({ ...d, altText: $event }))"
+              placeholder="e.g. Ojas fasting flours — Bhagar, Buckwheat, Upvas Bhajani, Shingada and Rajgira"
+            ></textarea>
+            <mat-hint>
+              Read aloud to customers using a screen reader, and shown if the picture fails to
+              load. Write out any words printed on the image.
+            </mat-hint>
+            @if (hasError('altText')) {
+              <mat-error>{{ getError('altText') }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Where tapping it goes (optional)</mat-label>
+            <input
+              matInput
+              name="linkUrl"
+              [ngModel]="formData().linkUrl"
+              (ngModelChange)="formData.update(d => ({ ...d, linkUrl: $event }))"
+              placeholder="/products"
+            />
+            <mat-hint>Leave empty and the picture is not a link.</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Position</mat-label>
+            <input
+              matInput
+              type="number"
+              name="sortOrder"
+              [ngModel]="formData().sortOrder"
+              (ngModelChange)="formData.update(d => ({ ...d, sortOrder: $event }))"
+            />
+            <mat-hint>Lowest number shows first.</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <mat-slide-toggle
+            name="isActive"
+            [ngModel]="formData().isActive"
+            (ngModelChange)="formData.update(d => ({ ...d, isActive: $event }))"
+            color="primary"
+          >
+            Show this picture on the home page
+          </mat-slide-toggle>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" mat-button (click)="cancelForm()">Cancel</button>
+          <button type="submit" mat-flat-button color="primary" [disabled]="submitting()">
+            @if (submitting()) {
+              <mat-spinner diameter="18"></mat-spinner>
+            }
+            {{ editingId() === 'new' ? 'Add to hero' : 'Save changes' }}
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+</section>

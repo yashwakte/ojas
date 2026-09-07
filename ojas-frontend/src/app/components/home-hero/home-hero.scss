@@ -121,16 +121,220 @@
   will-change: transform;
 }
 
+// ----- The deck -----
+// Every slide occupies the SAME grid cell, stacked. The deck is therefore as tall as its tallest
+// picture and never changes height between slides - which matters more than it sounds: a deck
+// that resized per slide would move every section of the home page up and down on each
+// transition, and on a phone that is the whole page lurching under the reader's thumb.
+.hero-deck {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  // A horizontal drag is the carousel's; a vertical one is still the page's. Without this the
+  // browser claims both and a swipe scrolls the page instead of changing the picture.
+  touch-action: pan-y;
+}
+
+.hero-slide {
+  grid-area: 1 / 1;
+  position: relative;
+  min-width: 0;
+  display: flex;
+  // Pictures of different shapes share one cell - a 1.835:1 poster and a 1.50:1 one - so the
+  // shorter of the two is centred in the deck's height rather than pinned to its top.
+  align-items: center;
+  justify-content: center;
+
+  // THE DISSOLVE. The outgoing picture does not merely disappear: it falls back a little and
+  // softens, which is what makes the incoming one read as arriving in front of it rather than
+  // replacing it. Both are briefly in the same space, and that overlap is the entire effect -
+  // a hard cut between two opacities looks like a bug, and a slide looks like a filmstrip.
+  //
+  // Held with visibility rather than display so the transition has something to animate, and so
+  // an off-deck slide cannot be reached by a pointer or by tab.
+  // Scaled DOWN, not up, and that direction is deliberate. The picture on top spends its whole
+  // dwell drifting slowly forward, so an incoming slide that arrived by settling *backwards*
+  // from 1.04 would reverse direction the moment it landed - a shrink, then a grow. Arriving
+  // from just under 1 instead means one continuous push-in from the first frame of the
+  // dissolve to the last frame of the dwell, and the outgoing picture recedes as it softens,
+  // which is what makes the new one read as coming forward in front of it.
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.985);
+  filter: blur(10px) saturate(0.85);
+  transition:
+    opacity 900ms var(--ojas-ease),
+    transform 1100ms var(--ojas-ease),
+    filter 900ms ease,
+    visibility 0s 900ms;
+  will-change: opacity, transform, filter;
+}
+
+.hero-slide--active {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  filter: none;
+  transition-delay: 0s;
+  z-index: 1;
+}
+
+// THE SLOW PUSH-IN. The picture on top keeps moving for as long as it is on screen - a very slow
+// drift forward over the whole dwell, which the component publishes as --hero-dwell so the two
+// can never disagree about how long a slide lasts.
+//
+// This is the difference between a photograph being looked at and a slideshow. It is deliberately
+// under 3% of travel: enough that the frame is never quite still, far too little to notice as
+// movement, and small enough that no part of the poster is pushed out of the frame.
+.hero-slide--active .hero-slide-inner {
+  animation: heroDrift var(--hero-dwell, 5000ms) linear both;
+}
+
+@keyframes heroDrift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.028);
+  }
+}
+
+// The tap target for a slide that has somewhere to go. Laid over the picture rather than wrapped
+// around it, so the focus ring stays square with the frame while the artwork drifts underneath.
+.hero-slide-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 4px;
+
+  &:focus-visible {
+    outline: 3px solid var(--ojas-orange-dark);
+    outline-offset: -6px;
+  }
+}
+
 .hero-art-main {
   display: block;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+}
+
+.hero-slide-inner {
+  will-change: transform;
 }
 
 .hero-banner-img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+// ----- Arrows -----
+// On the warm margin beside the poster. `contain` leaves that margin at every landscape size, so
+// these never cover a pack shot.
+.hero-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(84, 48, 22, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 253, 249, 0.82);
+  backdrop-filter: blur(8px);
+  color: var(--ojas-ink);
+  cursor: pointer;
+  transition:
+    background var(--ojas-transition),
+    border-color var(--ojas-transition),
+    scale var(--ojas-transition);
+
+  &:hover {
+    background: #fff;
+    border-color: rgba(84, 48, 22, 0.3);
+    scale: 1.06;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ojas-orange-dark);
+    outline-offset: 2px;
+  }
+
+  mat-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.hero-nav--prev {
+  left: 10px;
+}
+
+.hero-nav--next {
+  right: 10px;
+}
+
+// ----- Dots -----
+// Between the artwork and the copy, on the hero's own wash rather than floated on the picture -
+// the same rule the buttons and the trust line already follow, and for the same reason.
+.hero-dots {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  padding-top: 10px;
+}
+
+// The button is a comfortable 28px tap target; the visible dot inside it is small. Sizing the
+// button itself to the dot is how carousels end up with 8px targets nobody can hit.
+.hero-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--ojas-orange-dark);
+    outline-offset: -4px;
+    border-radius: 999px;
+  }
+}
+
+// The active dot stretches into a lozenge rather than merely changing colour. Colour alone is a
+// weak signal at 7px and fails outright for anyone who cannot separate the two shades; a change
+// of shape reads at a glance and survives greyscale.
+.hero-dot-fill {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(84, 48, 22, 0.26);
+  transition:
+    width var(--ojas-transition),
+    background var(--ojas-transition);
+}
+
+.hero-dot:hover .hero-dot-fill {
+  background: rgba(84, 48, 22, 0.45);
+}
+
+.hero-dot--active .hero-dot-fill {
+  width: 22px;
+  background: var(--ojas-orange-dark);
 }
 
 // ----- Doors -----
@@ -510,12 +714,28 @@
     flex: 0 0 auto;
   }
 
-  // A little overscan: the artwork carries roughly 8% of decorative margin at each side (the
-  // dried branches, the jars), so pushing past the viewport edge by 7% a side buys ~15% more
-  // height without touching a single pack shot or clipping the headline.
-  .hero-art-main {
-    width: 114%;
-    margin-inline: -7%;
+  // THE OVERSCAN IS GONE, and that is a deliberate reversal.
+  //
+  // The rail used to be pushed 7% past each viewport edge to buy about 15% more height. That was
+  // safe while the hero was ONE known picture: the shipped banner carries roughly 8% of
+  // decorative margin a side - dried branches, a vase, an empty frame - so the trim landed on
+  // nothing. It is not safe for a rail. The fasting poster is drawn to a maroon border with the
+  // headline close inside it, so the same 7% cut the border off and clipped the first letter of
+  // आपली; and every slide the owner uploads from the admin console is a picture
+  // whose composition nobody here has seen.
+  //
+  // A hero that crops whatever it is given, by an amount tuned to one image, is a trap. The
+  // height it bought is not worth clipping a shop's own headline on the screen most of its
+  // customers use.
+
+  // A swipe is the obvious gesture on a phone, and a 44px control floating on a 375px-wide
+  // picture is a tap target sitting on the product.
+  .hero-nav {
+    display: none;
+  }
+
+  .hero-dots {
+    padding-top: 8px;
   }
 
   // In flow, directly beneath the poster. Pinning this to the bottom of the screen only made
@@ -609,6 +829,14 @@
     flex: 1;
   }
 
+  // `height: 100%` on the picture only resolves if every box between it and the stage has a
+  // definite height, so the deck and the slides have to be stretched too - otherwise the poster
+  // falls back to its natural height and the fitted layout silently stops fitting.
+  .hero-deck,
+  .hero-slide {
+    height: 100%;
+  }
+
   .hero-art-main {
     height: 100%;
   }
@@ -662,6 +890,27 @@
 
   .hero-scroll-dot {
     animation: none;
+  }
+
+  // The carousel itself stays - the arrows, the dots and a swipe all still work, and taking it
+  // away would take every poster after the first with it. What goes is the motion: slides cut
+  // between each other on a short fade instead of dissolving through blur and scale, and the
+  // picture on top holds perfectly still rather than drifting.
+  .hero-slide {
+    transform: none;
+    filter: none;
+    transition:
+      opacity 200ms linear,
+      visibility 0s 200ms;
+  }
+
+  .hero-slide--active .hero-slide-inner {
+    animation: none;
+  }
+
+  .hero-dot-fill,
+  .hero-nav {
+    transition: none;
   }
 }
 

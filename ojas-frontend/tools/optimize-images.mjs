@@ -44,9 +44,19 @@ const OUTPUT_DIR = path.join(import.meta.dirname, '..', 'public', 'images');
 // a desktop monitor as well as a phone, so it gets a ladder for the browser to choose from;
 // everything else is only ever shown small.
 const RECIPES = {
-  'hero-banner': { widths: [640, 960, 1280, 1600], fallbackWidth: 1280, quality: 80 },
+  hero: { widths: [640, 960, 1280, 1600], fallbackWidth: 1280, quality: 80 },
   default: { widths: [1000], fallbackWidth: 1000, quality: 80 },
 };
+
+/**
+ * The hero is a carousel now rather than a single picture, so the ladder is chosen by prefix
+ * rather than by one hardcoded filename: anything named `hero-*.png|jpg` in source-images is a
+ * hero slide and gets the full set of widths. Adding another slide to the shipped set is then
+ * a matter of dropping the artwork in and re-running this, with nothing here to remember to edit.
+ */
+function recipeFor(name) {
+  return name.startsWith('hero-') ? RECIPES.hero : RECIPES.default;
+}
 
 /**
  * The pack shots — the client's photographs of every product, front and back — get their own pass,
@@ -206,7 +216,7 @@ async function run() {
   for (const file of files) {
     const name = path.basename(file, path.extname(file));
     const source = path.join(SOURCE_DIR, file);
-    const recipe = RECIPES[name] ?? RECIPES.default;
+    const recipe = recipeFor(name);
     const meta = await sharp(source).metadata();
 
     for (const width of recipe.widths) {
