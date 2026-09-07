@@ -14,8 +14,13 @@
         <!-- The legal entity behind the brand. Customers and payment providers alike need to be
              able to see who actually operates the shop, not only what it is called. -->
         <p class="footer-legal">
-          A brand owned and operated by <strong>Asha Marketing</strong>, Pune
+          A brand owned and operated by <strong>{{ businessName }}</strong>, Pune
         </p>
+        <!-- The FSSAI licence identifies the food business a customer is buying from. It is shown
+             here only once the real number is on file; until then the packs carry it. -->
+        @if (fssaiLicenceNumber) {
+          <p class="footer-legal">FSSAI Lic. No. <strong>{{ fssaiLicenceNumber }}</strong></p>
+        }
       </div>
 
       <div class="footer-links">
@@ -33,19 +38,38 @@
           <div class="contact-icon-wrap">
             <mat-icon>phone</mat-icon>
           </div>
-          <a href="tel:+918657781526">+91 8657781526</a>
+          <a [href]="supportPhoneHref">{{ supportPhone }}</a>
         </div>
         <div class="contact-item">
           <div class="contact-icon-wrap">
             <mat-icon>email</mat-icon>
           </div>
-          <a href="mailto:wecare@ojasaata.com">wecare&#64;ojasaata.com</a>
+          <a [href]="'mailto:' + supportEmail">{{ supportEmail }}</a>
         </div>
         <div class="contact-item">
           <div class="contact-icon-wrap">
+            <svg class="brand-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+              <circle cx="12" cy="12" r="4.4" />
+              <circle class="brand-glyph-dot" cx="17.4" cy="6.6" r="1.2" />
+            </svg>
+          </div>
+          <a [href]="instagramUrl" target="_blank" rel="noopener">
+            &#64;{{ instagramHandle }} on Instagram
+          </a>
+        </div>
+        <!-- The full registered address, not just the city. A customer needs to know which
+             business is behind the shop, and a payment provider's review looks for it here. -->
+        <div class="contact-item contact-address">
+          <div class="contact-icon-wrap">
             <mat-icon>location_on</mat-icon>
           </div>
-          <span>Pune, Maharashtra, India</span>
+          <address>
+            <strong>{{ businessName }}</strong><br />
+            @for (line of addressLines; track line) {
+              {{ line }}<br />
+            }
+          </address>
         </div>
       </div>
     </div>

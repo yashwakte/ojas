@@ -12,7 +12,7 @@
         <span class="label-line"></span>
       </div>
       <h1>About Ojas</h1>
-      <p>शुद्ध आहार...शुद्ध विचार — Pure food, pure thoughts. A family tradition of stone-ground purity.</p>
+      <p>शुद्ध आहार...शुद्ध विचार — Pure food, pure thoughts. A farming family's chakki, ten years on.</p>
     </div>
   </div>
 
@@ -20,17 +20,22 @@
   <section class="section story-section">
     <div class="story-inner">
       <div class="tag"><span>WHO WE ARE</span></div>
-      <h2 class="stitle">From a Family Chakki to Your Kitchen</h2>
+      <h2 class="stitle">From a Farming Family to 1,200+ Shelves</h2>
       <p class="story-text">
-        Ojas began in Pune with a simple belief — the food our families eat every day should be as
-        pure as the ingredients that go into it. What started as a small stone-ground chakki serving
-        neighbours has grown into a trusted name for flours and healthy essentials, without ever
-        giving up the traditional methods that make our products what they are.
+        We come from a farmers' background. Grain was something our family grew and understood long
+        before it was something we packed and sold, and that is still how we choose it — by handling
+        it, not by reading a spec sheet.
       </p>
       <p class="story-text">
-        We source the finest grains from trusted local farms, grind them slowly on traditional stone
-        chakkis to preserve every bit of nutrition and flavour, and pack them fresh — so that what
-        reaches your table is as close to nature as possible.
+        Ojas started as one small outlet in Pune, grinding fresh flour on a stone chakki for the
+        families in the lane. More than ten years later that single shop has become a range of over
+        fifty products stocked in more than 1,200 retail outlets, and we are growing fast across
+        Pune — with a vision to put Ojas on kitchen shelves all over the world.
+      </p>
+      <p class="story-text">
+        What has not changed is the method. We still source grain from farms we know, still grind it
+        slowly on traditional stone chakkis to keep every bit of nutrition and flavour, and still
+        pack it fresh — so what reaches your table is as close to nature as we can get it.
       </p>
     </div>
   </section>
@@ -100,9 +105,9 @@
         <h3>Registered business</h3>
         <p>
           <strong>Asha Marketing</strong><br />
-          Near Chhatrapati Shivaji Maharaj Udyan,<br />
-          Madhuban Society Lane No. 9, Old Sanghvi,<br />
-          Pune &ndash; 411027, Maharashtra, India
+          @for (line of addressLines; track line) {
+            {{ line }}<br />
+          }
         </p>
       </div>
 
@@ -111,8 +116,12 @@
         <h3>FSSAI licensed</h3>
         <p>
           Asha Marketing is a <strong>licensed food business</strong> under FSSAI, covering the
-          manufacture and packing of every product sold here. The licence number is printed on
-          each pack.
+          manufacture and packing of every product sold here.
+          @if (fssaiLicenceNumber) {
+            <br />Licence no. <strong>{{ fssaiLicenceNumber }}</strong>
+          } @else {
+            The licence number is printed on each pack.
+          }
         </p>
       </div>
 
@@ -120,8 +129,9 @@
         <div class="legal-ico"><mat-icon>support_agent</mat-icon></div>
         <h3>Contact us</h3>
         <p>
-          <a href="tel:+918657781526">+91 8657781526</a><br />
-          <a href="mailto:wecare&#64;ojasaata.com">wecare&#64;ojasaata.com</a><br />
+          <a [href]="supportPhoneHref">{{ supportPhone }}</a><br />
+          <a [href]="'mailto:' + supportEmail">{{ supportEmail }}</a><br />
+          <a [href]="instagramUrl" target="_blank" rel="noopener">&#64;{{ instagramHandle }} on Instagram</a><br />
           Monday to Saturday, 9am &ndash; 7pm IST
         </p>
       </div>

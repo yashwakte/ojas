@@ -1,3 +1,14 @@
+import {
+  BUSINESS_NAME,
+  FSSAI_LICENCE_NUMBER,
+  INSTAGRAM_HANDLE,
+  INSTAGRAM_URL,
+  REGISTERED_ADDRESS,
+  SUPPORT_EMAIL,
+  SUPPORT_HOURS,
+  SUPPORT_PHONE,
+} from '../../constants/business';
+
 /**
  * Content for the four policy pages Ojas is legally and commercially required to publish.
  *
@@ -32,11 +43,14 @@ export interface LegalDocument {
  * typo fixes, since a moved date implies to a returning customer that the terms changed. */
 export const POLICY_LAST_UPDATED = '1 September 2026';
 
-const BUSINESS_NAME = 'Asha Marketing';
-const SUPPORT_EMAIL = 'wecare@ojasaata.com';
-const SUPPORT_PHONE = '+91 8657781526';
-const REGISTERED_ADDRESS =
-  'Near Chhatrapati Shivaji Maharaj Udyan, Madhuban Society Lane No. 9, Old Sanghvi, Pune – 411027, Maharashtra, India';
+/** The licence sentence, in the one shape that is true whether or not the number is on file.
+ * A policy page must never imply we hold a licence number we cannot show. */
+const FSSAI_SENTENCE = FSSAI_LICENCE_NUMBER
+  ? `${BUSINESS_NAME} is a licensed food business under FSSAI, licence number ` +
+    `${FSSAI_LICENCE_NUMBER}, covering the manufacture and packing of every product sold on ` +
+    'this site.'
+  : `${BUSINESS_NAME} is a licensed food business under FSSAI, covering the manufacture and ` +
+    'packing of every product sold on this site. The licence number is printed on each pack.';
 
 const contact: LegalDocument = {
   slug: 'contact',
@@ -50,7 +64,8 @@ const contact: LegalDocument = {
       bullets: [
         `Phone: ${SUPPORT_PHONE}`,
         `Email: ${SUPPORT_EMAIL}`,
-        'Hours: Monday to Saturday, 9:00am – 7:00pm IST',
+        `Instagram: @${INSTAGRAM_HANDLE} (${INSTAGRAM_URL})`,
+        `Hours: ${SUPPORT_HOURS}`,
       ],
     },
     {
@@ -60,8 +75,7 @@ const contact: LegalDocument = {
     {
       heading: 'About the business',
       paragraphs: [
-        `${BUSINESS_NAME} is a licensed food business under FSSAI, covering the manufacture and ` +
-          'packing of every product sold on this site. The licence number is printed on each pack.',
+        FSSAI_SENTENCE,
         'When you place an order on this site, ' +
           `${BUSINESS_NAME} is the business you are buying from and the business accountable to you.`,
       ],
@@ -89,7 +103,8 @@ const terms: LegalDocument = {
       heading: '1. Who we are',
       paragraphs: [
         `Ojas is a brand owned and operated by ${BUSINESS_NAME}, whose registered address is ` +
-          `${REGISTERED_ADDRESS}. ${BUSINESS_NAME} is a licensed food business under FSSAI.`,
+          `${REGISTERED_ADDRESS}.`,
+        FSSAI_SENTENCE,
       ],
     },
     {

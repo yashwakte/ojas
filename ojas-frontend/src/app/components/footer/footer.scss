@@ -152,6 +152,40 @@
   }
 }
 
+// Material Icons carries no Instagram brand glyph, so the mark is drawn inline. It is stroked
+// rather than filled so it reads at the same weight as the mat-icons beside it, and it inherits
+// currentColor so it never drifts from them.
+.brand-glyph {
+  width: 18px;
+  height: 18px;
+  color: #e8e4df;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+
+  .brand-glyph-dot {
+    fill: currentColor;
+    stroke: none;
+  }
+}
+
+// The address runs to four lines, so it can't sit centred against a 36px icon like the one-line
+// rows above it.
+.contact-address {
+  align-items: flex-start;
+
+  address {
+    font-style: normal;
+    color: #999;
+    line-height: 1.6;
+
+    strong {
+      color: #e8e4df;
+      font-weight: 600;
+    }
+  }
+}
+
 .footer-bottom {
   text-align: center;
   padding: 20px 24px;
