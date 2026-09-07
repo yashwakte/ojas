@@ -1,5 +1,5 @@
 <section class="campaign-banner-management">
-  <header class="page-header">
+  <header class="page-header" id="campaign-list-top">
     <div>
       <p class="eyebrow">Home Page</p>
       <h1>Campaign Banners</h1>
@@ -30,7 +30,7 @@
     } @else {
       <div class="campaign-list">
         @for (c of campaigns(); track c.id) {
-          <mat-card class="campaign-list-card">
+          <mat-card class="campaign-list-card" [id]="'campaign-' + c.id">
             <div class="campaign-list-row">
               <div
                 class="campaign-list-thumb"
@@ -72,7 +72,7 @@
       </div>
     }
   } @else {
-    <mat-card class="config-card">
+    <mat-card class="config-card" id="campaign-form">
       <mat-card-content>
         <div class="form-heading">
           <h2>{{ editingId() === 'new' ? 'New Campaign' : 'Edit Campaign' }}</h2>

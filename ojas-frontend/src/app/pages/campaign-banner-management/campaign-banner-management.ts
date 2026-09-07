@@ -99,6 +99,7 @@ export class CampaignBannerManagement implements OnInit {
     this.formErrors.set({});
     this.productSearch.set('');
     this.editingId.set('new');
+    this.scrollTo('campaign-form', 'start');
   }
 
   startEdit(campaign: CampaignBannerConfig): void {
@@ -106,10 +107,17 @@ export class CampaignBannerManagement implements OnInit {
     this.formErrors.set({});
     this.productSearch.set('');
     this.editingId.set(campaign.id);
+    this.scrollTo('campaign-form', 'start');
   }
 
   cancelForm(): void {
+    const wasEditing = this.editingId();
     this.editingId.set(null);
+
+    // Back to the row they came from rather than to whatever offset the form's height left
+    // behind. Backing out of a new campaign has no row to return to, so the top of the pane is.
+    if (wasEditing && wasEditing !== 'new') this.scrollTo(`campaign-${wasEditing}`, 'center');
+    else this.scrollTo('campaign-list-top', 'start');
   }
 
   deleteCampaign(campaign: CampaignBannerConfig): void {
@@ -117,7 +125,11 @@ export class CampaignBannerManagement implements OnInit {
       return;
     }
     this.campaignBannerService.deleteCampaign(campaign.id).subscribe({
-      next: () => this.showSuccess('Campaign deleted'),
+      next: () => {
+        this.showSuccess('Campaign deleted');
+        // The list is one card shorter, so an offset near its end is now past the bottom of it.
+        this.scrollTo('campaign-list-top', 'start');
+      },
       error: (err) => this.showError(err?.error?.message ?? 'Failed to delete campaign'),
     });
   }
@@ -240,15 +252,42 @@ export class CampaignBannerManagement implements OnInit {
         : this.campaignBannerService.createCampaign(request);
 
     request$.subscribe({
-      next: () => {
+      next: (campaign) => {
         this.showSuccess(id && id !== 'new' ? 'Campaign updated successfully' : 'Campaign created successfully');
         this.submitting.set(false);
         this.editingId.set(null);
+        // Onto the campaign they just saved, not the footer. This form is long enough that Save
+        // is well below the fold, and closing it leaves the page exactly where it was.
+        this.scrollTo(`campaign-${campaign.id}`, 'center');
       },
       error: (err) => {
         this.showError(err?.error?.message ?? 'Failed to save campaign');
         this.submitting.set(false);
       },
+    });
+  }
+
+  /**
+   * Scrolls an element into view once it has actually been rendered.
+   *
+   * Retried across a few frames because the element is usually created by the same signal write
+   * that asked for the scroll - the card revealed by the form above it collapsing. Smooth unless
+   * the reader has asked for less motion, in which case it jumps: the point is arriving.
+   *
+   * Same helper and same reasoning as the product and hero-image admins. An action that swaps one
+   * view for another has to say where the page goes, every time - swapping two branches of very
+   * different heights does not reset the scroll offset, so the admin is left at the footer with
+   * the thing they just did off-screen above them.
+   */
+  private scrollTo(elementId: string, block: ScrollLogicalPosition, attemptsLeft = 5): void {
+    requestAnimationFrame(() => {
+      const target = document.getElementById(elementId);
+      if (!target) {
+        if (attemptsLeft > 1) this.scrollTo(elementId, block, attemptsLeft - 1);
+        return;
+      }
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+      target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block });
     });
   }
 
