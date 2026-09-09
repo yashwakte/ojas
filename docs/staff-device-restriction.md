@@ -57,7 +57,7 @@ it is spelled with a double underscore rather than a colon — environment varia
 contain `:`, and .NET maps `__` onto the config hierarchy separator:
 
 ```
-Frontend__BaseUrl = https://ojas-atta.vercel.app
+Frontend__BaseUrl = https://ojasaata.com
 ```
 
 Same convention as the `Jwt__Key`, `MongoDb__ConnectionString` and `Turnstile__SecretKey`

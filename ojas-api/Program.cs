@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using OjasApi.Configuration;
 using OjasApi.Data;
 using OjasApi.Models;
 using OjasApi.Services;
@@ -79,29 +80,20 @@ if (builder.Environment.IsProduction())
             + "relative or http value produces a return_url Cashfree cannot redirect to.");
 }
 
-var productionOrigins = builder.Configuration
+var configuredOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()
-    // Only reached when Cors:AllowedOrigins is unset. Browsers reach the API same-origin through
-    // the Vercel rewrite, so CORS is not on the ordinary path - this is the backstop for anything
-    // calling the API host directly, and it lists every origin the site is served from during the
-    // move to the custom domain rather than only the one it used to live at.
-    ?? ["https://ojasaata.com", "https://www.ojasaata.com", "https://ojas-atta.vercel.app"];
+    ?? CorsOriginPolicy.Defaults;
 
-var allowVercelPreviewOrigins = builder.Configuration.GetValue("Cors:AllowVercelPreviewOrigins", false);
+// See CorsOriginPolicy: the *.vercel.app addresses the site used to be served from are no longer
+// trusted at all, and a leftover entry is dropped with a warning rather than failing the boot.
+var productionOrigins = CorsOriginPolicy.Sanitize(configuredOrigins);
 
-// Anyone can deploy a site to a *.vercel.app address, and this policy sends credentials. Left on
-// in production it would let a stranger's page read a signed-in customer's orders, wallet and
-// profile straight out of their browser. It is a preview-deploy convenience and nothing else, so
-// production refuses to start with it rather than trusting nobody ever sets it there - a
-// deployment log is a far better place to find this out than a breach is. A specific preview
-// origin can still be allowed by naming it in Cors:AllowedOrigins.
-if (builder.Environment.IsProduction() && allowVercelPreviewOrigins)
+foreach (var dropped in configuredOrigins.Except(productionOrigins, StringComparer.OrdinalIgnoreCase))
 {
-    throw new InvalidOperationException(
-        "Cors:AllowVercelPreviewOrigins is on in Production, which would grant every *.vercel.app " +
-        "origin credentialed access to this API. Turn it off, and name any specific preview origin " +
-        "in Cors:AllowedOrigins instead.");
+    Console.WriteLine(
+        $"⚠️ Ignoring Cors:AllowedOrigins entry '{dropped}': *.vercel.app origins are no longer " +
+        "trusted. The site is served from https://ojasaata.com.");
 }
 
 // MongoDB
@@ -203,19 +195,7 @@ builder.Services.AddCors(options =>
 
     options.AddPolicy("AllowProduction", policy =>
     {
-        policy.SetIsOriginAllowed(origin =>
-        {
-            if (productionOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
-                return true;
-
-            if (!allowVercelPreviewOrigins)
-                return false;
-
-            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
-                return false;
-
-            return uri.Scheme == Uri.UriSchemeHttps && uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase);
-        })
+        policy.SetIsOriginAllowed(origin => CorsOriginPolicy.IsAllowed(origin, productionOrigins))
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()

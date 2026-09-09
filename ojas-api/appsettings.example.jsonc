@@ -81,15 +81,14 @@
   "Turnstile": {
     "SecretKey": "<turnstile-secret-key>"
   },
-  // List every origin the site is served from. While moving to the custom domain that is more
-  // than one, and dropping the old host too early breaks anything still pointing at it.
+  // List every origin the site is served from. *.vercel.app origins are refused whatever this
+  // says - anyone can deploy a page to one and this policy sends credentials - so the hosting
+  // platform's own addresses are not usable here; put the real domain in.
   "Cors": {
     "AllowedOrigins": [
       "https://ojasaata.com",
-      "https://www.ojasaata.com",
-      "https://ojas-atta.vercel.app"
-    ],
-    "AllowVercelPreviewOrigins": false
+      "https://www.ojasaata.com"
+    ]
   },
   // Error tracking - inert if left unset, no account needed to keep developing. Create a free
   // project at sentry.io and paste its DSN here to switch it on.
