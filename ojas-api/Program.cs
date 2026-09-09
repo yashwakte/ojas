@@ -90,6 +90,20 @@ var productionOrigins = builder.Configuration
 
 var allowVercelPreviewOrigins = builder.Configuration.GetValue("Cors:AllowVercelPreviewOrigins", false);
 
+// Anyone can deploy a site to a *.vercel.app address, and this policy sends credentials. Left on
+// in production it would let a stranger's page read a signed-in customer's orders, wallet and
+// profile straight out of their browser. It is a preview-deploy convenience and nothing else, so
+// production refuses to start with it rather than trusting nobody ever sets it there - a
+// deployment log is a far better place to find this out than a breach is. A specific preview
+// origin can still be allowed by naming it in Cors:AllowedOrigins.
+if (builder.Environment.IsProduction() && allowVercelPreviewOrigins)
+{
+    throw new InvalidOperationException(
+        "Cors:AllowVercelPreviewOrigins is on in Production, which would grant every *.vercel.app " +
+        "origin credentialed access to this API. Turn it off, and name any specific preview origin " +
+        "in Cors:AllowedOrigins instead.");
+}
+
 // MongoDB
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDb"));
@@ -221,9 +235,22 @@ builder.Services.AddRateLimiter(options =>
     // integration and Playwright suites hammer these endpoints from a single loopback IP and
     // would otherwise fail on the rate limiter rather than on anything real. Device enrolment
     // in particular costs two auth-policy calls (request a code, then redeem it).
+    // Who a request counts against. The signed-in account wherever there is one, because the
+    // address a request appears to come from is not dependable: behind a CDN or a managed proxy
+    // every customer can share a handful of egress addresses, which makes an IP bucket both too
+    // coarse to stop an attacker and tight enough to lock out real customers. Anonymous traffic
+    // has nothing else to go on, so it still counts by address.
+    static string PartitionFor(HttpContext context) =>
+        context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { Length: > 0 } userId
+            ? $"user:{userId}"
+            : $"ip:{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+
     var authPermitLimit = builder.Environment.IsProduction() ? 5 : 50;
     options.AddPolicy("auth", context =>
         RateLimitPartition.GetFixedWindowLimiter(
+            // Deliberately still by address: the callers this policy exists to slow down have no
+            // session yet. The account-scoped cooldown in AuthService is what actually stops
+            // password guessing, precisely because it does not depend on this.
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
@@ -237,7 +264,7 @@ builder.Services.AddRateLimiter(options =>
     // the same net as scraping or enumeration abuse.
     options.AddPolicy("general", context =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            partitionKey: PartitionFor(context),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 60,
@@ -390,9 +417,14 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseRateLimiter();
-
 app.UseAuthentication();
+
+// After authentication on purpose. The general limiter counts a signed-in caller against their
+// own account rather than against whatever address their CDN or proxy presents (see PartitionFor),
+// and context.User is only populated once authentication has run. The cost of that ordering is
+// one HMAC verification for a caller who is about to be limited, which is cheap next to the
+// alternative of bucketing every customer behind a shared egress address together.
+app.UseRateLimiter();
 
 // Stamp every authenticated response with the account it was served for.
 //

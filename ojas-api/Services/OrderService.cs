@@ -142,6 +142,117 @@ public class OrderService(IMongoDbService db)
             .ToListAsync();
     }
 
+    /// <summary>
+    /// The live, unpaid order this customer already has for exactly this basket, if there is one.
+    ///
+    /// This is what stops a second order being minted for a basket that already has one. Every
+    /// other guard against that is in the browser — a disabled button, a sessionStorage marker —
+    /// and every one of them is defeated by the ordinary ways a customer comes back to a checkout
+    /// they walked away from: a rebuilt tab, a cleared session store, a second press while the
+    /// payment SDK is still loading. Each of those used to place another order, take stock for it
+    /// again, and leave the customer looking at two live orders for one basket.
+    ///
+    /// Matched on contents rather than on a client-supplied key, because the client is exactly
+    /// what cannot be trusted to remember: same items and quantities, same total, same coupon and
+    /// the same address. A customer deliberately ordering something different, or re-ordering the
+    /// same basket once the first one is <em>paid</em>, is untouched — only an unpaid twin inside
+    /// the payment window collapses into the order that already exists.
+    /// </summary>
+    /// <param name="excludeOrderId">The order being placed right now, when this runs immediately
+    /// after the insert to settle a race. Left null on the ordinary check, before anything
+    /// exists.</param>
+    public async Task<Order?> FindUnpaidTwinAsync(
+        string userId, Order candidate, TimeSpan window, string? excludeOrderId = null)
+    {
+        var placedSince = DateTime.UtcNow - window;
+
+        var live = await _orders
+            .Find(Builders<Order>.Filter.And(
+                Builders<Order>.Filter.Eq(o => o.UserId, userId),
+                Builders<Order>.Filter.Eq(o => o.ReplacedByOrderId, null),
+                Builders<Order>.Filter.Eq(o => o.Status, "Pending"),
+                // "PartiallyPaid" belongs here as much as "Pending": an order the wallet part-paid
+                // whose gateway leg was never completed is still an order awaiting payment, and
+                // leaving it out is how a customer with wallet credit got duplicates anyway.
+                Builders<Order>.Filter.In(o => o.PaymentStatus, new[] { "Pending", "PartiallyPaid" }),
+                Builders<Order>.Filter.Gte(o => o.CreatedAt, placedSince)))
+            // Oldest first, so a race is always decided in favour of the order that already
+            // existed rather than by whichever query happened to run last.
+            .SortBy(o => o.CreatedAt)
+            .ToListAsync();
+
+        // An order with a pending edit has its own payment to make for its own amount, and is not
+        // a stand-in for a fresh basket.
+        return live.FirstOrDefault(o =>
+            !string.Equals(o.Id, excludeOrderId, StringComparison.Ordinal) &&
+            o.PendingAmendment == null &&
+            IsSameBasket(o, candidate));
+    }
+
+    /// <summary>
+    /// Stands down an order that turned out to be a duplicate of one already in flight, pointing
+    /// it at the one being kept so it drops out of the customer's list exactly as a retried
+    /// attempt does.
+    ///
+    /// This is the loser of a genuine race — two tabs, or a request the browser sent twice — where
+    /// both placements passed the duplicate check before either had inserted. It is deliberately
+    /// not a delete: an admin looking for why stock moved should be able to find it.
+    /// </summary>
+    public async Task<bool> RetireDuplicateAsync(string duplicateOrderId, string keptOrderId)
+    {
+        var result = await _orders.UpdateOneAsync(
+            Builders<Order>.Filter.And(
+                Builders<Order>.Filter.Eq(o => o.Id, duplicateOrderId),
+                Builders<Order>.Filter.Eq(o => o.ReplacedByOrderId, null)),
+            Builders<Order>.Update
+                .Set(o => o.Status, "Cancelled")
+                .Set(o => o.ReplacedByOrderId, keptOrderId)
+                .Set(o => o.UpdatedAt, DateTime.UtcNow));
+
+        return result.ModifiedCount > 0;
+    }
+
+    /// <summary>The live order that replaced a failed one, if that retry has already happened.
+    /// Pressing "Try payment again" twice names the same dead order both times, and the second
+    /// press must land on the replacement rather than mint a third order beside it. Refuses
+    /// anything that isn't this customer's own.</summary>
+    public async Task<Order?> GetLiveReplacementAsync(string failedOrderId, string userId)
+    {
+        var failed = await GetOrderByIdAsync(failedOrderId);
+        if (failed?.ReplacedByOrderId is not { } replacementId ||
+            !string.Equals(failed.UserId, userId, StringComparison.Ordinal))
+            return null;
+
+        var replacement = await GetOrderByIdAsync(replacementId);
+        if (replacement == null ||
+            !string.Equals(replacement.UserId, userId, StringComparison.Ordinal) ||
+            replacement.ReplacedByOrderId != null ||
+            !string.Equals(replacement.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+            replacement.PendingAmendment != null ||
+            replacement.PaymentStatus is not ("Pending" or "PartiallyPaid"))
+            return null;
+
+        return replacement;
+    }
+
+    /// <summary>Whether two orders are the same purchase: the same products in the same
+    /// quantities, for the same money, to the same address, under the same coupon. Quantities are
+    /// summed per product first, so a basket that arrives as two lines of the same item still
+    /// matches one that arrives as a single line of the total.</summary>
+    public static bool IsSameBasket(Order existing, Order candidate) =>
+        existing.TotalAmount == candidate.TotalAmount &&
+        string.Equals(existing.Address, candidate.Address, StringComparison.Ordinal) &&
+        string.Equals(existing.CouponCode ?? string.Empty, candidate.CouponCode ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase) &&
+        BasketLines(existing.Items).SequenceEqual(BasketLines(candidate.Items));
+
+    private static List<(string ProductId, int Quantity)> BasketLines(List<OrderItem> items) =>
+        items
+            .GroupBy(i => i.ProductId, StringComparer.Ordinal)
+            .Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity)))
+            .OrderBy(l => l.ProductId, StringComparer.Ordinal)
+            .ToList();
+
     /// <summary>Points a failed order at the one placed to replace it, retiring it from the
     /// customer's list. Refuses anything that isn't that customer's own failed order, so the id
     /// coming from the browser can't be used to hide someone else's order — or a live one.</summary>

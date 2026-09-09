@@ -298,8 +298,12 @@ public class AuthController : ControllerBase
     }
 
     // Doesn't reveal whether the email is registered - always returns the same generic message.
-    // (devCode does technically leak existence outside Production, same trade-off Register makes -
-    // it's a local/dev testing convenience only, never populated once IsProduction() is true.)
+    //
+    // devCode is a local testing convenience and does leak existence, so it is gated on
+    // IsDevelopment rather than on "not Production". Those are not the same set: Staging, or an
+    // ASPNETCORE_ENVIRONMENT someone mistyped on a real deployment, is not Production and would
+    // have handed out live reset codes to anyone who asked. Only a developer's own machine
+    // should ever see one.
     [HttpPost("resend-email-otp")]
     public async Task<IActionResult> ResendEmailOtp([FromBody] ResendEmailOtpRequest request)
     {
@@ -307,7 +311,7 @@ public class AuthController : ControllerBase
         if (await _authService.EmailExistsAsync(request.Email))
         {
             var code = await _otpService.SendEmailOtpAsync(request.Email);
-            devCode = _env.IsProduction() ? null : code;
+            devCode = _env.IsDevelopment() ? code : null;
         }
 
         return Ok(new { message = "If that email is registered, a new code has been sent.", devCode });
@@ -482,7 +486,7 @@ public class AuthController : ControllerBase
             invitePending = true,
             // Same dev-only convenience as devCode: lets the flow be walked locally without a
             // working inbox. Never populated in Production.
-            devInviteToken = _env.IsProduction() ? null : inviteToken,
+            devInviteToken = _env.IsDevelopment() ? inviteToken : null,
         });
     }
 
@@ -503,7 +507,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             message = "Invite sent.",
-            devInviteToken = _env.IsProduction() ? null : inviteToken,
+            devInviteToken = _env.IsDevelopment() ? inviteToken : null,
         });
     }
 
@@ -553,7 +557,7 @@ public class AuthController : ControllerBase
         if (await _authService.EmailExistsAsync(request.Email))
         {
             var code = await _otpService.SendPasswordResetOtpAsync(request.Email);
-            devCode = _env.IsProduction() ? null : code;
+            devCode = _env.IsDevelopment() ? code : null;
         }
 
         return Ok(new { message = "If that email is registered, we've sent a reset code.", devCode });
@@ -595,7 +599,7 @@ public class AuthController : ControllerBase
                 return Ok(new { message = "This device has already been approved by an admin.", devCode, preApproved = true });
 
             var code = await _otpService.SendDeviceOtpAsync(user.Email);
-            devCode = _env.IsProduction() ? null : code;
+            devCode = _env.IsDevelopment() ? code : null;
         }
 
         return Ok(new { message = "If those details are correct, we've sent a code to your email.", devCode, preApproved = false });

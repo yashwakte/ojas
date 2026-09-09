@@ -65,11 +65,14 @@ public class PaymentsController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.UserId, userId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         // The gateway order the customer's *own* order was raised against, as opposed to the
         // top-ups an edit charges separately. It is the order's own id, and the distinction is

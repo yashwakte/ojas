@@ -59,6 +59,12 @@ public class OrdersControllerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
 
+        // Placing an order first asks whether this customer already has an unpaid one for the same
+        // basket, so the orders collection has to answer a Find. These tests are about a customer
+        // with no order yet; the duplicate cases live in the Mongo-backed DuplicateOrderTests,
+        // since this mock does not evaluate filters.
+        _ordersMock.SetupFind(new List<Order>());
+
         _ordersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<Order>(), null, It.IsAny<CancellationToken>()))
             .Callback<Order, InsertOneOptions?, CancellationToken>((order, _, _) => order.Id ??= "507f1f77bcf86cd799439099")
@@ -544,7 +550,7 @@ public class OrdersControllerTests
     // ---------- MarkDeliveredByDeliveryPartner ----------
 
     [Fact]
-    public async Task MarkDeliveredByDeliveryPartner_ReturnsForbid_WhenWrongPartner()
+    public async Task MarkDeliveredByDeliveryPartner_AnswersNotFound_WhenWrongPartner()
     {
         SetUser("delivery-1", UserRoles.Delivery);
         var order = MakeOrder(deliveryPartnerId: "someone-else");
@@ -552,7 +558,9 @@ public class OrdersControllerTests
 
         var result = await _sut.MarkDeliveredByDeliveryPartner(order.Id!);
 
-        result.ShouldBeOfType<ForbidResult>();
+        // Not a ForbidResult: an order assigned to somebody else reads exactly like an order that
+        // does not exist, so nothing can be learned by walking order ids.
+        result.ShouldBeOfType<NotFoundObjectResult>();
     }
 
     [Fact]

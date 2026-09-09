@@ -767,7 +767,11 @@ export class MyOrders implements OnInit, OnDestroy {
    * no longer applies is corrected here rather than carried over from the failed attempt.
    */
   retryPayment(order: OrderResponse): void {
-    if (this.paymentInFlightFor(order.id)) return;
+    // A retry already under way blocks another, whatever the template is showing. The disabled
+    // button used to be the only thing standing between a second press and a second order, and a
+    // disabled attribute is not a guarantee — a stale render, a fast double tap or a keyboard
+    // repeat all get past it.
+    if (this.retryingPaymentId() || this.paymentInFlightFor(order.id)) return;
     this.retryingPaymentId.set(order.id);
 
     this.orderService
@@ -788,7 +792,6 @@ export class MyOrders implements OnInit, OnDestroy {
       })
       .subscribe({
         next: (placed) => {
-          this.retryingPaymentId.set(null);
           // The retry has taken stock again.
           this.productService.loadProducts();
 
@@ -797,12 +800,17 @@ export class MyOrders implements OnInit, OnDestroy {
             // that one they need an answer about if they come back without paying.
             this.cashfreeCheckout.markAwaitingPayment(placed.id);
             const handoffDidNotTake = () => {
+              this.retryingPaymentId.set(null);
               this.cashfreeCheckout.clearAwaitingPayment();
               this.showError(
                 "We couldn't open the payment page, so nothing was charged. Please try again.",
               );
               this.load();
             };
+            // Deliberately still held: the button stays disabled until the browser has actually
+            // left for the payment page. Releasing it here left it live for the seconds the
+            // checkout SDK takes to load on a phone, and a customer who saw nothing happen and
+            // pressed it again used to get a second order placed alongside the first.
             this.cashfreeCheckout
               .whenHandOffFails(placed.paymentSessionId)
               .then(handoffDidNotTake);
@@ -810,12 +818,23 @@ export class MyOrders implements OnInit, OnDestroy {
           }
 
           // Wallet credit covered the whole total this time, so there is no payment to make.
+          this.retryingPaymentId.set(null);
           this.wallet.load().subscribe({ error: () => {} });
           this.load();
           this.showSuccess('Order placed — your wallet covered the full amount.');
         },
         error: (err) => {
           this.retryingPaymentId.set(null);
+          // The server refused to raise a second payment because one is still with the bank. That
+          // is not a failure to report as one — the order is fine and the answer is coming.
+          if (err.status === 409 && err.error?.duplicateOfOrderId) {
+            this.showError(
+              err.error.message ??
+                "A payment for this order is still with your bank. Please don't pay again yet.",
+            );
+            this.load();
+            return;
+          }
           // Most likely someone bought the last one while this order sat unpaid, which is worth
           // saying precisely rather than as a generic failure.
           this.showError(
@@ -865,12 +884,12 @@ export class MyOrders implements OnInit, OnDestroy {
 
     this.orderService.resumePayment(order.id).subscribe({
       next: (result) => {
-        this.startingPaymentId.set(null);
         // Whole order in, always — it has just been reconciled against the gateway and can have
         // moved in more ways than this handler knows about.
         this.replaceOrder(result.order);
 
         if (result.alreadyPaid) {
+          this.startingPaymentId.set(null);
           this.wallet.load().subscribe({ error: () => {} });
           this.clearPurchasedItems(order.id);
           this.showSuccess('Good news — this order is already paid for. Nothing more is due.');
@@ -878,6 +897,7 @@ export class MyOrders implements OnInit, OnDestroy {
         }
 
         if (result.paymentInFlight) {
+          this.startingPaymentId.set(null);
           this.showError(
             "A payment for this order is still with your bank. We'll update it as soon as they decide — please don't pay again yet.",
           );
@@ -885,12 +905,17 @@ export class MyOrders implements OnInit, OnDestroy {
         }
 
         if (!result.paymentSessionId) {
+          this.startingPaymentId.set(null);
           this.showError("We couldn't start the payment. Your order is unchanged - please try again.");
           return;
         }
 
+        // Held until the browser has actually left for the payment page, not released the moment
+        // the session arrives: on a slow phone the SDK takes seconds to load, and a live button in
+        // that window is a second payment raised for an order that is already on its way to one.
         this.cashfreeCheckout.markAwaitingPayment(order.id);
         const handoffDidNotTake = () => {
+          this.startingPaymentId.set(null);
           this.cashfreeCheckout.clearAwaitingPayment();
           this.showError(
             `We couldn't open the payment page for ₹${result.amountDue.toFixed(2)}. Your order is unchanged — please try again.`,

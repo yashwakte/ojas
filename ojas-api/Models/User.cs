@@ -56,6 +56,21 @@ public class User
     /// where email delivery itself is down (the original break-glass gap: revoking a lost device
     /// still left re-enrollment stuck behind an OTP email). Null means no standing approval;
     /// cleared the moment it's consumed or once it expires.</summary>
+    /// <summary>Consecutive wrong passwords since the last successful sign-in. Cleared the moment
+    /// one succeeds, so an account in ordinary use never accumulates a count.</summary>
+    [BsonElement("failedLoginCount")]
+    public int FailedLoginCount { get; set; }
+
+    /// <summary>While this is in the future the account stops answering passwords at all.
+    ///
+    /// This is the brute-force defence that does not depend on where the request came from. The
+    /// IP rate limiter is the other half, and it is the weaker half: behind a CDN or a managed
+    /// proxy every customer can share one address, and an attacker with a botnet has as many
+    /// addresses as they like. A cooldown attached to the account itself is unaffected by both.
+    /// </summary>
+    [BsonElement("loginBlockedUntil")]
+    public DateTime? LoginBlockedUntil { get; set; }
+
     [BsonElement("pendingDeviceApprovalExpiresAt")]
     public DateTime? PendingDeviceApprovalExpiresAt { get; set; }
 }

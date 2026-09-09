@@ -121,7 +121,9 @@ public class OrderFlowTests : IDisposable
         var (_, otherDeliveryCsrf) = await _factory.SeedAndLoginAsStaffAsync(otherDeliveryClient, UserRoles.Delivery);
         var forbiddenAttempt = await otherDeliveryClient.SendAsync(
             PatchJson($"/api/orders/delivery/{placedOrder.Id}/delivered", new { }, otherDeliveryCsrf));
-        forbiddenAttempt.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        // Answered as "no such order", not "not yours" - an unassigned partner learns nothing
+        // about which order ids are real. See the note on the ownership checks in OrdersController.
+        forbiddenAttempt.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         // The assigned delivery partner can mark it delivered
         var deliveredResponse = await deliveryClient.SendAsync(
@@ -228,7 +230,9 @@ public class OrderFlowTests : IDisposable
         var (_, otherDeliveryCsrf) = await _factory.SeedAndLoginAsStaffAsync(otherDeliveryClient, UserRoles.Delivery);
         var forbiddenAttempt = await otherDeliveryClient.SendAsync(
             PatchJson($"/api/orders/delivery/{placedOrder.Id}/payment-collected", new { }, otherDeliveryCsrf));
-        forbiddenAttempt.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        // Answered as "no such order", not "not yours" - an unassigned partner learns nothing
+        // about which order ids are real. See the note on the ownership checks in OrdersController.
+        forbiddenAttempt.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         // Marking payment collected does not, by itself, mark the order Delivered.
         var collectedResponse = await deliveryClient.SendAsync(

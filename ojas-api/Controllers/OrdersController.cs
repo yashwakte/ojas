@@ -250,6 +250,58 @@ public class OrdersController : ControllerBase
         if (!quote.IsServiceable)
             return BadRequest(OutOfAreaPayload(quote));
 
+        // A cart above the free-delivery threshold waives the distance-based charge entirely,
+        // independent of the discount tiers above.
+        var deliveryCharge = OrderPricing.QualifiesForFreeDelivery(itemsTotal) ? 0m : quote.Charge;
+        var distanceKm = quote.DistanceKm;
+
+        var order = new Order
+        {
+            UserId = userId,
+            FullName = request.FullName,
+            Phone = request.Phone,
+            Address = request.Address,
+            Latitude = request.Latitude.Value,
+            Longitude = request.Longitude.Value,
+            AddressMapLink = UserController.BuildMapLink(request.Latitude.Value, request.Longitude.Value),
+            Notes = request.Notes ?? string.Empty,
+            Items = items!,
+            Subtotal = itemsTotal,
+            CouponCode = appliedCouponCode,
+            DiscountPercentage = discountPercentage,
+            DiscountAmount = discountAmount,
+            DeliveryCharge = deliveryCharge,
+            DeliveryDistanceKm = distanceKm,
+            TotalAmount = Math.Round(itemsTotal - discountAmount + deliveryCharge, 2, MidpointRounding.AwayFromZero),
+            PaymentMethod = OnlinePaymentMethod,
+        };
+
+        // Nothing is created and no stock is taken until we know this basket doesn't already have
+        // an order waiting to be paid for. Placing the same basket twice is not an unusual thing
+        // for a customer to do - backing out of the payment page, pressing Pay a second time while
+        // the checkout SDK loads, or coming back to a tab the browser rebuilt all look identical
+        // from here - and each of those used to mint a second order holding its own stock.
+        if (userId != null)
+        {
+            // The retry the customer is asking for may already have happened: "Try payment again"
+            // names the dead order every time it is pressed, so the second press has to land on
+            // the replacement rather than beside it.
+            var alreadyRetried = request.RetryOfOrderId is { Length: > 0 } retryOf
+                ? await _orderService.GetLiveReplacementAsync(retryOf, userId)
+                : null;
+
+            var existing = alreadyRetried
+                ?? await _orderService.FindUnpaidTwinAsync(userId, order, CashfreeService.PaymentWindow);
+
+            if (existing != null)
+            {
+                _logger.LogInformation(
+                    "Order {OrderId} is already awaiting payment for this basket; resuming it rather than " +
+                    "placing a second order for the same thing.", existing.Id);
+                return await ResumeInsteadOfDuplicatingAsync(existing);
+            }
+        }
+
         // Take the stock before creating the order, so a shortfall means no order
         // exists rather than an order we can't fulfil.
         var stock = await _productService.TryConsumeStockAsync(
@@ -268,33 +320,28 @@ public class OrdersController : ControllerBase
             });
         }
 
-        // A cart above the free-delivery threshold waives the distance-based charge entirely,
-        // independent of the discount tiers above.
-        var deliveryCharge = OrderPricing.QualifiesForFreeDelivery(itemsTotal) ? 0m : quote.Charge;
-        var distanceKm = quote.DistanceKm;
-
-        var order = new Order
-        {
-            UserId = userId,
-            FullName = request.FullName,
-            Phone = request.Phone,
-            Address = request.Address,
-            Latitude = request.Latitude.Value,
-            Longitude = request.Longitude.Value,
-            AddressMapLink = UserController.BuildMapLink(request.Latitude.Value, request.Longitude.Value),
-            Notes = request.Notes ?? string.Empty,
-            Items = items,
-            Subtotal = itemsTotal,
-            CouponCode = appliedCouponCode,
-            DiscountPercentage = discountPercentage,
-            DiscountAmount = discountAmount,
-            DeliveryCharge = deliveryCharge,
-            DeliveryDistanceKm = distanceKm,
-            TotalAmount = Math.Round(itemsTotal - discountAmount + deliveryCharge, 2, MidpointRounding.AwayFromZero),
-            PaymentMethod = OnlinePaymentMethod,
-        };
-
         var created = await _orderService.CreateOrderAsync(order);
+
+        // Two placements can both pass the check above before either has inserted - two tabs, or a
+        // request the browser sent twice. Whoever inserted second gives way here rather than
+        // leaving two live orders behind: only the stock has been touched so far, so it costs one
+        // restore and the customer lands on the order that already existed.
+        if (userId != null)
+        {
+            var raced = await _orderService.FindUnpaidTwinAsync(
+                userId, created, CashfreeService.PaymentWindow, excludeOrderId: created.Id);
+
+            if (raced != null)
+            {
+                _logger.LogWarning(
+                    "Order {DuplicateOrderId} raced order {KeptOrderId} for the same basket; standing the " +
+                    "later one down and resuming the earlier.", created.Id, raced.Id);
+
+                await _productService.RestoreStockAsync(items.Select(i => (i.ProductId, i.Quantity)));
+                await _orderService.RetireDuplicateAsync(created.Id!, raced.Id!);
+                return await ResumeInsteadOfDuplicatingAsync(raced);
+            }
+        }
 
         // Wallet credit is spent first, so the gateway is only asked for the remainder. Debited
         // after the order exists so the ledger row can name it, and atomically, so two orders
@@ -381,6 +428,107 @@ public class OrdersController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// How much of the payment window a stored session must have left before it is handed back
+    /// unchanged. A session that expires while the customer is looking at the payment page is the
+    /// dead end this whole path exists to avoid, so anything nearer the end than this gets a fresh
+    /// gateway order instead.
+    /// </summary>
+    private static readonly TimeSpan SessionMustHaveLeft = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Answers a repeat placement with the order that already exists, instead of a second one.
+    ///
+    /// The gateway is asked what it knows <em>before</em> anything is handed back, for the same
+    /// reason the Pay path asks: an order that has quietly been paid must be reported as paid, and
+    /// a payment the bank is still deciding on must block a new one rather than invite the
+    /// customer to pay twice for the same basket.
+    ///
+    /// A session already raised for this order, still well inside its window with nothing
+    /// attempted against it, is returned unchanged - so pressing Pay twice opens the same payment
+    /// page rather than raising a second gateway order beside the first.
+    /// </summary>
+    private async Task<ActionResult<OrderResponse>> ResumeInsteadOfDuplicatingAsync(Order existing)
+    {
+        var orderId = existing.Id!;
+        var reconciled = await _paymentOutcome.ReconcileWithGatewayAsync(orderId);
+        var order = reconciled.Order;
+
+        var due = Math.Round(order.TotalAmount - order.SettledAmount, 2, MidpointRounding.AwayFromZero);
+
+        // Same forgiveness the Pay path applies: a balance below the gateway minimum can never be
+        // charged, so treating it as owing would leave the customer on a page that cannot complete.
+        if (due > 0 && !OrderPricing.IsChargeable(due))
+            due = 0;
+
+        if (due <= 0)
+        {
+            _logger.LogInformation(
+                "Order {OrderId} was already settled when the same basket was placed again; nothing raised.",
+                orderId);
+
+            // The session that paid for it is still on the record, and the browser reads a session
+            // id as "go to the payment page". Handing one back for a settled order would send a
+            // customer who has already paid straight to Cashfree to pay again.
+            order.PaymentSessionId = null;
+            return Ok(order.ToResponse());
+        }
+
+        // "We could not ask" has to be answered the same way as "the bank is still deciding".
+        // Raising a payment on an order whose existing attempts we failed to read is precisely how
+        // a customer pays twice.
+        if (reconciled.AnyInFlight || !reconciled.Reachable)
+        {
+            _logger.LogWarning(
+                "Refused to raise a second payment on order {OrderId}: money may already be coming " +
+                "(in flight: {InFlight}, gateway reachable: {Reachable}).",
+                orderId, reconciled.AnyInFlight, reconciled.Reachable);
+
+            return Conflict(new
+            {
+                message = "A payment for this order is still with your bank. We'll update it as soon as they decide - please don't pay again yet.",
+                duplicateOfOrderId = orderId,
+                paymentInFlight = true,
+            });
+        }
+
+        var lastAttemptAt = order.PaymentAttempts.Count > 0
+            ? order.PaymentAttempts[^1].CreatedAt
+            : order.CreatedAt;
+
+        if (order.PaymentSessionId is { Length: > 0 } liveSession &&
+            order.Payments.Count == 0 &&
+            reconciled.LastFailureReason == null &&
+            DateTime.UtcNow - lastAttemptAt < CashfreeService.PaymentWindow - SessionMustHaveLeft)
+        {
+            order.PaymentSessionId = liveSession;
+            return Ok(order.ToResponse());
+        }
+
+        // Its own gateway order id: Cashfree refuses a reused one, and every later status check has
+        // to be able to ask about this attempt specifically.
+        var gatewayOrderId = CashfreeService.TopUpOrderId(orderId);
+        CashfreeOrderResult session;
+        try
+        {
+            session = await _cashfreeService.CreateOrderAsync(order, due, gatewayOrderId);
+        }
+        catch (Exception ex)
+        {
+            // Nothing was written, so there is nothing to roll back - and, crucially, no second
+            // order was created either. The customer's existing order is exactly as it was.
+            _logger.LogError(ex, "Cashfree order creation failed resuming order {OrderId} from a repeat placement", orderId);
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = "We couldn't start the payment. Please try again." });
+        }
+
+        await _orderService.AddPaymentAttemptAsync(orderId, gatewayOrderId, due);
+        await _orderService.SetPaymentSessionAsync(orderId, session.PaymentSessionId);
+
+        var refreshed = await _orderService.GetOrderByIdAsync(orderId) ?? order;
+        refreshed.PaymentSessionId = session.PaymentSessionId;
+        return Ok(refreshed.ToResponse());
+    }
+
     [HttpGet("my")]
     public async Task<ActionResult<List<OrderResponse>>> GetMyOrders()
     {
@@ -415,11 +563,14 @@ public class OrdersController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.UserId, userId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         if (!OrderService.IsCustomerEditable(order.Status))
             return BadRequest(new
@@ -634,11 +785,14 @@ public class OrdersController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.UserId, userId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         await _paymentOutcome.DiscardAsync(orderId);
 
@@ -685,11 +839,14 @@ public class OrdersController : ControllerBase
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Online payment is temporarily unavailable. Please try again shortly." });
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.UserId, userId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         // Also covers an order stood down after its payment failed: standing one down cancels it,
         // puts the stock back and returns any wallet credit, so there is nothing left to pay for.
@@ -795,11 +952,14 @@ public class OrdersController : ControllerBase
             return BadRequest(new { message = "Invalid refund destination." });
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.UserId, userId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.UserId, userId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         if (string.Equals(order.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
             return Ok(new CancelOrderResponse(0m, 0m, order.ToResponse()));
@@ -1014,11 +1174,14 @@ public class OrdersController : ControllerBase
         if (deliveryPartnerId == null) return Unauthorized();
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.DeliveryPartnerId, deliveryPartnerId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.DeliveryPartnerId, deliveryPartnerId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         if (string.Equals(order.Status, "Delivered", StringComparison.OrdinalIgnoreCase))
             return NoContent();
@@ -1045,11 +1208,14 @@ public class OrdersController : ControllerBase
         if (deliveryPartnerId == null) return Unauthorized();
 
         var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
 
-        if (!string.Equals(order.DeliveryPartnerId, deliveryPartnerId, StringComparison.Ordinal))
-            return Forbid();
+        // Somebody else's order is answered exactly as a nonexistent one, deliberately. Mongo
+        // ObjectIds run in near-sequence, so an id a little either side of your own is a
+        // guessable guess - and a 403 there would confirm the guess had landed on a real order,
+        // which is a customer count, an order-volume estimate and a target list for anyone
+        // patient enough to walk the range. A 404 tells them nothing at all.
+        if (order == null || !string.Equals(order.DeliveryPartnerId, deliveryPartnerId, StringComparison.Ordinal))
+            return NotFound(new { message = "Order not found." });
 
         if (string.Equals(order.PaymentStatus, "Collected", StringComparison.OrdinalIgnoreCase))
             return NoContent();

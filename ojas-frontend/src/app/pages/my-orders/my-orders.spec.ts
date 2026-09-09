@@ -922,7 +922,38 @@ describe('MyOrders', () => {
     );
     // Straight to the payment page — no detour through the cart and checkout again.
     expect(cashfreeCheckoutServiceSpy.whenHandOffFails).toHaveBeenCalledWith('session_retry');
+    // Still held: the button stays disabled until the browser has actually left for the payment
+    // page. Releasing it as soon as the order came back left it live for however long the
+    // checkout SDK takes to load, and a second press there placed a second order.
+    expect(fixture.componentInstance.retryingPaymentId()).toBe('o1');
+  });
+
+  it('releases the retry button only once the handoff is known to have failed', async () => {
+    userServiceSpy.getMyOrders.and.returnValue(of([failedOrder]));
+    orderServiceSpy.placeOrder.and.returnValue(
+      of({ ...failedOrder, id: 'o2', paymentSessionId: 'session_retry' }),
+    );
+    cashfreeCheckoutServiceSpy.whenHandOffFails.and.returnValue(Promise.resolve());
+    const fixture = create();
+
+    fixture.componentInstance.retryPayment(failedOrder);
+    await Promise.resolve();
+    await Promise.resolve();
+
     expect(fixture.componentInstance.retryingPaymentId()).toBeNull();
+  });
+
+  it('does not place a second order while the first press is still handing off', () => {
+    userServiceSpy.getMyOrders.and.returnValue(of([failedOrder]));
+    orderServiceSpy.placeOrder.and.returnValue(
+      of({ ...failedOrder, id: 'o2', paymentSessionId: 'session_retry' }),
+    );
+    const fixture = create();
+
+    fixture.componentInstance.retryPayment(failedOrder);
+    fixture.componentInstance.retryPayment(failedOrder);
+
+    expect(orderServiceSpy.placeOrder).toHaveBeenCalledTimes(1);
   });
 
   it('says why a retry could not be placed instead of failing silently', () => {

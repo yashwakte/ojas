@@ -232,10 +232,65 @@ public class AuthService
         if (user == null || string.IsNullOrEmpty(user.PasswordHash))
             return null;
 
-        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+        // Too many recent wrong guesses, so this account is not answering passwords at all just
+        // now - not even the right one. Deliberately indistinguishable from a wrong password: a
+        // distinct "this account is locked" answer would confirm the address is registered, and
+        // would tell an attacker exactly when to come back.
+        if (user.LoginBlockedUntil is { } blockedUntil && blockedUntil > DateTime.UtcNow)
             return null;
 
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+        {
+            await RecordFailedLoginAsync(user);
+            return null;
+        }
+
+        // Only written when there is something to clear, so an ordinary sign-in stays one read.
+        if (user.FailedLoginCount > 0 || user.LoginBlockedUntil != null)
+        {
+            await _db.Users.UpdateOneAsync(
+                u => u.Id == user.Id,
+                Builders<User>.Update
+                    .Set(u => u.FailedLoginCount, 0)
+                    .Set(u => u.LoginBlockedUntil, (DateTime?)null));
+        }
+
         return user;
+    }
+
+    /// <summary>Wrong passwords an account will answer before it stops answering for a while.
+    /// High enough that a customer mistyping theirs a few times never notices.</summary>
+    private const int FailedLoginsBeforeCooldown = 5;
+
+    /// <summary>The first cooldown, and the ceiling it doubles towards.
+    ///
+    /// Both ends matter. Short enough that someone who has genuinely forgotten their password is
+    /// inconvenienced rather than locked out - and that a stranger who knows their email address
+    /// cannot use this to keep them out for long, which is the cost of any account-scoped throttle.
+    /// Long enough that guessing at scale stops being possible: five tries then a doubling wait
+    /// takes an attacker from thousands of guesses an hour to a handful a day.</summary>
+    private static readonly TimeSpan FirstLoginCooldown = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan MaxLoginCooldown = TimeSpan.FromMinutes(15);
+
+    private async Task RecordFailedLoginAsync(User user)
+    {
+        var attempts = user.FailedLoginCount + 1;
+
+        DateTime? blockedUntil = null;
+        if (attempts >= FailedLoginsBeforeCooldown)
+        {
+            // Doubling from the first cooldown, capped - and the exponent is capped too, so the
+            // arithmetic cannot overflow however long an attacker keeps going.
+            var doublings = Math.Min(attempts - FailedLoginsBeforeCooldown, 8);
+            var ticks = Math.Min(FirstLoginCooldown.Ticks << doublings, MaxLoginCooldown.Ticks);
+            blockedUntil = DateTime.UtcNow.Add(TimeSpan.FromTicks(ticks));
+        }
+
+        await _db.Users.UpdateOneAsync(
+            u => u.Id == user.Id,
+            Builders<User>.Update
+                .Set(u => u.FailedLoginCount, attempts)
+                .Set(u => u.LoginBlockedUntil, blockedUntil));
     }
 
     /// <summary>Binds the calling device to a staff account and issues a session on it. Because
@@ -338,7 +393,13 @@ public class AuthService
                 .Set(u => u.PasswordHash, BCrypt.Net.BCrypt.HashPassword(newPassword))
                 // An account that never finished email verification has now proven control of
                 // the address by redeeming a code sent to it, so there's nothing left to verify.
-                .Set(u => u.IsEmailVerified, true));
+                .Set(u => u.IsEmailVerified, true)
+                // Whoever redeemed that code holds the mailbox, so they are not the attacker the
+                // cooldown was counting. Leaving it set would lock a customer out of the account
+                // they have just proved is theirs - and the wrong-password failures that raised it
+                // were, by definition, against a password that no longer exists.
+                .Set(u => u.FailedLoginCount, 0)
+                .Set(u => u.LoginBlockedUntil, (DateTime?)null));
 
         await RevokeAllRefreshTokensForUserAsync(user.Id!);
         return true;

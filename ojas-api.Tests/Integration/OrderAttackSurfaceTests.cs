@@ -92,7 +92,9 @@ public class OrderAttackSurfaceTests : IDisposable
 
         var response = await _attacker.SendAsync(EditRequest(victimOrder.Id, _attackerCsrf, Items(60)));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        // Not 403: see the note on the ownership checks in OrdersController. Confirming that the
+        // order exists is itself the leak.
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -109,7 +111,7 @@ public class OrderAttackSurfaceTests : IDisposable
         request.AttachCsrf(_attackerCsrf);
         var response = await _attacker.SendAsync(request);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         var stillLive = (await _victim.GetFromJsonAsync<List<OrderResponse>>("/api/orders/my"))!
             .Single(o => o.Id == victimOrder.Id);
@@ -124,7 +126,7 @@ public class OrderAttackSurfaceTests : IDisposable
 
         var response = await _attacker.GetAsync($"/api/payments/cashfree/status/{victimOrder.Id}");
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -137,7 +139,43 @@ public class OrderAttackSurfaceTests : IDisposable
             HttpMethod.Delete, $"/api/orders/my/{victimOrder.Id}/amendment");
         request.AttachCsrf(_attackerCsrf);
 
-        (await _attacker.SendAsync(request)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await _attacker.SendAsync(request)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// Somebody else's order and an order that was never placed have to be answered <em>the same
+    /// way</em>, byte for byte - not merely with the same status code.
+    ///
+    /// This is the whole point of the change, and it is easy to half-do. Mongo ObjectIds are
+    /// sequential enough that walking a range either side of your own id lands on real orders, so
+    /// any difference at all between the two answers - a status, a message, an extra field - turns
+    /// that walk into a census of the business: how many orders exist, and which ids are worth
+    /// coming back to. Asserting only the status code would let a differing body through.
+    /// </summary>
+    [Fact]
+    public async Task SomebodyElsesOrder_IsIndistinguishableFromAnOrderThatNeverExisted()
+    {
+        await SetUpAsync();
+        var victimOrder = await PlaceAsync(_victim, _victimCsrf, Items(6));
+
+        // A well-formed ObjectId that belongs to nobody.
+        const string NeverPlaced = "000000000000000000000000";
+
+        var theirs = await _attacker.GetAsync($"/api/payments/cashfree/status/{victimOrder.Id}");
+        var nobodys = await _attacker.GetAsync($"/api/payments/cashfree/status/{NeverPlaced}");
+
+        theirs.StatusCode.ShouldBe(nobodys.StatusCode);
+        (await theirs.Content.ReadAsStringAsync())
+            .ShouldBe(await nobodys.Content.ReadAsStringAsync());
+
+        var theirsEdit = await _attacker.SendAsync(
+            EditRequest(victimOrder.Id, _attackerCsrf, Items(6)));
+        var nobodysEdit = await _attacker.SendAsync(
+            EditRequest(NeverPlaced, _attackerCsrf, Items(6)));
+
+        theirsEdit.StatusCode.ShouldBe(nobodysEdit.StatusCode);
+        (await theirsEdit.Content.ReadAsStringAsync())
+            .ShouldBe(await nobodysEdit.Content.ReadAsStringAsync());
     }
 
     /// <summary>

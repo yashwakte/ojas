@@ -386,6 +386,13 @@ export class Checkout implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
+        // The server recognised this basket as one the customer already has an order for, and
+        // refused to place a second one because money is already on its way. That order is the
+        // answer, so they are sent to it rather than left here being told something went wrong.
+        if (err.status === 409 && err.error?.duplicateOfOrderId) {
+          this.goToUnfinishedOrder(err.error.duplicateOfOrderId);
+          return;
+        }
         if (err.status === 401) {
           this.errorMsg.set('Session expired. Please login again.');
         } else if (err.status === 503) {
