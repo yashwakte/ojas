@@ -106,6 +106,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<OrderPaymentOutcomeService>();
 builder.Services.AddScoped<OrderCancellationService>();
+builder.Services.AddScoped<ReturnService>();
 builder.Services.AddScoped<OrderStatusEmailService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();

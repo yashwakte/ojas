@@ -22,6 +22,9 @@ public static class WalletTransactionReasons
     /// dropped — the money can't buy what it was for, so it goes back to the customer.</summary>
     public const string UnappliedTopUpReturned = "UnappliedTopUpReturned";
 
+    /// <summary>A return was collected, checked and refunded to the customer's wallet.</summary>
+    public const string ReturnRefund = "ReturnRefund";
+
     /// <summary>An admin adjusting a balance by hand, e.g. to settle a dispute.</summary>
     public const string AdminAdjustment = "AdminAdjustment";
 }

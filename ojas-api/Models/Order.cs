@@ -447,4 +447,26 @@ public class Order
 
     [BsonElement("updatedAt")]
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// When this order became Delivered, stamped once on the transition and never moved again.
+    ///
+    /// The returns window is measured from here, which is why it cannot be derived from
+    /// <see cref="UpdatedAt"/>: that moves whenever anybody touches the order — an admin
+    /// reassigning a delivery partner, a late webhook, a refund — and a returns deadline that
+    /// slides forward every time support opens the record is not a deadline at all.
+    /// </summary>
+    [BsonElement("deliveredAt")]
+    public DateTime? DeliveredAt { get; set; }
+
+    /// <summary>
+    /// The moment the returns clock starts for this order.
+    ///
+    /// Orders delivered before <see cref="DeliveredAt"/> existed have no stamp, and refusing
+    /// every one of them a return would punish the customer for our migration. They fall back to
+    /// the last time the order was touched, which for a delivered-and-finished order is in
+    /// practice its delivery; the fallback can only ever be later than the real delivery, so it
+    /// is generous to the customer rather than the other way round.
+    /// </summary>
+    public DateTime ReturnWindowStartsAt => DeliveredAt ?? UpdatedAt ?? CreatedAt;
 }

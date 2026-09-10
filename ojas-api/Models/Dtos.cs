@@ -275,7 +275,13 @@ public record OrderResponse(
 	/// the share that went to the Ojas wallet. One cancellation routinely splits both ways, and a
 	/// single total cannot say which money the customer should be looking for where.</summary>
 	decimal RefundedToSource = 0,
-	decimal RefundedToWallet = 0);
+	decimal RefundedToWallet = 0,
+	/// <summary>When the order was delivered, and the moment its return window shuts - both null
+	/// until it is delivered. Sent so the orders page can offer or withhold the return button
+	/// without doing policy arithmetic of its own; the API enforces the same window regardless of
+	/// what the page decides to show.</summary>
+	DateTime? DeliveredAt = null,
+	DateTime? ReturnWindowEndsAt = null);
 
 /// <summary>An edit the customer priced but hasn't paid the difference for yet. The order's own
 /// fields above still describe what was actually bought and paid for — this is only a proposal,
@@ -473,3 +479,91 @@ public record ChatbotQuickReply(string Label, string Topic);
 /// prominently) - it's not a separate channel, the reply text already contains everything the
 /// bot has to say.</summary>
 public record ChatbotResponse(string Reply, bool Escalate, List<ChatbotQuickReply> QuickReplies);
+
+
+// ===== RETURNS =====
+
+/// <summary>One line the customer may send back, with what is left of it and what a single unit
+/// is worth. The unit figure is the order's own arithmetic - price less this line's share of any
+/// discount, scaled by what was actually charged - so the sheet can total a selection without
+/// re-deriving money rules the server owns.</summary>
+public record ReturnableItemDto(
+	string ProductId,
+	string ProductName,
+	string Weight,
+	decimal Price,
+	int OrderedQuantity,
+	int ReturnableQuantity,
+	decimal UnitRefund);
+
+/// <summary>Whether an order can be returned from, what of it, and - when it cannot - a sentence
+/// written to be shown to the customer as it stands.</summary>
+public record ReturnEligibilityResponse(
+	bool CanRequest,
+	string? Reason,
+	DateTime? WindowEndsAt,
+	int WindowDays,
+	decimal Refundable,
+	List<ReturnableItemDto> Items);
+
+public record ReturnRequestItemDto(
+	string ProductId,
+	string ProductName,
+	string Weight,
+	decimal Price,
+	int Quantity,
+	decimal RefundAmount);
+
+public record ReturnRequestEventDto(string Status, string? Note, string By, DateTime At);
+
+public record ReturnRequestResponse(
+	string Id,
+	string OrderId,
+	List<ReturnRequestItemDto> Items,
+	string Reason,
+	string? Comment,
+	string Status,
+	string RefundDestination,
+	decimal RefundAmount,
+	decimal RefundedToWallet,
+	decimal RefundedToSource,
+	decimal RefundQueued,
+	List<ReturnRequestEventDto> Events,
+	DateTime CreatedAt,
+	DateTime? UpdatedAt,
+	/// <summary>Admin queue only - a customer already knows who they are, and their own address.
+	/// Null on the customer's own reads so the payload cannot leak another customer's details if
+	/// a handler is ever pointed at the wrong list.</summary>
+	string? CustomerName = null,
+	string? CustomerPhone = null,
+	string? PickupAddress = null);
+
+/// <summary>One line of a return request as the browser sends it: a product and how many. The
+/// money is never sent - it is derived from the order, server-side, or a customer could name
+/// their own refund.</summary>
+public record ReturnItemRequest(
+	[Required] string ProductId,
+	[Range(1, 99)] int Quantity);
+
+public record CreateReturnRequest(
+	[Required] string OrderId,
+	[Required, MinLength(1)] List<ReturnItemRequest> Items,
+	[Required] string Reason,
+	[MaxLength(500)] string? Comment = null,
+	string RefundDestination = RefundDestinations.Wallet);
+
+/// <summary>An admin moving a return along. <c>Status</c> is the step being taken; <c>Note</c> is
+/// shown to the customer verbatim and is required when rejecting - "no" without a reason is the
+/// thing that generates a phone call.</summary>
+public record UpdateReturnStatusRequest(
+	[Required] string Status,
+	[MaxLength(300)] string? Note = null);
+
+/// <summary>What settling a return did with the money, so the dashboard reports what actually
+/// happened rather than what it assumed would.</summary>
+public record ReturnSettlementResponse(
+	ReturnRequestResponse? Request,
+	decimal WalletCredited,
+	decimal RefundedToSource,
+	decimal RefundQueued,
+	string? RefundError = null);

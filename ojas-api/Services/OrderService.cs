@@ -299,6 +299,26 @@ public class OrderService(IMongoDbService db)
             .Set(o => o.Status, normalizedStatus)
             .Set(o => o.UpdatedAt, DateTime.UtcNow);
 
+        // The returns window is measured from delivery, so the moment has to be recorded on the
+        // transition - there is no other point at which it is knowable. Stamped here rather than
+        // in a caller because both the delivery partner's app and the admin dashboard move an
+        // order to Delivered, and a window that exists only when one of them did it is worse than
+        // no window at all.
+        if (normalizedStatus == "Delivered")
+        {
+            var stamped = await _orders.UpdateOneAsync(
+                Builders<Order>.Filter.And(
+                    Builders<Order>.Filter.Eq(o => o.Id, orderId),
+                    // Only the first delivery counts. Re-marking an order delivered - a repeated
+                    // tap, an admin correcting something else - must not push the customer's
+                    // returns deadline further out.
+                    Builders<Order>.Filter.Eq(o => o.DeliveredAt, null)),
+                update.Set(o => o.DeliveredAt, DateTime.UtcNow));
+
+            if (stamped.MatchedCount > 0)
+                return true;
+        }
+
         var result = await _orders.UpdateOneAsync(o => o.Id == orderId, update);
         return result.MatchedCount > 0;
     }

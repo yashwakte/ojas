@@ -45,7 +45,13 @@ public static class OrderMapping
             order.GatewayDiscountTotal,
             order.AmountRefunded,
             order.RefundedToSource,
-            order.RefundedToWallet);
+            order.RefundedToWallet,
+            order.DeliveredAt,
+            // Only a delivered order has a window at all, and it is computed from the same policy
+            // constant the API enforces - never from the page's own idea of three days.
+            order.DeliveredAt == null && !string.Equals(order.Status, "Delivered", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : ReturnPolicy.WindowEndsAt(order.ReturnWindowStartsAt));
 
     public static PendingAmendmentDto? ToResponse(this OrderAmendment? amendment) =>
         amendment == null
