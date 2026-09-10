@@ -244,6 +244,7 @@
                  promising it here is a promise checkout can't keep. -->
             <span><mat-icon>bolt</mat-icon> Delivery in 1–2 Days</span>
             <span><mat-icon>verified</mat-icon> Quality Assured</span>
+            <span><mat-icon>assignment_return</mat-icon> {{ returnWindowDays }}-Day Returns</span>
           </div>
 
           <!-- Quantity Selector -->
@@ -389,6 +390,21 @@
               <div>
                 <strong>Fresh Guarantee</strong>
                 <span>Packed fresh on order day</span>
+              </div>
+            </div>
+            <!-- The returns window, stated where a shopper is deciding rather than only in the
+                 policy page. Both the number of days and the conditions come from the same
+                 constant and the same wording the Refunds and Cancellations page uses. -->
+            <div class="delivery-item">
+              <mat-icon>assignment_return</mat-icon>
+              <div>
+                <strong>{{ returnWindowDays }}-Day Returns</strong>
+                <span>
+                  Return an unopened pack in its original packaging within
+                  {{ returnWindowDays }} days of delivery. We collect it free and refund to your
+                  wallet or original payment method —
+                  <a routerLink="/refunds">full policy</a>.
+                </span>
               </div>
             </div>
           </div>

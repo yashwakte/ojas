@@ -4,6 +4,7 @@ import {
   INSTAGRAM_HANDLE,
   INSTAGRAM_URL,
   REGISTERED_ADDRESS,
+  RETURN_WINDOW_DAYS,
   SUPPORT_EMAIL,
   SUPPORT_HOURS,
   SUPPORT_PHONE,
@@ -41,7 +42,7 @@ export interface LegalDocument {
 
 /** Shown on every policy page. Bump this whenever the substance of a policy changes - not for
  * typo fixes, since a moved date implies to a returning customer that the terms changed. */
-export const POLICY_LAST_UPDATED = '1 September 2026';
+export const POLICY_LAST_UPDATED = '10 September 2026';
 
 /** The licence sentence, in the one shape that is true whether or not the number is on file.
  * A policy page must never imply we hold a licence number we cannot show. */
@@ -159,15 +160,20 @@ const terms: LegalDocument = {
         'Estimated delivery is 1–2 days from the time the order is placed. That is an estimate ' +
           'made in good faith, not a guarantee — weather, traffic and supply can delay it, and we ' +
           'will tell you if it does.',
-        'Please check your order at the door. You may refuse anything you are not happy with at ' +
-          'that moment, at no cost to you.',
+        'Please check your order when it arrives. If anything is damaged, short, wrong or simply ' +
+          `not up to standard, you have ${RETURN_WINDOW_DAYS} days from delivery to return the ` +
+          'pack to us in its original packaging — see our Refunds and Cancellations policy.',
       ],
     },
     {
-      heading: '7. Cancellations and refunds',
+      heading: '7. Cancellations, returns and refunds',
       paragraphs: [
-        'Cancellations and refunds are covered in full by our Refunds and Cancellations policy, ' +
-          'which forms part of these terms.',
+        'Cancellations, returns and refunds are covered in full by our Refunds and Cancellations ' +
+          'policy, which forms part of these terms.',
+        'In short: you can cancel any time before your order is packed, and you can return an ' +
+          `unopened pack, in its original packaging, within ${RETURN_WINDOW_DAYS} days of ` +
+          'delivery. We collect returns free of charge and refund to your Ojas wallet or to your ' +
+          'original payment method, as you prefer.',
       ],
     },
     {
@@ -227,34 +233,60 @@ const refunds: LegalDocument = {
   slug: 'refunds',
   title: 'Refunds and Cancellations',
   intro:
-    'Food is different from most things you buy online, so our policy is built around checking ' +
-    'your order at the door rather than sending it back afterwards. Here is exactly how it works.',
+    'You can cancel an order any time before we pack it, and you can send an unopened pack back ' +
+    `within ${RETURN_WINDOW_DAYS} days of delivery. Here is exactly how both work, and where ` +
+    'your money goes.',
   sections: [
     {
       heading: 'Cancelling an order',
       paragraphs: [
         'You can cancel any time before your order has been packed. Open My Orders, choose the ' +
           'order, and select Cancel. There is no cancellation fee.',
-        'Once an order has been packed and handed to delivery it can no longer be cancelled from ' +
-          'the site — but you can still refuse it at the door, which is treated the same way.',
+        'Once an order has been packed and handed to delivery it can no longer be cancelled. If ' +
+          'something is wrong with the order when it arrives, raise a return from My Orders once ' +
+          'it has been delivered.',
       ],
     },
     {
-      heading: 'Checking your order at the door',
+      heading: `Returning a pack within ${RETURN_WINDOW_DAYS} days`,
       paragraphs: [
-        'We do not operate a returns window, because we do not think it is right to take back food ' +
-          'that has left our hands and been out of our sight. Instead, please open and check your ' +
-          'order while the delivery person is still with you.',
-        'If anything is damaged, short, wrong or simply not up to standard, refuse it there and ' +
-          'then. You will not be charged for anything you refuse, and any money already taken for ' +
-          'it is refunded.',
+        `If something is wrong with what we sent you — it is damaged, it is not what you ` +
+          `ordered, the date is too close, or it is simply not up to standard — you have ` +
+          `${RETURN_WINDOW_DAYS} days from the day your order is delivered to return it to us. ` +
+          'Because we sell food, a returned pack has to come back in its original packaging, ' +
+          'unopened and with the seal intact.',
+        'A return is for something being wrong with the order. We are not able to take food back ' +
+          'simply because it is no longer wanted — please cancel before your order is packed if ' +
+          'you change your mind, which you can do at any time and at no cost.',
+        'To start a return, open My Orders, choose the delivered order and select Return items. ' +
+          'Pick what is going back and tell us why; you will see what you get back before you ' +
+          'confirm. If you would rather not do it on the site, call or email us with your order ' +
+          'number instead.',
+        'We arrange a pickup from your delivery address at no charge to you — you do not have to ' +
+          'bring anything to us or pay any courier. Once the pack is back with us and checked, ' +
+          'the refund is released.',
       ],
+      bullets: [
+        `The window is ${RETURN_WINDOW_DAYS} days from delivery, not from the day you ordered.`,
+        'The pack must be unopened and its seal unbroken, in the packaging it arrived in.',
+        'We collect it from you free of charge.',
+        'Once the pack is back with us and checked, the refund goes to your Ojas wallet or to ' +
+          'your original payment method, exactly as set out below — it is your choice.',
+      ],
+      footnote:
+        'An opened pack cannot be taken back, because we cannot resell food that has been out of ' +
+        'our sight with its seal broken. If an opened pack is genuinely not up to standard, ' +
+        'please call us anyway — that is a quality problem rather than a return, and we will put ' +
+        'it right.',
     },
     {
       heading: 'Where your refund goes',
       paragraphs: [
-        'A cancelled or refused order is refunded in full, including any delivery charge you paid ' +
-          'on it. Where the refund goes depends on how you paid:',
+        'A cancelled order is refunded in full, including any delivery charge you paid on it. ' +
+          'Where only some of the order comes back — a pack returned within the ' +
+          `${RETURN_WINDOW_DAYS}-day window, say — we refund what you paid for those items; the ` +
+          'delivery charge stands, because the delivery was made. Where the refund goes depends ' +
+          'on how you paid:',
       ],
       bullets: [
         'Anything paid from your Ojas wallet always returns to your Ojas wallet, immediately.',

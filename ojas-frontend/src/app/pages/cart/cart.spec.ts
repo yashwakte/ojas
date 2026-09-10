@@ -6,6 +6,7 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { CartItem, Product, effectivePrice } from '../../models/interfaces';
+import { RETURN_WINDOW_DAYS } from '../../constants/business';
 
 describe('Cart', () => {
   const product: Product = {
@@ -65,6 +66,15 @@ describe('Cart', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  it('states the returns window in the promise block, linked to the policy page', () => {
+    const text = create().nativeElement.querySelector('.cart-promise').textContent;
+
+    // The number comes from the shared constant, so this fails if the template ever hard-codes a
+    // window that disagrees with the Refunds and Cancellations page.
+    expect(text).toContain(`${RETURN_WINDOW_DAYS}-day returns`);
+    expect(text).toContain('on unopened packs, collected');
+  });
 
   it('should create and select all items by default', () => {
     const fixture = create();

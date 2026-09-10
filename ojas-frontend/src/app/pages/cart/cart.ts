@@ -8,6 +8,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { Product, deliveryBetweenLabel, effectivePrice } from '../../models/interfaces';
 import { roundMoney } from '../../constants/pricing';
+import { RETURN_WINDOW_DAYS } from '../../constants/business';
 import { thumbnailPackShot } from '../../constants/pack-shots';
 
 @Component({
@@ -26,6 +27,10 @@ export class Cart implements OnInit {
   /** Computed once per render rather than per line: every item in the basket ships together, so
    * thirteen identical date strings would be thirteen identical calculations. */
   readonly deliveryWindowLabel = deliveryBetweenLabel();
+
+  /** Read from the shared constant rather than typed into the template, so this promise and the
+   * Refunds and Cancellations page can never state two different windows. */
+  readonly returnWindowDays = RETURN_WINDOW_DAYS;
 
   /** What the discount is worth in rupees, which is what a shopper actually compares. Null when
    * there is no discount, so the line simply isn't drawn rather than showing "₹0 Off". */

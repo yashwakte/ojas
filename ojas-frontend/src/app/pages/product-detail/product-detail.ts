@@ -19,6 +19,7 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { FREE_DELIVERY_CART_THRESHOLD } from '../../constants/pricing';
+import { RETURN_WINDOW_DAYS } from '../../constants/business';
 import { DeliveryAddressService } from '../../services/delivery-address.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
 import {
@@ -61,6 +62,10 @@ export class ProductDetail {
   /** The one rule that actually makes delivery free. Everything else is priced from the delivery
    * pincode by the server, which is why this page no longer quotes a free-distance ring. */
   readonly freeDeliveryThreshold = FREE_DELIVERY_CART_THRESHOLD;
+
+  /** The returns window, read from the shared constant so this page, the cart and the Refunds
+   * and Cancellations policy can never quote three different numbers of days. */
+  readonly returnWindowDays = RETURN_WINDOW_DAYS;
 
   changeDeliveryAddress(): void {
     this.deliveryAddress.openPicker();

@@ -34,7 +34,7 @@ public class ChatbotService
         new("Track my order", ChatbotTopics.OrderStatus),
         new("Delivery charges", ChatbotTopics.DeliveryCharge),
         new("Check product stock", ChatbotTopics.Stock),
-        new("Cancellations & damaged items", ChatbotTopics.Policy),
+        new("Cancellations, returns & damaged items", ChatbotTopics.Policy),
         new("Talk to a human", ChatbotTopics.Human),
     ];
 
@@ -150,13 +150,17 @@ public class ChatbotService
         return new ChatbotResponse(reply, Escalate: false, MainMenu);
     }
 
-    // Wording confirmed directly by the business owner (2026-08-20) - not invented, and not to be
-    // changed without re-confirming, since this is real policy text a customer will act on.
+    // Wording confirmed directly by the business owner - returns window added 2026-09-09, and
+    // refusing a delivery at the door withdrawn 2026-09-10 ("The checking at door policy should be
+    // removed now completely. We are not supporting that"). Not invented, and not to be changed
+    // without re-confirming, since this is real policy text a customer will act on.
     private static ChatbotResponse AnswerPolicy() => new(
-        "You can cancel or change your order any time before it's packed for delivery - after that, it's locked in. " +
-        "When your order arrives, you're welcome to check every item before accepting it: if anything is damaged or " +
-        "incorrect, you can refuse it right at the door instead of accepting. Once you've accepted the delivery, the " +
-        "order can no longer be cancelled.",
+        "You can cancel or change your order any time before it's packed for delivery - after that, it's locked in " +
+        "and can no longer be cancelled. " +
+        $"If something is wrong when it arrives, you have {ReturnPolicy.WindowDays} days from delivery to return a " +
+        "pack that is still unopened and in its original packaging - just raise it from My Orders. We'll collect it " +
+        "free of charge and refund you to your Ojas wallet or back to how you paid. An opened pack can't be taken " +
+        "back, but call us and we'll sort it out.",
         Escalate: false,
         MainMenu);
 
@@ -166,7 +170,7 @@ public class ChatbotService
         MainMenu);
 
     private static ChatbotResponse AnswerGreeting() => new(
-        "Hi! I'm the Ojas assistant. I can help with order status, delivery charges, product stock, or cancellations - what do you need?",
+        "Hi! I'm the Ojas assistant. I can help with order status, delivery charges, product stock, returns, or cancellations - what do you need?",
         Escalate: false,
         MainMenu);
 

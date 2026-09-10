@@ -43,3 +43,13 @@ export const FSSAI_LICENCE_NUMBER = '11526082000125';
 
 export const INSTAGRAM_HANDLE = 'ojas.aata';
 export const INSTAGRAM_URL = `https://www.instagram.com/${INSTAGRAM_HANDLE}/`;
+
+/**
+ * How long after delivery a customer may send an unopened pack back, in days.
+ *
+ * Lives here because four separate surfaces state this number to the customer — the Refunds and
+ * Cancellations policy, the Terms, the cart's promise block and the product page's delivery card —
+ * and a returns window that reads as three days in one place and five in another is the kind of
+ * mismatch a customer will hold us to. Change it here and every surface follows.
+ */
+export const RETURN_WINDOW_DAYS = 3;

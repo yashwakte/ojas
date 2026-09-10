@@ -301,6 +301,9 @@
   strong {
     color: var(--ojas-text);
     font-weight: 700;
+    // A bold lead-in that breaks mid-phrase ("3-day" over "returns") reads as a two-column
+    // layout rather than a sentence, which is exactly what it looked like at 375px wide.
+    white-space: nowrap;
   }
 
   mat-icon {
@@ -310,6 +313,19 @@
     height: 1rem;
     margin-top: 1px;
     color: var(--ojas-ink-soft);
+  }
+
+  // Underlined rather than coloured alone: at 0.78rem on a muted line, colour on its own is not
+  // a reliable signal that something is clickable, and this one leads to a policy page.
+  a {
+    color: var(--ojas-orange-dark);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      text-decoration-thickness: 2px;
+    }
   }
 }
 

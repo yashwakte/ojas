@@ -8,6 +8,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { FREE_DELIVERY_CART_THRESHOLD } from '../../constants/pricing';
+import { RETURN_WINDOW_DAYS } from '../../constants/business';
 import {
   Product,
   DeliveryChargesConfig,
@@ -92,6 +93,15 @@ describe('ProductDetail', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  it('states the returns window on the page, with its conditions', () => {
+    const text = create().nativeElement.textContent as string;
+
+    // Both surfaces: the trust badge a shopper skims and the delivery card that explains it.
+    expect(text).toContain(`${RETURN_WINDOW_DAYS}-Day Returns`);
+    expect(text).toContain('unopened pack in its original packaging');
+    expect(text).toContain(`within ${RETURN_WINDOW_DAYS} days of delivery`);
+  });
 
   it('should create and resolve the product from the id input', () => {
     const fixture = create();

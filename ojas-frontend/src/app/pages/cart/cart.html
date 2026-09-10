@@ -105,18 +105,24 @@
           }
 
           <!-- Stated once, not per line. Ojas ships a whole order together and one policy covers
-               all of it, so repeating both notes against every item only made the page longer.
-               The wording is the policy we actually operate: there is no returns window - you
-               check the order at the door and refuse anything you aren't happy with, and you can
-               cancel any time before it is packed. -->
+               all of it, so repeating these notes against every item only made the page longer.
+               The wording is the policy we actually operate, and every number in it comes from
+               the same constants the Refunds and Cancellations page reads - a promise made here
+               that the policy page contradicts is worse than making no promise at all. -->
           <div class="cart-promise">
             <p class="promise-note">
               <mat-icon>local_shipping</mat-icon>
               Delivery between <strong>{{ deliveryWindowLabel }}</strong>
             </p>
             <p class="promise-note">
-              <mat-icon>verified_user</mat-icon>
-              Check it at the door — refuse anything you're not happy with
+              <mat-icon>assignment_return</mat-icon>
+              <!-- One span, not three loose children: .promise-note is a flex row, so a bare
+                   <strong> and <a> beside text become separate flex items and the sentence is
+                   laid out as columns rather than wrapped as prose. -->
+              <span
+                ><strong>{{ returnWindowDays }}-day returns</strong> on unopened packs, collected
+                free — <a routerLink="/refunds">see policy</a></span
+              >
             </p>
             <p class="promise-note">
               <mat-icon>event_busy</mat-icon>

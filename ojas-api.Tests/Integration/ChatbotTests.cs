@@ -238,8 +238,16 @@ public class ChatbotTests : IDisposable
         var body = await response.Content.ReadFromJsonAsync<ChatbotResponse>();
 
         body!.Reply.ShouldContain("before it's packed");
-        body.Reply.ShouldContain("check every item");
         body.Reply.ShouldContain("no longer be cancelled");
+        // The returns window the owner added on 2026-09-09, which is the only route to sending
+        // something back now.
+        body.Reply.ShouldContain("3 days from delivery");
+        body.Reply.ShouldContain("unopened");
+        // Refusing a delivery at the door was withdrawn on 2026-09-10. The bot must not go on
+        // offering it: a customer told they can hand the box back will try to, and the delivery
+        // partner has no instruction that matches.
+        body.Reply.ShouldNotContain("at the door");
+        body.Reply.ShouldNotContain("refuse");
     }
 
     [Fact]
