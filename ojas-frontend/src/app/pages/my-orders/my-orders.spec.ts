@@ -1444,5 +1444,16 @@ describe('MyOrders', () => {
       expect(page.returnWindowLeft(order, at('2026-09-14T03:00:00Z'))).toBe('Last day to return');
       expect(page.returnWindowLeft(order, at('2026-09-14T18:31:00Z'))).toBeNull();
     });
+
+    it('shows when the order was delivered', () => {
+      const order = delivered({ deliveredAt: '2026-09-11T10:37:00Z' });
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+      const fixture = create();
+      fixture.detectChanges();
+
+      const line = fixture.nativeElement.querySelector('.order-delivered')?.textContent ?? '';
+      expect(line).toContain('Delivered');
+      expect(line).toContain('Sep 2026');
+    });
   });
 });

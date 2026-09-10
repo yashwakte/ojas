@@ -342,6 +342,21 @@
   color: var(--ojas-text-light);
 }
 
+.order-delivered {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ojas-success, #2e7d32);
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+}
+
 .order-header-right {
   display: flex;
   align-items: center;

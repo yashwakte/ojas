@@ -1324,3 +1324,10 @@
     }
   }
 }
+
+// Under the order time once it is delivered: the delivered moment is what the owner checks when a
+// customer says a pack came late, or asks whether they are still inside the return window.
+.order-card-head .delivered-at {
+  color: var(--ojas-success, #2e7d32);
+  font-weight: 600;
+}
