@@ -20,12 +20,12 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
+    [AdminEditableCache]
     public async Task<ActionResult<List<Product>>> GetAll()
     {
         // Admins get the drafts too: the admin console is where an unlisted product gets its price
-        // and is put on sale, so it is the one caller that must be able to see one. PublicCache
-        // already sends no-store to an authenticated admin, so this never lands in a shared cache.
+        // and is put on sale, so it is the one caller that must be able to see one. The cache
+        // attribute sends no-store to an authenticated admin, so this never lands in a shared cache.
         var products = await _productService.GetAllAsync(includeUnlisted: IsAdmin);
         return Ok(products);
     }
@@ -43,7 +43,7 @@ public class ProductsController : ControllerBase
         && HttpContext.User.IsInRole(UserRoles.Admin);
 
     [HttpGet("{id}")]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
+    [AdminEditableCache]
     public async Task<ActionResult<Product>> GetById(string id)
     {
         var product = await _productService.GetByIdAsync(id, includeUnlisted: IsAdmin);
@@ -52,7 +52,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("category/{category}")]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
+    [AdminEditableCache]
     public async Task<ActionResult<List<Product>>> GetByCategory(string category)
     {
         var products = await _productService.GetByCategoryAsync(category);
@@ -60,7 +60,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("bestsellers")]
-    [PublicCache(maxAgeSeconds: 60, staleWhileRevalidateSeconds: 600, sharedMaxAgeSeconds: 120)]
+    [AdminEditableCache]
     public async Task<ActionResult<List<Product>>> GetBestsellers([FromQuery] int limit = 6)
     {
         var clampedLimit = Math.Clamp(limit, 1, 24);

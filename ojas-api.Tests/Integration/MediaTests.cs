@@ -156,16 +156,64 @@ public class MediaTests : IDisposable
         (await CountAssetsAsync()).ShouldBe(0);
     }
 
+    /// <summary>
+    /// The owner publishes a banner and checks the storefront straight away. When the browser was
+    /// allowed to keep the list for five minutes - with stale-while-revalidate letting it show the
+    /// old one once more after that - the new banner was invisible in their normal tab while an
+    /// incognito window showed it. So the browser must always ask, and only the edge, which every
+    /// visitor shares, may hold the list - for seconds, not minutes.
+    /// </summary>
+    [Theory]
+    [InlineData("/api/campaign-banner")]
+    [InlineData("/api/hero-slides")]
+    [InlineData("/api/products")]
+    [InlineData("/api/products/bestsellers")]
+    [InlineData("/api/products/category/Flour")]
+    [InlineData("/api/delivery-charges")]
+    public async Task AdminEditableContent_IsNeverKeptByTheBrowser_AndOnlyBrieflyByTheEdge(string path)
+    {
+        if (path == "/api/delivery-charges")
+        {
+            // Unconfigured, this endpoint answers 404 - and an error carries no cache headers.
+            await _factory.SeedAsync(async db => await db.DeliveryCharges.InsertOneAsync(new DeliveryCharges
+            {
+                WarehouseAddress = "W", WarehouseLatitude = 18.6, WarehouseLongitude = 73.8,
+                FreeDeliveryUpToKm = 5, PerKmChargeAfterFree = 10, IsActive = true,
+            }));
+        }
+
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync(path);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var cacheControl = response.Headers.CacheControl!;
+        cacheControl.Public.ShouldBeTrue();
+        cacheControl.MaxAge.ShouldBe(TimeSpan.Zero);
+        cacheControl.MustRevalidate.ShouldBeTrue();
+        cacheControl.ToString().ShouldNotContain("stale-while-revalidate");
+
+        var edge = response.Headers.GetValues("Vercel-CDN-Cache-Control").Single();
+        edge.ShouldContain("max-age=15");
+        edge.ShouldContain("stale-while-revalidate=45");
+    }
+
+    /// <summary>The owner is usually signed in when they look, so the signed-in path must be just
+    /// as fresh - and must never hand the edge a response that names an account.</summary>
     [Fact]
-    public async Task CampaignBanners_AreServedWithAPublicCacheHeaderForAnonymousVisitors()
+    public async Task CampaignBanners_AreNotKeptByASignedInCustomersBrowserEither()
     {
         using var client = _factory.CreateClient();
+        await client.RegisterAsync();
 
         var response = await client.GetAsync("/api/campaign-banner");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        response.Headers.CacheControl!.Public.ShouldBeTrue();
-        response.Headers.CacheControl.ToString().ShouldContain("stale-while-revalidate");
+        var cacheControl = response.Headers.CacheControl!;
+        cacheControl.Private.ShouldBeTrue();
+        cacheControl.MaxAge.ShouldBe(TimeSpan.Zero);
+        cacheControl.ToString().ShouldNotContain("stale-while-revalidate");
+        response.Headers.Contains("Vercel-CDN-Cache-Control").ShouldBeFalse();
     }
 
     [Fact]
@@ -184,11 +232,12 @@ public class MediaTests : IDisposable
         response.Headers.CacheControl!.Public.ShouldBeFalse();
         response.Headers.CacheControl.Private.ShouldBeTrue();
 
-        // ...and their own browser is explicitly allowed to keep it. Forbidding that too bought no
-        // privacy and made every catalogue read of a signed-in customer - the ones who browse most
-        // - travel all the way to the API.
+        // ...and their browser, like everyone's, re-checks rather than keeping a copy. no-store would
+        // buy no privacy here; max-age=0 is about freshness - a signed-in customer is the one most
+        // likely to notice a price that changed while their copy sat in the cache.
         response.Headers.CacheControl.NoStore.ShouldBeFalse();
-        response.Headers.CacheControl.MaxAge.ShouldNotBeNull();
+        response.Headers.CacheControl.MaxAge.ShouldBe(TimeSpan.Zero);
+        response.Headers.CacheControl.MustRevalidate.ShouldBeTrue();
     }
 
     [Fact]

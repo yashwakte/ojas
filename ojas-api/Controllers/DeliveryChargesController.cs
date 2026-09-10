@@ -20,11 +20,11 @@ public class DeliveryChargesController : ControllerBase
     }
 
     // Fetched at app boot on every visit — DeliveryChargesService loads it in its constructor —
-    // and it changes when the owner edits the delivery rules, which is a handful of times a year.
-    // Answering that from the edge rather than from the origin takes one request off the instance
-    // per visitor, and takes it off the critical path of a cold start entirely.
+    // so the edge answers it rather than the instance. It is admin-editable all the same: a
+    // storefront that has not caught up with a changed charge quotes the customer one delivery fee
+    // and bills them another at checkout.
     [HttpGet]
-    [PublicCache(maxAgeSeconds: 300, staleWhileRevalidateSeconds: 3600, sharedMaxAgeSeconds: 600)]
+    [AdminEditableCache]
     public async Task<ActionResult<DeliveryCharges>> GetConfig()
     {
         var config = await _deliveryChargesService.GetAsync();

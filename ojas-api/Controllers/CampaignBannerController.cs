@@ -19,10 +19,15 @@ public class CampaignBannerController : ControllerBase
         _campaignBannerService = campaignBannerService;
     }
 
-    // Banners change when a festival campaign is set up - a few times a month at most - and
-    // are fetched on every visit, so this is exactly the response a cache should be answering.
+    // Admin-published content: when the owner saves a banner they check the storefront straight
+    // away, and so do the customers who were told about the sale. So the browser never keeps its
+    // own copy - it asks the edge every time, which answers in milliseconds - and the edge holds
+    // it for 15 seconds plus 45 of background refresh. A new banner is live for everyone within a
+    // minute of Save, and the API still sees a handful of requests a minute however many people
+    // are browsing. It used to be five minutes in the browser and up to an hour at the edge,
+    // which is how a published banner stayed invisible in a normal tab while incognito showed it.
     [HttpGet]
-    [PublicCache(maxAgeSeconds: 300, staleWhileRevalidateSeconds: 3600)]
+    [AdminEditableCache]
     public async Task<ActionResult<List<CampaignBanner>>> GetBanners()
     {
         var banners = await _campaignBannerService.GetAllAsync();

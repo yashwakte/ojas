@@ -22,7 +22,7 @@ public class HeroSlideController : ControllerBase
     // The first request of the first screenful of the site, and it changes a few times a month
     // at most. Same cache treatment as the campaign banners for the same reason.
     [HttpGet]
-    [PublicCache(maxAgeSeconds: 300, staleWhileRevalidateSeconds: 3600)]
+    [AdminEditableCache]
     public async Task<ActionResult<List<HeroSlide>>> GetSlides()
     {
         var slides = await _heroSlideService.GetAllAsync();

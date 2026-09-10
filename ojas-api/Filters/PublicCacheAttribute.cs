@@ -28,6 +28,9 @@ public sealed class PublicCacheAttribute : ActionFilterAttribute
     private readonly int _staleWhileRevalidateSeconds;
     private readonly int _sharedMaxAgeSeconds;
 
+    /// <summary>How long the edge may keep answering from its copy while the API is erroring.</summary>
+    private const int StaleIfErrorSeconds = 86_400;
+
     /// <param name="maxAgeSeconds">How long a browser may reuse the response without asking.</param>
     /// <param name="staleWhileRevalidateSeconds">
     /// How long past that a cache may keep answering from what it has while it refreshes behind
@@ -93,14 +96,30 @@ public sealed class PublicCacheAttribute : ActionFilterAttribute
                 return;
             }
 
-            response.Headers.CacheControl =
-                $"private, max-age={_maxAgeSeconds}, stale-while-revalidate={_staleWhileRevalidateSeconds}";
+            // A zero browser lifetime means "always ask", and stale-while-revalidate would undo
+            // that: it lets the browser show the copy it has once more while it fetches the new
+            // one, so a customer would see a just-published banner one page view late.
+            response.Headers.CacheControl = _maxAgeSeconds > 0
+                ? $"private, max-age={_maxAgeSeconds}, stale-while-revalidate={_staleWhileRevalidateSeconds}"
+                : "private, max-age=0, must-revalidate";
             return;
         }
 
-        response.Headers.CacheControl =
-            $"public, max-age={_maxAgeSeconds}, s-maxage={_sharedMaxAgeSeconds}, "
-            + $"stale-while-revalidate={_staleWhileRevalidateSeconds}";
+        // Two audiences, two headers. Cache-Control is what the visitor's browser obeys, and it
+        // carries no stale-while-revalidate: a browser allowed to serve stale shows the old banner
+        // once more after the owner has published a new one, and that "once more" is the tab they
+        // are looking at. Vercel-CDN-Cache-Control is read by Vercel's edge alone and stripped
+        // before the response leaves it, so the background refresh - which is what keeps visitors
+        // from ever waiting on this instance - lives there, where one refresh serves everybody.
+        //
+        // s-maxage stays in Cache-Control too, for any shared cache that does not know the Vercel
+        // header; browsers ignore it.
+        response.Headers.CacheControl = _maxAgeSeconds > 0
+            ? $"public, max-age={_maxAgeSeconds}, s-maxage={_sharedMaxAgeSeconds}"
+            : $"public, max-age=0, must-revalidate, s-maxage={_sharedMaxAgeSeconds}";
+        response.Headers["Vercel-CDN-Cache-Control"] =
+            $"max-age={_sharedMaxAgeSeconds}, stale-while-revalidate={_staleWhileRevalidateSeconds}, "
+            + $"stale-if-error={StaleIfErrorSeconds}";
 
         // Appended, never assigned. CORS puts "Origin" in Vary on cross-origin responses, and
         // overwriting that on a response we have just made publicly cacheable would let a shared
