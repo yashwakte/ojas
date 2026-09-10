@@ -274,8 +274,10 @@
                 [ngModel]="formData().stockQuantity"
                 (ngModelChange)="formData.update(d => ({...d, stockQuantity: $event === null || $event === '' ? null : +$event}))">
               <span class="field-hint">
-                Blank means stock isn't tracked — the product stays buyable and is never
-                counted down. Enter a number to start tracking it.
+                Blank means stock isn't tracked — the product stays buyable and is never counted
+                down. Enter a number to start tracking it: each order subtracts what was bought,
+                and at 0 the product shows as Out of Stock and can't be added to a cart. Clear the
+                box again to stop tracking.
               </span>
             </label>
 

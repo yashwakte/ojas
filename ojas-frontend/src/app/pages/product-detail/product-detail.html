@@ -90,7 +90,7 @@
           @if (p.discount && p.discount > 0) {
             <div class="discount-badge">{{ p.discount }}% OFF</div>
           }
-          @if (!p.isAvailable) {
+          @if (!purchasable()) {
             <div class="out-of-stock-badge">Out of Stock</div>
           }
 
@@ -123,10 +123,13 @@
           <span class="category-badge">{{ p.category }}</span>
           <h1 class="detail-name">{{ p.name }}</h1>
 
-          <!-- Availability -->
-          <div class="availability" [class.out-of-stock]="!p.isAvailable">
+          <!-- Availability. Reads isPurchasable, not isAvailable alone: a tracked product that
+               has sold out has isAvailable = true and stockQuantity = 0, and saying "In Stock"
+               beside an Out of Stock badge further down the same page is worse than saying
+               nothing. -->
+          <div class="availability" [class.out-of-stock]="!purchasable()">
             <span class="availability-dot"></span>
-            {{ p.isAvailable ? 'In Stock' : 'Out of Stock' }}
+            {{ purchasable() ? 'In Stock' : 'Out of Stock' }}
           </div>
 
           <!-- Price -->

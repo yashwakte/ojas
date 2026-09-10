@@ -92,7 +92,7 @@ public class ProductsController : ControllerBase
             Weight = Clean(request.Weight),
             IsAvailable = request.IsAvailable,
             IsListed = request.IsListed,
-            StockQuantity = request.StockQuantity,
+            StockQuantity = Product.NormalizeStockQuantity(request.StockQuantity),
             LowStockThreshold = request.LowStockThreshold ?? 5,
             Ingredients = Clean(request.Ingredients),
             Benefits = Clean(request.Benefits),
@@ -125,6 +125,11 @@ public class ProductsController : ControllerBase
             Weight = request.Weight is null ? null : Clean(request.Weight),
             IsAvailable = request.IsAvailable,
             IsListed = request.IsListed,
+            // Deliberately NOT normalized here. On this request type, null means "leave the field
+            // alone", and -1 means "untrack this product" - so folding -1 down to null at this
+            // point would erase the very instruction it is carrying, and Apply below would skip
+            // the field entirely. The sentinel is resolved at the moment it is written onto the
+            // product, not before.
             StockQuantity = request.StockQuantity,
             LowStockThreshold = request.LowStockThreshold,
             Ingredients = request.Ingredients is null ? null : Clean(request.Ingredients),
@@ -180,7 +185,10 @@ public class ProductsController : ControllerBase
         if (request.GalleryImageUrls != null) product.GalleryImageUrls = request.GalleryImageUrls;
         if (request.Weight != null) product.Weight = request.Weight;
         if (request.IsAvailable.HasValue) product.IsAvailable = request.IsAvailable.Value;
-        if (request.StockQuantity.HasValue) product.StockQuantity = request.StockQuantity.Value;
+        // A negative value is the admin asking to untrack, so it must reach the product as
+        // null - see Product.NormalizeStockQuantity.
+        if (request.StockQuantity.HasValue)
+            product.StockQuantity = Product.NormalizeStockQuantity(request.StockQuantity);
         if (request.LowStockThreshold.HasValue) product.LowStockThreshold = request.LowStockThreshold.Value;
         if (request.Ingredients != null) product.Ingredients = request.Ingredients;
         if (request.Benefits != null) product.Benefits = request.Benefits;

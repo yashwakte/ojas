@@ -46,6 +46,16 @@ export function isPurchasable(product: Product): boolean {
   return product.isAvailable && (product.stockQuantity === null || product.stockQuantity > 0);
 }
 
+/**
+ * What the admin form sends when the Stock field is left blank, meaning "don't track this
+ * product". The API turns any negative value back into null.
+ *
+ * A sentinel is needed because the update request models stock as a nullable number where null
+ * already means "leave this field unchanged" — so blanking the field used to be a silent no-op,
+ * and a product could only be untracked by editing the database directly.
+ */
+export const UNTRACKED_STOCK = -1;
+
 export function isOutOfStock(product: Product): boolean {
   return product.stockQuantity !== null && product.stockQuantity <= 0;
 }

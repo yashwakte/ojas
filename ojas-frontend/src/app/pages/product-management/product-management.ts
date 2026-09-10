@@ -9,7 +9,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ProductService } from '../../services/product.service';
 import { MediaUploadService } from '../../services/media-upload.service';
-import { Product, CreateProductRequest, UpdateProductRequest } from '../../models/interfaces';
+import {
+  Product,
+  CreateProductRequest,
+  UpdateProductRequest,
+  UNTRACKED_STOCK,
+} from '../../models/interfaces';
 import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 
 @Component({
@@ -449,7 +454,11 @@ export class ProductManagement implements OnInit {
       galleryImageUrls: data.galleryImageUrls.map((url) => url.trim()).filter(Boolean),
       weight: this.sanitizeString(data.weight),
       isAvailable: data.isAvailable,
-      stockQuantity: data.stockQuantity ?? null,
+      // Blank means "don't track this product", and it has to be SAID rather than left out:
+      // the API models stock as int? where null already means "leave this field alone", so a
+      // blank field used to be a silent no-op and untracking was impossible from here. -1 is the
+      // sentinel the API turns back into null. See Product.NormalizeStockQuantity.
+      stockQuantity: data.stockQuantity ?? UNTRACKED_STOCK,
       lowStockThreshold: data.lowStockThreshold ?? 5,
       ingredients: this.sanitizeString(data.ingredients),
       benefits: this.sanitizeString(data.benefits),

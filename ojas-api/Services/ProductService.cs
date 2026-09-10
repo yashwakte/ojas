@@ -108,7 +108,8 @@ public class ProductService
         if (request.Weight != null) product.Weight = request.Weight;
         if (request.IsAvailable.HasValue) product.IsAvailable = request.IsAvailable.Value;
         if (request.IsListed.HasValue) product.IsListed = request.IsListed.Value;
-        if (request.StockQuantity.HasValue) product.StockQuantity = request.StockQuantity.Value;
+        if (request.StockQuantity.HasValue)
+            product.StockQuantity = Product.NormalizeStockQuantity(request.StockQuantity);
         if (request.LowStockThreshold.HasValue) product.LowStockThreshold = request.LowStockThreshold.Value;
         if (request.Ingredients != null) product.Ingredients = request.Ingredients;
         if (request.Benefits != null) product.Benefits = request.Benefits;

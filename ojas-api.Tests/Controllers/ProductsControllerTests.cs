@@ -287,6 +287,40 @@ public class ProductsControllerTests
     }
 
     [Fact]
+    public async Task Update_UntracksStock_WhenGivenTheNegativeSentinel()
+    {
+        // The admin cleared the Stock box. That cannot be sent as null, because null already
+        // means "leave this field alone" - which is why clearing the box used to do nothing at
+        // all. -1 is how the form says "stop tracking this product".
+        var existing = MakeProduct("507f1f77bcf86cd799439011");
+        existing.StockQuantity = 15;
+        _productsMock.SetupFind(new List<Product> { existing });
+
+        var result = await _sut.Update(existing.Id!, new UpdateProductRequest { StockQuantity = -1 });
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var product = okResult.Value.ShouldBeOfType<Product>();
+        product.StockQuantity.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Update_KeepsZeroAsATrackedCount()
+    {
+        // Zero is not "untracked" - it is a tracked product that has sold out, and it is what
+        // makes the storefront show Out of Stock. Collapsing it to null would silently make a
+        // sold-out product buyable again.
+        var existing = MakeProduct("507f1f77bcf86cd799439011");
+        existing.StockQuantity = 3;
+        _productsMock.SetupFind(new List<Product> { existing });
+
+        var result = await _sut.Update(existing.Id!, new UpdateProductRequest { StockQuantity = 0 });
+
+        var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
+        var product = okResult.Value.ShouldBeOfType<Product>();
+        product.StockQuantity.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Update_ReturnsBadRequest_WhenPriceOutOfRangeAfterMerge()
     {
         var existing = MakeProduct("507f1f77bcf86cd799439011");

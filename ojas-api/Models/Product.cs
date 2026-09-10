@@ -60,6 +60,27 @@ public class Product
     [BsonElement("stockQuantity")]
     public int? StockQuantity { get; set; }
 
+    /// <summary>
+    /// Turns what an admin typed into the Stock field into a stored value.
+    ///
+    /// **Any negative number, canonically -1, means "stop tracking this product"** and is stored
+    /// as null. This exists because the update request models stock as `int?` where null already
+    /// means "leave this field alone" — so an admin who cleared the box was sending null, the
+    /// field was skipped, and the save silently did nothing. Untracking was only possible directly
+    /// in the database. The sentinel gives the field a way to say "untracked" that is distinct
+    /// from "unchanged".
+    ///
+    /// Zero is emphatically NOT untracked: zero is a tracked product that has sold out, and is
+    /// what makes it show as Out of Stock.
+    /// </summary>
+    public static int? NormalizeStockQuantity(int? requested) =>
+        requested is < 0 ? null : requested;
+
+    /// <summary>Untracked at all, or tracked and sold out. Either way the customer cannot buy it
+    /// — but only the second is worth telling them about, since the first means we simply never
+    /// counted this product.</summary>
+    public bool IsOutOfStock => StockQuantity is <= 0;
+
     /// <summary>At or below this (and above zero), admin sees a low-stock warning.</summary>
     [BsonElement("lowStockThreshold")]
     public int LowStockThreshold { get; set; } = 5;
