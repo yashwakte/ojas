@@ -26,6 +26,7 @@ import {
   SERVICEABLE_STATES,
   citiesForState,
   isValidPunePincode,
+  pincodeError,
 } from '../../constants/serviceable-locations';
 
 @Component({
@@ -186,6 +187,12 @@ export class Profile implements OnInit {
     this.showAddressForm.set(true);
   }
 
+  /** Why the pincode on the "add address" form is refused, or null. See the note on
+   * `pincodeError` — a disabled Save button cannot say which of ten fields is at fault. */
+  get newPincodeMessage(): string | null {
+    return pincodeError(this.newPincode);
+  }
+
   get isNewAddressValid(): boolean {
     return !!(
       this.newLabel.trim() &&
@@ -254,6 +261,11 @@ export class Profile implements OnInit {
     this.userService.deleteAddress(index).subscribe({
       next: () => this.loadProfile(),
     });
+  }
+
+  /** The same, for the "edit address" form. */
+  get editPincodeMessage(): string | null {
+    return pincodeError(this.editPincode);
   }
 
   get isEditAddressValid(): boolean {

@@ -180,7 +180,12 @@
                   placeholder="411001–411062"
                   pattern="[0-9]{6}"
                   maxlength="6"
+                  [attr.aria-invalid]="pincodeMessage ? 'true' : null"
+                  [attr.aria-describedby]="pincodeMessage ? 'pincodeError' : null"
                 />
+                @if (pincodeMessage; as msg) {
+                  <p class="field-error" id="pincodeError" role="alert">{{ msg }}</p>
+                }
               </div>
             </div>
 

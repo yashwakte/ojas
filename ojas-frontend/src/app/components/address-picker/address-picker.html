@@ -88,7 +88,12 @@
                 maxlength="6"
                 placeholder="411001–411062"
                 [(ngModel)]="pincode"
+                [attr.aria-invalid]="pincodeMessage ? 'true' : null"
+                [attr.aria-describedby]="pincodeMessage ? 'apPinError' : null"
               />
+              @if (pincodeMessage; as msg) {
+                <p class="ap-field-error" id="apPinError" role="alert">{{ msg }}</p>
+              }
             </div>
           </div>
 

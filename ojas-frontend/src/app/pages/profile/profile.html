@@ -192,7 +192,11 @@
                       inputmode="numeric"
                       maxlength="6"
                     />
-                    <mat-hint>Pune pincodes only (411001–411062)</mat-hint>
+                    @if (editPincodeMessage; as msg) {
+                      <mat-hint class="hint-error">{{ msg }}</mat-hint>
+                    } @else {
+                      <mat-hint>Pune pincodes only (411001–411062)</mat-hint>
+                    }
                   </mat-form-field>
                 </div>
                 <div class="pin-location-block">
@@ -353,7 +357,11 @@
                 inputmode="numeric"
                 maxlength="6"
               />
-              <mat-hint>Pune pincodes only (411001–411062)</mat-hint>
+              @if (newPincodeMessage; as msg) {
+                <mat-hint class="hint-error">{{ msg }}</mat-hint>
+              } @else {
+                <mat-hint>Pune pincodes only (411001–411062)</mat-hint>
+              }
             </mat-form-field>
           </div>
 

@@ -311,3 +311,13 @@
     animation: none;
   }
 }
+
+// Field-level message, distinct from .ap-error: that one is a banner for a failed save, this sits
+// under the input it is talking about and so needs no icon, box or fill to be attributed.
+.ap-field-error {
+  margin: 6px 0 0;
+  color: #b91c1c;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.35;
+}

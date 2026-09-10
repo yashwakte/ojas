@@ -34,6 +34,7 @@ import {
   SERVICEABLE_STATES,
   citiesForState,
   isValidPunePincode,
+  pincodeError,
 } from '../../constants/serviceable-locations';
 import {
   calculateCouponDiscount,
@@ -238,6 +239,15 @@ export class Checkout implements OnInit {
       this.manualLat !== null &&
       this.manualLng !== null
     );
+  }
+
+  /**
+   * Why the typed pincode is being refused, or null when there is nothing to say. Attached to the
+   * field, because `isAddressValid` above disables the Place Order button on any of eight
+   * conditions and so cannot tell the customer which one they tripped.
+   */
+  get pincodeMessage(): string | null {
+    return this.selectedSavedAddress() ? null : pincodeError(this.pincode);
   }
 
   private get composedAddress(): string {

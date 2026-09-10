@@ -13,6 +13,7 @@ import {
   SERVICEABLE_STATES,
   citiesForState,
   isValidPunePincode,
+  pincodeError,
 } from '../../constants/serviceable-locations';
 
 /**
@@ -63,6 +64,17 @@ export class AddressPicker {
       this.area.trim().length > 0 &&
       isValidPunePincode(this.pincode.trim()),
   );
+
+  /**
+   * Why the pincode is being refused, or null. Bound to the field rather than to the save button,
+   * because the save button is disabled by any of five fields and so can never explain itself.
+   *
+   * A plain getter, not a computed: `pincode` is a template-driven `[(ngModel)]` string, not a
+   * signal, so a computed would never re-evaluate as it is typed.
+   */
+  protected get pincodeMessage(): string | null {
+    return pincodeError(this.pincode);
+  }
 
   constructor() {
     effect(() => {

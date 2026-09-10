@@ -292,7 +292,14 @@
                   } @else if (q.isFree) {
                     <span class="deliver-to-charge free">Free delivery</span>
                   } @else {
-                    <span class="deliver-to-charge">Delivery ₹{{ q.charge | number: '1.2-2' }}</span>
+                    <!-- The quote is for this pincode alone; it cannot know the cart, so the
+                         threshold has to be spelled out or the number reads as unconditional. -->
+                    <span class="deliver-to-charge">
+                      Delivery ₹{{ q.charge | number: '1.2-2' }}
+                      <span class="deliver-to-free-hint"
+                        >— free on orders over ₹{{ freeDeliveryThreshold }}</span
+                      >
+                    </span>
                   }
                 }
               </div>

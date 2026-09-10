@@ -519,3 +519,11 @@
     padding: 24px 20px;
   }
 }
+
+// A hint that is carrying a refusal rather than guidance. It stays a mat-hint (so Material keeps
+// reserving the subscript row and the layout does not jump) but reads as an error, which is what
+// mat-error would give us if these template-driven fields had a validated control behind them.
+.hint-error {
+  color: #b91c1c;
+  font-weight: 600;
+}

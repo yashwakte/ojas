@@ -285,10 +285,16 @@
                     navigation only, so it can't affect what they're charged.
                   </p>
                 } @else {
-                  <p class="pincode-note pincode-note--warning">
-                    No pincodes listed, so delivery is still priced by distance from the
-                    customer's pinned location — which their browser supplies. Add your delivery
-                    pincodes here before going live.
+                  <!-- Distance pricing is the owner's deliberate choice (2026-09-09), not an
+                       unfinished setup, so this reads as information rather than a to-do. It
+                       still names the trade-off, because listing pincodes is the only thing that
+                       stops a crafted request pricing its own delivery from a map pin. -->
+                  <p class="pincode-note">
+                    Delivery is priced by distance from the warehouse, and the service area is the
+                    delivery radius above. That's fine to leave as it is — this list is optional.
+                    Add pincodes only if you'd rather charge a flat amount per area; doing so also
+                    makes the charge impossible to tamper with, since it would no longer be read
+                    from the customer's pinned location.
                   </p>
                 }
 

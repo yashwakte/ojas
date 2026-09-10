@@ -694,6 +694,13 @@
   &.out {
     color: #b91c1c;
   }
+
+  // The threshold is context for the charge, not a second headline - it sits on the same line at
+  // normal weight so the eye still lands on the rupee figure first.
+  .deliver-to-free-hint {
+    font-weight: 500;
+    color: var(--ojas-text-light, #6b7280);
+  }
 }
 
 .deliver-to-btn {
