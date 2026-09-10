@@ -701,6 +701,83 @@
   }
 }
 
+// Sits under the locked note on a delivered order. Deliberately quiet - it is information a
+// customer may need, not an action we are pushing them towards.
+.returns-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 0 20px 14px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 1px;
+    color: var(--ojas-ink-soft);
+  }
+
+  a {
+    color: var(--ojas-orange-dark);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+// ===== RETURNS =====
+// The offer sits under the locked note on a delivered order, and any return raised against that
+// order sits under it in turn. Quiet by default: this is information a customer may need, not an
+// action being pushed at them.
+.returns-offer {
+  padding: 0 20px 14px;
+
+  // The note carries the padding when it stands alone; inside the offer the wrapper owns it.
+  .returns-note {
+    padding: 0;
+  }
+}
+
+.returns-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+// Shares the shape of the edit/cancel buttons above rather than declaring its own: these three
+// sit on the same card, and a fourth pill with its own padding and radius would read as a button
+// from a different screen.
+.return-btn {
+  @extend .order-edit-btn;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+}
+
+.returns-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    font-size: 0.95rem;
+    width: 1em;
+    height: 1em;
+  }
+}
+
 .cancel-confirm {
   margin: 14px 20px;
   padding: 14px;

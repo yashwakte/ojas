@@ -618,6 +618,52 @@
                 <mat-icon>lock_outline</mat-icon>
                 This order is {{ order.status.toLowerCase() }} and can no longer be changed.
               </p>
+              <!-- A delivered order is the one place a customer looks when they want to send
+                   something back, so the whole returns flow lives here rather than only on the
+                   policy page. The countdown is real now: the order carries the moment it was
+                   delivered, stamped once on the transition, and the deadline is computed by the
+                   API from the same window it enforces. -->
+              @if (canOfferReturn(order)) {
+                <div class="returns-offer">
+                  <p class="returns-note">
+                    <mat-icon>assignment_return</mat-icon>
+                    <span>
+                      Something wrong with this order? Send back an unopened pack, in its original
+                      packaging, within {{ returnWindowDays }} days of delivery — we collect it
+                      free. <a routerLink="/refunds">Read the policy</a>.
+                    </span>
+                  </p>
+                  <div class="returns-actions">
+                    <button
+                      type="button"
+                      class="return-btn"
+                      [disabled]="checkingReturnFor() === order.id"
+                      (click)="openReturnSheet(order)"
+                    >
+                      <mat-icon>assignment_return</mat-icon>
+                      {{ checkingReturnFor() === order.id ? 'Checking…' : 'Return items' }}
+                    </button>
+                    @if (returnWindowLeft(order); as left) {
+                      <span class="returns-countdown">
+                        <mat-icon>schedule</mat-icon>
+                        {{ left }}
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Every return raised against this order, whatever state it is in. A finished
+                   one stays on the card: "what happened to the pack I sent back" is the question
+                   this page exists to answer, and hiding settled returns sends people to the
+                   phone. -->
+              @for (request of returnsFor(order.id); track request.id) {
+                <app-return-status-card
+                  [request]="request"
+                  [cancelling]="cancellingReturnId() === request.id"
+                  (cancelRequested)="cancelReturn($event)"
+                />
+              }
             }
           }
         </div>
@@ -625,3 +671,15 @@
     </div>
   }
 </div>
+
+@if (returnSheetFor(); as open) {
+  <app-return-sheet
+    [orderId]="open.orderId"
+    [eligibility]="open.eligibility"
+    [walletOnly]="returnIsWalletOnly(open.orderId)"
+    [submitting]="submittingReturn()"
+    [errorMessage]="returnError()"
+    (confirmed)="submitReturn($event)"
+    (closed)="closeReturnSheet()"
+  />
+}

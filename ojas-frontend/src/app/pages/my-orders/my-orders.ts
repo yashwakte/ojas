@@ -28,6 +28,8 @@ import {
   isPaymentFailed,
   paymentIcon,
   paymentLabel,
+  ReturnEligibility,
+  ReturnRequestResponse,
 } from '../../models/interfaces';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
@@ -41,7 +43,15 @@ import {
   roundMoney,
 } from '../../constants/pricing';
 import { thumbnailPackShot } from '../../constants/pack-shots';
+import {
+  RETURN_WINDOW_DAYS,
+  SUPPORT_PHONE,
+  SUPPORT_PHONE_HREF,
+} from '../../constants/business';
 import { CashfreeCheckoutService } from '../../services/cashfree-checkout.service';
+import { ReturnService } from '../../services/return.service';
+import { ReturnDraft, ReturnSheet } from '../../components/return-sheet/return-sheet';
+import { ReturnStatusCard } from '../../components/return-status-card/return-status-card';
 
 /** Most payments answer on the very first call. These only matter for one the bank is still
  * deciding on — a UPI collect awaiting approval — which is exactly the case where telling the
@@ -63,6 +73,8 @@ const HIGHLIGHT_DURATION_MS = 6000;
   selector: 'app-my-orders',
   imports: [
     RouterLink,
+    ReturnSheet,
+    ReturnStatusCard,
     DatePipe,
     CurrencyPipe,
     FormsModule,
@@ -92,6 +104,13 @@ export class MyOrders implements OnInit, OnDestroy {
   private readonly cartService = inject(CartService);
   private readonly checkoutService = inject(CheckoutService);
   readonly wallet = inject(WalletService);
+  private readonly returnService = inject(ReturnService);
+
+  /** Returns policy, read from the shared constants so a delivered order, the cart and the
+   * Refunds and Cancellations page all quote the same window and the same phone number. */
+  readonly returnWindowDays = RETURN_WINDOW_DAYS;
+  readonly supportPhone = SUPPORT_PHONE;
+  readonly supportPhoneHref = SUPPORT_PHONE_HREF;
 
   orders = signal<OrderResponse[]>([]);
   loading = signal(true);
@@ -191,6 +210,167 @@ export class MyOrders implements OnInit, OnDestroy {
     freeDeliveryNudgeFor(this.editItemsTotal(), this.editDeliveryQuote()),
   );
 
+  // ===== RETURNS =====
+
+  /** Every return this customer has raised. Loaded alongside the orders so a delivered card can
+   * show its return without a second round trip when the page is opened. */
+  readonly myReturns = this.returnService.mine;
+
+  /** The order whose return sheet is open, with the eligibility the server just answered with.
+   * Held together rather than as two signals: a sheet open against stale eligibility would offer
+   * quantities the API is about to refuse. */
+  returnSheetFor = signal<{ orderId: string; eligibility: ReturnEligibility } | null>(null);
+
+  /** Order whose eligibility is being fetched, so only that card's button waits. */
+  checkingReturnFor = signal<string | null>(null);
+  submittingReturn = signal(false);
+  returnError = signal<string | null>(null);
+
+  /** Return being called off, so only that one shows a spinner. */
+  cancellingReturnId = signal<string | null>(null);
+
+  /** The returns raised against one order, newest first. */
+  returnsFor(orderId: string): ReturnRequestResponse[] {
+    return this.myReturns().filter((r) => r.orderId === orderId);
+  }
+
+  /**
+   * Whether to offer the return button on this order.
+   *
+   * Deliberately a cheap local check against the order's own delivery stamp rather than a call
+   * per card: the page shows every order the customer has ever placed, and asking the server
+   * about each one would be a round trip per row. The server is still the authority — pressing
+   * the button fetches real eligibility, and the API refuses anything outside the window whatever
+   * this decides.
+   */
+  canOfferReturn(order: OrderResponse): boolean {
+    if (order.status.toLowerCase() !== 'delivered') return false;
+    if (order.amountPaid <= 0) return false;
+
+    const closes = order.returnWindowEndsAt;
+    if (!closes) return true; // Delivered before the stamp existed; let the server decide.
+
+    const ends = new Date(closes).getTime();
+    return !Number.isNaN(ends) && Date.now() <= ends;
+  }
+
+  /** How long is left, in the words a customer thinks in. Null once it has closed. */
+  returnWindowLeft(order: OrderResponse): string | null {
+    const closes = order.returnWindowEndsAt;
+    if (!closes) return null;
+
+    const ends = new Date(closes).getTime();
+    if (Number.isNaN(ends)) return null;
+
+    const msLeft = ends - Date.now();
+    if (msLeft <= 0) return null;
+
+    const daysLeft = Math.ceil(msLeft / 86400000);
+    if (daysLeft <= 1) return 'Last day to return';
+    return `${daysLeft} days left to return`;
+  }
+
+  /**
+   * Opens the return sheet, but only after the server has said what may go back.
+   *
+   * The eligibility call is what makes the sheet honest: quantities already claimed by an earlier
+   * request, an order that has been refunded since the page loaded, a window that closed while
+   * the tab sat open — all of them are answered here rather than discovered on submit.
+   */
+  openReturnSheet(order: OrderResponse): void {
+    this.checkingReturnFor.set(order.id);
+    this.returnError.set(null);
+
+    this.returnService.eligibility(order.id).subscribe({
+      next: (eligibility) => {
+        this.checkingReturnFor.set(null);
+        if (!eligibility.canRequest) {
+          // The server's own sentence, shown as it stands — it says why, which a disabled button
+          // never could.
+          this.snackBar.open(
+            eligibility.reason ?? 'This order can no longer be returned.',
+            'Close',
+            { duration: 6000 },
+          );
+          return;
+        }
+        this.returnSheetFor.set({ orderId: order.id, eligibility });
+      },
+      error: () => {
+        this.checkingReturnFor.set(null);
+        this.snackBar.open('Could not check this order just now. Please try again.', 'Close', {
+          duration: 4000,
+        });
+      },
+    });
+  }
+
+  closeReturnSheet(): void {
+    this.returnSheetFor.set(null);
+    this.returnError.set(null);
+    this.submittingReturn.set(false);
+  }
+
+  /** True when the order was paid entirely from wallet credit, so there is no card behind it to
+   * refund to and the sheet must not offer one. */
+  returnIsWalletOnly(orderId: string): boolean {
+    const order = this.orders().find((o) => o.id === orderId);
+    if (!order) return false;
+    return order.walletAmountApplied > 0 && order.walletAmountApplied >= order.amountPaid;
+  }
+
+  submitReturn(draft: ReturnDraft): void {
+    const open = this.returnSheetFor();
+    if (!open) return;
+
+    this.submittingReturn.set(true);
+    this.returnError.set(null);
+
+    this.returnService
+      .create({
+        orderId: open.orderId,
+        items: draft.items,
+        reason: draft.reason,
+        comment: draft.comment,
+        refundDestination: draft.refundDestination,
+      })
+      .subscribe({
+        next: () => {
+          this.submittingReturn.set(false);
+          this.closeReturnSheet();
+          this.snackBar.open('Return requested. We will call to arrange the pickup.', 'Close', {
+            duration: 5000,
+          });
+        },
+        error: (err) => {
+          this.submittingReturn.set(false);
+          // Shown inside the sheet rather than as a toast: the customer is mid-form, and the
+          // message usually tells them what to change.
+          this.returnError.set(
+            err?.error?.message ?? 'We could not raise this return. Please try again.',
+          );
+        },
+      });
+  }
+
+  cancelReturn(request: ReturnRequestResponse): void {
+    this.cancellingReturnId.set(request.id);
+    this.returnService.cancel(request.id).subscribe({
+      next: () => {
+        this.cancellingReturnId.set(null);
+        this.snackBar.open('Return cancelled.', 'Close', { duration: 3000 });
+      },
+      error: (err) => {
+        this.cancellingReturnId.set(null);
+        this.snackBar.open(
+          err?.error?.message ?? 'That return can no longer be cancelled.',
+          'Close',
+          { duration: 5000 },
+        );
+      },
+    });
+  }
+
   /** Id awaiting cancel confirmation — avoids an accidental one-click cancel. */
   confirmingCancelId = signal<string | null>(null);
   cancelling = signal(false);
@@ -280,6 +460,9 @@ export class MyOrders implements OnInit, OnDestroy {
     }
 
     this.load();
+    // Alongside the orders, not after them: a delivered card renders its return in the same
+    // frame as the order itself rather than popping one in a beat later.
+    this.returnService.loadMine();
   }
 
   /**

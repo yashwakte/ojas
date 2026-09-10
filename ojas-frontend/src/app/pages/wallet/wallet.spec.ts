@@ -60,6 +60,9 @@ describe('Wallet', () => {
     expect(walletReasonLabel('WalletPortionReturned')).toBe(
       'Wallet amount returned from a cancelled order',
     );
+    // The reason a settled return credits the wallet with. Without this the customer's statement
+    // would read "ReturnRefund" against real money.
+    expect(walletReasonLabel('ReturnRefund')).toBe('Refund for a returned item');
     // An unknown code falls back to itself rather than rendering blank.
     expect(walletReasonLabel('SomethingNew')).toBe('SomethingNew');
   });

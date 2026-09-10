@@ -18,6 +18,7 @@ import {
 } from '../../models/interfaces';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
+import { ReturnService } from '../../services/return.service';
 
 /** Lets the checkout handoff's promise callbacks run. fixture.whenStable() can't be used here:
  * the success snackbar leaves a timer pending, so the zone never reports stable. */
@@ -31,6 +32,7 @@ describe('MyOrders', () => {
   let walletServiceSpy: jasmine.SpyObj<WalletService>;
   let cartServiceSpy: jasmine.SpyObj<CartService>;
   let checkoutServiceSpy: jasmine.SpyObj<CheckoutService>;
+  let returnServiceSpy: jasmine.SpyObj<ReturnService>;
 
   const order: OrderResponse = {
     id: 'o1',
@@ -87,6 +89,13 @@ describe('MyOrders', () => {
     walletServiceSpy.load.and.returnValue(of({ balance: 0, transactions: [] }));
     cartServiceSpy = jasmine.createSpyObj('CartService', ['removeFromCart']);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['removeItem']);
+    // The page loads the customer's returns alongside their orders, so every test needs this
+    // even when it is not about returns.
+    returnServiceSpy = jasmine.createSpyObj(
+      'ReturnService',
+      ['loadMine', 'eligibility', 'create', 'cancel'],
+      { mine: signal([]) },
+    );
 
     TestBed.configureTestingModule({
       imports: [MyOrders],
@@ -99,6 +108,7 @@ describe('MyOrders', () => {
         { provide: WalletService, useValue: walletServiceSpy },
         { provide: CartService, useValue: cartServiceSpy },
         { provide: CheckoutService, useValue: checkoutServiceSpy },
+        { provide: ReturnService, useValue: returnServiceSpy },
       ],
     });
   });
@@ -1294,6 +1304,140 @@ describe('MyOrders', () => {
       const fixture = create();
 
       expect(fixture.componentInstance.refundBreakdown(order)).toBeNull();
+    });
+  });
+
+  /**
+   * The return button on a delivered order.
+   *
+   * The page decides whether to *offer* it from the order's own delivery stamp - one call per
+   * card would be a round trip per row on a page that lists every order a customer ever placed -
+   * and the server decides whether to *allow* it when the button is pressed. Both halves are
+   * pinned here: an offer that outlives the window is a promise the API will refuse, and a
+   * missing offer inside it is a feature nobody can find.
+   */
+  describe('returning a delivered order', () => {
+    const delivered = (over: Partial<OrderResponse> = {}): OrderResponse => ({
+      ...order,
+      status: 'Delivered',
+      paymentMethod: 'Cashfree',
+      paymentStatus: 'Paid',
+      amountPaid: 100,
+      deliveredAt: new Date().toISOString(),
+      returnWindowEndsAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+      ...over,
+    });
+
+    it('offers a return inside the window', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([delivered()]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.canOfferReturn(delivered())).toBeTrue();
+    });
+
+    it('withholds it once the window has closed', () => {
+      const expired = delivered({
+        returnWindowEndsAt: new Date(Date.now() - 86400000).toISOString(),
+      });
+      userServiceSpy.getMyOrders.and.returnValue(of([expired]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.canOfferReturn(expired)).toBeFalse();
+    });
+
+    it('withholds it on an order that was never delivered, or never paid', () => {
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.canOfferReturn(order)).toBeFalse();
+      expect(
+        fixture.componentInstance.canOfferReturn(delivered({ amountPaid: 0 })),
+      ).toBeFalse();
+    });
+
+    /** An order delivered before the stamp existed cannot be judged locally, so the server is
+     * asked rather than the customer being refused for our migration. */
+    it('lets the server decide for an order with no delivery stamp', () => {
+      const legacy = delivered({ deliveredAt: null, returnWindowEndsAt: null });
+      userServiceSpy.getMyOrders.and.returnValue(of([legacy]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.canOfferReturn(legacy)).toBeTrue();
+    });
+
+    it('opens the sheet only on the server\u2019s say-so', () => {
+      const target = delivered();
+      userServiceSpy.getMyOrders.and.returnValue(of([target]));
+      returnServiceSpy.eligibility.and.returnValue(
+        of({
+          canRequest: true,
+          reason: null,
+          windowEndsAt: target.returnWindowEndsAt!,
+          windowDays: 3,
+          refundable: 100,
+          items: [
+            {
+              productId: 'p1',
+              productName: 'Bajra Flour',
+              weight: '1kg',
+              price: 100,
+              orderedQuantity: 1,
+              returnableQuantity: 1,
+              unitRefund: 100,
+            },
+          ],
+        }),
+      );
+
+      const fixture = create();
+      fixture.componentInstance.openReturnSheet(target);
+
+      expect(fixture.componentInstance.returnSheetFor()?.orderId).toBe(target.id);
+    });
+
+    it('does not open the sheet when the server says no, and says why instead', () => {
+      const target = delivered();
+      userServiceSpy.getMyOrders.and.returnValue(of([target]));
+      returnServiceSpy.eligibility.and.returnValue(
+        of({
+          canRequest: false,
+          reason: 'Every item on this order already has a return in progress.',
+          windowEndsAt: target.returnWindowEndsAt!,
+          windowDays: 3,
+          refundable: 0,
+          items: [],
+        }),
+      );
+
+      const fixture = create();
+      fixture.componentInstance.openReturnSheet(target);
+
+      expect(fixture.componentInstance.returnSheetFor()).toBeNull();
+    });
+
+    /** An order paid entirely from wallet credit has no card behind it, so offering a refund to
+     * "how you paid" would be a promise the money cannot keep. */
+    it('offers only the wallet when the order was paid entirely from wallet credit', () => {
+      const walletOrder = delivered({ walletAmountApplied: 100, amountPaid: 100 });
+      userServiceSpy.getMyOrders.and.returnValue(of([walletOrder]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.returnIsWalletOnly(walletOrder.id)).toBeTrue();
+    });
+
+    it('counts down the days left in the window', () => {
+      const twoDays = delivered({
+        returnWindowEndsAt: new Date(Date.now() + 1.5 * 86400000).toISOString(),
+      });
+      userServiceSpy.getMyOrders.and.returnValue(of([twoDays]));
+      const fixture = create();
+
+      expect(fixture.componentInstance.returnWindowLeft(twoDays)).toBe('2 days left to return');
+
+      const lastDay = delivered({
+        returnWindowEndsAt: new Date(Date.now() + 3600000).toISOString(),
+      });
+      expect(fixture.componentInstance.returnWindowLeft(lastDay)).toBe('Last day to return');
     });
   });
 });

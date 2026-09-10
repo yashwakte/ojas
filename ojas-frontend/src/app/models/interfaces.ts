@@ -425,6 +425,168 @@ export interface OrderResponse {
    * a single total leaves the customer hunting a card statement for money that went elsewhere. */
   refundedToSource?: number;
   refundedToWallet?: number;
+  /** When the order was delivered, and when its return window shuts — both absent until it is
+   * delivered. The deadline is computed by the API from the same policy constant it enforces, so
+   * the page never does returns arithmetic of its own. */
+  deliveredAt?: string | null;
+  returnWindowEndsAt?: string | null;
+}
+
+// ===== RETURNS =====
+
+/** Where a return has got to. The customer sees these as a timeline, not a single word. */
+export type ReturnStatus =
+  | 'Requested'
+  | 'Approved'
+  | 'PickedUp'
+  | 'Refunded'
+  | 'Rejected'
+  | 'Cancelled';
+
+/** Why it is going back. A fixed list rather than free text, because these are counted: the
+ * owner needs to see that one pack keeps arriving crushed.
+ *
+ * Changing your mind is deliberately not one of them — the owner removed "ordered by mistake" on
+ * 2026-09-11 because a customer's own error is not a reason for us to take food back. It reaches
+ * us as `Other` with their words attached, for a human to decide on. */
+export type ReturnReason =
+  | 'Damaged'
+  | 'WrongItem'
+  | 'Expired'
+  | 'QualityNotAsExpected'
+  | 'Other';
+
+/** One line of a delivered order and how much of it can still go back. `unitRefund` is the
+ * server's own arithmetic — the price less this line's share of any basket discount, scaled by
+ * what was actually charged — so the sheet can total a selection without re-deriving money rules
+ * that belong to the API. */
+export interface ReturnableItem {
+  productId: string;
+  productName: string;
+  weight: string;
+  price: number;
+  orderedQuantity: number;
+  returnableQuantity: number;
+  unitRefund: number;
+}
+
+/** Whether an order can be returned from, and — when it cannot — a sentence written to be shown
+ * to the customer exactly as it stands. A disabled button with no explanation is what generates
+ * the phone call this feature exists to prevent. */
+export interface ReturnEligibility {
+  canRequest: boolean;
+  reason?: string | null;
+  windowEndsAt?: string | null;
+  windowDays: number;
+  refundable: number;
+  items: ReturnableItem[];
+}
+
+export interface ReturnRequestItem {
+  productId: string;
+  productName: string;
+  weight: string;
+  price: number;
+  quantity: number;
+  refundAmount: number;
+}
+
+export interface ReturnRequestEvent {
+  status: ReturnStatus;
+  note?: string | null;
+  /** "customer" or "admin" — never a user id, which would tell the reader nothing. */
+  by: string;
+  at: string;
+}
+
+export interface ReturnRequestResponse {
+  id: string;
+  orderId: string;
+  items: ReturnRequestItem[];
+  reason: ReturnReason;
+  comment?: string | null;
+  status: ReturnStatus;
+  refundDestination: RefundDestination;
+  refundAmount: number;
+  refundedToWallet: number;
+  refundedToSource: number;
+  refundQueued: number;
+  events: ReturnRequestEvent[];
+  createdAt: string;
+  updatedAt?: string | null;
+  /** Admin queue only. Absent on a customer's own reads, deliberately. */
+  customerName?: string | null;
+  customerPhone?: string | null;
+  pickupAddress?: string | null;
+}
+
+export interface CreateReturnRequest {
+  orderId: string;
+  items: { productId: string; quantity: number }[];
+  reason: ReturnReason;
+  comment?: string | null;
+  refundDestination: RefundDestination;
+}
+
+export interface UpdateReturnStatusRequest {
+  status: ReturnStatus;
+  note?: string | null;
+}
+
+export interface ReturnSettlementResponse {
+  request: ReturnRequestResponse | null;
+  walletCredited: number;
+  refundedToSource: number;
+  refundQueued: number;
+  refundError?: string | null;
+}
+
+/** The reasons, in the order they are offered. Damage and a wrong item come first because they
+ * are both the most urgent for the customer and the ones we most need to hear about. */
+export const RETURN_REASONS: { value: ReturnReason; label: string; hint: string }[] = [
+  { value: 'Damaged', label: 'Pack arrived damaged', hint: 'Torn, crushed or leaking' },
+  { value: 'WrongItem', label: 'Wrong item delivered', hint: 'Not what I ordered' },
+  { value: 'Expired', label: 'Expired or too close to expiry', hint: 'Check the date on the pack' },
+  { value: 'QualityNotAsExpected', label: 'Quality not as expected', hint: 'Tell us what was wrong' },
+  { value: 'Other', label: 'Something else', hint: 'Add a note below' },
+];
+
+/** What a status means to the customer, in their words. */
+export const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
+  Requested: 'Return requested',
+  Approved: 'Pickup scheduled',
+  PickedUp: 'Picked up',
+  Refunded: 'Refunded',
+  Rejected: 'Not accepted',
+  Cancelled: 'Cancelled by you',
+};
+
+/** The steps a return walks through, in order, for the timeline. Rejected and Cancelled are
+ * endings rather than steps, so they are not on it. */
+export const RETURN_TIMELINE: ReturnStatus[] = ['Requested', 'Approved', 'PickedUp', 'Refunded'];
+
+export function returnReasonLabel(reason: ReturnReason): string {
+  return RETURN_REASONS.find((r) => r.value === reason)?.label ?? 'Return';
+}
+
+/** Nothing further will happen to it. */
+export function isReturnFinished(request: ReturnRequestResponse): boolean {
+  return (
+    request.status === 'Refunded' ||
+    request.status === 'Rejected' ||
+    request.status === 'Cancelled'
+  );
+}
+
+/** The customer may call it off right up until we have collected the goods — after that,
+ * cancelling would leave the pack with us and the money with them. */
+export function canCancelReturn(request: ReturnRequestResponse): boolean {
+  return request.status === 'Requested' || request.status === 'Approved';
+}
+
+/** Still holding units of the order, so they cannot be claimed by a second request. */
+export function isReturnLive(request: ReturnRequestResponse): boolean {
+  return !(request.status === 'Rejected' || request.status === 'Cancelled');
 }
 
 /** One destination the money went back to. There is a line per destination because a single
@@ -522,6 +684,7 @@ const WALLET_REASON_LABELS: Record<string, string> = {
   UnappliedTopUpReturned: 'Returned — payment arrived after the changes were dropped',
   OrderCancellationRefund: 'Refund from a cancelled order',
   WalletPortionReturned: 'Wallet amount returned from a cancelled order',
+  ReturnRefund: 'Refund for a returned item',
   OrderPayment: 'Paid towards an order',
   AdminAdjustment: 'Adjustment by Ojas',
 };

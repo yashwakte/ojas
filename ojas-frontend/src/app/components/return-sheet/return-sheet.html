@@ -1,0 +1,193 @@
+<div class="rs-backdrop" (click)="close()"></div>
+
+<div class="rs-sheet" role="dialog" aria-modal="true" aria-labelledby="rsTitle">
+  <span class="rs-glow" aria-hidden="true"></span>
+  <span class="rs-grip" aria-hidden="true"></span>
+
+  <div class="rs-head">
+    <span class="rs-titles">
+      <strong id="rsTitle">Return items</strong>
+      <small>
+        Unopened packs, in their original packaging, within {{ windowDays }} days of delivery
+      </small>
+    </span>
+    <button type="button" class="rs-close" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="rs-body">
+    <!-- 1. WHAT -->
+    <section class="rs-step">
+      <h4 class="rs-step-title"><span class="rs-step-no">1</span> What are you sending back?</h4>
+
+      <div class="rs-items">
+        @for (item of returnable(); track item.productId) {
+          <div class="rs-item" [class.picked]="isPicked(item)">
+            <button
+              type="button"
+              class="rs-item-main"
+              (click)="toggle(item)"
+              [attr.aria-pressed]="isPicked(item)"
+            >
+              <span class="rs-check" aria-hidden="true">
+                <mat-icon>{{ isPicked(item) ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+              </span>
+              <span class="rs-item-text">
+                <strong>{{ item.productName }}</strong>
+                <small>
+                  {{ item.weight }} · ₹{{ item.unitRefund | number: '1.2-2' }} back per pack
+                  @if (item.returnableQuantity < item.orderedQuantity) {
+                    · {{ item.returnableQuantity }} of {{ item.orderedQuantity }} available
+                  }
+                </small>
+              </span>
+            </button>
+
+            @if (isPicked(item)) {
+              <!-- Only once a line is chosen. A stepper against every row, most of them at zero,
+                   is noise on a phone. -->
+              <div class="rs-qty" role="group" [attr.aria-label]="'How many ' + item.productName">
+                <button
+                  type="button"
+                  (click)="decrease(item)"
+                  [attr.aria-label]="'One fewer ' + item.productName"
+                >
+                  <mat-icon>remove</mat-icon>
+                </button>
+                <span>{{ quantityFor(item) }}</span>
+                <button
+                  type="button"
+                  (click)="increase(item)"
+                  [disabled]="quantityFor(item) >= item.returnableQuantity"
+                  [attr.aria-label]="'One more ' + item.productName"
+                >
+                  <mat-icon>add</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- 2. WHY -->
+    <section class="rs-step">
+      <h4 class="rs-step-title"><span class="rs-step-no">2</span> Why are you returning it?</h4>
+
+      <div class="rs-reasons" role="radiogroup" aria-label="Reason for the return">
+        @for (option of reasons; track option.value) {
+          <button
+            type="button"
+            class="rs-reason"
+            role="radio"
+            [class.selected]="reason() === option.value"
+            [attr.aria-checked]="reason() === option.value"
+            (click)="chooseReason(option.value)"
+          >
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.hint }}</small>
+          </button>
+        }
+      </div>
+
+      <label class="rs-comment">
+        <span class="rs-comment-label">
+          Anything you want to add?
+          @if (needsComment()) {
+            <em>Required</em>
+          }
+        </span>
+        <textarea
+          rows="2"
+          maxlength="500"
+          [ngModel]="comment()"
+          (ngModelChange)="comment.set($event)"
+          placeholder="Tell us what happened — it helps us fix it"
+        ></textarea>
+      </label>
+    </section>
+
+    <!-- 3. WHERE THE MONEY GOES -->
+    <section class="rs-step">
+      <h4 class="rs-step-title"><span class="rs-step-no">3</span> Where should the refund go?</h4>
+
+      <div class="rs-destinations" role="radiogroup" aria-label="Where the refund goes">
+        <button
+          type="button"
+          class="rs-destination"
+          role="radio"
+          [class.selected]="destination() === 'wallet'"
+          [attr.aria-checked]="destination() === 'wallet'"
+          (click)="chooseDestination('wallet')"
+        >
+          <mat-icon>account_balance_wallet</mat-icon>
+          <span>
+            <strong>Ojas wallet</strong>
+            <small>Credited as soon as we have checked the pack</small>
+          </span>
+        </button>
+
+        <!-- Withheld when the order was paid entirely from wallet credit: there is no card
+             behind it to send anything back to, and offering the choice would be a promise the
+             money cannot keep. -->
+        @if (!walletOnly()) {
+          <button
+            type="button"
+            class="rs-destination"
+            role="radio"
+            [class.selected]="destination() === 'source'"
+            [attr.aria-checked]="destination() === 'source'"
+            (click)="chooseDestination('source')"
+          >
+            <mat-icon>credit_card</mat-icon>
+            <span>
+              <strong>Back to how you paid</strong>
+              <small>5–7 working days once we release it</small>
+            </span>
+          </button>
+        }
+      </div>
+    </section>
+
+    <p class="rs-promise">
+      <mat-icon>local_shipping</mat-icon>
+      We collect it from your delivery address, free of charge. Keep the pack sealed and in its
+      original packaging until then.
+    </p>
+
+    @if (errorMessage(); as error) {
+      <p class="rs-error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        {{ error }}
+      </p>
+    }
+  </div>
+
+  <!-- The total and the action are pinned, so on a phone the one thing they came here to see is
+       never scrolled off the bottom of a three-step form. -->
+  <div class="rs-foot">
+    <div class="rs-total">
+      <span>Refund</span>
+      <strong>₹{{ refundTotal() | number: '1.2-2' }}</strong>
+    </div>
+    <button
+      type="button"
+      class="rs-submit"
+      [disabled]="!canSubmit() || commentMissing()"
+      (click)="submit()"
+    >
+      @if (submitting()) {
+        Sending…
+      } @else if (selectedCount() === 0) {
+        Choose an item
+      } @else if (!reason()) {
+        Choose a reason
+      } @else if (commentMissing()) {
+        Add a note
+      } @else {
+        Request return of {{ selectedCount() }} item{{ selectedCount() === 1 ? '' : 's' }}
+      }
+    </button>
+  </div>
+</div>

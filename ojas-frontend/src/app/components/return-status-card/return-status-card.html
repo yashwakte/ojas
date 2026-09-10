@@ -1,0 +1,76 @@
+@if (request(); as r) {
+  <div class="return-card" [class.return-card--closed]="finished()">
+    <div class="return-card-head">
+      <span class="return-status" [class]="'return-status--' + r.status">
+        {{ statusLabels[r.status] }}
+      </span>
+      <span class="return-amount">₹{{ r.refundAmount | number: '1.2-2' }}</span>
+    </div>
+
+    <p class="return-items">
+      @for (item of r.items; track item.productId) {
+        <span class="return-item">{{ item.quantity }} × {{ item.productName }}</span>
+      }
+    </p>
+    <p class="return-reason">{{ reasonLabel(r.reason) }}</p>
+
+    @if (showTimeline()) {
+      <ol class="return-track" aria-label="Return progress">
+        @for (step of timeline; track step) {
+          <li
+            class="return-step"
+            [class.done]="isStepDone(step)"
+            [attr.aria-current]="r.status === step ? 'step' : null"
+          >
+            <span class="return-dot" aria-hidden="true"></span>
+            <span class="return-step-label">{{ statusLabels[step] }}</span>
+          </li>
+        }
+      </ol>
+    }
+
+    <!-- Whatever we last said about it, in our own words. A refusal without a reason is the thing
+         that generates the phone call this flow exists to save. -->
+    @for (note of notes(); track $index) {
+      <p class="return-note">
+        <mat-icon>chat_bubble_outline</mat-icon>
+        {{ note }}
+      </p>
+    }
+
+    @if (r.status === 'Refunded') {
+      <p class="return-settled">
+        <mat-icon>check_circle</mat-icon>
+        <span>
+          @if (r.refundedToWallet > 0) {
+            ₹{{ r.refundedToWallet | number: '1.2-2' }} added to your Ojas wallet.
+          }
+          @if (r.refundedToSource > 0) {
+            ₹{{ r.refundedToSource | number: '1.2-2' }} sent back to how you paid — your bank
+            usually takes 5–7 working days.
+          }
+          @if (r.refundQueued > 0) {
+            ₹{{ r.refundQueued | number: '1.2-2' }} is still being processed; we will call you
+            about it.
+          }
+        </span>
+      </p>
+    } @else if (r.status === 'Requested' || r.status === 'Approved') {
+      <p class="return-pending">
+        <mat-icon>local_shipping</mat-icon>
+        We will call to arrange a free pickup. Keep the pack sealed until then.
+      </p>
+    }
+
+    @if (cancellable()) {
+      <button
+        type="button"
+        class="return-cancel-btn"
+        [disabled]="cancelling()"
+        (click)="cancel()"
+      >
+        {{ cancelling() ? 'Cancelling…' : 'Cancel this return' }}
+      </button>
+    }
+  </div>
+}
