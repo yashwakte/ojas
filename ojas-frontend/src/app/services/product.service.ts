@@ -24,35 +24,72 @@ export class ProductService {
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
 
+  /** How long a tab may go without re-checking the catalogue when it comes back into view. */
+  static readonly REFRESH_AFTER_MS = 60_000;
+  private lastLoadedAt = 0;
+  private bypassCache = false;
+
   constructor(private http: HttpClient) {
     this.loadProducts();
+
+    // The catalogue is fetched once per tab, and a storefront tab is routinely left open for
+    // hours - so a price the owner changed at noon was still the old one in a tab opened that
+    // morning, right up until checkout quoted the new one. Coming back to the tab re-checks, at
+    // most once a minute; the answer comes from the CDN edge, so it costs the API nothing.
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') this.refreshIfStale();
+      });
+    }
   }
 
   /**
    * Loads the catalogue into the shared signal.
    *
-   * `bypassCache` is for the admin console. The catalogue is served with `public, max-age=60,
-   * stale-while-revalidate=300` to anonymous visitors, and a shared cache that has stored one of
-   * those copies will keep answering with it for minutes - including to an admin who has just
-   * saved an edit, because their own `no-store` response header only governs responses the origin
-   * actually gets asked for. A one-off query parameter is a different cache key, so the request
-   * cannot be answered from any stored copy at any layer. It is deliberately NOT the default:
-   * customers are the traffic this cache exists for.
+   * `bypassCache` is for the admin console. The CDN edge may hold the catalogue for up to about a
+   * minute, and an admin who has just saved an edit would be answered from that copy - their own
+   * `no-store` response header only governs responses the origin actually gets asked for. A
+   * one-off query parameter is a different cache key, so no stored copy at any layer can answer
+   * it. The choice is remembered, so the tab-return re-check keeps going round the cache for them
+   * too. It is deliberately NOT the default: customers are the traffic the edge cache exists for.
    */
   loadProducts(options?: { bypassCache?: boolean }): void {
     this._loading.set(true);
     this._error.set(null);
-    const params = options?.bypassCache ? { _: Date.now() } : undefined;
-    this.http.get<Product[]>(this.apiUrl, { params }).subscribe({
+    this.bypassCache = options?.bypassCache ?? false;
+    this.http.get<Product[]>(this.apiUrl, { params: this.cacheParams() }).subscribe({
       next: (products) => {
         this._products.set(products.map((product) => this.normalizeProduct(product)));
         this._loading.set(false);
+        this.lastLoadedAt = Date.now();
       },
       error: () => {
         this._error.set('Failed to load products');
         this._loading.set(false);
       },
     });
+  }
+
+  /**
+   * Re-checks the catalogue when a tab comes back into view, so a price the owner changed while
+   * the tab sat open is the price the customer sees before checkout, not a surprise at it. Quiet:
+   * no loading state, and a failed check keeps the list on screen rather than emptying the shop.
+   */
+  refreshIfStale(now = Date.now()): void {
+    if (this._loading() || now - this.lastLoadedAt < ProductService.REFRESH_AFTER_MS) return;
+    this.lastLoadedAt = now;
+    this.http.get<Product[]>(this.apiUrl, { params: this.cacheParams() }).subscribe({
+      next: (products) => {
+        const fresh = products.map((product) => this.normalizeProduct(product));
+        // Only swap when something changed, so an unchanged catalogue does not re-render the page.
+        if (JSON.stringify(fresh) !== JSON.stringify(this._products())) this._products.set(fresh);
+      },
+      error: () => {},
+    });
+  }
+
+  private cacheParams(): { _: number } | undefined {
+    return this.bypassCache ? { _: Date.now() } : undefined;
   }
 
   getProduct(id: string): Product | undefined {

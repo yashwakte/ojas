@@ -94,4 +94,40 @@ describe('CampaignBannerService', () => {
     req.flush(refreshed);
     expect(service.campaigns()).toEqual(refreshed);
   });
+
+  it('re-checks quietly when the tab comes back after a while, so a newly published banner shows', () => {
+    httpMock.expectOne(environment.apiUrl + '/campaign-banner').flush([config]);
+
+    service.refreshIfStale(Date.now() + CampaignBannerService.REFRESH_AFTER_MS + 1000);
+    const req = httpMock.expectOne(environment.apiUrl + '/campaign-banner');
+    expect(service.loading()).toBeFalse();
+
+    const published = [config, { ...config, id: 'b2', title: 'Diwali' }];
+    req.flush(published);
+    expect(service.campaigns()).toEqual(published);
+  });
+
+  it('does not re-check on every tab switch', () => {
+    httpMock.expectOne(environment.apiUrl + '/campaign-banner').flush([config]);
+    service.refreshIfStale(Date.now() + 5000);
+    httpMock.expectNone(environment.apiUrl + '/campaign-banner');
+  });
+
+  it('keeps the banners on screen when a background re-check fails', () => {
+    httpMock.expectOne(environment.apiUrl + '/campaign-banner').flush([config]);
+    service.refreshIfStale(Date.now() + CampaignBannerService.REFRESH_AFTER_MS + 1000);
+    httpMock
+      .expectOne(environment.apiUrl + '/campaign-banner')
+      .flush('fail', { status: 500, statusText: 'err' });
+    expect(service.campaigns()).toEqual([config]);
+  });
+
+  it('goes round every cache for the admin console, including on a tab-return re-check', () => {
+    const url = environment.apiUrl + '/campaign-banner';
+    httpMock.expectOne(url).flush([config]);
+    service.loadCampaigns({ bypassCache: true });
+    httpMock.expectOne((r) => r.url === url && r.params.has('_')).flush([config]);
+    service.refreshIfStale(Date.now() + CampaignBannerService.REFRESH_AFTER_MS + 1000);
+    httpMock.expectOne((r) => r.url === url && r.params.has('_')).flush([config]);
+  });
 });

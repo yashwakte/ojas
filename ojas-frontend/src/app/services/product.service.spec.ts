@@ -178,4 +178,40 @@ describe('ProductService', () => {
     req.flush(null);
     expect(service.products()).toEqual([]);
   });
+
+  describe('re-checking when the tab comes back', () => {
+    const url = environment.apiUrl + '/products';
+    const later = () => Date.now() + ProductService.REFRESH_AFTER_MS + 1000;
+
+    it('quietly picks up a price the owner changed while the tab sat open', () => {
+      flushInitialLoad([fullProduct]);
+      service.refreshIfStale(later());
+      const req = httpMock.expectOne(url);
+      expect(service.loading()).toBeFalse();
+      req.flush([{ ...fullProduct, price: 250 }]);
+      expect(service.getProduct('p2')?.price).toBe(250);
+    });
+
+    it('does not re-check on every tab switch', () => {
+      flushInitialLoad([fullProduct]);
+      service.refreshIfStale(Date.now() + 5000);
+      httpMock.expectNone(url);
+    });
+
+    it('keeps the catalogue on screen when a re-check fails', () => {
+      flushInitialLoad([fullProduct]);
+      service.refreshIfStale(later());
+      httpMock.expectOne(url).flush('fail', { status: 500, statusText: 'err' });
+      expect(service.products().length).toBe(1);
+      expect(service.error()).toBeNull();
+    });
+
+    it('keeps going round the cache for the admin console', () => {
+      flushInitialLoad([fullProduct]);
+      service.loadProducts({ bypassCache: true });
+      httpMock.expectOne((r) => r.url === url && r.params.has('_')).flush([fullProduct]);
+      service.refreshIfStale(later());
+      httpMock.expectOne((r) => r.url === url && r.params.has('_')).flush([fullProduct]);
+    });
+  });
 });

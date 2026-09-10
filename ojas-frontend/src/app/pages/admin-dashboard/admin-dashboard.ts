@@ -252,7 +252,7 @@ export class AdminDashboard implements OnInit {
     } else if (tab === 'hero-images') {
       this.heroSlideService.loadSlides({ bypassCache: true });
     } else if (tab === 'campaign-banner') {
-      this.campaignBannerService.loadCampaigns();
+      this.campaignBannerService.loadCampaigns({ bypassCache: true });
     }
   }
 

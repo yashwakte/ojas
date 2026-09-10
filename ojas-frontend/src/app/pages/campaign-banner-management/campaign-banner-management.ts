@@ -77,7 +77,7 @@ export class CampaignBannerManagement implements OnInit {
   readonly formErrors = signal<Partial<Record<keyof UpdateCampaignBannerRequest, string>>>({});
 
   ngOnInit(): void {
-    this.campaignBannerService.loadCampaigns();
+    this.campaignBannerService.loadCampaigns({ bypassCache: true });
   }
 
   private toFormData(cfg: CampaignBannerConfig): UpdateCampaignBannerRequest {

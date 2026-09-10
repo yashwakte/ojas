@@ -19,8 +19,21 @@ export class DeliveryChargesService {
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
 
+  /** How long a tab may go without re-checking the delivery rules when it comes back into view. */
+  static readonly REFRESH_AFTER_MS = 60_000;
+  private lastLoadedAt = 0;
+
   constructor(private http: HttpClient) {
     this.loadConfig();
+
+    // Loaded once per tab, and storefront tabs stay open for hours - a charge the owner changed in
+    // the meantime would be quoted on the product page and then differ at checkout. Coming back to
+    // the tab re-checks, at most once a minute, from the CDN edge.
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') this.refreshIfStale();
+      });
+    }
   }
 
   loadConfig(): void {
@@ -30,6 +43,7 @@ export class DeliveryChargesService {
       next: (config) => {
         this._config.set(config);
         this._loading.set(false);
+        this.lastLoadedAt = Date.now();
       },
       error: () => {
         this._error.set('Failed to load delivery charges');
@@ -38,11 +52,29 @@ export class DeliveryChargesService {
     });
   }
 
+  /**
+   * Re-checks the delivery rules when a tab comes back into view. Quiet: no loading state, and a
+   * failed check keeps the rules already in hand rather than dropping the delivery quote.
+   */
+  refreshIfStale(now = Date.now()): void {
+    if (this._loading() || now - this.lastLoadedAt < DeliveryChargesService.REFRESH_AFTER_MS) return;
+    this.lastLoadedAt = now;
+    this.http.get<DeliveryChargesConfig>(this.apiUrl).subscribe({
+      next: (config) => {
+        if (JSON.stringify(config) !== JSON.stringify(this._config())) this._config.set(config);
+      },
+      error: () => {},
+    });
+  }
+
   updateConfig(request: UpdateDeliveryChargesRequest): Observable<DeliveryChargesConfig> {
     return this.http.patch<DeliveryChargesConfig>(this.apiUrl, request).pipe(
       tap((config) => {
         // Keep the displayed configuration in sync with the successful upsert response.
         this._config.set(config);
+        // This is the freshest copy there is. The edge may keep answering with the pre-save one for
+        // up to a minute, so a tab-return re-check inside that minute must not swap it back.
+        this.lastLoadedAt = Date.now();
         this._error.set(null);
       }),
     );

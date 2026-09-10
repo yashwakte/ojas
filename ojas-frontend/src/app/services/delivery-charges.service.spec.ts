@@ -177,4 +177,35 @@ describe('DeliveryChargesService', () => {
       expect(service.isWithinServiceArea(25.1)).toBeFalse();
     });
   });
+
+  describe('re-checking when the tab comes back', () => {
+    const url = environment.apiUrl + '/delivery-charges';
+    const later = () => Date.now() + DeliveryChargesService.REFRESH_AFTER_MS + 1000;
+
+    it('quietly picks up a charge the owner changed', () => {
+      flushInitialLoad();
+      service.refreshIfStale(later());
+      const req = httpMock.expectOne(url);
+      expect(service.loading()).toBeFalse();
+      req.flush({ ...config, perKmChargeAfterFree: 15 });
+      expect(service.config()?.perKmChargeAfterFree).toBe(15);
+    });
+
+    it('keeps the rules in hand when a re-check fails', () => {
+      flushInitialLoad();
+      service.refreshIfStale(later());
+      httpMock.expectOne(url).flush('fail', { status: 500, statusText: 'err' });
+      expect(service.config()).toEqual(config);
+      expect(service.error()).toBeNull();
+    });
+
+    it('does not let a re-check straight after a save swap the saved rules back', () => {
+      flushInitialLoad();
+      service.updateConfig({} as any).subscribe();
+      httpMock.expectOne(url).flush({ ...config, perKmChargeAfterFree: 20 });
+      service.refreshIfStale(Date.now() + 5000);
+      httpMock.expectNone(url);
+      expect(service.config()?.perKmChargeAfterFree).toBe(20);
+    });
+  });
 });

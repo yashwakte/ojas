@@ -90,7 +90,7 @@ describe('CampaignBannerManagement', () => {
 
   it('calls loadCampaigns on init and starts in list view', () => {
     const { fixture } = create();
-    expect(campaignBannerServiceSpy.loadCampaigns).toHaveBeenCalled();
+    expect(campaignBannerServiceSpy.loadCampaigns).toHaveBeenCalledWith({ bypassCache: true });
     expect(fixture.componentInstance).toBeTruthy();
     expect(fixture.componentInstance.editingId()).toBeNull();
   });
