@@ -254,20 +254,31 @@ export class MyOrders implements OnInit, OnDestroy {
     return !Number.isNaN(ends) && Date.now() <= ends;
   }
 
-  /** How long is left, in the words a customer thinks in. Null once it has closed. */
-  returnWindowLeft(order: OrderResponse): string | null {
+  /**
+   * How long is left, in the words a customer thinks in. Null once it has closed.
+   *
+   * Counted in calendar days, not in hours rounded up. The window runs to midnight on the third
+   * day after delivery, so on delivery day there are three days *plus the rest of today* left —
+   * and rounding that up printed "4 days left to return" beside a "3-day returns" promise.
+   * Counted by calendar day, delivery day says 3, and the last day says so.
+   */
+  returnWindowLeft(order: OrderResponse, now = Date.now()): string | null {
     const closes = order.returnWindowEndsAt;
     if (!closes) return null;
 
     const ends = new Date(closes).getTime();
-    if (Number.isNaN(ends)) return null;
+    if (Number.isNaN(ends) || ends <= now) return null;
 
-    const msLeft = ends - Date.now();
-    if (msLeft <= 0) return null;
-
-    const daysLeft = Math.ceil(msLeft / 86400000);
-    if (daysLeft <= 1) return 'Last day to return';
+    const daysLeft = MyOrders.indiaDay(ends) - MyOrders.indiaDay(now);
+    if (daysLeft <= 0) return 'Last day to return';
+    if (daysLeft === 1) return 'Return by tomorrow';
     return `${daysLeft} days left to return`;
+  }
+
+  /** India is UTC+5:30 all year. The API sets the deadline on India's calendar, so the countdown
+   * counts days on that calendar too, whatever timezone the browser happens to report. */
+  private static indiaDay(ms: number): number {
+    return Math.floor((ms + 5.5 * 3_600_000) / 86_400_000);
   }
 
   /**

@@ -1425,19 +1425,24 @@ describe('MyOrders', () => {
       expect(fixture.componentInstance.returnIsWalletOnly(walletOrder.id)).toBeTrue();
     });
 
-    it('counts down the days left in the window', () => {
-      const twoDays = delivered({
-        returnWindowEndsAt: new Date(Date.now() + 1.5 * 86400000).toISOString(),
+    /** The policy says three days. Delivery day used to say "4 days left", because the window
+     * runs to midnight on the third day after and the hours were rounded up. */
+    it('counts the window in calendar days, so delivery day says 3 — never 4', () => {
+      // Delivered 4:07pm IST on 11 Sep; the API closes the window at 11:59:59pm IST on 14 Sep.
+      const order = delivered({
+        deliveredAt: '2026-09-11T10:37:00Z',
+        returnWindowEndsAt: '2026-09-14T18:29:59.999Z',
       });
-      userServiceSpy.getMyOrders.and.returnValue(of([twoDays]));
-      const fixture = create();
+      userServiceSpy.getMyOrders.and.returnValue(of([order]));
+      const page = create().componentInstance;
+      const at = (iso: string) => new Date(iso).getTime();
 
-      expect(fixture.componentInstance.returnWindowLeft(twoDays)).toBe('2 days left to return');
-
-      const lastDay = delivered({
-        returnWindowEndsAt: new Date(Date.now() + 3600000).toISOString(),
-      });
-      expect(fixture.componentInstance.returnWindowLeft(lastDay)).toBe('Last day to return');
+      expect(page.returnWindowLeft(order, at('2026-09-11T10:40:00Z'))).toBe('3 days left to return');
+      // 11:30pm IST on the 12th, then a minute past midnight on the 13th.
+      expect(page.returnWindowLeft(order, at('2026-09-12T18:00:00Z'))).toBe('2 days left to return');
+      expect(page.returnWindowLeft(order, at('2026-09-12T18:31:00Z'))).toBe('Return by tomorrow');
+      expect(page.returnWindowLeft(order, at('2026-09-14T03:00:00Z'))).toBe('Last day to return');
+      expect(page.returnWindowLeft(order, at('2026-09-14T18:31:00Z'))).toBeNull();
     });
   });
 });

@@ -646,7 +646,8 @@
                     @if (returnWindowLeft(order); as left) {
                       <span class="returns-countdown">
                         <mat-icon>schedule</mat-icon>
-                        {{ left }}
+                        {{ left }} · closes
+                        {{ order.returnWindowEndsAt | date: 'EEE, d MMM' : '+0530' }}
                       </span>
                     }
                   </div>

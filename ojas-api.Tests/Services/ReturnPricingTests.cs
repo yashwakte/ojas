@@ -136,15 +136,29 @@ public class ReturnPricingTests
         ReturnPricing.Refundable(order).ShouldBe(0m);
     }
 
-    /// <summary>The window runs to the end of its last day. A customer told "three days" does not
-    /// expect it to expire at 4:07pm because that is when the doorbell rang.</summary>
+    /// <summary>The window runs to the end of its last day on the customer's own clock. A customer
+    /// told "three days" does not expect it to expire at 4:07pm because that is when the doorbell
+    /// rang - nor at 5:29am because that is midnight in UTC.</summary>
     [Fact]
-    public void TheWindowRunsToTheEndOfItsLastDay()
+    public void TheWindowRunsToMidnightIndiaTime_OnTheThirdDayAfterDelivery()
     {
-        var delivered = new DateTime(2026, 9, 9, 16, 7, 0, DateTimeKind.Utc);
+        var delivered = new DateTime(2026, 9, 9, 10, 37, 0, DateTimeKind.Utc); // 4:07pm IST, 9 Sep
 
         ReturnPolicy.IsWithinWindow(delivered, delivered).ShouldBeTrue();
-        ReturnPolicy.IsWithinWindow(delivered, new DateTime(2026, 9, 12, 23, 59, 0, DateTimeKind.Utc)).ShouldBeTrue();
-        ReturnPolicy.IsWithinWindow(delivered, new DateTime(2026, 9, 13, 0, 1, 0, DateTimeKind.Utc)).ShouldBeFalse();
+        // 11:59pm IST on 12 Sep.
+        ReturnPolicy.IsWithinWindow(delivered, new DateTime(2026, 9, 12, 18, 29, 0, DateTimeKind.Utc)).ShouldBeTrue();
+        // 12:01am IST on 13 Sep.
+        ReturnPolicy.IsWithinWindow(delivered, new DateTime(2026, 9, 12, 18, 31, 0, DateTimeKind.Utc)).ShouldBeFalse();
+    }
+
+    /// <summary>1:30am in Pune is still the previous day in UTC. Counting from the UTC date would
+    /// have started this customer's three days on a day they had not yet received anything.</summary>
+    [Fact]
+    public void ADeliveryJustAfterMidnight_CountsFromThatDayInIndia()
+    {
+        var delivered = new DateTime(2026, 9, 9, 20, 0, 0, DateTimeKind.Utc); // 1:30am IST, 10 Sep
+
+        ReturnPolicy.WindowEndsAt(delivered)
+            .ShouldBe(new DateTime(2026, 9, 13, 18, 30, 0, DateTimeKind.Utc).AddTicks(-1)); // end of 13 Sep IST
     }
 }
