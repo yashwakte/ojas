@@ -18,10 +18,12 @@ import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { HeroSlideService } from '../../services/hero-slide.service';
+import { ReturnService } from '../../services/return.service';
 import { ProductManagement } from '../product-management/product-management';
 import { DeliveryChargesManagement } from '../delivery-charges-management/delivery-charges-management';
 import { CampaignBannerManagement } from '../campaign-banner-management/campaign-banner-management';
 import { HeroSlideManagement } from '../hero-slide-management/hero-slide-management';
+import { ReturnManagement } from '../return-management/return-management';
 import {
   AdminStatusChangeResponse,
   CancellationPreviewResponse,
@@ -40,6 +42,7 @@ import {
 
 type AdminTab =
   | 'orders'
+  | 'returns'
   | 'products'
   | 'delivery-partners'
   | 'delivery-charges'
@@ -69,6 +72,7 @@ type AdminTab =
     DeliveryChargesManagement,
     CampaignBannerManagement,
     HeroSlideManagement,
+    ReturnManagement,
   ],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.scss',
@@ -86,12 +90,14 @@ export class AdminDashboard implements OnInit {
   private deliveryChargesService = inject(DeliveryChargesService);
   private campaignBannerService = inject(CampaignBannerService);
   private heroSlideService = inject(HeroSlideService);
+  private returnService = inject(ReturnService);
   private snackBar = inject(MatSnackBar);
   /** Lets a header Refresh discard an in-progress add/edit form instead of leaving it open with stale data. */
   private readonly productManagement = viewChild(ProductManagement);
 
   readonly tabs = [
     { id: 'orders', label: 'Orders', shortLabel: 'Orders', icon: 'receipt_long' },
+    { id: 'returns', label: 'Returns', shortLabel: 'Returns', icon: 'assignment_return' },
     { id: 'products', label: 'Products', shortLabel: 'Products', icon: 'inventory_2' },
     { id: 'delivery-partners', label: 'Delivery Partners', shortLabel: 'Partners', icon: 'delivery_dining' },
     { id: 'delivery-charges', label: 'Delivery Charges', shortLabel: 'Charges', icon: 'local_shipping' },
@@ -232,6 +238,8 @@ export class AdminDashboard implements OnInit {
     const tab = this.activeTab();
     if (tab === 'orders') {
       this.loadOrders();
+    } else if (tab === 'returns') {
+      this.returnService.loadQueue();
     } else if (tab === 'delivery-partners') {
       this.loadDeliveryPartners();
     } else if (tab === 'products') {

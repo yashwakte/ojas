@@ -286,6 +286,19 @@
       </div>
     </mat-tab>
 
+    <!-- Returns Tab. Second, next to Orders: it is the other queue with a customer waiting at
+         the end of it, and a return nobody sees is a refund nobody pays. -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>assignment_return</mat-icon>
+        <span>Returns</span>
+      </ng-template>
+
+      <div class="tab-content">
+        <app-return-management></app-return-management>
+      </div>
+    </mat-tab>
+
     <!-- Products Tab -->
     <mat-tab>
       <ng-template mat-tab-label>

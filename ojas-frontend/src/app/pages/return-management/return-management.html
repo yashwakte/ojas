@@ -1,0 +1,202 @@
+<section class="returns-pane">
+  <header class="pane-head">
+    <div class="pane-titles">
+      <h3>Returns</h3>
+      <p>
+        Approve a request, record the pickup, then refund it. The money only moves on the last
+        step — the pack has to be back with you first.
+      </p>
+    </div>
+
+    <!-- Money the business is holding that belongs to customers. The one figure worth putting at
+         the top of this pane. -->
+    @if (awaitingRefund() > 0) {
+      <div class="pane-owed">
+        <span>Awaiting refund</span>
+        <strong>₹{{ awaitingRefund() | number: '1.2-2' }}</strong>
+      </div>
+    }
+  </header>
+
+  <div class="pane-filters" role="tablist" aria-label="Filter returns">
+    @for (option of filters; track option.id) {
+      <button
+        type="button"
+        role="tab"
+        class="filter-chip"
+        [class.active]="filter() === option.id"
+        [attr.aria-selected]="filter() === option.id"
+        (click)="setFilter(option.id)"
+      >
+        {{ option.label }}
+        <span class="filter-count">{{ countFor(option.id) }}</span>
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="pane-state">
+      <mat-spinner diameter="34"></mat-spinner>
+      <p>Loading returns…</p>
+    </div>
+  } @else if (error()) {
+    <div class="pane-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+      <button mat-stroked-button (click)="reload()">Try again</button>
+    </div>
+  } @else if (visible().length === 0) {
+    <div class="pane-state">
+      <mat-icon>assignment_turned_in</mat-icon>
+      <p>
+        @if (filter() === 'open') {
+          Nothing waiting on you. Every return has been dealt with.
+        } @else {
+          No returns here.
+        }
+      </p>
+    </div>
+  } @else {
+    <div class="return-list">
+      @for (request of visible(); track request.id) {
+        <article
+          class="return-row"
+          [id]="'return-' + request.id"
+          [class.just-acted]="justActedId() === request.id"
+        >
+          <div class="row-head">
+            <span class="row-status" [class]="'row-status--' + request.status">
+              {{ statusLabels[request.status] }}
+            </span>
+            <span class="row-date">{{ request.createdAt | date: 'd MMM, h:mm a' }}</span>
+            <span class="row-amount">₹{{ request.refundAmount | number: '1.2-2' }}</span>
+          </div>
+
+          <div class="row-body">
+            <div class="row-block">
+              <h4>Items</h4>
+              <ul class="row-items">
+                @for (item of request.items; track item.productId) {
+                  <li>
+                    <strong>{{ item.quantity }} ×</strong> {{ item.productName }}
+                    <small>{{ item.weight }} · ₹{{ item.refundAmount | number: '1.2-2' }}</small>
+                  </li>
+                }
+              </ul>
+              <p class="row-reason">
+                <mat-icon>help_outline</mat-icon>
+                {{ reasonLabel(request.reason) }}
+              </p>
+              @if (request.comment) {
+                <p class="row-comment">“{{ request.comment }}”</p>
+              }
+            </div>
+
+            <div class="row-block">
+              <h4>Collect from</h4>
+              <p class="row-customer">
+                <strong>{{ request.customerName }}</strong>
+                @if (request.customerPhone) {
+                  <a class="row-phone" [href]="'tel:' + request.customerPhone">
+                    <mat-icon>call</mat-icon>
+                    {{ request.customerPhone }}
+                  </a>
+                }
+              </p>
+              <p class="row-address">{{ request.pickupAddress }}</p>
+              <p class="row-destination">
+                <mat-icon>
+                  {{
+                    request.refundDestination === 'wallet'
+                      ? 'account_balance_wallet'
+                      : 'credit_card'
+                  }}
+                </mat-icon>
+                Refund to
+                {{ request.refundDestination === 'wallet' ? 'Ojas wallet' : 'original payment method' }}
+              </p>
+              <a class="row-order-link" [href]="'/my-orders?order=' + request.orderId">
+                Order {{ request.orderId.slice(-6).toUpperCase() }}
+              </a>
+            </div>
+          </div>
+
+          @if (request.status === 'Refunded') {
+            <p class="row-settled">
+              <mat-icon>check_circle</mat-icon>
+              <span>
+                @if (request.refundedToWallet > 0) {
+                  ₹{{ request.refundedToWallet | number: '1.2-2' }} credited to their wallet.
+                }
+                @if (request.refundedToSource > 0) {
+                  ₹{{ request.refundedToSource | number: '1.2-2' }} sent to their payment method.
+                }
+                @if (request.refundQueued > 0) {
+                  <strong>
+                    ₹{{ request.refundQueued | number: '1.2-2' }} could not be sent and is queued —
+                    settle it from the order's refund action.
+                  </strong>
+                }
+              </span>
+            </p>
+          }
+
+          <!-- Whatever was last said to the customer, so the next person to open this card can
+               see what they have already been told. -->
+          @for (event of request.events; track $index) {
+            @if (event.note) {
+              <p class="row-note">
+                <mat-icon>chat_bubble_outline</mat-icon>
+                {{ event.note }}
+              </p>
+            }
+          }
+
+          @if (rejectingId() === request.id) {
+            <div class="row-reject">
+              <label>
+                Why are you refusing this return? The customer sees this.
+                <textarea
+                  rows="2"
+                  maxlength="300"
+                  [ngModel]="rejectReason()"
+                  (ngModelChange)="rejectReason.set($event)"
+                  placeholder="e.g. The pack had been opened."
+                ></textarea>
+              </label>
+              <div class="row-reject-actions">
+                <button mat-stroked-button type="button" (click)="cancelReject()">Keep it open</button>
+                <button
+                  mat-flat-button
+                  color="warn"
+                  type="button"
+                  [disabled]="!rejectReason().trim() || busyId() === request.id"
+                  (click)="confirmReject(request)"
+                >
+                  Refuse this return
+                </button>
+              </div>
+            </div>
+          } @else if (nextAction(request); as action) {
+            <div class="row-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="busyId() === request.id"
+                (click)="advance(request)"
+              >
+                {{ busyId() === request.id ? 'Working…' : action.label }}
+              </button>
+              @if (canReject(request)) {
+                <button mat-stroked-button type="button" (click)="startReject(request)">
+                  Refuse
+                </button>
+              }
+            </div>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>

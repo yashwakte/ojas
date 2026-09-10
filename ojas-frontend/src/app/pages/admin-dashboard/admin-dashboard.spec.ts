@@ -277,9 +277,15 @@ describe('AdminDashboard', () => {
     const { fixture } = create();
     expect(fixture.componentInstance.getTabIndex()).toBe(0); // 'orders'
 
+    // Returns sits second, beside Orders: it is the other queue with a customer waiting at the
+    // end of it. The index and the tab list are read from the same array, so this also pins that
+    // the template's tab order has not drifted from it.
     fixture.componentInstance.onTabChange({ index: 1 });
-    expect(fixture.componentInstance.activeTab()).toBe('products');
+    expect(fixture.componentInstance.activeTab()).toBe('returns');
     expect(fixture.componentInstance.getTabIndex()).toBe(1);
+
+    fixture.componentInstance.onTabChange({ index: 2 });
+    expect(fixture.componentInstance.activeTab()).toBe('products');
   });
 
   it('refreshCurrentTab delegates to the right service for each tab', () => {

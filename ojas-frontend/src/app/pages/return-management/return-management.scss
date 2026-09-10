@@ -1,0 +1,361 @@
+// The returns queue. Deliberately the same furniture as the other admin panes - card rows,
+// hairline borders, chip filters - so an admin moving between Orders and Returns is looking at
+// one console rather than two.
+.returns-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pane-titles {
+  h3 {
+    margin: 0 0 4px;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--ojas-text, #2d2d2d);
+  }
+
+  p {
+    margin: 0;
+    max-width: 52ch;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--ojas-text-light, #6b6b6b);
+  }
+}
+
+// Money the business is holding that belongs to customers.
+.pane-owed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(242, 90, 26, 0.08);
+  border: 1px solid rgba(242, 90, 26, 0.2);
+
+  span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ojas-orange-dark, #d14500);
+  }
+
+  strong {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ojas-text, #2d2d2d);
+  }
+}
+
+.pane-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--ojas-border, #e7e2dc);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ojas-text-light, #6b6b6b);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color var(--ojas-transition, 180ms ease),
+    background var(--ojas-transition, 180ms ease),
+    color var(--ojas-transition, 180ms ease);
+
+  &.active {
+    border-color: var(--ojas-orange, #f25a1a);
+    background: var(--ojas-orange-bg, #fff8f6);
+    color: var(--ojas-orange-dark, #d14500);
+  }
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f0ebe5;
+  font-size: 0.7rem;
+  font-weight: 800;
+
+  .active & {
+    background: rgba(242, 90, 26, 0.16);
+  }
+}
+
+.pane-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--ojas-text-light, #6b6b6b);
+
+  mat-icon {
+    font-size: 2rem;
+    width: 2rem;
+    height: 2rem;
+    color: #cfc7bf;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.88rem;
+  }
+}
+
+.return-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.return-row {
+  padding: 16px;
+  border: 1px solid var(--ojas-border, #e7e2dc);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--ojas-shadow-sm, 0 1px 2px rgba(24, 18, 14, 0.05));
+  transition: box-shadow var(--ojas-transition, 180ms ease);
+
+  // Flashed after an action, so an admin who was scrolled back to this card can see which one
+  // moved rather than having to work it out.
+  &.just-acted {
+    border-color: var(--ojas-orange, #f25a1a);
+    box-shadow: 0 0 0 3px rgba(242, 90, 26, 0.14);
+  }
+}
+
+.row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.row-status {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #ece5dd;
+  color: var(--ojas-text, #2d2d2d);
+
+  &--Requested {
+    background: rgba(242, 90, 26, 0.12);
+    color: var(--ojas-orange-dark, #d14500);
+  }
+
+  &--Approved {
+    background: rgba(217, 119, 6, 0.14);
+    color: #b45309;
+  }
+
+  &--PickedUp {
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+  }
+
+  &--Refunded {
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+  }
+
+  &--Rejected {
+    background: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+  }
+}
+
+.row-date {
+  font-size: 0.74rem;
+  color: var(--ojas-text-light, #6b6b6b);
+}
+
+.row-amount {
+  margin-left: auto;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ojas-text, #2d2d2d);
+}
+
+.row-body {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 20px;
+}
+
+.row-block h4 {
+  margin: 0 0 8px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ojas-text-light, #6b6b6b);
+}
+
+.row-items {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  li {
+    font-size: 0.84rem;
+    color: var(--ojas-text, #2d2d2d);
+  }
+
+  small {
+    margin-left: 6px;
+    font-size: 0.72rem;
+    color: var(--ojas-text-light, #6b6b6b);
+  }
+}
+
+.row-reason,
+.row-destination,
+.row-note,
+.row-settled {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ojas-text-light, #6b6b6b);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 1px;
+  }
+}
+
+.row-settled {
+  margin-top: 10px;
+  color: #15803d;
+}
+
+.row-comment {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ojas-text, #2d2d2d);
+}
+
+.row-customer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 4px;
+  font-size: 0.84rem;
+}
+
+.row-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ojas-orange-dark, #d14500);
+  font-weight: 700;
+  text-decoration: none;
+
+  mat-icon {
+    font-size: 0.95rem;
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+}
+
+.row-address {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ojas-text-light, #6b6b6b);
+}
+
+.row-order-link {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ojas-orange-dark, #d14500);
+}
+
+.row-actions,
+.row-reject-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.row-reject {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ojas-text, #2d2d2d);
+  }
+
+  textarea {
+    width: 100%;
+    margin-top: 6px;
+    padding: 9px 11px;
+    border: 1px solid var(--ojas-border, #e7e2dc);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 0.83rem;
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: #b91c1c;
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  .row-body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .row-amount {
+    margin-left: 0;
+    width: 100%;
+  }
+}
