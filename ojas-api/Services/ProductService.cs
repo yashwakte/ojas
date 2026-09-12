@@ -314,11 +314,105 @@ public class ProductService
             filter.In(p => p.Name, fastingProductNames) & filter.Eq(p => p.Category, "Flour"),
             update.Set(p => p.Category, "Upwas"));
 
+        await RecategoriseCatalogueAsync();
+
         if (packData is not null)
         {
             await IntroduceNewProductsAsync(packData);
             await BackfillPackContentAsync(packData);
         }
+    }
+
+    /// <summary>
+    /// The categories retired in September 2026, and where a product in one goes when nothing
+    /// more specific is known about it. Premium Atta was empty, Grains held a single product, and
+    /// Powder Box named the packaging rather than what was in it, so custard sat beside cinnamon
+    /// and citric acid. The storefront keeps the same table (LEGACY_CATEGORY_NAMES) for links.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> RetiredCategories =
+        new Dictionary<string, string>
+        {
+            ["Flour"] = "Everyday Flours",
+            ["Premium Atta"] = "Everyday Flours",
+            ["Grains"] = "Health & Breakfast",
+            ["Health Mix"] = "Health & Breakfast",
+            ["Powder Box"] = "Baking & Desserts",
+        };
+
+    /// <summary>
+    /// The aisle each catalogue product belongs in, for the products whose old category was too
+    /// broad to translate on its own: Flour held both everyday millet flours and festive ones,
+    /// and Powder Box held baking goods, salts and spices.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> CategoryByProductName =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Sorghum Flour"] = "Everyday Flours",
+            ["Bajra Flour"] = "Everyday Flours",
+            ["Ragi Flour"] = "Everyday Flours",
+            ["Rice Flour"] = "Everyday Flours",
+            ["Modak Pith"] = "Traditional & Festive",
+            ["Anarasa Flour"] = "Traditional & Festive",
+            ["Thalipeeth Bhajani"] = "Traditional & Festive",
+            ["Amboli (Ghavan) Flour"] = "Traditional & Festive",
+            ["Rajgira (Amaranth) Flour"] = "Upwas",
+            ["Buckwheat Flour"] = "Upwas",
+            ["Shingada Flour"] = "Upwas",
+            ["Upvas Bhajani"] = "Upwas",
+            ["Bhagar (Varai) Peeth"] = "Upwas",
+            // Sendha namak is the fasting salt; the client's own Upwas poster puts it with the
+            // fasting flours.
+            ["Rock Salt"] = "Upwas",
+            ["Wheat Daliya"] = "Health & Breakfast",
+            ["Chana Sattu"] = "Health & Breakfast",
+            ["Ragi Malt (Sprouted)"] = "Health & Breakfast",
+            ["Custard Powder - Vanilla Flavour"] = "Baking & Desserts",
+            ["Custard Powder - Mango Flavour"] = "Baking & Desserts",
+            ["Custard Powder - Strawberry Flavour"] = "Baking & Desserts",
+            ["Custard Powder - Pineapple Flavour"] = "Baking & Desserts",
+            ["Corn Flour"] = "Baking & Desserts",
+            ["Baking Powder"] = "Baking & Desserts",
+            ["Baking Soda"] = "Baking & Desserts",
+            ["Cocoa Powder"] = "Baking & Desserts",
+            ["Active Dry Yeast"] = "Baking & Desserts",
+            ["Black Salt"] = "Spices & Essentials",
+            ["Citric Acid"] = "Spices & Essentials",
+            ["Monosodium Glutamate"] = "Spices & Essentials",
+            ["Dry Ginger Powder"] = "Spices & Essentials",
+            ["Cinnamon Powder"] = "Spices & Essentials",
+            ["Jeshthamadh (Sweet Root) Powder"] = "Spices & Essentials",
+        };
+
+    /// <summary>
+    /// Moves every product still filed under a retired category into its new aisle.
+    ///
+    /// Only retired values are ever touched, which is what makes it safe to run on every boot: a
+    /// category the owner picks in the admin console is one of the new ones, so it is never
+    /// second-guessed here. A product this table does not know by name - one the owner added
+    /// themselves - follows its old category's default. The filter on the old value in each
+    /// update means an edit that lands between the read and the write wins.
+    /// </summary>
+    private async Task RecategoriseCatalogueAsync()
+    {
+        var filter = Builders<Product>.Filter;
+
+        var stale = await _db.Products
+            .Find(filter.In(p => p.Category, RetiredCategories.Keys))
+            .ToListAsync();
+        if (stale.Count == 0) return;
+
+        var moves = stale
+            .Select(p => new UpdateOneModel<Product>(
+                filter.Eq(x => x.Id, p.Id) & filter.Eq(x => x.Category, p.Category),
+                Builders<Product>.Update.Set(
+                    x => x.Category,
+                    CategoryByProductName.TryGetValue(p.Name, out var aisle)
+                        ? aisle
+                        : RetiredCategories[p.Category])))
+            .ToList();
+
+        await _db.Products.BulkWriteAsync(moves);
+        Console.WriteLine($"✅ {moves.Count} product(s) moved into the new catalogue categories.");
     }
 
     /// <summary>

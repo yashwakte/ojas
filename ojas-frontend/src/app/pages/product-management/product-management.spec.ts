@@ -14,7 +14,7 @@ describe('ProductManagement', () => {
     description: 'A great flour',
     price: 100,
     discount: 10,
-    category: 'Flour',
+    category: 'Everyday Flours',
     imageUrl: '/images/p1.jpg',
     galleryImageUrls: [],
     weight: '500g',
@@ -75,7 +75,7 @@ describe('ProductManagement', () => {
       description: 'A wonderful new product description',
       price: 50,
       discount: 5,
-      category: 'Grains' as const,
+      category: 'Health & Breakfast' as const,
       imageUrl: '/images/new.jpg',
       galleryImageUrls: [],
       weight: '1kg',
@@ -99,13 +99,13 @@ describe('ProductManagement', () => {
   it('filteredProducts returns all when filter is All, or the matching category otherwise', () => {
     const { fixture } = create();
     expect(fixture.componentInstance.filteredProducts()).toEqual([product]);
-    fixture.componentInstance.selectCategoryFilter('Grains');
+    fixture.componentInstance.selectCategoryFilter('Health & Breakfast');
     expect(fixture.componentInstance.filteredProducts()).toEqual([]);
   });
 
   it('categoryCounts tallies products per category', () => {
     const { fixture } = create();
-    expect(fixture.componentInstance.categoryCounts()).toEqual({ Flour: 1 });
+    expect(fixture.componentInstance.categoryCounts()).toEqual({ 'Everyday Flours': 1 });
   });
 
   it('discountedPrice is derived from formData price and discount', () => {
@@ -296,9 +296,9 @@ describe('ProductManagement', () => {
   });
 
   it('widens the category filter when the saved product no longer matches it', () => {
-    productServiceSpy.updateProduct.and.returnValue(of(product)); // product.category === 'Flour'
+    productServiceSpy.updateProduct.and.returnValue(of(product)); // product.category === 'Everyday Flours'
     const { fixture } = create();
-    fixture.componentInstance.selectCategoryFilter('Grains');
+    fixture.componentInstance.selectCategoryFilter('Health & Breakfast');
     fixture.componentInstance.editProduct(product);
     fixture.componentInstance.formData.set(validFormData());
 

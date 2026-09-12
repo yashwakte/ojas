@@ -1,7 +1,7 @@
 <app-home-hero />
 <!-- QUICK CATEGORY NAV (mobile only — desktop already has the header dropdown) -->
 <nav class="quick-cats" aria-label="Shop by category">
-  @for (c of categoryTiles; track c.name) {
+  @for (c of categoryTiles(); track c.name) {
     <a class="quick-cat-chip" [routerLink]="['/products']" [queryParams]="{ category: c.name }">
       <span class="quick-cat-chip-ico"><mat-icon>{{ c.icon }}</mat-icon></span>
       <span class="quick-cat-chip-label">{{ c.name }}</span>
@@ -166,7 +166,7 @@
   <h2 class="stitle">Shop by Category</h2>
 
   <div class="category-tiles">
-    @for (c of categoryTiles; track c.name; let i = $index) {
+    @for (c of categoryTiles(); track c.name; let i = $index) {
       <a
         class="category-tile"
         [routerLink]="['/products']"

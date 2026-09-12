@@ -81,7 +81,11 @@ export class Home implements OnInit {
       .slice(0, 8),
   );
 
-  readonly categoryTiles = PRODUCT_CATEGORY_DETAILS;
+  /** Only the aisles with something in them - see ProductService.categoriesInUse. */
+  readonly categoryTiles = computed(() => {
+    const inUse = new Set<string>(this.productService.categoriesInUse());
+    return PRODUCT_CATEGORY_DETAILS.filter((c) => inUse.has(c.name));
+  });
 
   ngOnInit(): void {
     this.productService.getBestsellers(6).subscribe({

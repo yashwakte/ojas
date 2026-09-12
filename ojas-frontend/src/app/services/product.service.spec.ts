@@ -14,7 +14,7 @@ describe('ProductService', () => {
     name: 'Bajra Flour',
     description: 'desc',
     price: 100,
-    category: 'Flour',
+    category: 'Everyday Flours',
     weight: '500g',
     createdAt: '2024-01-01',
     // discount, imageUrl, galleryImageUrls, isAvailable, ingredients, benefits, storageInfo, updatedAt omitted
@@ -26,7 +26,7 @@ describe('ProductService', () => {
     description: 'desc2',
     price: 200,
     discount: 10,
-    category: 'Grains',
+    category: 'Health & Breakfast',
     imageUrl: '/images/ragi.jpg',
     galleryImageUrls: ['/images/g1.jpg'],
     weight: '1kg',
@@ -122,8 +122,20 @@ describe('ProductService', () => {
 
   it('getByCategory filters by category from the signal', () => {
     flushInitialLoad([rawProduct, fullProduct]);
-    expect(service.getByCategory('Grains')).toEqual([fullProduct]);
+    expect(service.getByCategory('Health & Breakfast')).toEqual([fullProduct]);
     expect(service.getByCategory('Nope')).toEqual([]);
+  });
+
+  // Products the API has not moved yet (it recategorises on boot) still land in the right aisle.
+  it('files a product still carrying a retired category under its new one', () => {
+    flushInitialLoad([{ ...rawProduct, category: 'Powder Box' }]);
+    expect(service.products()[0].category).toBe('Baking & Desserts');
+  });
+
+  it('offers every category until the catalogue arrives, then only those with products', () => {
+    expect(service.categoriesInUse().length).toBe(6);
+    flushInitialLoad([rawProduct, fullProduct]);
+    expect(service.categoriesInUse()).toEqual(['Everyday Flours', 'Health & Breakfast']);
   });
 
   it('getBestsellers issues a GET with a limit param and normalizes the response', () => {

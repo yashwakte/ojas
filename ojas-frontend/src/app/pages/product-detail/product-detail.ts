@@ -341,19 +341,19 @@ export class ProductDetail {
       { icon: 'verified', text: 'Quality Tested' },
     ];
     switch (category) {
-      case 'Flour':
+      case 'Everyday Flours':
         return [
           ...base,
           { icon: 'settings', text: 'Traditional Stone-Ground' },
           { icon: 'restaurant', text: 'Perfect for Rotis & Bhakris' },
         ];
-      case 'Grains':
+      case 'Traditional & Festive':
         return [
           ...base,
-          { icon: 'grain', text: 'Whole Grain Goodness' },
-          { icon: 'fitness_center', text: 'High in Fiber & Protein' },
+          { icon: 'celebration', text: 'A Festival Favourite' },
+          { icon: 'restaurant', text: 'Traditional Maharashtrian Recipes' },
         ];
-      case 'Health Mix':
+      case 'Health & Breakfast':
         return [
           ...base,
           { icon: 'favorite', text: 'Nutrient-Rich Superfood' },
@@ -365,17 +365,17 @@ export class ProductDetail {
           { icon: 'self_improvement', text: 'Fasting Friendly' },
           { icon: 'spa', text: 'Upwas Approved' },
         ];
-      case 'Premium Atta':
+      case 'Baking & Desserts':
         return [
           ...base,
-          { icon: 'settings', text: 'Traditional Stone-Ground' },
-          { icon: 'restaurant', text: 'Perfect for Rotis & Bhakris' },
-        ];
-      case 'Powder Box':
-        return [
-          ...base,
-          { icon: 'science', text: 'Kitchen Essential' },
+          { icon: 'cake', text: 'Easy Desserts & Baking' },
           { icon: 'straighten', text: 'Precise, Consistent Measure' },
+        ];
+      case 'Spices & Essentials':
+        return [
+          ...base,
+          { icon: 'soup_kitchen', text: 'Kitchen Essential' },
+          { icon: 'inventory_2', text: 'Small Packs, Always Fresh' },
         ];
       default:
         return base;

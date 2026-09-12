@@ -8,6 +8,7 @@ import {
   UpdateProductRequest,
 } from '../models/interfaces';
 import { packShotSrc } from '../constants/pack-shots';
+import { PRODUCT_CATEGORIES, ProductCategory, normalizeCategory } from '../constants/product-categories';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
@@ -23,6 +24,21 @@ export class ProductService {
   readonly products = this._products.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
+
+  /**
+   * The categories that have something in them, in shop order.
+   *
+   * Every menu, chip rail and tile grid reads this rather than the full list, because an aisle
+   * with nothing in it is a dead end: "Premium Atta" sat in every menu for months leading to "No
+   * products found". Until the catalogue has arrived the answer is every category, so the menus
+   * are never briefly empty.
+   */
+  readonly categoriesInUse = computed<readonly ProductCategory[]>(() => {
+    const products = this._products();
+    if (products.length === 0) return PRODUCT_CATEGORIES;
+    const used = new Set(products.map((p) => p.category));
+    return PRODUCT_CATEGORIES.filter((c) => used.has(c));
+  });
 
   /** How long a tab may go without re-checking the catalogue when it comes back into view. */
   static readonly REFRESH_AFTER_MS = 60_000;
@@ -181,6 +197,10 @@ export class ProductService {
   private normalizeProduct(product: Product): Product {
     return {
       ...product,
+      // Retired category names are translated here, at the one point every product enters the
+      // app, so a product the API has not yet moved still appears in the right aisle - and an
+      // admin who saves it writes the new name back.
+      category: normalizeCategory(product.category),
       discount: product.discount ?? 0,
       // Stamped with the pack-shot revision here, at the single point every product enters the
       // app, so a re-shoot reaches customers who already have the old file cached. Every screen

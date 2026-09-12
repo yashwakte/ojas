@@ -25,7 +25,7 @@ describe('ProductDetail', () => {
     description: 'desc',
     price: 100,
     discount: 10,
-    category: 'Flour',
+    category: 'Everyday Flours',
     imageUrl: '/images/p1.jpg',
     galleryImageUrls: ['/images/p1b.jpg'],
     weight: '500g',
@@ -146,7 +146,7 @@ describe('ProductDetail', () => {
       ...similarProduct,
       id: '3',
       name: 'Custard Powder',
-      category: 'Powder Box',
+      category: 'Baking & Desserts',
     };
     (productServiceSpy as unknown as { products: unknown }).products = signal([
       product,
@@ -265,7 +265,7 @@ describe('ProductDetail', () => {
     expect(text).not.toContain('km of our warehouse');
   });
 
-  it('highlights include category-specific entries for Flour', () => {
+  it('highlights include category-specific entries for Everyday Flours', () => {
     const fixture = create();
     const texts = fixture.componentInstance.highlights().map((h) => h.text);
     expect(texts).toContain('Traditional Stone-Ground');

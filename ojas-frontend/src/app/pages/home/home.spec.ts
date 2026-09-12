@@ -9,6 +9,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { Product, CampaignBannerConfig } from '../../models/interfaces';
+import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
 
 describe('Home', () => {
   const product: Product = {
@@ -48,6 +49,8 @@ describe('Home', () => {
 
     productServiceSpy = jasmine.createSpyObj('ProductService', ['getBestsellers'], {
       products: productsSignal,
+      loading: signal(false),
+      categoriesInUse: signal(PRODUCT_CATEGORIES),
     });
     productServiceSpy.getBestsellers.and.returnValue(of([product]));
 
