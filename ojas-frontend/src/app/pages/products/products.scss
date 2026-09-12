@@ -1,158 +1,686 @@
 @use '../../styles/liquid-glass' as glass;
 
-.products-page {
+.shop {
   min-height: 80vh;
 }
 
-// ===== PAGE HEADER =====
-.page-header {
+// ===== HEADING =====
+// Starts under the fixed header (64px on phones, 56px on desktops) and carries the page title, the
+// breadcrumb and a line about the aisle - short, so the products start within the first screen.
+.shop-head {
   position: relative;
-  padding: 72px 24px 56px;
-  text-align: center;
   overflow: hidden;
-  background: linear-gradient(160deg, #fff8f6 0%, #ffede8 40%, #ffdacf 100%);
+  padding: 78px 16px 16px;
+  background: linear-gradient(160deg, #fff8f4 0%, #ffece2 55%, #ffe0d2 100%);
 }
 
-.page-header-bg {
+.shop-head-glow {
   position: absolute;
-  inset: 0;
+  width: 360px;
+  height: 360px;
+  right: -120px;
+  top: -140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 90, 26, 0.18), transparent 65%);
   pointer-events: none;
 }
 
-.header-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-
-  &.orb-1 {
-    width: 300px;
-    height: 300px;
-    background: var(--ojas-blob-rose-1);
-    top: -100px;
-    right: -50px;
-    animation: float 6s ease-in-out infinite;
-  }
-
-  &.orb-2 {
-    width: 200px;
-    height: 200px;
-    background: var(--ojas-blob-sage-1);
-    bottom: -80px;
-    left: -40px;
-    animation: float 8s ease-in-out infinite 1s;
-  }
-}
-
-.page-header-content {
+.shop-head-inner {
   position: relative;
-  z-index: 2;
-  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  max-width: 1320px;
+  margin: 0 auto;
+  animation: rise 0.6s var(--ojas-ease) both;
+
+  h1 {
+    margin: 6px 0 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: #231a14;
+    word-break: break-word;
+  }
 }
 
-.section-label {
+// What kind of page this is - the pantry, a category, a search - so the title can simply be the
+// name, with a hairline dash in the brand's colour ahead of it.
+.shop-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ojas-orange-dark);
+
+  &::before {
+    content: '';
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.6;
+  }
+}
+
+.shop-sub {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: #6f655d;
+  // Two lines at most on a phone, so the heading never pushes the products off the first screen.
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Desktop and tablet only: on a phone the label above the title does the job in less space.
+.crumbs {
+  display: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-size: 0.76rem;
+  color: var(--ojas-text-light);
+
+  a {
+    color: var(--ojas-text-light);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--ojas-orange-dark);
+    }
+  }
+
+  span {
+    color: var(--ojas-text);
+    font-weight: 600;
+  }
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    opacity: 0.6;
+  }
+}
+
+.shop-body {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 16px 16px 72px;
+}
+
+// ===== SEARCH =====
+.shop-search {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
   margin-bottom: 12px;
 }
 
-.label-line {
-  width: 40px;
-  height: 1px;
-  background: var(--ojas-ink);
-  opacity: 0.4;
-}
-
-.label-text {
-  font-family: 'Poppins', sans-serif;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 3px;
-  color: var(--ojas-ink);
-}
-
-.page-header h1 {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 700;
-  font-size: 2.5rem;
-  color: var(--ojas-text);
-  margin-bottom: 5px;
-}
-
-.page-header p {
+.shop-search-icon {
+  position: absolute;
+  left: 16px;
   color: var(--ojas-text-light);
-  font-size: 1.05rem;
-  max-width: 460px;
-  margin: 0 auto;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
 }
 
-// ===== CONTAINER =====
-.products-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 24px 80px;
-}
-
-// ===== CATEGORY FILTER =====
-.category-filter {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 40px;
-  flex-wrap: wrap;
-}
-
-.filter-chip {
+.shop-search-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 48px 0 46px;
+  border-radius: 16px;
+  border: 1.5px solid var(--ojas-border);
   background: #fff;
-  border: 2px solid var(--ojas-border);
-  border-radius: 50px;
-  padding: 10px 28px;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  color: var(--ojas-text-light);
+  font: 500 1rem 'Poppins', sans-serif;
+  color: var(--ojas-text);
+  box-shadow: var(--ojas-shadow-sm);
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 
-  &:hover {
-    border-color: var(--ojas-ink);
-    color: var(--ojas-ink);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(45, 45, 45, 0.1);
+  &::placeholder {
+    color: #9a928a;
   }
 
-  &.active {
+  &:focus {
+    border-color: var(--ojas-orange);
+    box-shadow: 0 0 0 4px rgba(242, 90, 26, 0.12);
+  }
+
+  &::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+.shop-search-clear {
+  position: absolute;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ojas-text-light);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--ojas-ink-bg);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// ===== CATEGORY RAIL (phones and tablets; desktops use the sidebar) =====
+.chip-rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 2px 16px 6px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ojas-border);
+  background: #fff;
+  font: 600 0.82rem 'Poppins', sans-serif;
+  color: var(--ojas-text-light);
+  cursor: pointer;
+  transition: all 0.3s var(--ojas-ease);
+
+  &:hover {
+    color: var(--ojas-text);
+    border-color: #d8cfc6;
+  }
+
+  &.on {
     background: var(--ojas-ink);
     border-color: var(--ojas-ink);
     color: #fff;
-    box-shadow: 0 4px 16px rgba(45, 45, 45, 0.25);
+    box-shadow: var(--ojas-shadow-ink);
   }
 }
 
-// ===== PRODUCTS GRID =====
-.products-grid {
-  display: grid;
-  // Four across on a wide screen rather than three. The cards were reading as oversized panels
-  // with a lot of white inside them; a narrower column makes the grid scan as a catalogue and
-  // brings the whole card down in both dimensions at once.
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+.chip-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.7rem;
+  text-align: center;
+
+  .on & {
+    background: rgba(255, 255, 255, 0.18);
+  }
 }
 
-// ===== PRODUCT CARD — PREMIUM =====
+// ===== TOOLBAR =====
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 10px;
+  scroll-margin-top: 80px;
+}
+
+.toolbar-count {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ojas-text-light);
+
+  b {
+    color: var(--ojas-text);
+  }
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--ojas-border);
+  background: #fff;
+  font: 600 0.8rem 'Poppins', sans-serif;
+  color: var(--ojas-text);
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--ojas-orange-dark);
+  }
+}
+
+.tool-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--ojas-orange);
+  color: #fff;
+  font-size: 0.66rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+.sort-select {
+  display: none;
+  position: relative;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--ojas-text-light);
+
+  select {
+    appearance: none;
+    height: 42px;
+    padding: 0 40px 0 14px;
+    border-radius: 12px;
+    border: 1px solid var(--ojas-border);
+    background: #fff;
+    font: 600 0.84rem 'Poppins', sans-serif;
+    color: var(--ojas-text);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--ojas-orange);
+      outline-offset: 1px;
+    }
+  }
+
+  mat-icon {
+    position: absolute;
+    right: 10px;
+    pointer-events: none;
+    color: var(--ojas-text-light);
+  }
+}
+
+// ===== APPLIED FILTERS =====
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 6px 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 90, 26, 0.3);
+  background: var(--ojas-orange-bg);
+  font: 600 0.78rem 'Poppins', sans-serif;
+  color: var(--ojas-orange-dark);
+  animation: rise 0.3s var(--ojas-ease) both;
+
+  button {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(242, 90, 26, 0.14);
+    color: var(--ojas-orange-dark);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+
+    mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  &--clear {
+    padding: 0 12px;
+    border-color: var(--ojas-border);
+    background: #fff;
+    color: var(--ojas-text-light);
+    cursor: pointer;
+  }
+}
+
+// ===== LAYOUT =====
+.shop-layout {
+  display: block;
+}
+
+.side-filters {
+  display: none;
+}
+
+// ===== FILTER CONTROLS (sidebar and sheet) =====
+.fgroup {
+  padding: 16px 0;
+  border-bottom: 1px solid #f1ebe5;
+
+  &:first-of-type {
+    padding-top: 4px;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.fgroup-title {
+  margin: 0 0 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a8f86;
+}
+
+.fopts {
+  display: grid;
+  gap: 2px;
+}
+
+.fopt,
+.sopt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font: 500 0.86rem 'Poppins', sans-serif;
+  color: var(--ojas-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease;
+
+  &:hover {
+    background: #faf5f0;
+  }
+
+  &.on {
+    font-weight: 600;
+    background: var(--ojas-orange-bg);
+  }
+}
+
+.fradio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #cfc5bb;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+
+  .on & {
+    border-color: var(--ojas-orange);
+    border-width: 5px;
+  }
+}
+
+.fopt-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.fopt-count {
+  font-size: 0.74rem;
+  color: var(--ojas-text-light);
+}
+
+.fchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ojas-border);
+  background: #fff;
+  font: 600 0.8rem 'Poppins', sans-serif;
+  color: var(--ojas-text);
+  cursor: pointer;
+  transition: all 0.25s var(--ojas-ease);
+
+  span {
+    font-size: 0.7rem;
+    color: var(--ojas-text-light);
+  }
+
+  &.on {
+    border-color: var(--ojas-orange);
+    background: var(--ojas-orange-bg);
+    color: var(--ojas-orange-dark);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.ftoggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font: 500 0.86rem 'Poppins', sans-serif;
+  color: var(--ojas-text);
+  cursor: pointer;
+
+  &:hover {
+    background: #faf5f0;
+  }
+
+  small {
+    margin-left: 4px;
+    font-size: 0.74rem;
+    color: var(--ojas-text-light);
+  }
+}
+
+.fswitch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: #ddd4cb;
+  transition: background 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform 0.25s var(--ojas-ease);
+  }
+
+  [aria-checked='true'] & {
+    background: var(--ojas-orange);
+
+    &::after {
+      transform: translateX(16px);
+    }
+  }
+}
+
+// ===== PHONE SHEETS =====
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1003;
+  background: rgba(20, 14, 10, 0.55);
+  animation: fade 0.25s ease both;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1004;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -18px 50px rgba(20, 14, 10, 0.25);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  animation: sheetUp 0.4s var(--ojas-ease) both;
+}
+
+.sheet-grip {
+  width: 40px;
+  height: 4px;
+  border-radius: 4px;
+  background: #e2dcd5;
+  margin: 10px auto 2px;
+  flex-shrink: 0;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px 12px;
+  border-bottom: 1px solid #f1ebe5;
+
+  h2 {
+    margin: 0;
+    font: 700 1.05rem 'Poppins', sans-serif;
+    color: var(--ojas-text);
+  }
+}
+
+.sheet-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: #f5f0eb;
+  color: var(--ojas-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 20px 12px;
+
+  &--list {
+    padding: 10px 14px 18px;
+  }
+}
+
+.sheet-foot {
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid #f1ebe5;
+}
+
+.sheet-btn {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 14px;
+  font: 600 0.9rem 'Poppins', sans-serif;
+  cursor: pointer;
+
+  &--ghost {
+    border: 1.5px solid var(--ojas-border);
+    background: #fff;
+    color: var(--ojas-text);
+  }
+
+  &--primary {
+    flex: 1.6;
+    border: none;
+    background: var(--ojas-orange-glass);
+    color: #fff;
+    box-shadow: var(--ojas-shadow-orange);
+  }
+}
+
+// ===== GRID =====
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .product-link {
   text-decoration: none;
   color: inherit;
   display: block;
-  cursor: pointer;
-}
-
-.product-info-top {
-  padding: 14px 15px 0;
 }
 
 .product-card {
+  // The card is its own size query: see COMPACT CARDS below.
+  container: card / inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -160,8 +688,7 @@
   overflow: hidden;
   background: #fff;
   box-shadow: var(--ojas-shadow-sm);
-  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-  // Depth and the travelling rim light, shared with the home page cards.
+  animation: rise 0.6s var(--ojas-ease) both;
   @include glass.card-depth(6px, 0.8deg);
   @include glass.card-ring;
 
@@ -171,52 +698,67 @@
     .product-image img {
       transform: scale(1.08);
     }
+
     .product-overlay {
       opacity: 1;
     }
   }
 }
 
-// Square and `contain`, matching the shape the pack shots are actually photographed in.
-//
-// This was a fixed 220px band with `object-fit: cover`. Against a square photograph, cover scales
-// the picture to the card's width and then throws away whatever will not fit vertically — so
-// every pack lost its top and its bottom, and the grid showed a strip of each pouch with the
-// brand mark cut off above and the net weight cut off below. A shopper scanning the page could
-// not tell one 500g pouch from another.
-//
-// aspect-ratio rather than a fixed height, so the frame keeps its shape as the column grows
-// instead of cropping harder the wider the screen gets.
+// 4:3 with `contain`, the shape the pack shots are published in, so no pack loses its top or its
+// net weight to a crop.
 .product-image {
   aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
-  // The same warm wash the home page cards use, rather than a flat grey that makes a pack shot
-  // look like it is floating on nothing.
   background: linear-gradient(160deg, #fdf8f3 0%, #f6efe7 100%);
 
   img {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.6s var(--ojas-ease);
   }
+}
+
+.product-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--ojas-orange);
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .product-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 50%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent 50%);
   opacity: 0;
   transition: opacity 0.3s ease;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: 12px;
+  padding: 10px;
 }
 
-// A veil over the image rather than hiding the card: the product stays
-// discoverable and simply reads as unavailable right now.
+.product-badge {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ojas-ink);
+  font-size: 0.64rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 50px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+// A veil rather than hiding the card: the product stays findable and reads as unavailable today.
 .stock-veil {
   position: absolute;
   inset: 0;
@@ -239,50 +781,26 @@
   }
 }
 
-
-.product-badge {
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--ojas-ink);
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 4px 14px;
-  border-radius: 50px;
-  font-family: 'Poppins', sans-serif;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.product-info {
-  padding: 0 15px 15px;
-  margin-top: auto;
-}
-
-.product-actions {
-  display: flex;
-  gap: 8px;
-
-  > button {
-    flex: 1;
-    min-width: 0;
-  }
+.product-info-top {
+  padding: 12px 12px 0;
 }
 
 .product-name {
+  margin: 0 0 4px;
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   color: var(--ojas-text);
-  margin-bottom: 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .product-desc {
-  font-size: 0.78rem;
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  line-height: 1.55;
   color: var(--ojas-text-light);
-  line-height: 1.6;
-  margin-bottom: 11px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -292,50 +810,20 @@
 .product-meta {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding-top: 9px;
-  border-top: 1px solid #f0f0f0;
-  margin-bottom: 10px;
-}
-
-.product-price {
-  display: flex;
-  flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  font-family: 'Poppins', sans-serif;
-
-  .original-price {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--ojas-text-light);
-    text-decoration: line-through;
-  }
-
-  .sale-price {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--ojas-ink);
-  }
-
-  .discount-badge {
-    background: var(--ojas-orange);
-    color: #fff;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-top: 2px;
-  }
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid #f2ede8;
+  margin-bottom: 10px;
 }
 
 .product-weight {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.82rem;
-  color: var(--ojas-text-light);
+  font-size: 0.78rem;
   font-weight: 500;
+  color: var(--ojas-text-light);
 
   mat-icon {
     font-size: 15px;
@@ -344,269 +832,401 @@
   }
 }
 
-.add-to-cart-btn {
+.product-price {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 9px 8px;
-  // The card is narrower now. Without this "Add to Cart" breaks after "to", which makes one
-  // button two lines tall and the pair beside it uneven.
-  white-space: nowrap;
-  background: var(--ojas-orange);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
+  flex-direction: column;
+  align-items: flex-end;
   font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 0.76rem;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
-  mat-icon {
-    font-size: 15px;
-    width: 15px;
-    height: 15px;
+  .original-price {
+    font-size: 0.74rem;
+    color: var(--ojas-text-light);
+    text-decoration: line-through;
   }
 
-  &:hover {
-    background: var(--ojas-orange-dark);
-    transform: translateY(-1px);
-    box-shadow: var(--ojas-shadow-orange);
-  }
-
-  &.added {
-    background: #4caf50;
-
-    &:hover {
-      background: #388e3c;
-      box-shadow: 0 4px 14px rgba(76, 175, 80, 0.3);
-    }
-  }
-
-  &:active {
-    transform: translateY(0);
+  .sale-price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ojas-ink);
   }
 }
 
-.add-to-cart-btn:disabled,
-.buy-now-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  filter: grayscale(0.6);
+.product-info {
+  padding: 0 12px 12px;
+  margin-top: auto;
+}
 
-  &:hover {
-    transform: none;
-    box-shadow: none;
+.product-actions {
+  display: flex;
+  gap: 6px;
+
+  > button {
+    flex: 1;
+    min-width: 0;
   }
 }
 
+.add-to-cart-btn,
 .buy-now-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 9px 8px;
-  // The card is narrower now. Without this "Add to Cart" breaks after "to", which makes one
-  // button two lines tall and the pair beside it uneven.
+  min-height: 40px;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
   white-space: nowrap;
-  background: transparent;
-  color: var(--ojas-orange);
-  border: 1.5px solid var(--ojas-orange);
   border-radius: 12px;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 0.76rem;
+  font: 600 0.76rem 'Poppins', sans-serif;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s var(--ojas-ease);
 
+  // Never squeezed: an icon in a flex row shrinks by default when the row is tight, and with its
+  // box narrower than the glyph the cart was drawn half-cut.
   mat-icon {
-    font-size: 15px;
-    width: 15px;
-    height: 15px;
+    flex-shrink: 0;
+    font-size: 17px;
+    width: 17px;
+    height: 17px;
   }
 
-  &:hover {
-    background: var(--ojas-orange);
-    color: #fff;
-    transform: translateY(-1px);
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+  }
+}
+
+.add-to-cart-btn {
+  border: none;
+  background: var(--ojas-orange);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: var(--ojas-orange-dark);
     box-shadow: var(--ojas-shadow-orange);
   }
 
-  &:active {
-    transform: translateY(0);
+  &.added {
+    background: #2e7d32;
   }
 }
 
-// ===== EMPTY STATE =====
-.no-products {
-  text-align: center;
-  padding: 80px 16px;
-  color: var(--ojas-text-light);
+.buy-now-btn {
+  background: transparent;
+  color: var(--ojas-orange-dark);
+  border: 1.5px solid var(--ojas-orange);
 
-  mat-icon {
-    font-size: 64px;
-    width: 64px;
-    height: 64px;
-    color: var(--ojas-border);
-    margin-bottom: 16px;
+  &:hover:not(:disabled) {
+    background: var(--ojas-orange);
+    color: #fff;
+  }
+}
+
+// ===== LOADING / EMPTY / ERROR =====
+.sk-card {
+  border-radius: var(--ojas-radius);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--ojas-shadow-sm);
+}
+
+.sk-img,
+.sk-line {
+  background: linear-gradient(100deg, #f3eee9 30%, #faf7f4 50%, #f3eee9 70%);
+  background-size: 250% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+.sk-img {
+  aspect-ratio: 4 / 3;
+}
+
+.sk-line {
+  height: 11px;
+  margin: 12px;
+  border-radius: 6px;
+
+  &--short {
+    width: 55%;
+  }
+}
+
+.state {
+  text-align: center;
+  padding: 56px 16px;
+  animation: rise 0.4s var(--ojas-ease) both;
+
+  h3 {
+    margin: 0 0 6px;
+    font: 600 1.05rem 'Poppins', sans-serif;
+    color: var(--ojas-text);
+    word-break: break-word;
   }
 
   p {
-    font-size: 1rem;
+    margin: 0 0 18px;
+    font-size: 0.86rem;
+    color: var(--ojas-text-light);
   }
 }
 
-// ===== LOADING & ERROR STATES =====
-.loading-state,
-.error-state {
-  text-align: center;
-  padding: 60px 20px;
-}
-.loading-state p,
-.error-state p {
-  font-size: 0.92rem;
+.state-ico {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 16px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: #f5f0eb;
   color: var(--ojas-text-light);
-  margin-top: 12px;
-}
-.error-state {
+
   mat-icon {
-    font-size: 48px;
-    width: 48px;
-    height: 48px;
-    color: var(--ojas-text-light);
-    opacity: 0.5;
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
   }
 }
-.retry-btn {
+
+.state-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 16px;
-  padding: 10px 24px;
+  min-height: 46px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 14px;
   background: var(--ojas-ink);
   color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.88rem;
+  font: 600 0.88rem 'Poppins', sans-serif;
   cursor: pointer;
-  transition: all 0.3s ease;
+
   mat-icon {
     font-size: 18px;
     width: 18px;
     height: 18px;
-    opacity: 1;
   }
-  &:hover {
-    background: var(--ojas-ink-soft);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(45, 45, 45, 0.25);
-  }
-}
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--ojas-ink-bg);
-  border-top-color: var(--ojas-ink-soft);
-  border-radius: 50%;
-  margin: 0 auto;
-  animation: spin 0.8s linear infinite;
 }
 
-// ===== RESPONSIVE =====
-// A step between four and two, so a tablet does not jump straight from a catalogue to two
-// oversized panels — which is the shape the cards were being complained about in.
-@media (max-width: 1240px) {
+// Short phones (a 320x568 screen, or any phone with a lot of browser chrome): the sentence under
+// the title goes, so the first products still start on the first screen.
+@media (max-width: 599px) and (max-height: 640px) {
+  .shop-sub {
+    display: none;
+  }
+
+  .shop-head {
+    padding-bottom: 12px;
+  }
+}
+
+// ===== WIDER SCREENS =====
+@media (min-width: 380px) {
   .products-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 992px) {
-  .products-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .page-header {
-    padding: 48px 20px 40px;
-
-    h1 {
-      font-size: 1.8rem;
-    }
-    p {
-      font-size: 0.92rem;
-    }
-  }
-
-  .products-container {
-    padding: 24px 16px 60px;
-  }
-
-  .filter-chip {
-    padding: 8px 20px;
-    font-size: 0.82rem;
-  }
-
-  .products-grid {
-    grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
+}
 
-  .product-image {
-    height: 150px;
+.btn-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-label--short {
+  display: none;
+}
+
+// ===== COMPACT CARDS =====
+// Sized by the card, not the screen, so the same rules hold for two across on a phone, three on a
+// tablet and four on a big desktop. Too narrow for two labelled buttons: "Add" and a bolt.
+@container card (max-width: 250px) {
+  .btn-label--long {
+    display: none;
   }
 
-  .product-info {
-    padding: 10px;
+  .btn-label--short {
+    display: inline;
   }
 
+  .product-actions > .buy-now-btn {
+    flex: 0 0 40px;
+    padding: 0;
+
+    .btn-label {
+      display: none;
+    }
+  }
+}
+
+// Phone-sized: no description, a two-line name, tighter spacing - a card a thumb can scan.
+@container card (max-width: 210px) {
   .product-desc {
-    -webkit-line-clamp: 2;
-    font-size: 0.78rem;
-    margin-bottom: 10px;
+    display: none;
+  }
+
+  .product-info-top {
+    padding: 10px 10px 0;
   }
 
   .product-name {
-    font-size: 0.88rem;
-    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    min-height: 2.5em;
+    margin-bottom: 6px;
+    white-space: normal;
+    font-size: 0.86rem;
+    line-height: 1.25;
   }
 
-  .product-price {
-    font-size: 1rem;
+  .product-meta {
+    padding-top: 8px;
+    margin-bottom: 8px;
   }
 
-  .product-actions {
-    gap: 6px;
+  .product-info {
+    padding: 0 10px 10px;
+  }
+}
+
+@media (min-width: 600px) {
+  .shop-head {
+    padding: 84px 24px 26px;
   }
 
-  .add-to-cart-btn,
-  .buy-now-btn {
-    padding: 9px 6px;
-    font-size: 0;
-    gap: 0;
-    border-radius: 10px;
+  .crumbs {
+    display: flex;
+    margin-bottom: 14px;
+  }
 
-    mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
+  .shop-head-inner h1 {
+    font-size: 1.9rem;
+  }
+
+  .shop-sub {
+    display: block;
+    font-size: 0.95rem;
+  }
+
+  .shop-body {
+    padding: 20px 24px 80px;
+  }
+
+  .chip-rail {
+    margin: 0 -24px;
+    padding: 2px 24px 6px;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shop-head {
+    padding: 78px 32px 22px;
+  }
+
+  .shop-head-inner h1 {
+    font-size: 2.2rem;
+  }
+
+  .shop-body {
+    padding: 22px 32px 90px;
+  }
+
+  // The sidebar carries categories on a desktop, so the rail and the phone buttons step aside.
+  .chip-rail,
+  .tool-btn {
+    display: none;
+  }
+
+  .sort-select {
+    display: inline-flex;
+  }
+
+  .toolbar {
+    margin-top: 6px;
+  }
+
+  .shop-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+
+  .side-filters {
+    display: block;
+    position: sticky;
+    top: 76px;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    padding: 16px 16px 8px;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid #f1ebe5;
+    box-shadow: var(--ojas-shadow-sm);
+    // Scrolls when the filters are taller than the screen, without drawing a scrollbar track
+    // down the inside of the card.
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
     }
   }
-}
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+  .side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+
+    h2 {
+      margin: 0;
+      font: 700 1rem 'Poppins', sans-serif;
+      color: var(--ojas-text);
+    }
+
+    button {
+      border: none;
+      background: none;
+      font: 600 0.76rem 'Poppins', sans-serif;
+      color: var(--ojas-orange-dark);
+      cursor: pointer;
+    }
+  }
+
+  .products-grid {
+    gap: 20px;
+  }
+
+  .product-info-top {
+    padding: 14px 15px 0;
+  }
+
+  .product-info {
+    padding: 0 15px 15px;
+  }
+
+  .product-name {
+    font-size: 0.98rem;
   }
 }
 
-@keyframes fadeInUp {
+@media (min-width: 1440px) {
+  .products-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -614,12 +1234,34 @@
   }
 }
 
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
+@keyframes fade {
+  from {
+    opacity: 0;
   }
-  50% {
-    transform: translateY(-15px);
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card,
+  .shop-head-inner,
+  .pill,
+  .sheet,
+  .sheet-backdrop,
+  .state {
+    animation: none;
   }
 }

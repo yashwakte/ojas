@@ -1,111 +1,343 @@
-<section class="products-page">
-  <div class="page-header">
-    <div class="page-header-bg">
-      <div class="header-orb orb-1"></div>
-      <div class="header-orb orb-2"></div>
+<section class="shop">
+  <header class="shop-head">
+    <div class="shop-head-glow" aria-hidden="true"></div>
+    <div class="shop-head-inner">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a routerLink="/">Home</a>
+        <mat-icon aria-hidden="true">chevron_right</mat-icon>
+        @if (selectedCategory() === 'All') {
+          <span aria-current="page">Shop</span>
+        } @else {
+          <a routerLink="/products">Shop</a>
+          <mat-icon aria-hidden="true">chevron_right</mat-icon>
+          <span aria-current="page">{{ selectedCategory() }}</span>
+        }
+      </nav>
+      <p class="shop-eyebrow">{{ eyebrow() }}</p>
+      <h1>{{ title() }}</h1>
+      <p class="shop-sub">{{ subtitle() }}</p>
     </div>
-    <div class="page-header-content">
-      <div class="section-label">
-        <span class="label-line"></span>
-        <span class="label-text">EXPLORE</span>
-        <span class="label-line"></span>
-      </div>
-      <h1>Our Products</h1>
-      <p>Pure, natural flours and healthy food products for your family</p>
-    </div>
-  </div>
+  </header>
 
-  <div class="products-container">
+  <div class="shop-body">
     <app-order-picking-banner />
 
-    <!-- Category Filter -->
-    <div class="category-filter">
-      @for (cat of categories; track cat) {
-        <button
-          [class.active]="selectedCategory() === cat"
-          (click)="selectCategory(cat)"
-          class="filter-chip"
-        >
-          {{ cat }}
+    <div class="shop-search" role="search">
+      <mat-icon class="shop-search-icon" aria-hidden="true">search</mat-icon>
+      <input
+        type="search"
+        class="shop-search-input"
+        [value]="searchDraft()"
+        (input)="onSearchInput($any($event.target).value)"
+        (keydown.enter)="commitSearch()"
+        [attr.placeholder]="
+          selectedCategory() === 'All' ? 'Search jowar, ragi, custard…' : 'Search in ' + selectedCategory() + '…'
+        "
+        aria-label="Search products"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        enterkeyhint="search"
+      />
+      @if (searchDraft()) {
+        <button type="button" class="shop-search-clear" (click)="clearSearch()" aria-label="Clear search">
+          <mat-icon>close</mat-icon>
         </button>
       }
     </div>
 
-    <!-- Products Grid -->
-    <div class="products-grid">
-      @for (product of filteredProducts(); track product.id; let i = $index) {
-        <div class="product-card" [style.animation-delay]="cardDelay(i)">
-          <a class="product-link" [routerLink]="['/products', product.id]">
-            <div class="product-image">
-              <!-- The first row is the page. Left to `loading="lazy"`, the browser will not even
-                   begin fetching the photographs a customer is already looking at until layout has
-                   settled, which shows as a grid of empty cards filling in late. Everything below
-                   is lazy, which is where lazy actually pays. -->
-              <img
-                [src]="thumbnail(product.imageUrl)"
-                [alt]="product.name"
-                [attr.loading]="i < eagerImageCount ? null : 'lazy'"
-                [attr.fetchpriority]="i < eagerImageCount ? 'high' : null"
-                decoding="async"
-                (error)="onImgError($event)"
-              />
-              <div class="product-overlay">
-                <span class="product-badge">{{ product.category }}</span>
-              </div>
-              @if (isOutOfStock(product)) {
-                <span class="stock-veil"><span>Out of Stock</span></span>
-              }
-            </div>
-<div class="product-info-top">
-            <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
-            <p class="product-desc">{{ product.description }}</p>
-            <div class="product-meta">
-              <span class="product-weight">
-                <mat-icon>scale</mat-icon> {{ product.weight }}
-              </span>
-              <span class="product-price">
-                @if (product.discount && product.discount > 0) {
-                  <span class="original-price">₹{{ product.price | number: '1.0-2' }}</span>
-                  <span class="sale-price">₹{{ effectivePrice(product) | number: '1.0-2' }}</span>
-                  <span class="discount-badge">{{ product.discount }}% OFF</span>
-                } @else {
-                  ₹{{ product.price | number: '1.0-2' }}
-                }
-              </span>
-            </div>
-          </div>
-          </a>
-          <div class="product-info">
-            <div class="product-actions">
-              <button
-                class="add-to-cart-btn"
-                [class.added]="justAdded() === product.id"
-                [disabled]="!isPurchasable(product)"
-                (click)="addToCart(product)"
-              >
-                <mat-icon>{{
-                  justAdded() === product.id ? 'check' : 'add_shopping_cart'
-                }}</mat-icon>
-                {{
-                  justAdded() === product.id ? 'Added!' : picking() ? 'Add' : 'Add to Cart'
-                }}
-              </button>
-              @if (!picking()) {
-                <button class="buy-now-btn" [disabled]="!isPurchasable(product)" (click)="buyNow(product)">
-                  <mat-icon>bolt</mat-icon> Buy Now
-                </button>
-              }
-            </div>
-          </div>
-        </div>
+    <div class="chip-rail" role="group" aria-label="Categories">
+      @for (cat of categories(); track cat) {
+        <button
+          type="button"
+          class="chip"
+          [class.on]="selectedCategory() === cat"
+          [attr.aria-pressed]="selectedCategory() === cat"
+          (click)="selectCategory(cat)"
+        >
+          {{ cat }}<span class="chip-count">{{ categoryCount(cat) }}</span>
+        </button>
       }
     </div>
 
-    @if (filteredProducts().length === 0) {
-      <div class="no-products">
-        <mat-icon>inventory_2</mat-icon>
-        <p>No products found in this category.</p>
+    <div class="toolbar" #resultsTop>
+      <p class="toolbar-count" aria-live="polite">
+        Showing <b>{{ filteredProducts().length }}</b>
+        {{ filteredProducts().length === 1 ? 'product' : 'products' }}
+      </p>
+      <div class="toolbar-actions">
+        <label class="sort-select">
+          <span>Sort by</span>
+          <select [value]="sort()" (change)="setSort($any($event.target).value)" aria-label="Sort products">
+            @for (o of sortOptions; track o.key) {
+              <option [value]="o.key" [selected]="sort() === o.key">{{ o.label }}</option>
+            }
+          </select>
+          <mat-icon aria-hidden="true">expand_more</mat-icon>
+        </label>
+        <button type="button" class="tool-btn tool-btn--sort" (click)="openSortSheet()">
+          <mat-icon aria-hidden="true">swap_vert</mat-icon>{{ sortLabel() }}
+        </button>
+        <button type="button" class="tool-btn tool-btn--filter" (click)="openFilterSheet()">
+          <mat-icon aria-hidden="true">tune</mat-icon>Filter
+          @if (activeFilterCount() > 0) {
+            <span class="tool-badge">{{ activeFilterCount() }}</span>
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (activePills().length > 0) {
+      <div class="pills">
+        @for (pill of activePills(); track pill.id) {
+          <span class="pill">
+            {{ pill.label }}
+            <button type="button" (click)="removePill(pill)" [attr.aria-label]="'Remove ' + pill.label">
+              <mat-icon>close</mat-icon>
+            </button>
+          </span>
+        }
+        @if (activePills().length > 1) {
+          <button type="button" class="pill pill--clear" (click)="clearAll()">Clear all</button>
+        }
       </div>
     }
+
+    <div class="shop-layout">
+      <aside class="side-filters" aria-label="Filters">
+        <div class="side-head">
+          <h2>Filters</h2>
+          @if (activeFilterCount() > 0) {
+            <button type="button" (click)="clearAll()">Clear all</button>
+          }
+        </div>
+        <ng-container [ngTemplateOutlet]="filterPanel" />
+      </aside>
+
+      <div class="grid-wrap">
+        @if (showSkeleton()) {
+          <div class="products-grid" aria-busy="true" aria-label="Loading products">
+            @for (s of skeletons; track s) {
+              <div class="sk-card" aria-hidden="true">
+                <div class="sk-img"></div>
+                <div class="sk-line"></div>
+                <div class="sk-line sk-line--short"></div>
+              </div>
+            }
+          </div>
+        } @else if (showError()) {
+          <div class="state" role="alert">
+            <span class="state-ico"><mat-icon>cloud_off</mat-icon></span>
+            <h3>We couldn't load the shop</h3>
+            <p>It's usually a patchy connection. Trying again normally sorts it out.</p>
+            <button type="button" class="state-btn" (click)="retry()">
+              <mat-icon>refresh</mat-icon> Try again
+            </button>
+          </div>
+        } @else if (filteredProducts().length === 0) {
+          <div class="state">
+            <span class="state-ico"><mat-icon>search_off</mat-icon></span>
+            <h3>No products match {{ query() ? '“' + query() + '”' : 'these filters' }}</h3>
+            <p>Try a different word, or take a filter off.</p>
+            <button type="button" class="state-btn" (click)="clearAll()">Clear all filters</button>
+          </div>
+        } @else {
+          <div class="products-grid">
+            @for (product of filteredProducts(); track product.id; let i = $index) {
+              <div class="product-card" [style.animation-delay]="cardDelay(i)">
+                <a class="product-link" [routerLink]="['/products', product.id]">
+                  <div class="product-image">
+                    <!-- The first row is the page: left lazy, the browser would not start fetching
+                         the photographs a customer is already looking at until layout settled. -->
+                    <img
+                      [src]="thumbnail(product.imageUrl)"
+                      [alt]="product.name"
+                      [attr.loading]="i < eagerImageCount ? null : 'lazy'"
+                      [attr.fetchpriority]="i < eagerImageCount ? 'high' : null"
+                      decoding="async"
+                      (error)="onImgError($event)"
+                    />
+                    @if (product.discount > 0 && !isOutOfStock(product)) {
+                      <span class="product-tag">{{ product.discount }}% OFF</span>
+                    }
+                    <div class="product-overlay">
+                      <span class="product-badge">{{ product.category }}</span>
+                    </div>
+                    @if (isOutOfStock(product)) {
+                      <span class="stock-veil"><span>Out of Stock</span></span>
+                    }
+                  </div>
+                  <div class="product-info-top">
+                    <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
+                    <p class="product-desc">{{ product.description }}</p>
+                    <div class="product-meta">
+                      <span class="product-weight"> <mat-icon>scale</mat-icon> {{ product.weight }} </span>
+                      <span class="product-price">
+                        @if (product.discount && product.discount > 0) {
+                          <span class="original-price">₹{{ product.price | number: '1.0-2' }}</span>
+                          <span class="sale-price">₹{{ effectivePrice(product) | number: '1.0-2' }}</span>
+                        } @else {
+                          <span class="sale-price">₹{{ product.price | number: '1.0-2' }}</span>
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </a>
+                <div class="product-info">
+                  <div class="product-actions">
+                    <button
+                      type="button"
+                      class="add-to-cart-btn"
+                      [class.added]="justAdded() === product.id"
+                      [disabled]="!isPurchasable(product)"
+                      [attr.aria-label]="'Add ' + product.name + ' to cart'"
+                      (click)="addToCart(product)"
+                    >
+                      <mat-icon>{{ justAdded() === product.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                      <span class="btn-label btn-label--long">{{
+                        justAdded() === product.id ? 'Added!' : picking() ? 'Add' : 'Add to Cart'
+                      }}</span>
+                      <span class="btn-label btn-label--short">{{ justAdded() === product.id ? 'Added' : 'Add' }}</span>
+                    </button>
+                    @if (!picking()) {
+                      <button
+                        type="button"
+                        class="buy-now-btn"
+                        [disabled]="!isPurchasable(product)"
+                        [attr.aria-label]="'Buy ' + product.name + ' now'"
+                        (click)="buyNow(product)"
+                      >
+                        <mat-icon>bolt</mat-icon><span class="btn-label">Buy Now</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
   </div>
+
+  <!-- One set of filter controls, drawn in the desktop sidebar and in the phone's filter sheet. -->
+  <ng-template #filterPanel>
+    <div class="fgroup">
+      <h3 class="fgroup-title">Category</h3>
+      <div class="fopts">
+        @for (cat of categories(); track cat) {
+          <button
+            type="button"
+            class="fopt"
+            [class.on]="selectedCategory() === cat"
+            [attr.aria-pressed]="selectedCategory() === cat"
+            (click)="selectCategory(cat)"
+          >
+            <span class="fradio" aria-hidden="true"></span>
+            <span class="fopt-label">{{ cat === 'All' ? 'All products' : cat }}</span>
+            <span class="fopt-count">{{ categoryCount(cat) }}</span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <h3 class="fgroup-title">Price</h3>
+      <div class="fchips">
+        @for (b of priceOptions(); track b.id) {
+          <button
+            type="button"
+            class="fchip"
+            [class.on]="priceBands().has(b.id)"
+            [attr.aria-pressed]="priceBands().has(b.id)"
+            [disabled]="b.count === 0 && !priceBands().has(b.id)"
+            (click)="toggleBand(b.id)"
+          >
+            {{ b.label }}<span>{{ b.count }}</span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <h3 class="fgroup-title">Pack size</h3>
+      <div class="fchips">
+        @for (s of sizeOptions(); track s.id) {
+          <button
+            type="button"
+            class="fchip"
+            [class.on]="sizes().has(s.id)"
+            [attr.aria-pressed]="sizes().has(s.id)"
+            [disabled]="s.count === 0 && !sizes().has(s.id)"
+            (click)="toggleSize(s.id)"
+          >
+            {{ s.label }}<span>{{ s.count }}</span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <h3 class="fgroup-title">Availability &amp; offers</h3>
+      <button type="button" class="ftoggle" role="switch" [attr.aria-checked]="inStockOnly()" (click)="toggleInStock()">
+        <span class="ftoggle-label">In stock only <small>{{ inStockCount() }}</small></span>
+        <span class="fswitch" aria-hidden="true"></span>
+      </button>
+      @if (onOfferCount() > 0 || onOfferOnly()) {
+        <button type="button" class="ftoggle" role="switch" [attr.aria-checked]="onOfferOnly()" (click)="toggleOnOffer()">
+          <span class="ftoggle-label">On offer <small>{{ onOfferCount() }}</small></span>
+          <span class="fswitch" aria-hidden="true"></span>
+        </button>
+      }
+    </div>
+  </ng-template>
+
+  @if (filterSheetOpen()) {
+    <div class="sheet-backdrop" (click)="closeSheets()" aria-hidden="true"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="filter-sheet-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2 id="filter-sheet-title">Filters</h2>
+        <button type="button" class="sheet-close" (click)="closeSheets()" aria-label="Close filters">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <ng-container [ngTemplateOutlet]="filterPanel" />
+      </div>
+      <div class="sheet-foot">
+        <button type="button" class="sheet-btn sheet-btn--ghost" (click)="clearAll()">Clear all</button>
+        <button type="button" class="sheet-btn sheet-btn--primary" (click)="closeSheets()">
+          Show {{ filteredProducts().length }} {{ filteredProducts().length === 1 ? 'product' : 'products' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (sortSheetOpen()) {
+    <div class="sheet-backdrop" (click)="closeSheets()" aria-hidden="true"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sort-sheet-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2 id="sort-sheet-title">Sort by</h2>
+        <button type="button" class="sheet-close" (click)="closeSheets()" aria-label="Close sorting">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="sheet-body sheet-body--list" role="radiogroup" aria-labelledby="sort-sheet-title">
+        @for (o of sortOptions; track o.key) {
+          <button
+            type="button"
+            class="sopt"
+            role="radio"
+            [class.on]="sort() === o.key"
+            [attr.aria-checked]="sort() === o.key"
+            (click)="setSort(o.key)"
+          >
+            <span class="fradio" aria-hidden="true"></span>{{ o.label }}
+          </button>
+        }
+      </div>
+    </div>
+  }
 </section>
