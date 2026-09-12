@@ -1,0 +1,142 @@
+<div class="drawer-backdrop" (click)="close()" aria-hidden="true"></div>
+
+<aside
+  class="drawer"
+  id="mobile-drawer"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Menu"
+  [cdkTrapFocus]="open()"
+>
+  <div class="drawer-head">
+    @if (auth.isLoggedIn()) {
+      <div class="drawer-avatar" aria-hidden="true">{{ initials() }}</div>
+      <div class="drawer-who">
+        <b>{{ auth.user()?.fullName }}</b>
+        <span>{{ auth.user()?.phone || auth.user()?.email }}</span>
+      </div>
+    } @else {
+      <img class="drawer-logo" src="/images/logo.png" alt="" width="66" height="42" />
+      <div class="drawer-who">
+        <b>Welcome to Ojas</b>
+        <span>Log in to track orders and check out faster</span>
+      </div>
+    }
+    <button #closeButton type="button" class="drawer-close" (click)="close()" aria-label="Close menu">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  @if (!auth.isLoggedIn()) {
+    <div class="drawer-auth">
+      <a routerLink="/login" class="drawer-auth-btn drawer-auth-btn--primary" (click)="close()">Log in</a>
+      <a routerLink="/register" class="drawer-auth-btn" (click)="close()">Create account</a>
+    </div>
+  }
+
+  <nav class="drawer-body" aria-label="Menu">
+    @if (isCustomerArea()) {
+      <p class="drawer-label">Shop</p>
+      <a
+        class="drawer-item"
+        style="--i: 0"
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="close()"
+      >
+        <span class="drawer-ico"><mat-icon>storefront</mat-icon></span>
+        <span class="drawer-text">Home</span>
+      </a>
+      <a
+        class="drawer-item"
+        style="--i: 1"
+        routerLink="/products"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="close()"
+      >
+        <span class="drawer-ico"><mat-icon>grid_view</mat-icon></span>
+        <span class="drawer-text">All Products</span>
+      </a>
+      <button type="button" class="drawer-item" style="--i: 2" (click)="showCategories()">
+        <span class="drawer-ico"><mat-icon>category</mat-icon></span>
+        <span class="drawer-text">Shop by Category</span>
+        <mat-icon class="drawer-go" aria-hidden="true">chevron_right</mat-icon>
+      </button>
+      <button type="button" class="drawer-item" style="--i: 3" (click)="openSearch()">
+        <span class="drawer-ico"><mat-icon>search</mat-icon></span>
+        <span class="drawer-text">Search Products</span>
+      </button>
+    }
+
+    @if (isCustomer()) {
+      <div class="drawer-sep" role="presentation"></div>
+      <p class="drawer-label">My Account</p>
+      <a class="drawer-item" style="--i: 4" routerLink="/my-orders" routerLinkActive="active" (click)="close()">
+        <span class="drawer-ico"><mat-icon>receipt_long</mat-icon></span>
+        <span class="drawer-text">Your Orders</span>
+      </a>
+      <a class="drawer-item" style="--i: 5" routerLink="/wallet" routerLinkActive="active" (click)="close()">
+        <span class="drawer-ico"><mat-icon>account_balance_wallet</mat-icon></span>
+        <span class="drawer-text">Wallet</span>
+        <span class="drawer-pill">{{ wallet.balance() | currency: 'INR' : 'symbol' : '1.2-2' }}</span>
+      </a>
+      <a class="drawer-item" style="--i: 6" routerLink="/cart" routerLinkActive="active" (click)="close()">
+        <span class="drawer-ico"><mat-icon>shopping_cart</mat-icon></span>
+        <span class="drawer-text">Cart</span>
+        @if (cart.items().length > 0) {
+          <span class="drawer-pill drawer-pill--count">{{ cart.items().length }}</span>
+        }
+      </a>
+      <a class="drawer-item" style="--i: 7" routerLink="/profile" routerLinkActive="active" (click)="close()">
+        <span class="drawer-ico"><mat-icon>account_circle</mat-icon></span>
+        <span class="drawer-text">Profile</span>
+      </a>
+    }
+
+    @if (auth.isAdmin() || auth.isDelivery()) {
+      <p class="drawer-label">Workspace</p>
+      @if (auth.isAdmin()) {
+        <a class="drawer-item" style="--i: 0" routerLink="/admin" routerLinkActive="active" (click)="close()">
+          <span class="drawer-ico"><mat-icon>dashboard</mat-icon></span>
+          <span class="drawer-text">Admin Panel</span>
+        </a>
+      }
+      @if (auth.isDelivery()) {
+        <a class="drawer-item" style="--i: 1" routerLink="/delivery/orders" routerLinkActive="active" (click)="close()">
+          <span class="drawer-ico"><mat-icon>local_shipping</mat-icon></span>
+          <span class="drawer-text">Delivery Hub</span>
+        </a>
+      }
+    }
+
+    @if (isCustomerArea()) {
+      <div class="drawer-sep" role="presentation"></div>
+      <p class="drawer-label">Help &amp; Info</p>
+      <button type="button" class="drawer-item" style="--i: 8" (click)="openChat()">
+        <span class="drawer-ico"><mat-icon>support_agent</mat-icon></span>
+        <span class="drawer-text">Chat with us</span>
+      </button>
+      <a class="drawer-item" style="--i: 9" [href]="supportPhoneHref">
+        <span class="drawer-ico"><mat-icon>call</mat-icon></span>
+        <span class="drawer-text">Call us</span>
+        <span class="drawer-meta">{{ supportPhone }}</span>
+      </a>
+      <a class="drawer-item" style="--i: 10" routerLink="/about" routerLinkActive="active" (click)="close()">
+        <span class="drawer-ico"><mat-icon>info</mat-icon></span>
+        <span class="drawer-text">About Us</span>
+      </a>
+    }
+  </nav>
+
+  <div class="drawer-foot">
+    @if (auth.isLoggedIn()) {
+      <button type="button" class="drawer-logout" (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        Log out
+      </button>
+    }
+    <p class="drawer-tagline">शुद्ध आहार… शुद्ध विचार</p>
+  </div>
+</aside>

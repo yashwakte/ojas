@@ -1,0 +1,362 @@
+// Fixed and full-screen, above the header and the bottom tab bar (both 1000) and the category
+// sheet (1002), below the search overlay (1010) that a row here can open.
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 1004;
+  pointer-events: none;
+  visibility: hidden;
+  // Stays visible until the panel has finished sliding out, then drops out of the page.
+  transition: visibility 0s linear 0.42s;
+}
+
+:host(.open) {
+  pointer-events: auto;
+  visibility: visible;
+  transition: none;
+}
+
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  // Flat rather than blurred: a blur behind a sliding panel is a full repaint per frame on a
+  // budget phone, and it is phones this drawer is for.
+  background: rgba(20, 14, 10, 0.55);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+:host(.open) .drawer-backdrop {
+  opacity: 1;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 88vw);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 24px 0 0 24px;
+  box-shadow: -24px 0 60px -20px rgba(20, 14, 10, 0.35);
+  font-family: 'Poppins', sans-serif;
+  padding-top: env(safe-area-inset-top, 0px);
+  transform: translateX(104%);
+  transition: transform 0.42s var(--ojas-ease);
+}
+
+:host(.open) .drawer {
+  transform: none;
+}
+
+// ----- Head: who is signed in, and the way out -----
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 16px 16px 20px;
+  background: linear-gradient(160deg, #fff8f4 0%, #fdeee4 100%);
+  border-bottom: 1px solid #f3e6dc;
+  border-radius: 24px 0 0 0;
+}
+
+.drawer-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--ojas-orange) 0%, var(--ojas-orange-dark) 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  box-shadow: var(--ojas-shadow-orange);
+}
+
+.drawer-logo {
+  width: 58px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.drawer-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  b {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  span {
+    font-size: 0.74rem;
+    color: var(--ojas-text-light);
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.drawer-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #efe3d9;
+  background: #fff;
+  color: var(--ojas-text);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    transform 0.3s var(--ojas-ease),
+    background 0.2s ease;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  &:hover {
+    transform: rotate(90deg);
+    background: var(--ojas-orange-bg);
+  }
+}
+
+// ----- Guest sign-in -----
+.drawer-auth {
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px 4px;
+}
+
+.drawer-auth-btn {
+  flex: 1;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1.5px solid var(--ojas-orange);
+  color: var(--ojas-orange-dark);
+  font-weight: 600;
+  font-size: 0.86rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &--primary {
+    background: var(--ojas-orange-glass);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: var(--ojas-shadow-orange);
+  }
+}
+
+// ----- The list -----
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 10px 12px;
+}
+
+.drawer-label {
+  margin: 14px 12px 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a8f86;
+}
+
+.drawer-sep {
+  height: 1px;
+  margin: 10px 12px 4px;
+  background: linear-gradient(90deg, #efe6de, #efe6de 70%, transparent);
+}
+
+// Every row is the same three columns - icon tile, label, and whatever sits on the right edge -
+// whether it is a link or a button, so the labels line up down the whole panel.
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 50px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ojas-text);
+  font: 500 0.92rem 'Poppins', sans-serif;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  opacity: 0;
+  transform: translateX(18px);
+  transition:
+    opacity 0.35s var(--ojas-ease),
+    transform 0.35s var(--ojas-ease),
+    background 0.2s ease;
+
+  &:hover {
+    background: #faf5f0;
+
+    .drawer-go {
+      transform: translateX(3px);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange);
+    outline-offset: -2px;
+  }
+
+  &.active {
+    background: var(--ojas-orange-bg);
+    font-weight: 600;
+
+    .drawer-ico {
+      background: var(--ojas-orange);
+      color: #fff;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: -10px;
+      top: 12px;
+      bottom: 12px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--ojas-orange);
+    }
+  }
+}
+
+:host(.open) .drawer-item {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i, 0) * 28ms + 110ms);
+}
+
+.drawer-ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #f6f0ea;
+  color: var(--ojas-orange-dark);
+  transition: all 0.2s ease;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.drawer-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer-go {
+  color: #bfb5ac;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  transition: transform 0.25s var(--ojas-ease);
+}
+
+.drawer-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ojas-orange-bg);
+  color: var(--ojas-orange-dark);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  &--count {
+    min-width: 24px;
+    text-align: center;
+    background: var(--ojas-orange);
+    color: #fff;
+  }
+}
+
+.drawer-meta {
+  font-size: 0.72rem;
+  color: var(--ojas-text-light);
+  white-space: nowrap;
+}
+
+// ----- Foot -----
+.drawer-foot {
+  padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #f1e9e2;
+  background: #fffdfb;
+}
+
+.drawer-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(198, 40, 40, 0.3);
+  background: #fff;
+  color: #c62828;
+  font: 600 0.9rem 'Poppins', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  mat-icon {
+    font-size: 19px;
+    width: 19px;
+    height: 19px;
+  }
+
+  &:hover {
+    background: #fdeeee;
+    border-color: #c62828;
+  }
+}
+
+.drawer-tagline {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #a79c93;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer-backdrop,
+  .drawer-item {
+    transition: none;
+  }
+
+  :host {
+    transition: none;
+  }
+}
