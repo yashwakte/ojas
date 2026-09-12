@@ -2,16 +2,17 @@
   <header class="page-header" id="hero-slide-list-top">
     <div>
       <p class="eyebrow">Home Page</p>
-      <h1>Hero Images</h1>
+      <h1>Home Posters</h1>
       <p class="subtitle">
-        The pictures at the very top of the home page. Add more than one and they become a
-        carousel customers can swipe, which also advances on its own every few seconds.
+        Your posters, shown whole in the carousel at the very top of the home page, above the
+        Explore Products button. Add more than one and customers can swipe between them; it also
+        advances on its own every few seconds.
       </p>
     </div>
     @if (editingId() === null) {
       <button mat-flat-button color="primary" (click)="startCreate()">
         <mat-icon>add</mat-icon>
-        Add Hero Image
+        Add Poster
       </button>
     }
   </header>
@@ -19,7 +20,7 @@
   @if (loading() && slides().length === 0) {
     <div class="loading-state">
       <mat-spinner diameter="40"></mat-spinner>
-      <p>Loading hero images…</p>
+      <p>Loading posters…</p>
     </div>
   } @else if (editingId() === null) {
     <!-- Zero live slides is a real, reachable state - turn them all off and this is what happens -
@@ -217,7 +218,7 @@
             @if (submitting()) {
               <mat-spinner diameter="18"></mat-spinner>
             }
-            {{ editingId() === 'new' ? 'Add to hero' : 'Save changes' }}
+            {{ editingId() === 'new' ? 'Add poster' : 'Save changes' }}
           </button>
         </div>
       </form>

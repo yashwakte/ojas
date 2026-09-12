@@ -1,0 +1,73 @@
+<div class="posters" [class.posters--waiting]="!activeReady()" [class.posters--playing]="playing()">
+  <div class="posters-frame">
+    <div class="posters-deck" #deck role="region" aria-roledescription="carousel" aria-label="Ojas posters">
+      @for (slide of slides(); track slide.key; let i = $index) {
+        <div
+          class="poster"
+          [class.poster--active]="activeIndex() === i"
+          [class.poster--ready]="ready().has(slide.key)"
+          role="group"
+          aria-roledescription="slide"
+          [attr.aria-label]="'Poster ' + (i + 1) + ' of ' + slides().length"
+          [attr.aria-hidden]="activeIndex() === i ? null : 'true'"
+        >
+          @if (settled() && primed().has(i)) {
+            <picture class="poster-picture">
+              @if (slide.srcset) {
+                <source type="image/webp" [srcset]="slide.srcset" [sizes]="sizes" />
+              }
+              <img
+                [src]="slide.src"
+                [alt]="slide.alt"
+                [attr.width]="slide.width || null"
+                [attr.height]="slide.height || null"
+                [attr.loading]="i === 0 ? 'eager' : 'lazy'"
+                [attr.fetchpriority]="i === 0 ? 'high' : null"
+                decoding="async"
+                (load)="onLoaded(slide.key, i)"
+                (error)="onLoaded(slide.key, i)"
+              />
+            </picture>
+          }
+          @if (slide.link) {
+            <a
+              class="poster-hit"
+              [routerLink]="slide.link"
+              [attr.aria-label]="slide.alt"
+              [attr.tabindex]="activeIndex() === i ? null : -1"
+            ></a>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- A soft shade along the foot of the picture, for whatever is laid over it there. -->
+    <div class="posters-shade" aria-hidden="true"></div>
+
+    @if (slides().length > 1) {
+      <button type="button" class="posters-nav posters-nav--prev" aria-label="Previous poster" (click)="previous()">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button type="button" class="posters-nav posters-nav--next" aria-label="Next poster" (click)="next()">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    }
+  </div>
+
+  @if (slides().length > 1) {
+    <div class="posters-dots">
+      @for (slide of slides(); track slide.key; let i = $index) {
+        <button
+          type="button"
+          class="posters-dot"
+          [class.posters-dot--active]="activeIndex() === i"
+          [attr.aria-label]="'Show poster ' + (i + 1)"
+          [attr.aria-current]="activeIndex() === i ? 'true' : null"
+          (click)="select(i)"
+        >
+          <span class="posters-dot-fill"></span>
+        </button>
+      }
+    </div>
+  }
+</div>

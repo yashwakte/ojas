@@ -12,7 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { HeroSlideService } from '../../services/hero-slide.service';
 import { MediaUploadService } from '../../services/media-upload.service';
 import { HeroSlideConfig, UpdateHeroSlideRequest } from '../../models/interfaces';
-import { SHIPPED_HERO_SLIDES } from '../../components/home-hero/home-hero';
+import { SHIPPED_HERO_SLIDES } from '../../components/home-posters/home-posters';
 
 function emptyFormData(): UpdateHeroSlideRequest {
   return {
@@ -116,7 +116,7 @@ export class HeroSlideManagement implements OnInit {
   }
 
   deleteSlide(slide: HeroSlideConfig): void {
-    if (!confirm('Remove this slide from the home page hero? This cannot be undone.')) return;
+    if (!confirm('Remove this poster from the home page? This cannot be undone.')) return;
 
     this.heroSlideService.deleteSlide(slide.id).subscribe({
       next: () => {

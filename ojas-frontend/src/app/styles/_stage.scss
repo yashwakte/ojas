@@ -1,0 +1,28 @@
+// The storefront's first column: the hero card and the campaign banners below it share one width,
+// one inset and one radius, so they read as one column rather than blocks of different sizes.
+//
+// Both hold 2:1 pictures. From 1024px the column is also capped by the screen's height, so a 2:1
+// picture at full width still ends above the fold on a short laptop (1366x650) instead of running
+// off the bottom of it; the column narrows a little there rather than cropping the picture.
+
+$max-content: 1304px;
+$radius-phone: 22px;
+$radius: 26px;
+
+@mixin column {
+  box-sizing: border-box;
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 12px;
+
+  @media (min-width: 700px) {
+    max-width: $max-content + 48px;
+    padding-inline: 24px;
+  }
+
+  @media (min-width: 1024px) {
+    // 88px: the desktop header and a 16px breath below the picture.
+    max-width: min(#{$max-content + 64px}, calc((100svh - 88px) * 2 + 64px));
+    padding-inline: 32px;
+  }
+}

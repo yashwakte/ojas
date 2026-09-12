@@ -103,7 +103,7 @@ export class AdminDashboard implements OnInit {
     { id: 'products', label: 'Products', shortLabel: 'Products', icon: 'inventory_2' },
     { id: 'delivery-partners', label: 'Delivery Partners', shortLabel: 'Partners', icon: 'delivery_dining' },
     { id: 'delivery-charges', label: 'Delivery Charges', shortLabel: 'Charges', icon: 'local_shipping' },
-    { id: 'hero-images', label: 'Hero Images', shortLabel: 'Hero', icon: 'photo_library' },
+    { id: 'hero-images', label: 'Home Posters', shortLabel: 'Posters', icon: 'photo_library' },
     { id: 'campaign-banner', label: 'Campaign Banner', shortLabel: 'Banners', icon: 'campaign' },
   ] as const;
 

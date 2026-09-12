@@ -31,10 +31,12 @@
          (see MediaController), so the real picture is prioritised the moment it is known and comes
          from the edge rather than from the API instance.
 
-         If the hero ever goes back to being a fixed picture in the bundle, a preload of that file
-         belongs here again. Doing better than that for managed slides needs the first slide's URL
-         to be known at document-serve time, which means server-rendering this file - a bigger
-         change than it is worth today. -->
+         Still true after the September 2026 redesign: the owner's posters are the hero's picture
+         again, in the carousel window at the top of the hero card (home-posters), and which
+         poster comes first is only known once the API answers. Even a fixed picture would not
+         belong here: this file is served for every route, so a preload charges product pages and
+         checkout for a picture only the home page draws, and limiting it to "/" needs an inline
+         script the CSP in vercel.json does not allow without a hash. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Phone verification pulls the MSG91 widget, which in turn pulls hCaptcha from two further

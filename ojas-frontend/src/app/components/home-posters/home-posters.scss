@@ -1,0 +1,256 @@
+:host {
+  display: block;
+}
+
+// The window at the top of the hero's dark card. The card clips it to its own rounded corners;
+// this component only fills the width it is given.
+//
+// Every poster is published at exactly this shape - 2:1 - so `cover` fills the window edge to edge
+// with nothing cropped and nothing padded. The admin console reshapes each upload to 2:1 before it
+// is stored (app-image-framer), and tools/build-hero-posters.mjs does the same for the posters
+// that ship with the site. An older upload in some other shape is cropped from the top down, which
+// keeps the headline a poster almost always carries there.
+.posters-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 120% at 50% 0%, rgba(242, 122, 40, 0.18) 0%, rgba(242, 122, 40, 0) 70%),
+    #1d130c;
+}
+
+.posters-deck {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  touch-action: pan-y;
+}
+
+.poster {
+  grid-area: 1 / 1;
+  position: relative;
+  min-height: 0;
+  opacity: 0;
+  transform: scale(1.015);
+  transition:
+    opacity 0.9s var(--ojas-ease),
+    transform 1.2s var(--ojas-ease);
+  pointer-events: none;
+
+  &--active {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+.poster-picture,
+.poster-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.poster-picture img {
+  object-fit: cover;
+  object-position: 50% 0%;
+  opacity: 0;
+  transition: opacity 0.6s var(--ojas-ease);
+}
+
+.poster--ready .poster-picture img {
+  opacity: 1;
+}
+
+// How tall and how deep the shade is, is the hero's call: a short fade into the card on a phone,
+// where the buttons sit below the picture, and a deeper one on a laptop, where they sit on it.
+.posters-shade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--posters-shade-height, 18%);
+  pointer-events: none;
+  background: linear-gradient(
+    0deg,
+    rgba(20, 12, 7, var(--posters-shade-strength, 0.55)) 0%,
+    rgba(20, 12, 7, calc(var(--posters-shade-strength, 0.55) * 0.45)) 45%,
+    rgba(20, 12, 7, 0) 100%
+  );
+}
+
+// While the poster on top is still on its way, a soft sweep across the window says something is
+// coming - on 3G that can be a few seconds, and an empty box reads as broken.
+.posters--waiting .posters-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.07) 50%, transparent 70%);
+  background-size: 250% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+.poster-hit {
+  position: absolute;
+  inset: 0;
+
+  &:focus-visible {
+    outline: 3px solid #ffb47a;
+    outline-offset: -3px;
+  }
+}
+
+// Inside the window at desktop sizes; hidden on phones, where a swipe is the obvious gesture and a
+// tap target floating on a 360px picture covers product.
+.posters-nav {
+  display: none;
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(29, 19, 12, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  place-items: center;
+  transition:
+    transform 0.25s var(--ojas-ease),
+    background 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover {
+    background: rgba(242, 122, 40, 0.85);
+    border-color: rgba(255, 180, 122, 0.6);
+    transform: scale(1.06);
+  }
+
+  &:focus-visible {
+    outline: 3px solid #ffb47a;
+    outline-offset: 2px;
+  }
+
+  &--prev {
+    left: 16px;
+  }
+
+  &--next {
+    right: 16px;
+  }
+}
+
+// Under the window on a phone; laid over the foot of the picture on a laptop, where the hero
+// lifts them clear of its buttons with --posters-dots-bottom. The active dot doubles as the
+// autoplay's clock: it fills over the time the poster holds, so the change is never a surprise.
+.posters-dots {
+  position: var(--posters-dots-position, static);
+  left: 0;
+  right: 0;
+  bottom: var(--posters-dots-bottom, auto);
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  padding-top: var(--posters-dots-gap, 8px);
+  pointer-events: none;
+}
+
+.posters-dot {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+
+  &:focus-visible {
+    outline: 2px solid #ffb47a;
+    outline-offset: -2px;
+    border-radius: 8px;
+  }
+}
+
+.posters-dot-fill {
+  position: relative;
+  overflow: hidden;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 241, 230, 0.36);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition:
+    width 0.35s var(--ojas-ease),
+    background 0.35s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: #ff9a52;
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+
+  .posters-dot--active & {
+    width: 26px;
+    background: rgba(255, 180, 122, 0.32);
+
+    // Held (hovered, focused, just swiped, reduced motion): simply lit.
+    &::after {
+      transform: none;
+    }
+  }
+
+  // Must match AUTOPLAY_MS in home-posters.ts. Restarts whenever the autoplay does, because the
+  // class that carries it comes and goes with it.
+  .posters--playing .posters-dot--active &::after {
+    animation: dot-clock 5s linear forwards;
+  }
+}
+
+@keyframes dot-clock {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (min-width: 700px) {
+  .posters-nav {
+    display: grid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poster {
+    transition: none;
+    transform: none;
+  }
+
+  .posters--waiting .posters-frame::after {
+    animation: none;
+  }
+}

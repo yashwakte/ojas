@@ -1,200 +1,50 @@
-<!-- HERO — a full-bleed stage, not a framed picture.
-     It used to render as a 1020px-wide rounded card floating in a cream page, which is what
-     made the first screenful read as a slide deck rather than a storefront. It now fills the
-     viewport edge to edge and top to bottom, and the call to action lives inside it instead of
-     in a separate band below, so the first screen is one thing rather than three stacked strips.
+<section class="hero" [class.hero--revealed]="revealed()" aria-labelledby="hero-title">
+  <!-- The posters carry their own headlines, so the page's heading is for screen readers and
+       search engines only. -->
+  <h1 id="hero-title" class="visually-hidden">
+    Ojas: stone-ground Maharashtrian flours, upwas staples and kitchen essentials, delivered fresh
+    across Pune
+  </h1>
 
-     The artwork is now a RAIL rather than a single file: the client's composed posters, each
-     complete with its own headline and wordmark, on a horizontal scroll-snap track that the
-     visitor can swipe and that advances itself between times. Which pictures are on it is the
-     owner's to decide from the admin console; the two committed posters are what shows until
-     they publish their own, and if the API cannot be reached at all.
+  <div class="hero-card">
+    <!-- The owner's posters fill the card. On a laptop the buttons are laid over the foot of the
+         picture, on its shade; on a phone or tablet, where that would bury half the poster, they
+         sit directly under it. -->
+    <app-home-posters class="hero-posters" />
 
-     Every poster is shown WHOLE — `contain`, never cropped — so slides of different shapes sit
-     on the same rail without one of them losing its bottom row of packs. What the shape leaves
-     over is the hero's own warm gradient.
-
-     The shipped artwork ships as a WebP ladder rather than one big file: a phone downloads the
-     640px version, a desktop the 1280px one. width/height are the artwork's intrinsic size —
-     they don't constrain the rendered size, they let the browser reserve the right shape before
-     the picture arrives so the page below never jumps. fetchpriority + the preload in index.html
-     start the FIRST slide's download before Angular has booted; the rest are lazy, because a
-     picture the visitor has not swiped to yet must not compete with the one they are looking at. -->
-<section
-  class="hero"
-  appHeroParallax
-  [class.hero--open]="open()"
-  [class.hero--revealed]="revealed()"
->
-  <!-- Depth, in three cheap layers that drift against each other as the pointer moves and the
-       page scrolls. A hero that holds still while everything around it moves is the thing that
-       reads as flat; a hero with even slight internal parallax reads as a space. -->
-  <div class="hero-atmos" aria-hidden="true">
-    <span class="hero-bloom hero-bloom--warm"></span>
-    <span class="hero-bloom hero-bloom--sage"></span>
-    <span class="hero-grain"></span>
+    <div class="hero-actions">
+      <div class="hero-cta">
+        <a routerLink="/products" class="btn-primary btn-lg">Explore Products <mat-icon>arrow_forward</mat-icon></a>
+        <a routerLink="/register" class="btn-outline btn-lg">Join Our Journey</a>
+      </div>
+      <div class="trust-strip">
+        <span><mat-icon aria-hidden="true">eco</mat-icon> 100% Natural</span>
+        <span><mat-icon aria-hidden="true">verified</mat-icon> No Preservatives</span>
+        <span><mat-icon aria-hidden="true">local_shipping</mat-icon> Fresh Delivery</span>
+      </div>
+    </div>
   </div>
 
-  <div class="hero-stage">
-    <!-- There is deliberately no second, blurred copy of the poster behind this one. An
-         out-of-focus fill used to sit here to hide the fact that a banner cannot fill a window of
-         any other shape. It was the wrong answer twice over: it read as a smear behind the
-         buttons, and it cost a second decode plus a 46px blur pass on every frame of the hero's
-         parallax. The margins are simply the hero's own warm gradient now. -->
-    <div class="hero-art">
-      <!-- A DECK, not a filmstrip.
-           Every picture occupies the same grid cell, stacked one on top of another, and moving
-           between them is a crossfade rather than a slide. That is the whole change: sliding
-           announces the mechanism - here is a strip of pictures, watch it move - while a
-           dissolve announces the picture. The outgoing poster softens and falls back as the
-           incoming one arrives, so for a moment both are in the same space. All of the
-           movement lives in the transition: a slide that has arrived holds perfectly still,
-           because these posters are shown whole and there is nowhere to drift to that would
-           not crop one.
-
-           A swipe still works - see the pointer handlers - it simply no longer drives the
-           animation, so the transition is the same considered one however it was asked for. -->
-      <div
-        class="hero-deck"
-        #deck
-        role="region"
-        aria-roledescription="carousel"
-        aria-label="Ojas featured artwork"
-      >
-        @for (slide of slides(); track slide.key; let i = $index; let first = $first) {
-          <div
-            class="hero-slide"
-            [class.hero-slide--active]="activeIndex() === i"
-            role="group"
-            aria-roledescription="slide"
-            [attr.aria-label]="'Slide ' + (i + 1) + ' of ' + slides().length"
-            [attr.aria-hidden]="activeIndex() === i ? null : 'true'"
-          >
-            <picture class="hero-art-main hero-slide-inner">
-              @if (slide.srcset) {
-                <source type="image/webp" [srcset]="slide.srcset" sizes="100vw" />
-              }
-              <img
-                [src]="slide.src"
-                [alt]="slide.alt"
-                class="hero-banner-img"
-                [attr.width]="slide.width || null"
-                [attr.height]="slide.height || null"
-                [attr.fetchpriority]="first ? 'high' : 'low'"
-                [attr.loading]="first ? 'eager' : 'lazy'"
-                decoding="async"
-              />
-            </picture>
-
-            <!-- A slide with a destination gets a hit area laid over it rather than the picture
-                 being wrapped in an anchor. Wrapping would put the link inside the element that
-                 drifts, so its focus ring would drift with it; this stays square with the frame.
-                 Slides that are not on top are taken out of the tab order - a keyboard user must
-                 not land on a link that is invisible. -->
-            @if (slide.link) {
-              <a
-                class="hero-slide-hit"
-                [routerLink]="slide.link"
-                [attr.aria-label]="slide.alt"
-                [attr.tabindex]="activeIndex() === i ? null : -1"
-              ></a>
-            }
-          </div>
-        }
-      </div>
-
-      @if (slides().length > 1) {
-        <!-- On the warm margin beside the poster, never over it — `contain` leaves that margin at
-             every landscape size, so these cost no product. Hidden on phones, where a swipe is
-             the obvious gesture and a tap target floating on a 375px-wide picture is not. -->
-        <button
-          type="button"
-          class="hero-nav hero-nav--prev"
-          aria-label="Previous slide"
-          (click)="previous()"
-        >
-          <mat-icon>chevron_left</mat-icon>
-        </button>
-        <button
-          type="button"
-          class="hero-nav hero-nav--next"
-          aria-label="Next slide"
-          (click)="next()"
-        >
-          <mat-icon>chevron_right</mat-icon>
-        </button>
+  <ul class="hero-stats" aria-label="Ojas in numbers">
+    <li>
+      <b [appCountUp]="rangeSize" countUpSuffix="+" [countUpActive]="revealed()"></b>
+      <span>Products</span>
+    </li>
+    <li>
+      @if (catalogueReady()) {
+        <b [appCountUp]="categoryCount()" [countUpActive]="statsLive()"></b>
+      } @else {
+        <b class="hero-stat-wait" aria-hidden="true"></b>
       }
-    </div>
-
-    <!-- THE DOORS. Two panels hinged on the outer edges of the stage that swing open in real
-         perspective — rotateY about a hinge, not a flat slide — so they pass through the
-         viewer's space on the way out and the artwork is revealed from behind rather than
-         from under. The seam between them carries a line of light that widens as they part,
-         and the artwork behind starts pushed back and settles forward as they clear, which is
-         what sells the depth: two things moving at different rates in the same volume.
-         Pure flourish, so it is hidden from assistive tech. -->
-    <div class="hero-doors" aria-hidden="true">
-      <span class="hero-seam"></span>
-      <div class="hero-door hero-door--left">
-        <span class="hero-door-face"></span>
-        <span class="hero-door-edge"></span>
-      </div>
-      <div class="hero-door hero-door--right">
-        <span class="hero-door-face"></span>
-        <span class="hero-door-edge"></span>
-      </div>
-      <div class="hero-mark">
-        <span class="hero-mark-word">OJAS</span>
-        <span class="hero-mark-rule"></span>
-        <span class="hero-mark-tagline">शुद्ध आहार... शुद्ध विचार</span>
-      </div>
-    </div>
-
-    <!-- The dots sit between the artwork and the copy, on the hero's own wash. They are the one
-         piece of carousel furniture that has to be visible at every size, so they get their own
-         band rather than floating on the picture. Each is a real button: the visitor's way back
-         to a slide the rail has moved on from. -->
-    @if (slides().length > 1) {
-      <div class="hero-dots">
-        @for (slide of slides(); track slide.key; let i = $index) {
-          <button
-            type="button"
-            class="hero-dot"
-            [class.hero-dot--active]="activeIndex() === i"
-            [attr.aria-label]="'Show slide ' + (i + 1)"
-            [attr.aria-current]="activeIndex() === i ? 'true' : null"
-            (click)="select(i)"
-          >
-            <!-- The fill is a child rather than the button itself so the tap target can stay a
-                 comfortable 28px while the visible dot stays small. -->
-            <span class="hero-dot-fill"></span>
-          </button>
-        }
-      </div>
-    }
-
-    <!-- In flow underneath the poster, on the hero's own warm wash — never floated over the
-         picture. Laying the controls on the photograph was tried at every size and failed the
-         same way twice: the buttons covered the bottom row of pack shots, which are the product,
-         and the small print underneath landed on printed packaging and became unreadable. -->
-    <div class="hero-copy">
-      <div class="hero-copy-panel">
-        <div class="hero-cta">
-          <a routerLink="/products" class="btn-primary btn-lg"
-            >Explore Products <mat-icon>arrow_forward</mat-icon></a
-          >
-          <a routerLink="/register" class="btn-outline btn-lg">Join Our Journey</a>
-        </div>
-        <div class="trust-strip">
-          <span><mat-icon>eco</mat-icon> 100% Natural</span>
-          <span><mat-icon>verified</mat-icon> No Preservatives</span>
-          <span><mat-icon>local_shipping</mat-icon> Fresh Delivery</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <span class="hero-scroll-cue" aria-hidden="true">
-    <span class="hero-scroll-rail"><span class="hero-scroll-dot"></span></span>
-  </span>
+      <span>Categories</span>
+    </li>
+    <li>
+      <b>1–2 days</b>
+      <span>Delivery in Pune</span>
+    </li>
+    <li>
+      <b>₹{{ freeDeliveryFrom }}+</b>
+      <span>Free delivery</span>
+    </li>
+  </ul>
 </section>

@@ -1,253 +1,186 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { HomeHero, SHIPPED_HERO_SLIDES } from './home-hero';
-import { HeroSlideService } from '../../services/hero-slide.service';
+import { HomeHero } from './home-hero';
 import { WelcomeService } from '../../services/welcome.service';
-import { HeroSlideConfig } from '../../models/interfaces';
+import { ProductService } from '../../services/product.service';
+import { HeroSlideService } from '../../services/hero-slide.service';
+import { Product } from '../../models/interfaces';
 
-function slide(overrides: Partial<HeroSlideConfig> = {}): HeroSlideConfig {
+function product(id: string, category: string, isListed = true): Product {
   return {
-    id: 's1',
-    imageUrl: '/media/poster.webp',
-    altText: 'A poster',
-    linkUrl: '',
-    isActive: true,
-    sortOrder: 0,
-    createdAt: '2026-09-01',
-    updatedAt: '2026-09-01',
-    ...overrides,
+    id,
+    name: id,
+    description: '',
+    price: 50,
+    discount: 0,
+    category,
+    imageUrl: '',
+    galleryImageUrls: [],
+    weight: '500g',
+    isAvailable: true,
+    isListed,
+    stockQuantity: null,
+    lowStockThreshold: 5,
+    ingredients: '',
+    benefits: '',
+    storageInfo: '',
+    createdAt: '',
+    updatedAt: '',
   };
 }
 
 describe('HomeHero', () => {
-  let slides: ReturnType<typeof signal<HeroSlideConfig[]>>;
-  let loaded: ReturnType<typeof signal<boolean>>;
+  let products: ReturnType<typeof signal<Product[]>>;
+  let loading: ReturnType<typeof signal<boolean>>;
+  let introDone: ReturnType<typeof signal<boolean>>;
 
-  /** Must match AUTOPLAY_MS in home-hero.ts. */
-  const AUTOPLAY_MS = 5000;
-
-  /** The fixture, for tests that need to run change detection so the effects flush. */
-  function create() {
-    slides = signal<HeroSlideConfig[]>([]);
-    loaded = signal(false);
-
-    // Pinned rather than read from the runner: the whole carousel is switched off under reduced
-    // motion, so a headless browser that happened to report it would turn the autoplay tests
-    // into no-ops that still pass.
-    spyOn(WelcomeService, 'prefersReducedMotion').and.returnValue(false);
+  function create(reducedMotion = false) {
+    products = signal<Product[]>([]);
+    loading = signal(true);
+    introDone = signal(true);
+    spyOn(WelcomeService, 'prefersReducedMotion').and.returnValue(reducedMotion);
 
     TestBed.configureTestingModule({
       imports: [HomeHero],
       providers: [
         provideRouter([]),
+        { provide: ProductService, useValue: { products, loading } },
         {
           provide: HeroSlideService,
           useValue: {
-            slides: slides.asReadonly(),
+            slides: signal([]).asReadonly(),
             loading: signal(false).asReadonly(),
-            loaded: loaded.asReadonly(),
+            loaded: signal(false).asReadonly(),
             loadSlides: () => {},
           },
         },
         {
           provide: WelcomeService,
           useValue: {
-            introDone: signal(true).asReadonly(),
+            introDone: introDone.asReadonly(),
             celebration: signal(null).asReadonly(),
             stageHeld: () => false,
           },
         },
       ],
     });
-
     return TestBed.createComponent(HomeHero);
   }
 
-  function setup() {
-    return create().componentInstance;
-  }
+  it('counts the categories of listed products, leaving out unlisted drafts', () => {
+    const hero = create().componentInstance;
 
-  it('shows the artwork that ships with the site before the API has answered', () => {
-    const hero = setup();
-
-    expect(loaded()).toBeFalse();
-    expect(hero.slides()).toEqual(SHIPPED_HERO_SLIDES);
-  });
-
-  it('shows the shipped artwork when the owner has published nothing', () => {
-    const hero = setup();
-
-    loaded.set(true);
-    slides.set([]);
-
-    // The hero is the biggest thing in the first screenful and is never allowed to be empty.
-    expect(hero.slides()).toEqual(SHIPPED_HERO_SLIDES);
-  });
-
-  it("shows the shipped artwork when every one of the owner's slides is switched off", () => {
-    const hero = setup();
-
-    loaded.set(true);
-    slides.set([slide({ isActive: false }), slide({ id: 's2', isActive: false })]);
-
-    expect(hero.slides()).toEqual(SHIPPED_HERO_SLIDES);
-  });
-
-  it("replaces the shipped artwork with the owner's live slides", () => {
-    const hero = setup();
-
-    loaded.set(true);
-    slides.set([
-      slide({ id: 'a', imageUrl: '/media/a.webp', altText: 'A', linkUrl: '/products' }),
-      slide({ id: 'b', imageUrl: '/media/b.webp', altText: 'B', isActive: false }),
-      slide({ id: 'c', imageUrl: '/media/c.webp', altText: 'C' }),
+    products.set([
+      product('a', 'Everyday Flours'),
+      product('b', 'Everyday Flours'),
+      product('c', 'Upwas'),
+      product('draft', 'Spices & Essentials', false),
     ]);
+    loading.set(false);
 
-    const shown = hero.slides();
-    expect(shown.length).toBe(2);
-    expect(shown.map((s) => s.key)).toEqual(['a', 'c']);
-    expect(shown[0].src).toBe('/media/a.webp');
-    expect(shown[0].alt).toBe('A');
-    expect(shown[0].link).toBe('/products');
-    // An uploaded slide is one stored file, not a ladder — the ladder is only for the shipped set.
-    expect(shown[0].srcset).toBeNull();
+    expect(hero.catalogueReady()).toBeTrue();
+    expect(hero.categoryCount()).toBe(2);
   });
 
-  it('ignores a slide that has no picture', () => {
-    const hero = setup();
+  it('states the range as 30+ products, whatever is listed online today', () => {
+    // The counter reads reduced motion straight from the browser. With it on, the figure is
+    // written at once rather than counted up over a second and a half of animation frames.
+    spyOn(window, 'matchMedia').and.returnValue({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    } as unknown as MediaQueryList);
+    const fixture = create(true);
+    products.set([product('a', 'Upwas')]);
+    loading.set(false);
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    fixture.detectChanges();
 
-    loaded.set(true);
-    slides.set([slide({ id: 'a', imageUrl: '' }), slide({ id: 'b', imageUrl: '/media/b.webp' })]);
-
-    expect(hero.slides().map((s) => s.key)).toEqual(['b']);
+    const first = fixture.nativeElement.querySelector('.hero-stats li b') as HTMLElement;
+    expect(first.textContent).toBe('30+');
   });
 
-  it('ships the fasting poster alongside the original banner', () => {
-    // Both shipped posters must reach the rail; the second one arriving is the whole point of
-    // the carousel existing.
-    expect(SHIPPED_HERO_SLIDES.length).toBe(2);
-    expect(SHIPPED_HERO_SLIDES[1].src).toContain('hero-upvas');
-    expect(SHIPPED_HERO_SLIDES[1].srcset).toContain('hero-upvas-640.webp 640w');
+  it('holds a placeholder rather than a category count until the whole catalogue is in', () => {
+    const fixture = create();
+    // A product page opened first fetches just its own product - that is not the catalogue.
+    products.set([product('a', 'Upwas')]);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.catalogueReady()).toBeFalse();
+    expect(fixture.nativeElement.querySelectorAll('.hero-stat-wait').length).toBe(1);
   });
 
-  it('gives every shipped slide a description for screen readers', () => {
-    for (const s of SHIPPED_HERO_SLIDES) {
-      expect(s.alt.trim().length).toBeGreaterThan(10);
+  it('waits for the intro to finish before bringing the copy in', () => {
+    jasmine.clock().install();
+    try {
+      const fixture = create();
+      introDone.set(false);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      jasmine.clock().tick(1000);
+      expect(fixture.componentInstance.revealed()).toBeFalse();
+
+      introDone.set(true);
+      TestBed.flushEffects();
+      jasmine.clock().tick(400);
+      expect(fixture.componentInstance.revealed()).toBeTrue();
+    } finally {
+      jasmine.clock().uninstall();
     }
   });
 
-  describe('the deck', () => {
-    it('wraps past the last slide back to the first', () => {
-      const hero = setup();
-      loaded.set(true);
-      slides.set([slide({ id: 'a' }), slide({ id: 'b' })]);
-
-      hero.goTo(1);
-      expect(hero.activeIndex()).toBe(1);
-
-      hero.goTo(2);
-      expect(hero.activeIndex()).toBe(0);
-
-      // ...and backwards off the front, to the end.
-      hero.goTo(-1);
-      expect(hero.activeIndex()).toBe(1);
-    });
-
-    it('drops back to the first slide when the deck shrinks under the current index', () => {
-      const fixture = create();
-      const hero = fixture.componentInstance;
-
-      loaded.set(true);
-      slides.set([slide({ id: 'a' }), slide({ id: 'b' }), slide({ id: 'c' })]);
-      fixture.detectChanges();
-
-      hero.goTo(2);
-      expect(hero.activeIndex()).toBe(2);
-
-      // The owner deletes two of them.
-      slides.set([slide({ id: 'a' })]);
-      fixture.detectChanges();
-
-      expect(hero.activeIndex()).toBe(0);
-    });
+  it('shows everything at once for someone who has asked for reduced motion', () => {
+    const fixture = create(true);
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    expect(fixture.componentInstance.revealed()).toBeTrue();
   });
 
-  describe('autoplay', () => {
-    beforeEach(() => jasmine.clock().install());
-    afterEach(() => jasmine.clock().uninstall());
+  it("puts the owner's posters in the card's window, with the buttons below and nothing over them", () => {
+    const fixture = create();
+    fixture.detectChanges();
+    const card = fixture.nativeElement.querySelector('.hero-card') as HTMLElement;
+    const [first, second] = Array.from(card.children);
 
-    /**
-     * THE REGRESSION THIS PINS: on a first load the hero used to sit on its opening picture and
-     * never move. Advancing went through scrolling a container, so it could only happen once a
-     * viewChild had resolved and the element had a measurable width — and when that did not line
-     * up there was nothing on screen to say why. Advancing is a signal write now, so the only
-     * thing it waits for is the door reveal.
-     */
-    it('advances on its own after the doors clear, with nothing else touched', () => {
-      const fixture = create();
-      const hero = fixture.componentInstance;
+    expect(first.tagName.toLowerCase()).toBe('app-home-posters');
+    expect(second.classList).toContain('hero-actions');
+    // The posters are the only picture: no wall of packs, no written headline laid on the art.
+    expect(fixture.nativeElement.querySelector('.hero-media, .hero-copy')).toBeNull();
+  });
 
-      loaded.set(true);
-      slides.set([slide({ id: 'a' }), slide({ id: 'b' })]);
+  it('still gives the page its one heading, for screen readers and search engines', () => {
+    const fixture = create();
+    fixture.detectChanges();
+    const headings = fixture.nativeElement.querySelectorAll('h1');
 
-      // The doors finish; this is the whole of what autoplay is allowed to wait on.
-      hero.revealed.set(true);
-      fixture.detectChanges();
+    expect(headings.length).toBe(1);
+    expect(headings[0].classList).toContain('visually-hidden');
+    expect(headings[0].textContent).toContain('Pune');
+  });
 
-      expect(hero.activeIndex()).toBe(0);
+  it('keeps the trust line under the buttons', () => {
+    const fixture = create();
+    fixture.detectChanges();
+    const items = Array.from(fixture.nativeElement.querySelectorAll('.hero-actions .trust-strip span')) as HTMLElement[];
 
-      jasmine.clock().tick(AUTOPLAY_MS + 10);
-      expect(hero.activeIndex()).toBe(1);
+    expect(items.map((s) => s.textContent?.replace(/^\s*\w+\s+/, '').trim())).toEqual([
+      '100% Natural',
+      'No Preservatives',
+      'Fresh Delivery',
+    ]);
+  });
 
-      jasmine.clock().tick(AUTOPLAY_MS + 10);
-      expect(hero.activeIndex()).toBe(0);
-    });
+  it('keeps the two buttons it has always had', () => {
+    const fixture = create();
+    fixture.detectChanges();
+    const links = Array.from(fixture.nativeElement.querySelectorAll('.hero-cta a')) as HTMLAnchorElement[];
 
-    it('does not advance while the doors are still shut', () => {
-      const fixture = create();
-      const hero = fixture.componentInstance;
-
-      loaded.set(true);
-      slides.set([slide({ id: 'a' }), slide({ id: 'b' })]);
-      fixture.detectChanges();
-
-      // A hero that advances behind a closed door has spent a slide nobody saw.
-      jasmine.clock().tick(AUTOPLAY_MS * 3);
-      expect(hero.activeIndex()).toBe(0);
-    });
-
-    it('holds still after the visitor picks a slide themselves', () => {
-      const fixture = create();
-      const hero = fixture.componentInstance;
-
-      loaded.set(true);
-      slides.set([slide({ id: 'a' }), slide({ id: 'b' }), slide({ id: 'c' })]);
-      hero.revealed.set(true);
-      fixture.detectChanges();
-
-      hero.select(2);
-      fixture.detectChanges();
-      expect(hero.activeIndex()).toBe(2);
-
-      // Moving it out from under someone who has just chosen a picture is the single most
-      // irritating thing a carousel can do.
-      jasmine.clock().tick(AUTOPLAY_MS * 2);
-      fixture.detectChanges();
-      expect(hero.activeIndex()).toBe(2);
-    });
-
-    it('never advances a deck with only one picture in it', () => {
-      const fixture = create();
-      const hero = fixture.componentInstance;
-
-      loaded.set(true);
-      slides.set([slide({ id: 'a' })]);
-      hero.revealed.set(true);
-      fixture.detectChanges();
-
-      jasmine.clock().tick(AUTOPLAY_MS * 3);
-      expect(hero.activeIndex()).toBe(0);
-    });
+    expect(links.map((a) => a.textContent?.trim())).toEqual([
+      'Explore Products arrow_forward',
+      'Join Our Journey',
+    ]);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/products', '/register']);
   });
 });
