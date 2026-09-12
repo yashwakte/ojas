@@ -184,6 +184,13 @@
     mask-composite: exclude;
 
     animation: ojas-card-ring $duration linear infinite;
+
+    // Touch screens cannot hover, so there the sweep is only ever a repaint of every card on
+    // every frame - on a budget phone, the difference between a smooth scroll and a janky one.
+    // The ring stays, still.
+    @media (hover: none) {
+      animation: none;
+    }
   }
 
   // A rim that turns on its own is exactly the motion someone asking for less of it means. The

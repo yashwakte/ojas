@@ -75,12 +75,71 @@
       .boot-shell a {
         color: #b3541e;
       }
+      /* What a customer sees while the app downloads - on a slow phone connection, several
+         seconds that used to be a blank white page. The brand mark and a travelling line, drawn
+         from nothing but this HTML: no image, no script. Angular replaces it as it starts. */
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: #fffaf6;
+        font-family: 'Poppins', system-ui, sans-serif;
+      }
+      .boot-splash-mark {
+        font-size: 2.6rem;
+        font-weight: 700;
+        line-height: 1.1;
+        color: #f25a1a;
+      }
+      .boot-splash-line {
+        font-size: 0.8rem;
+        color: #8a7e75;
+      }
+      .boot-splash-bar {
+        position: relative;
+        width: 120px;
+        height: 3px;
+        margin-top: 6px;
+        border-radius: 3px;
+        background: #f3e4d9;
+        overflow: hidden;
+      }
+      .boot-splash-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        width: 40%;
+        border-radius: 3px;
+        background: #f25a1a;
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      @keyframes boot-slide {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash-bar::after {
+          animation: none;
+          width: 100%;
+          opacity: 0.5;
+        }
+      }
     </style>
   </head>
   <body>
-    <!-- Deliberately empty. An earlier version put the business description inside app-root, where
-         it rendered as a wall of unstyled text for the few hundred milliseconds before Angular
-         booted - a poor first impression on every single visit.
+    <!-- No text inside app-root. An earlier version put the business description here, where it
+         rendered as a wall of unstyled text for the moments before Angular booted - a poor first
+         impression on every single visit. What sits here now is the styled splash above: the
+         brand mark and a loading line, marked aria-hidden, which on 3G replaces what measured as
+         about six seconds of blank white page. Angular clears it as it starts.
 
          The noscript block below achieves the same thing without that cost. Its content is present
          in the HTML as served, so anything that does not execute JavaScript still reads it -
@@ -89,7 +148,13 @@
          with JavaScript on never renders it, so a real customer sees only the app.
 
          Do not "simplify" this away: without it the served HTML has zero visible text again. -->
-    <app-root></app-root>
+    <app-root>
+      <div class="boot-splash" aria-hidden="true">
+        <span class="boot-splash-mark">ओजस्</span>
+        <span class="boot-splash-line">शुद्ध आहार… शुद्ध विचार</span>
+        <span class="boot-splash-bar"></span>
+      </div>
+    </app-root>
 
     <noscript>
       <div class="boot-shell">

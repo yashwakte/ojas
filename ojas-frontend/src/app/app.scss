@@ -1,5 +1,10 @@
 .main-content {
-  min-height: calc(100vh - 72px - 200px);
+  // At least a screen tall, so the footer always starts below the fold. It used to be drawn on
+  // screen while a page's content was still loading and then shoved down when it arrived - on
+  // throttled 3G that one jump scored 0.32 layout shift on every page, over three times Google's
+  // "poor" threshold of 0.1.
+  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
 }

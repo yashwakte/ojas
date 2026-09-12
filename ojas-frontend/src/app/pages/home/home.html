@@ -9,251 +9,259 @@
   }
 </nav>
 
-<!-- CAMPAIGNS (each active campaign renders its own banner + featured row) -->
-@for (c of activeCampaigns(); track c.id) {
-  <app-campaign-banner
-    [title]="c.title"
-    [subtitle]="c.subtitle"
-    [ctaText]="c.ctaText"
-    [ctaLink]="c.ctaLink"
-    [backgroundImageUrl]="c.backgroundImageUrl"
-    [priority]="$index === 0"
-  />
+<!-- Everything below the first screen is built once the browser is idle, not with the page.
+     On a budget phone over 3G, building every section down to the reviews before anything
+     appeared held the main thread for seconds - the lag a customer feels as a page that will
+     not respond. The first screen (the hero with its posters, the categories) is drawn at once. -->
+@defer (on idle) {
+  <!-- CAMPAIGNS (each active campaign renders its own banner + featured row) -->
+  @for (c of activeCampaigns(); track c.id) {
+    <app-campaign-banner
+      [title]="c.title"
+      [subtitle]="c.subtitle"
+      [ctaText]="c.ctaText"
+      [ctaLink]="c.ctaLink"
+      [backgroundImageUrl]="c.backgroundImageUrl"
+      [priority]="$index === 0"
+    />
 
-  <!-- CAMPAIGN FEATURED PRODUCTS -->
-  @if (featuredProductsFor(c).length > 0) {
-    <section class="section products-section campaign-featured-section" [appScrollReveal]="0">
-      <div class="tag"><span>FEATURED</span></div>
-      <h2 class="stitle">Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}</h2>
+    <!-- CAMPAIGN FEATURED PRODUCTS -->
+    @if (featuredProductsFor(c).length > 0) {
+      <section class="section products-section campaign-featured-section" [appScrollReveal]="0">
+        <div class="tag"><span>FEATURED</span></div>
+        <h2 class="stitle">Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}</h2>
 
+        <div class="pscroll-wrap">
+          <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFeatured.scrollBy({ left: -320, behavior: 'smooth' })">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <div class="pscroll coverflow" #pscrollFeatured appCoverflow>
+            @for (p of featuredProductsFor(c); track p.id) {
+              <app-product-card
+                class="cf-item"
+                [product]="p"
+                badge="Featured"
+                [justAdded]="justAdded() === p.id"
+                (addToCart)="addToCart($event)"
+                (buyNow)="buyNow($event)"
+              />
+            }
+          </div>
+          <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFeatured.scrollBy({ left: 320, behavior: 'smooth' })">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+      </section>
+    }
+  }
+
+  <!-- MOST LOVED — 3D coverflow: the centred card sits flat and full-size, its
+       neighbours rotate away into the distance as you scroll, à la a card deck fanned in
+       space rather than a flat list. -->
+  <section class="section products-section" [appScrollReveal]="0">
+    <div class="tag"><span>BESTSELLERS</span></div>
+    <h2 class="stitle">Most Loved by Our Customers</h2>
+
+    @if (!bestsellersLoading() && bestsellers().length > 0) {
       <div class="pscroll-wrap">
-        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFeatured.scrollBy({ left: -320, behavior: 'smooth' })">
+        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollBestsellers.scrollBy({ left: -320, behavior: 'smooth' })">
           <mat-icon>chevron_left</mat-icon>
         </button>
-        <div class="pscroll coverflow" #pscrollFeatured appCoverflow>
-          @for (p of featuredProductsFor(c); track p.id) {
+        <div class="pscroll coverflow" #pscrollBestsellers appCoverflow>
+          @for (p of bestsellers(); track p.id) {
             <app-product-card
               class="cf-item"
               [product]="p"
-              badge="Featured"
+              badge="Bestseller"
               [justAdded]="justAdded() === p.id"
               (addToCart)="addToCart($event)"
               (buyNow)="buyNow($event)"
             />
           }
         </div>
-        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFeatured.scrollBy({ left: 320, behavior: 'smooth' })">
+        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollBestsellers.scrollBy({ left: 320, behavior: 'smooth' })">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    }
+    <div class="ctr">
+      <a routerLink="/products" class="btn-primary sm"
+        >View All Products <mat-icon>arrow_forward</mat-icon></a
+      >
+    </div>
+  </section>
+
+  <!-- WHY OJAS -->
+  <section class="section why-section" [appScrollReveal]="0">
+    <div class="tag"><span>WHY OJAS</span></div>
+    <div class="why-scroll">
+      @for (f of features; track f.title) {
+        <div class="why-card">
+          <div class="why-ico">
+            <mat-icon>{{ f.icon }}</mat-icon>
+          </div>
+          <h3>{{ f.title }}</h3>
+          <p>{{ f.desc }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- FESTIVE SAVINGS -->
+  @if (festiveSavings().length > 0) {
+    <section class="section products-section festive-section" [appScrollReveal]="0">
+      <div class="tag"><span>LIMITED TIME</span></div>
+      <h2 class="stitle">Festive Savings</h2>
+
+      <div class="pscroll-wrap">
+        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFestive.scrollBy({ left: -320, behavior: 'smooth' })">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <div class="pscroll coverflow" #pscrollFestive appCoverflow>
+          @for (p of festiveSavings(); track p.id) {
+            <app-product-card
+              class="cf-item"
+              [product]="p"
+              badge="Sale"
+              [justAdded]="justAdded() === p.id"
+              (addToCart)="addToCart($event)"
+              (buyNow)="buyNow($event)"
+            />
+          }
+        </div>
+        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFestive.scrollBy({ left: 320, behavior: 'smooth' })">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </section>
+  } @else if (everydayEssentials().length > 0) {
+    <!-- Nothing is on offer today. Rather than dropping a row and leaving a gap in the page,
+         the slot shows the staples — always in stock, and what most returning customers came
+         to reorder anyway. -->
+    <section class="section products-section festive-section" [appScrollReveal]="0">
+      <div class="tag"><span>KITCHEN STAPLES</span></div>
+      <h2 class="stitle">Everyday Essentials</h2>
+      <p class="section-subtitle">The flours that run out first — back in your kitchen in 1–2 days</p>
+
+      <div class="pscroll-wrap">
+        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollEssentials.scrollBy({ left: -320, behavior: 'smooth' })">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <div class="pscroll coverflow" #pscrollEssentials appCoverflow>
+          @for (p of everydayEssentials(); track p.id) {
+            <app-product-card
+              class="cf-item"
+              [product]="p"
+              [justAdded]="justAdded() === p.id"
+              (addToCart)="addToCart($event)"
+              (buyNow)="buyNow($event)"
+            />
+          }
+        </div>
+        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollEssentials.scrollBy({ left: 320, behavior: 'smooth' })">
           <mat-icon>chevron_right</mat-icon>
         </button>
       </div>
     </section>
   }
-}
 
-<!-- MOST LOVED — 3D coverflow: the centred card sits flat and full-size, its
-     neighbours rotate away into the distance as you scroll, à la a card deck fanned in
-     space rather than a flat list. -->
-<section class="section products-section" [appScrollReveal]="0">
-  <div class="tag"><span>BESTSELLERS</span></div>
-  <h2 class="stitle">Most Loved by Our Customers</h2>
+  <!-- SHOP BY CATEGORY -->
+  <section class="section category-section" [appScrollReveal]="0">
+    <div class="tag"><span>CATEGORIES</span></div>
+    <h2 class="stitle">Shop by Category</h2>
 
-  @if (!bestsellersLoading() && bestsellers().length > 0) {
-    <div class="pscroll-wrap">
-      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollBestsellers.scrollBy({ left: -320, behavior: 'smooth' })">
-        <mat-icon>chevron_left</mat-icon>
-      </button>
-      <div class="pscroll coverflow" #pscrollBestsellers appCoverflow>
-        @for (p of bestsellers(); track p.id) {
-          <app-product-card
-            class="cf-item"
-            [product]="p"
-            badge="Bestseller"
-            [justAdded]="justAdded() === p.id"
-            (addToCart)="addToCart($event)"
-            (buyNow)="buyNow($event)"
-          />
-        }
-      </div>
-      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollBestsellers.scrollBy({ left: 320, behavior: 'smooth' })">
-        <mat-icon>chevron_right</mat-icon>
-      </button>
-    </div>
-  }
-  <div class="ctr">
-    <a routerLink="/products" class="btn-primary sm"
-      >View All Products <mat-icon>arrow_forward</mat-icon></a
-    >
-  </div>
-</section>
-
-<!-- WHY OJAS -->
-<section class="section why-section" [appScrollReveal]="0">
-  <div class="tag"><span>WHY OJAS</span></div>
-  <div class="why-scroll">
-    @for (f of features; track f.title) {
-      <div class="why-card">
-        <div class="why-ico">
-          <mat-icon>{{ f.icon }}</mat-icon>
-        </div>
-        <h3>{{ f.title }}</h3>
-        <p>{{ f.desc }}</p>
-      </div>
-    }
-  </div>
-</section>
-
-<!-- FESTIVE SAVINGS -->
-@if (festiveSavings().length > 0) {
-  <section class="section products-section festive-section" [appScrollReveal]="0">
-    <div class="tag"><span>LIMITED TIME</span></div>
-    <h2 class="stitle">Festive Savings</h2>
-
-    <div class="pscroll-wrap">
-      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFestive.scrollBy({ left: -320, behavior: 'smooth' })">
-        <mat-icon>chevron_left</mat-icon>
-      </button>
-      <div class="pscroll coverflow" #pscrollFestive appCoverflow>
-        @for (p of festiveSavings(); track p.id) {
-          <app-product-card
-            class="cf-item"
-            [product]="p"
-            badge="Sale"
-            [justAdded]="justAdded() === p.id"
-            (addToCart)="addToCart($event)"
-            (buyNow)="buyNow($event)"
-          />
-        }
-      </div>
-      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollFestive.scrollBy({ left: 320, behavior: 'smooth' })">
-        <mat-icon>chevron_right</mat-icon>
-      </button>
+    <div class="category-tiles">
+      @for (c of categoryTiles(); track c.name; let i = $index) {
+        <a
+          class="category-tile"
+          [routerLink]="['/products']"
+          [queryParams]="{ category: c.name }"
+          [appScrollReveal]="i * 70"
+        >
+          <div class="category-tile-ico">
+            <mat-icon>{{ c.icon }}</mat-icon>
+          </div>
+          <h3>{{ c.name }}</h3>
+        </a>
+      }
     </div>
   </section>
-} @else if (everydayEssentials().length > 0) {
-  <!-- Nothing is on offer today. Rather than dropping a row and leaving a gap in the page,
-       the slot shows the staples — always in stock, and what most returning customers came
-       to reorder anyway. -->
-  <section class="section products-section festive-section" [appScrollReveal]="0">
-    <div class="tag"><span>KITCHEN STAPLES</span></div>
-    <h2 class="stitle">Everyday Essentials</h2>
-    <p class="section-subtitle">The flours that run out first — back in your kitchen in 1–2 days</p>
 
-    <div class="pscroll-wrap">
-      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollEssentials.scrollBy({ left: -320, behavior: 'smooth' })">
-        <mat-icon>chevron_left</mat-icon>
-      </button>
-      <div class="pscroll coverflow" #pscrollEssentials appCoverflow>
-        @for (p of everydayEssentials(); track p.id) {
-          <app-product-card
-            class="cf-item"
-            [product]="p"
-            [justAdded]="justAdded() === p.id"
-            (addToCart)="addToCart($event)"
-            (buyNow)="buyNow($event)"
-          />
-        }
-      </div>
-      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollEssentials.scrollBy({ left: 320, behavior: 'smooth' })">
-        <mat-icon>chevron_right</mat-icon>
-      </button>
-    </div>
-  </section>
-}
+  <!-- UPWAS SPECIALS -->
+  @if (upwasSpecials().length > 0) {
+    <section class="section products-section upwas-section" [appScrollReveal]="0">
+      <div class="tag"><span>FASTING SPECIALS</span></div>
+      <h2 class="stitle">Upwas Specials</h2>
+      <p class="section-subtitle">Pure, grain-free flours crafted for your fasting days</p>
 
-<!-- SHOP BY CATEGORY -->
-<section class="section category-section" [appScrollReveal]="0">
-  <div class="tag"><span>CATEGORIES</span></div>
-  <h2 class="stitle">Shop by Category</h2>
-
-  <div class="category-tiles">
-    @for (c of categoryTiles(); track c.name; let i = $index) {
-      <a
-        class="category-tile"
-        [routerLink]="['/products']"
-        [queryParams]="{ category: c.name }"
-        [appScrollReveal]="i * 70"
-      >
-        <div class="category-tile-ico">
-          <mat-icon>{{ c.icon }}</mat-icon>
-        </div>
-        <h3>{{ c.name }}</h3>
-      </a>
-    }
-  </div>
-</section>
-
-<!-- UPWAS SPECIALS -->
-@if (upwasSpecials().length > 0) {
-  <section class="section products-section upwas-section" [appScrollReveal]="0">
-    <div class="tag"><span>FASTING SPECIALS</span></div>
-    <h2 class="stitle">Upwas Specials</h2>
-    <p class="section-subtitle">Pure, grain-free flours crafted for your fasting days</p>
-
-    <div class="pscroll-wrap">
-      <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollUpwas.scrollBy({ left: -320, behavior: 'smooth' })">
-        <mat-icon>chevron_left</mat-icon>
-      </button>
-      <div class="pscroll coverflow" #pscrollUpwas appCoverflow>
-        @for (p of upwasSpecials(); track p.id) {
-          <app-product-card
-            class="cf-item"
-            [product]="p"
-            [justAdded]="justAdded() === p.id"
-            (addToCart)="addToCart($event)"
-            (buyNow)="buyNow($event)"
-          />
-        }
-      </div>
-      <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollUpwas.scrollBy({ left: 320, behavior: 'smooth' })">
-        <mat-icon>chevron_right</mat-icon>
-      </button>
-    </div>
-  </section>
-}
-
-<!-- PROCESS -->
-<section class="section process-section" [appScrollReveal]="0">
-  <div class="tag"><span>OUR PROCESS</span></div>
-  <h2 class="stitle">From Farm to Your Table</h2>
-  <div class="steps">
-    @for (s of processSteps; track s.title; let i = $index) {
-      <div class="step" [appScrollReveal]="i * 80">
-        <div class="snum">{{ i + 1 }}</div>
-        <div class="sico">
-          <mat-icon>{{ s.icon }}</mat-icon>
-        </div>
-        <h4>{{ s.title }}</h4>
-        <p>{{ s.desc }}</p>
-      </div>
-    }
-  </div>
-</section>
-
-<!-- REVIEWS -->
-<section class="section reviews-section" [appScrollReveal]="0">
-  <div class="tag"><span>REVIEWS</span></div>
-  <h2 class="stitle">Loved by Families</h2>
-  <div class="rscroll">
-    @for (t of testimonials; track t.name) {
-      <div class="rcard">
-        <div class="rstars">
-          @for (s of [1, 2, 3, 4, 5]; track s) {
-            <mat-icon>star</mat-icon>
+      <div class="pscroll-wrap">
+        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollUpwas.scrollBy({ left: -320, behavior: 'smooth' })">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <div class="pscroll coverflow" #pscrollUpwas appCoverflow>
+          @for (p of upwasSpecials(); track p.id) {
+            <app-product-card
+              class="cf-item"
+              [product]="p"
+              [justAdded]="justAdded() === p.id"
+              (addToCart)="addToCart($event)"
+              (buyNow)="buyNow($event)"
+            />
           }
         </div>
-        <p>"{{ t.text }}"</p>
-        <div class="rauthor">
-          <div class="ravatar">{{ t.name[0] }}</div>
-          <span>{{ t.name }}</span>
-        </div>
+        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollUpwas.scrollBy({ left: 320, behavior: 'smooth' })">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
       </div>
-    }
-  </div>
-</section>
+    </section>
+  }
 
-<!-- CTA -->
-<section class="cta-section" [appScrollReveal]="0">
-  <h2>Ready to taste the <span>purity</span>?</h2>
-  <p>Join families who trust Ojas for daily nutrition.</p>
-  <a routerLink="/register" class="btn-white">Create Account <mat-icon>arrow_forward</mat-icon></a>
-</section>
+  <!-- PROCESS -->
+  <section class="section process-section" [appScrollReveal]="0">
+    <div class="tag"><span>OUR PROCESS</span></div>
+    <h2 class="stitle">From Farm to Your Table</h2>
+    <div class="steps">
+      @for (s of processSteps; track s.title; let i = $index) {
+        <div class="step" [appScrollReveal]="i * 80">
+          <div class="snum">{{ i + 1 }}</div>
+          <div class="sico">
+            <mat-icon>{{ s.icon }}</mat-icon>
+          </div>
+          <h4>{{ s.title }}</h4>
+          <p>{{ s.desc }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- REVIEWS -->
+  <section class="section reviews-section" [appScrollReveal]="0">
+    <div class="tag"><span>REVIEWS</span></div>
+    <h2 class="stitle">Loved by Families</h2>
+    <div class="rscroll">
+      @for (t of testimonials; track t.name) {
+        <div class="rcard">
+          <div class="rstars">
+            @for (s of [1, 2, 3, 4, 5]; track s) {
+              <mat-icon>star</mat-icon>
+            }
+          </div>
+          <p>"{{ t.text }}"</p>
+          <div class="rauthor">
+            <div class="ravatar">{{ t.name[0] }}</div>
+            <span>{{ t.name }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section" [appScrollReveal]="0">
+    <h2>Ready to taste the <span>purity</span>?</h2>
+    <p>Join families who trust Ojas for daily nutrition.</p>
+    <a routerLink="/register" class="btn-white">Create Account <mat-icon>arrow_forward</mat-icon></a>
+  </section>
+} @placeholder {
+  <div class="home-rest-placeholder" aria-hidden="true"></div>
+}

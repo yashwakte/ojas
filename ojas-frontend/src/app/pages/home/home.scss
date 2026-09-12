@@ -74,6 +74,12 @@
 }
 
 
+// Holds the space the idle-rendered sections will fill, so the footer does not flash up under the
+// hero and then get pushed away.
+.home-rest-placeholder {
+  min-height: 100vh;
+}
+
 // ===== SHARED =====
 .section {
   padding: 30px 16px;
