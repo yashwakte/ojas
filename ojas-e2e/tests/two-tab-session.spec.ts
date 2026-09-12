@@ -129,6 +129,8 @@ test('two tabs never disagree about who is signed in', async ({ page }) => {
     // and that answer is recorded per account in storage the two tabs share.
 
     await page.getByRole('button', { name: /Logout/i }).click();
+    // Logging out asks first (LogoutConfirmService); nothing happens until it is confirmed.
+    await page.getByRole('dialog').getByRole('button', { name: 'Log out' }).click();
     await expect(page).toHaveURL(/\/login/);
 
     // The cookies are gone browser-wide, so leaving the other tab looking signed in would be a

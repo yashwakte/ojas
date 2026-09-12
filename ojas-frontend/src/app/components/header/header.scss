@@ -16,6 +16,14 @@
   transition: all 0.3s ease;
 }
 
+// The header is its own stacking context (fixed, z-index 1000), and the phone drawer is drawn
+// inside it - so however high the drawer's own z-index, it can never rise above 1000 on the page,
+// and the chat bubble (1001) sat on top of the open menu. While the menu is open the whole header
+// is lifted above the bubble instead.
+:host.menu-open {
+  z-index: 1020;
+}
+
 :host.scrolled .header {
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.06);
@@ -220,6 +228,14 @@
       background: var(--ojas-ink-bg);
       padding-left: 18px;
     }
+  }
+
+  .nav-dropdown-ico {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+    color: var(--ojas-orange-dark);
   }
 }
 
@@ -487,22 +503,11 @@
   font-family: 'Poppins', sans-serif;
 }
 
-.mobile-wallet-balance {
-  margin-left: 8px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--ojas-orange-dark);
-}
-
 .logout-item {
   color: #dc2626 !important;
   mat-icon {
     color: #dc2626 !important;
   }
-}
-
-.mobile-logout {
-  color: #dc2626 !important;
 }
 
 .hamburger {
@@ -560,32 +565,40 @@
   }
 }
 
-.nav-mobile {
-  display: none;
-  flex-direction: column;
-  padding: 8px 24px 20px;
-  border-top: 1px solid rgba(0, 0, 0, 0.04);
-  animation: fadeInDown 0.3s ease both;
+// Between the phone layout and a wide desktop there is not room for four labelled links with
+// icons, the address, search, cart and the account buttons on one line: at 1024px "Shop by
+// Category" and "About Us" broke onto two lines and Register ran off the edge. The link icons go,
+// and the spacing tightens. (Only the top-level links - the category menu keeps its icons.)
+@media (min-width: 901px) and (max-width: 1180px) {
+  .header-container {
+    gap: 12px;
+  }
 
-  a {
-    padding: 14px 0;
-    font-family: 'Poppins', sans-serif;
-    font-weight: 500;
-    color: var(--ojas-text);
-    border-bottom: 1px solid #f5f5f5;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  .nav-desktop {
+    gap: 2px;
 
-    &:hover {
-      color: var(--ojas-ink);
-      padding-left: 8px;
-    }
+    > a,
+    .nav-dropdown-trigger {
+      padding: 8px 10px;
+      font-size: 0.88rem;
+      white-space: nowrap;
 
-    &:last-child {
-      border-bottom: none;
+      mat-icon:first-child {
+        display: none;
+      }
     }
   }
+
+  .header-right {
+    gap: 2px;
+  }
+
+  .register-btn {
+    padding: 9px 16px !important;
+  }
 }
+
+// The phone menu is its own component now (app-mobile-drawer) with its own stylesheet.
 
 @media (max-width: 900px) {
   .nav-desktop {
@@ -602,10 +615,6 @@
   }
 
   .hamburger {
-    display: flex;
-  }
-
-  .nav-mobile {
     display: flex;
   }
 

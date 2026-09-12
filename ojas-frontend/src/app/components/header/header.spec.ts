@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { DeferBlockBehavior, DeferBlockState, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
@@ -6,39 +6,43 @@ import { Header } from './header';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
-import { ChatbotUiService } from '../../services/chatbot-ui.service';
+import { ProductService } from '../../services/product.service';
+import { SearchUiService } from '../../services/search-ui.service';
+import { LogoutConfirmService } from '../../services/logout-confirm.service';
+import { PRODUCT_CATEGORIES, ProductCategory } from '../../constants/product-categories';
 
 describe('Header', () => {
   let cartItems: ReturnType<typeof signal<any[]>>;
   let checkoutCount: ReturnType<typeof signal<number>>;
   let authUser: ReturnType<typeof signal<any>>;
+  let categoriesInUse: ReturnType<typeof signal<readonly ProductCategory[]>>;
   let authServiceSpy: jasmine.SpyObj<AuthService>;
-  let cartServiceSpy: any;
-  let checkoutServiceSpy: any;
 
   beforeEach(() => {
     cartItems = signal<any[]>([]);
     checkoutCount = signal(0);
     authUser = signal<any>(null);
+    categoriesInUse = signal<readonly ProductCategory[]>(PRODUCT_CATEGORIES);
 
     authServiceSpy = jasmine.createSpyObj('AuthService', ['getDefaultRouteForRole'], {
       user: authUser,
       isLoggedIn: () => !!authUser(),
       role: () => authUser()?.role ?? 'customer',
+      isAdmin: () => authUser()?.role === 'admin',
+      isDelivery: () => authUser()?.role === 'delivery',
     });
     authServiceSpy.getDefaultRouteForRole.and.returnValue('/');
 
-    cartServiceSpy = { items: cartItems };
-    checkoutServiceSpy = { count: checkoutCount };
-
     TestBed.configureTestingModule({
       imports: [Header],
+      deferBlockBehavior: DeferBlockBehavior.Manual,
       providers: [
         provideRouter([]),
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceSpy },
-        { provide: CartService, useValue: cartServiceSpy },
-        { provide: CheckoutService, useValue: checkoutServiceSpy },
+        { provide: CartService, useValue: { items: cartItems } },
+        { provide: CheckoutService, useValue: { count: checkoutCount } },
+        { provide: ProductService, useValue: { categoriesInUse: categoriesInUse.asReadonly() } },
       ],
     });
   });
@@ -55,56 +59,128 @@ describe('Header', () => {
   });
 
   it('toggleMenu flips menuOpen', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
+    const header = create().componentInstance;
 
     header.toggleMenu();
-    expect(header.menuOpen).toBeTrue();
+    expect(header.menuOpen()).toBeTrue();
 
     header.toggleMenu();
-    expect(header.menuOpen).toBeFalse();
+    expect(header.menuOpen()).toBeFalse();
   });
 
   it('toggleMenu closes the categories sheet when opening', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
+    const header = create().componentInstance;
     header.categoriesSheetOpen.set(true);
 
     header.toggleMenu();
 
-    expect(header.menuOpen).toBeTrue();
+    expect(header.menuOpen()).toBeTrue();
     expect(header.categoriesSheetOpen()).toBeFalse();
   });
 
   it('toggleCategoriesSheet flips the signal and closes the hamburger menu when opening', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
-    header.menuOpen = true;
+    const header = create().componentInstance;
+    header.menuOpen.set(true);
 
     header.toggleCategoriesSheet();
     expect(header.categoriesSheetOpen()).toBeTrue();
-    expect(header.menuOpen).toBeFalse();
+    expect(header.menuOpen()).toBeFalse();
 
     header.toggleCategoriesSheet();
     expect(header.categoriesSheetOpen()).toBeFalse();
   });
 
-  it('openChatSupport opens the shared chatbot and closes the hamburger menu', () => {
+  it('openCategoriesFromMenu always opens the sheet and closes the drawer', () => {
+    const header = create().componentInstance;
+    header.menuOpen.set(true);
+
+    header.openCategoriesFromMenu();
+
+    expect(header.menuOpen()).toBeFalse();
+    expect(header.categoriesSheetOpen()).toBeTrue();
+  });
+
+  it('openSearch closes the drawer and opens the search overlay', () => {
+    const header = create().componentInstance;
+    const search = TestBed.inject(SearchUiService);
+    header.menuOpen.set(true);
+
+    header.openSearch();
+
+    expect(header.menuOpen()).toBeFalse();
+    expect(search.isOpen()).toBeTrue();
+  });
+
+  it('logout asks for confirmation instead of signing out on the tap', () => {
+    const header = create().componentInstance;
+    const confirm = TestBed.inject(LogoutConfirmService);
+    spyOn(confirm, 'request');
+    header.menuOpen.set(true);
+
+    header.logout();
+
+    expect(confirm.request).toHaveBeenCalled();
+    expect(header.menuOpen()).toBeFalse();
+  });
+
+  it('"/" opens search from anywhere but a text field, and not for staff', () => {
+    const header = create().componentInstance;
+    const search = TestBed.inject(SearchUiService);
+    const slash = (target?: EventTarget) => {
+      const event = new KeyboardEvent('keydown', { key: '/', cancelable: true });
+      if (target) Object.defineProperty(event, 'target', { value: target });
+      return event;
+    };
+
+    header.onDocumentKeydown(slash());
+    expect(search.isOpen()).toBeTrue();
+    search.close();
+
+    header.onDocumentKeydown(slash(document.createElement('input')));
+    expect(search.isOpen()).toBeFalse();
+
+    authUser.set({ role: 'admin' });
+    header.onDocumentKeydown(slash());
+    expect(search.isOpen()).toBeFalse();
+  });
+
+  it('Escape closes the drawer and the category sheet', () => {
+    const header = create().componentInstance;
+    header.menuOpen.set(true);
+    header.onEscape();
+    expect(header.menuOpen()).toBeFalse();
+
+    header.categoriesSheetOpen.set(true);
+    header.onEscape();
+    expect(header.categoriesSheetOpen()).toBeFalse();
+  });
+
+  it('hands the drawer its open state once the drawer has loaded', async () => {
     const fixture = create();
-    const header = fixture.componentInstance;
-    const chatbotUi = TestBed.inject(ChatbotUiService);
-    spyOn(chatbotUi, 'openChat');
-    header.menuOpen = true;
+    const [drawerBlock] = await fixture.getDeferBlocks();
+    await drawerBlock.render(DeferBlockState.Complete);
+    const drawer: HTMLElement = fixture.nativeElement.querySelector('app-mobile-drawer');
+    expect(drawer.classList).not.toContain('open');
 
-    header.openChatSupport();
+    fixture.componentInstance.menuOpen.set(true);
+    fixture.detectChanges();
 
-    expect(chatbotUi.openChat).toHaveBeenCalled();
-    expect(header.menuOpen).toBeFalse();
+    expect(drawer.classList).toContain('open');
+  });
+
+  it('lists only the categories that have products in the desktop menu', () => {
+    categoriesInUse.set(['Everyday Flours', 'Upwas']);
+    const fixture = create();
+
+    const links = fixture.nativeElement.querySelectorAll('.nav-dropdown-panel a');
+    expect(Array.from(links).map((a) => (a as HTMLElement).textContent?.trim())).toEqual([
+      'grainEveryday Flours',
+      'self_improvementUpwas',
+    ]);
   });
 
   it('openDesktopCategoryMenu / closeDesktopCategoryMenu set the signal', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
+    const header = create().componentInstance;
     header.openDesktopCategoryMenu();
     expect(header.desktopCategoryOpen()).toBeTrue();
     header.closeDesktopCategoryMenu();
@@ -140,8 +216,7 @@ describe('Header', () => {
   });
 
   it('getInitials returns empty string when logged out', () => {
-    const fixture = create();
-    expect(fixture.componentInstance.getInitials()).toBe('');
+    expect(create().componentInstance.getInitials()).toBe('');
   });
 
   it('getInitials builds initials from the full name, capped at 2 chars', () => {
@@ -151,8 +226,7 @@ describe('Header', () => {
   });
 
   it('isCustomerArea is true when logged out', () => {
-    const fixture = create();
-    expect(fixture.componentInstance.isCustomerArea()).toBeTrue();
+    expect(create().componentInstance.isCustomerArea()).toBeTrue();
   });
 
   it('isCustomerArea is true for a customer and false for admin/delivery', () => {
@@ -188,8 +262,7 @@ describe('Header', () => {
   });
 
   it('onDesktopCategoryFocusOut closes the menu when focus leaves the container', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
+    const header = create().componentInstance;
     header.desktopCategoryOpen.set(true);
 
     const container = document.createElement('div');
@@ -202,8 +275,7 @@ describe('Header', () => {
   });
 
   it('onDesktopCategoryFocusOut keeps the menu open when focus stays inside the container', () => {
-    const fixture = create();
-    const header = fixture.componentInstance;
+    const header = create().componentInstance;
     header.desktopCategoryOpen.set(true);
 
     const container = document.createElement('div');
