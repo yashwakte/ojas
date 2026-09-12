@@ -15,6 +15,7 @@ import { ProductService } from '../../services/product.service';
 import { CampaignBannerConfig, UpdateCampaignBannerRequest } from '../../models/interfaces';
 import { CampaignBanner } from '../../components/campaign-banner/campaign-banner';
 import { MediaUploadService } from '../../services/media-upload.service';
+import { ImageFramer } from '../../components/image-framer/image-framer';
 
 function emptyFormData(): UpdateCampaignBannerRequest {
   return {
@@ -46,6 +47,7 @@ function emptyFormData(): UpdateCampaignBannerRequest {
     MatSlideToggleModule,
     MatChipsModule,
     CampaignBanner,
+    ImageFramer,
   ],
   templateUrl: './campaign-banner-management.html',
   styleUrl: './campaign-banner-management.scss',
@@ -63,6 +65,9 @@ export class CampaignBannerManagement implements OnInit {
   readonly submitting = signal(false);
   readonly uploadingImage = signal(false);
   readonly productSearch = signal('');
+
+  /** A picture the admin has picked and is fitting to the banner frame, before it is uploaded. */
+  readonly framingFile = signal<File | null>(null);
 
   // null = list view; 'new' = create form; an id = editing that campaign.
   readonly editingId = signal<string | 'new' | null>(null);
@@ -135,7 +140,8 @@ export class CampaignBannerManagement implements OnInit {
   }
 
   /**
-   * Downscales, re-encodes and uploads the picture, then stores the URL it was given.
+   * Opens the picked picture in the framer, which reshapes it to the banner's 2:1 frame with the
+   * admin's say over how (see ImageFramer). Nothing is uploaded until they accept it.
    *
    * The banner used to be kept as a base64 string on the campaign document itself, which meant
    * every visitor downloaded the full image inside the campaign JSON on every page load, with
@@ -147,27 +153,38 @@ export class CampaignBannerManagement implements OnInit {
     if (!input.files || !input.files[0]) return;
 
     const file = input.files[0];
+    // Let the same file be picked again - after fixing it, or after cancelling the framer.
+    input.value = '';
     const problem = this.mediaUpload.validate(file);
     if (problem) {
       this.showError(problem);
-      // Let the same file be picked again once the admin has fixed it.
-      input.value = '';
       return;
     }
 
+    this.framingFile.set(file);
+    this.scrollTo('campaign-framer', 'start');
+  }
+
+  /** The framed banner, uploaded exactly as the framer made it, then shown in the live preview. */
+  onFramed(blob: Blob): void {
+    this.framingFile.set(null);
     this.uploadingImage.set(true);
-    this.mediaUpload.upload(file, 'banner').subscribe({
+    this.mediaUpload.uploadPrepared(blob).subscribe({
       next: (image) => {
         this.formData.update((d) => ({ ...d, backgroundImageUrl: image.url }));
         this.uploadingImage.set(false);
-        input.value = '';
+        this.scrollTo('campaign-live-preview', 'center');
       },
       error: (err) => {
         this.showError(err?.error?.message ?? 'Could not upload that image. Please try again.');
         this.uploadingImage.set(false);
-        input.value = '';
       },
     });
+  }
+
+  cancelFraming(): void {
+    this.framingFile.set(null);
+    this.scrollTo('campaign-form', 'start');
   }
 
   clearBackgroundImage(): void {

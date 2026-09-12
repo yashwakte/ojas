@@ -1,0 +1,108 @@
+<section class="framer" aria-labelledby="framer-title">
+  <header class="framer-head">
+    <h3 id="framer-title">Fit your picture to the banner</h3>
+    <p>
+      Every banner on the home page is the same wide shape (2:1) and your picture fills it edge to
+      edge.
+      @if (slot() === 'hero') {
+        On laptops our buttons sit over the shaded strip at the bottom — keep words and products
+        above it.
+      } @else {
+        The campaign's button sits over the bottom centre.
+      }
+    </p>
+  </header>
+
+  @if (failed()) {
+    <p class="framer-error" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      That file could not be read as a picture. Please choose a JPG, PNG or WebP image.
+    </p>
+  } @else {
+    <div
+      class="framer-stage"
+      #stage
+      tabindex="0"
+      role="group"
+      aria-label="Banner preview. Drag the picture, or use the arrow keys, to choose what shows."
+      [class.framer-stage--movable]="ready()"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp()"
+      (pointercancel)="onPointerUp()"
+      (keydown)="onKeydown($event)"
+    >
+      <canvas #preview width="960" height="480" aria-hidden="true"></canvas>
+
+      @if (!ready()) {
+        <div class="framer-loading" aria-live="polite">Reading your picture…</div>
+      }
+
+      @if (slot() === 'hero') {
+        <div class="framer-guide framer-guide--hero" aria-hidden="true">
+          <span class="ghost ghost--primary">Explore Products</span>
+          <span class="ghost ghost--outline">Join Our Journey</span>
+          <small>Buttons sit here on laptops</small>
+        </div>
+      } @else {
+        <div class="framer-guide framer-guide--campaign" aria-hidden="true">
+          <span class="ghost ghost--white">Shop Now</span>
+        </div>
+      }
+    </div>
+
+    <div class="framer-controls">
+      <div class="framer-modes" role="group" aria-label="How the picture fits the banner">
+        <button
+          type="button"
+          class="framer-mode"
+          [class.framer-mode--on]="size() === 0"
+          [attr.aria-pressed]="size() === 0"
+          [disabled]="!ready()"
+          (click)="setSize(0)"
+        >
+          <mat-icon aria-hidden="true">fit_screen</mat-icon>
+          Show whole picture
+        </button>
+        <button
+          type="button"
+          class="framer-mode"
+          [class.framer-mode--on]="size() === 100"
+          [attr.aria-pressed]="size() === 100"
+          [disabled]="!ready()"
+          (click)="setSize(100)"
+        >
+          <mat-icon aria-hidden="true">crop</mat-icon>
+          Fill the banner
+        </button>
+      </div>
+
+      <label class="framer-size">
+        <span>Size</span>
+        <input type="range" min="0" max="100" step="1" [value]="size()" [disabled]="!ready()" (input)="onSizeInput($event)" />
+      </label>
+
+      <p class="framer-note" aria-live="polite">
+        @if (!ready()) {
+          &nbsp;
+        } @else if (alreadyFits() && !crops() && !extends()) {
+          <mat-icon aria-hidden="true">check_circle</mat-icon> Already the right shape — nothing is added or cut.
+        } @else if (crops() && extends()) {
+          <mat-icon aria-hidden="true">info</mat-icon> Some of the picture is cut off and its edges are continued to fill the rest. Drag to choose what shows.
+        } @else if (crops()) {
+          <mat-icon aria-hidden="true">crop</mat-icon> The parts outside the banner will be cut off. Drag to choose what stays.
+        } @else {
+          <mat-icon aria-hidden="true">auto_fix_high</mat-icon> All of your picture is kept; its own wall and table are continued to fill the banner.
+        }
+      </p>
+    </div>
+  }
+
+  <footer class="framer-foot">
+    <button type="button" mat-button (click)="cancelled.emit()">Cancel</button>
+    <button type="button" mat-flat-button color="primary" [disabled]="!ready() || busy()" (click)="use()">
+      <mat-icon>check</mat-icon>
+      {{ busy() ? 'Preparing…' : 'Use this picture' }}
+    </button>
+  </footer>
+</section>

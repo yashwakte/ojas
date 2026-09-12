@@ -13,6 +13,7 @@ import { HeroSlideService } from '../../services/hero-slide.service';
 import { MediaUploadService } from '../../services/media-upload.service';
 import { HeroSlideConfig, UpdateHeroSlideRequest } from '../../models/interfaces';
 import { SHIPPED_HERO_SLIDES } from '../../components/home-posters/home-posters';
+import { ImageFramer } from '../../components/image-framer/image-framer';
 
 function emptyFormData(): UpdateHeroSlideRequest {
   return {
@@ -37,6 +38,7 @@ function emptyFormData(): UpdateHeroSlideRequest {
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatSnackBarModule,
+    ImageFramer,
   ],
   templateUrl: './hero-slide-management.html',
   styleUrl: './hero-slide-management.scss',
@@ -62,6 +64,9 @@ export class HeroSlideManagement implements OnInit {
 
   readonly submitting = signal(false);
   readonly uploadingImage = signal(false);
+
+  /** A picture the admin has picked and is fitting to the poster frame, before it is uploaded. */
+  readonly framingFile = signal<File | null>(null);
 
   // null = list view; 'new' = create form; an id = editing that slide.
   readonly editingId = signal<string | 'new' | null>(null);
@@ -146,37 +151,46 @@ export class HeroSlideManagement implements OnInit {
   }
 
   /**
-   * Downscales, re-encodes and uploads the picture, then stores the URL it was given.
-   *
-   * The 'banner' preset, not 'product': this is the widest thing on the storefront and is shown
-   * full-bleed, so it needs the extra width and the gentler compression.
+   * Opens the picked picture in the framer, which reshapes it to the home page's 2:1 poster frame
+   * with the admin's say over how (see ImageFramer). Nothing is uploaded until they accept it.
    */
   onImageSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || !input.files[0]) return;
 
     const file = input.files[0];
+    // Let the same file be picked again - after fixing it, or after cancelling the framer.
+    input.value = '';
     const problem = this.mediaUpload.validate(file);
     if (problem) {
       this.showError(problem);
-      // Let the same file be picked again once the admin has fixed it.
-      input.value = '';
       return;
     }
 
+    this.framingFile.set(file);
+    this.scrollTo('hero-slide-framer', 'start');
+  }
+
+  /** The framed poster, uploaded exactly as the framer made it, then shown in the preview. */
+  onFramed(blob: Blob): void {
+    this.framingFile.set(null);
     this.uploadingImage.set(true);
-    this.mediaUpload.upload(file, 'banner').subscribe({
+    this.mediaUpload.uploadPrepared(blob).subscribe({
       next: (image) => {
         this.formData.update((d) => ({ ...d, imageUrl: image.url }));
         this.uploadingImage.set(false);
-        input.value = '';
+        this.scrollTo('hero-slide-image-preview', 'center');
       },
       error: (err) => {
         this.showError(err?.error?.message ?? 'Could not upload that image. Please try again.');
         this.uploadingImage.set(false);
-        input.value = '';
       },
     });
+  }
+
+  cancelFraming(): void {
+    this.framingFile.set(null);
+    this.scrollTo('hero-slide-form', 'start');
   }
 
   clearImage(): void {

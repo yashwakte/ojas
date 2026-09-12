@@ -57,15 +57,20 @@ export class MediaUploadService {
   private readonly endpoint = `${environment.apiUrl}/media`;
 
   upload(file: File, preset: ImagePreset): Observable<UploadedImage> {
-    return from(this.optimise(file, preset)).pipe(
-      switchMap((blob) => {
-        const form = new FormData();
-        // The server sniffs the real format from the bytes, so the filename here is only ever
-        // for humans reading logs.
-        form.append('file', blob, `upload.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`);
-        return this.http.post<UploadedImage>(this.endpoint, form);
-      }),
-    );
+    return from(this.optimise(file, preset)).pipe(switchMap((blob) => this.uploadPrepared(blob)));
+  }
+
+  /**
+   * Uploads an image that has already been prepared for the storefront - reshaped and encoded by
+   * the image framer - exactly as it is. Running it through `optimise` again would only
+   * re-compress an already-compressed file.
+   */
+  uploadPrepared(blob: Blob): Observable<UploadedImage> {
+    const form = new FormData();
+    // The server sniffs the real format from the bytes, so the filename here is only ever for
+    // humans reading logs.
+    form.append('file', blob, `upload.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`);
+    return this.http.post<UploadedImage>(this.endpoint, form);
   }
 
   /** Human-readable reason this file can't be uploaded at all, or null if it's fine. */

@@ -106,11 +106,11 @@
         <div class="form-row">
           <span class="form-block-label">Picture</span>
           <span class="field-hint">
-            A wide, landscape image works best — the whole picture is always shown, never cropped,
-            so nothing gets cut off whatever screen it lands on. Upload the best-quality original
-            you have, up to 12MB, and please don't shrink or compress it first: it's resized and
-            converted automatically, and starting from the full-quality file gives a sharper
-            result.
+            Posters fill the top of the home page edge to edge, in a wide 2:1 shape (2400×1200 is
+            ideal), with the Explore and Join buttons laid over the bottom strip on laptops. Any
+            picture can be uploaded: before it's saved you choose how it fits that shape — shown
+            whole, or filling the banner — and see exactly where the buttons will sit. Upload the
+            best-quality original you have, up to 12MB.
           </span>
 
           <mat-form-field appearance="outline" class="full-width">
@@ -136,7 +136,7 @@
               (click)="fileInput.click()"
             >
               <mat-icon>upload</mat-icon>
-              {{ uploadingImage() ? 'Optimising…' : 'Upload Image' }}
+              {{ uploadingImage() ? 'Uploading…' : 'Upload Image' }}
             </button>
             @if (formData().imageUrl) {
               <button type="button" mat-button color="warn" (click)="clearImage()">
@@ -146,10 +146,19 @@
             }
           </div>
 
+          @if (framingFile(); as file) {
+            <div id="hero-slide-framer" class="framer-slot">
+              <app-image-framer [file]="file" slot="hero" (framed)="onFramed($event)" (cancelled)="cancelFraming()" />
+            </div>
+          }
+
           @if (formData().imageUrl) {
-            <figure class="image-preview">
+            <figure class="image-preview" id="hero-slide-image-preview">
               <img [src]="formData().imageUrl" [alt]="formData().altText || 'Hero image preview'" />
-              <figcaption>Exactly what customers will see, whole and uncropped.</figcaption>
+              <figcaption>
+                As customers will see it: filling the top of the home page, with the buttons laid
+                over its bottom strip on laptops.
+              </figcaption>
             </figure>
           }
         </div>

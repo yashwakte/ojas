@@ -39,7 +39,7 @@ describe('HeroSlideManagement', () => {
     service.updateSlide.and.returnValue(of(slide()));
     service.deleteSlide.and.returnValue(of(undefined));
 
-    media = jasmine.createSpyObj<MediaUploadService>('MediaUploadService', ['validate', 'upload']);
+    media = jasmine.createSpyObj<MediaUploadService>('MediaUploadService', ['validate', 'upload', 'uploadPrepared']);
     media.validate.and.returnValue(null);
 
     TestBed.configureTestingModule({
@@ -271,10 +271,10 @@ describe('HeroSlideManagement', () => {
     expect(sent.imageUrl).toBe(existing.imageUrl);
   });
 
-  it('stores the URL an upload was given, at banner quality', () => {
+  it('fits a picked poster to the 2:1 frame first, then stores the URL the framed poster was given', () => {
     const page = setup();
-    const uploaded: UploadedImage = { url: '/media/stored.webp', width: 1600, height: 1066 };
-    media.upload.and.returnValue(of(uploaded));
+    const uploaded: UploadedImage = { url: '/media/stored.webp', width: 2000, height: 1000 };
+    media.uploadPrepared.and.returnValue(of(uploaded));
 
     page.startCreate();
     const input = document.createElement('input');
@@ -282,8 +282,17 @@ describe('HeroSlideManagement', () => {
     Object.defineProperty(input, 'files', { value: [file] });
     page.onImageSelected({ target: input } as unknown as Event);
 
-    // 'banner', not 'product': the hero is the widest thing on the storefront.
-    expect(media.upload).toHaveBeenCalledWith(file, 'banner');
+    // Opened in the framer; nothing is uploaded until the admin accepts how it fits.
+    expect(page.framingFile()).toBe(file);
+    expect(media.upload).not.toHaveBeenCalled();
+    expect(media.uploadPrepared).not.toHaveBeenCalled();
+
+    const framed = new Blob(['framed'], { type: 'image/webp' });
+    page.onFramed(framed);
+
+    // Uploaded exactly as the framer made it - not re-compressed a second time.
+    expect(media.uploadPrepared).toHaveBeenCalledWith(framed);
+    expect(page.framingFile()).toBeNull();
     expect(page.formData().imageUrl).toBe('/media/stored.webp');
     expect(page.uploadingImage()).toBeFalse();
   });
@@ -300,6 +309,7 @@ describe('HeroSlideManagement', () => {
     page.onImageSelected({ target: input } as unknown as Event);
 
     expect(media.upload).not.toHaveBeenCalled();
+    expect(page.framingFile()).toBeNull();
     expect(snackBar.open).toHaveBeenCalledWith('Too big', 'Close', jasmine.anything());
   });
 

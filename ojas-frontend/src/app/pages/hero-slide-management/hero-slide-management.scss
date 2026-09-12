@@ -240,10 +240,13 @@
 .image-preview {
   margin: 16px 0 0;
 
+  // The home page's own 2:1 frame, so the preview shows the poster as the storefront crops it.
   img {
     display: block;
     width: 100%;
-    height: auto;
+    aspect-ratio: 2;
+    object-fit: cover;
+    object-position: 50% 0%;
     border-radius: 12px;
     border: 1px solid rgba(84, 48, 22, 0.12);
     background: #fdf6ef;

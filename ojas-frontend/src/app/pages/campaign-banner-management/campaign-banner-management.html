@@ -142,10 +142,11 @@
           <div class="form-row">
             <span class="form-block-label">Background Image <span class="optional">(optional — e.g. a Ganpati festival scene)</span></span>
             <span class="field-hint">
-              Upload the best-quality original you have, up to 12MB — please don't shrink or compress it first.
-              It's resized and converted automatically when you upload, and starting from the full-quality file
-              gives a sharper result than starting from one that's already been compressed. The preview below
-              shows the finished image exactly as customers will see it.
+              Banners fill a wide 2:1 frame on the home page (2400×1200 is ideal), the same width as the
+              posters above them, with the button laid over the bottom centre. Any picture can be uploaded:
+              before it's saved you choose how it fits that shape — shown whole, or filling the banner.
+              Upload the best-quality original you have, up to 12MB. The preview below shows the finished
+              banner exactly as customers will see it.
             </span>
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Background Image URL</mat-label>
@@ -159,7 +160,7 @@
               <input type="file" accept="image/*" (change)="onBackgroundImageSelected($event)" hidden #bgFileInput>
               <button type="button" mat-stroked-button [disabled]="uploadingImage()" (click)="bgFileInput.click()">
                 <mat-icon>upload</mat-icon>
-                {{ uploadingImage() ? 'Optimising…' : 'Upload Image' }}
+                {{ uploadingImage() ? 'Uploading…' : 'Upload Image' }}
               </button>
               @if (formData().backgroundImageUrl) {
                 <button type="button" mat-button color="warn" (click)="clearBackgroundImage()">
@@ -168,6 +169,12 @@
                 </button>
               }
             </div>
+
+            @if (framingFile(); as file) {
+              <div id="campaign-framer">
+                <app-image-framer [file]="file" slot="campaign" (framed)="onFramed($event)" (cancelled)="cancelFraming()" />
+              </div>
+            }
           </div>
 
           <div class="form-row checkbox-row">
@@ -181,7 +188,7 @@
           </div>
 
           @if (formData().title || formData().subtitle || formData().backgroundImageUrl) {
-            <div class="banner-preview" [class.inactive]="!formData().isActive">
+            <div class="banner-preview" id="campaign-live-preview" [class.inactive]="!formData().isActive">
               <p class="preview-label">Live Preview — exactly how it'll look on the home page</p>
               <app-campaign-banner
                 [title]="formData().title ?? ''"

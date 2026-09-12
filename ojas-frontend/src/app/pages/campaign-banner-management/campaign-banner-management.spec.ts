@@ -62,10 +62,13 @@ describe('CampaignBannerManagement', () => {
     );
     productServiceSpy = { products: signal<Product[]>([product, product2]) };
 
-    mediaUploadSpy = jasmine.createSpyObj<MediaUploadService>('MediaUploadService', ['upload', 'validate']);
+    mediaUploadSpy = jasmine.createSpyObj<MediaUploadService>('MediaUploadService', ['upload', 'uploadPrepared', 'validate']);
     mediaUploadSpy.validate.and.returnValue(null);
     mediaUploadSpy.upload.and.returnValue(
       of<UploadedImage>({ url: '/api/media/abc.webp', width: 1600, height: 900 }),
+    );
+    mediaUploadSpy.uploadPrepared.and.returnValue(
+      of<UploadedImage>({ url: '/api/media/abc.webp', width: 2000, height: 1000 }),
     );
 
     TestBed.configureTestingModule({
@@ -189,34 +192,42 @@ describe('CampaignBannerManagement', () => {
     expect(campaignBannerServiceSpy.createCampaign).not.toHaveBeenCalled();
   });
 
-  it('onBackgroundImageSelected uploads the picture and keeps only the URL', () => {
+  it('opens a picked picture in the framer, and uploads only the framed banner, keeping its URL', () => {
     const { fixture } = create();
-    fixture.componentInstance.startCreate();
+    const page = fixture.componentInstance;
+    page.startCreate();
     const file = new File(['artwork'], 'janmashtami.png', { type: 'image/png' });
     const input = document.createElement('input');
     Object.defineProperty(input, 'files', { value: [file] });
 
-    fixture.componentInstance.onBackgroundImageSelected({ target: input } as unknown as Event);
+    page.onBackgroundImageSelected({ target: input } as unknown as Event);
 
-    expect(mediaUploadSpy.upload).toHaveBeenCalledWith(file, 'banner');
-    expect(fixture.componentInstance.formData().backgroundImageUrl).toBe('/api/media/abc.webp');
-    expect(fixture.componentInstance.uploadingImage()).toBeFalse();
+    // Nothing leaves the admin's machine until they have chosen how it fits the 2:1 banner.
+    expect(page.framingFile()).toBe(file);
+    expect(mediaUploadSpy.upload).not.toHaveBeenCalled();
+    expect(mediaUploadSpy.uploadPrepared).not.toHaveBeenCalled();
+
+    const framed = new Blob(['framed'], { type: 'image/webp' });
+    page.onFramed(framed);
+
+    expect(mediaUploadSpy.uploadPrepared).toHaveBeenCalledWith(framed);
+    expect(page.framingFile()).toBeNull();
+    expect(page.formData().backgroundImageUrl).toBe('/api/media/abc.webp');
+    expect(page.uploadingImage()).toBeFalse();
   });
 
-  it('onBackgroundImageSelected leaves the existing image alone when the upload fails', () => {
+  it('leaves the existing image alone when the framed banner fails to upload', () => {
     const { fixture, snackBar } = create();
-    fixture.componentInstance.startCreate();
-    fixture.componentInstance.formData.update((d) => ({ ...d, backgroundImageUrl: '/api/media/old.webp' }));
-    mediaUploadSpy.upload.and.returnValue(throwError(() => ({ error: { message: 'Upload rejected' } })));
-    const file = new File(['artwork'], 'janmashtami.png', { type: 'image/png' });
-    const input = document.createElement('input');
-    Object.defineProperty(input, 'files', { value: [file] });
+    const page = fixture.componentInstance;
+    page.startCreate();
+    page.formData.update((d) => ({ ...d, backgroundImageUrl: '/api/media/old.webp' }));
+    mediaUploadSpy.uploadPrepared.and.returnValue(throwError(() => ({ error: { message: 'Upload rejected' } })));
 
-    fixture.componentInstance.onBackgroundImageSelected({ target: input } as unknown as Event);
+    page.onFramed(new Blob(['framed'], { type: 'image/webp' }));
 
     expect(snackBar.open).toHaveBeenCalledWith('Upload rejected', 'Close', jasmine.any(Object));
-    expect(fixture.componentInstance.formData().backgroundImageUrl).toBe('/api/media/old.webp');
-    expect(fixture.componentInstance.uploadingImage()).toBeFalse();
+    expect(page.formData().backgroundImageUrl).toBe('/api/media/old.webp');
+    expect(page.uploadingImage()).toBeFalse();
   });
 
   it('saveConfig calls createCampaign and shows a success message when creating', () => {
