@@ -13,6 +13,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../services/auth.service';
+import { LogoutConfirmService } from '../../services/logout-confirm.service';
 import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
@@ -92,6 +93,7 @@ export class AdminDashboard implements OnInit {
   private heroSlideService = inject(HeroSlideService);
   private returnService = inject(ReturnService);
   private snackBar = inject(MatSnackBar);
+  private logoutConfirm = inject(LogoutConfirmService);
   /** Lets a header Refresh discard an in-progress add/edit form instead of leaving it open with stale data. */
   private readonly productManagement = viewChild(ProductManagement);
 
@@ -643,7 +645,8 @@ export class AdminDashboard implements OnInit {
     this.snackBar.open(message, 'Close', { duration: 5000, panelClass: 'snack-error' });
   }
 
+  /** Asks first — see LogoutConfirmService. */
   logout(): void {
-    this.authService.logout();
+    this.logoutConfirm.request();
   }
 }

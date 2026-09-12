@@ -469,6 +469,27 @@ body.intro-locked {
   }
 }
 
+// ===== CONFIRM DIALOG (see LogoutConfirmService) =====
+// The dialog's own component styles cannot reach the Material surface it is drawn inside, so the
+// shape and the backdrop are set here, keyed off the classes the service opens it with.
+.ojas-confirm-panel .mat-mdc-dialog-surface {
+  // Painted explicitly, as the profile menu below is: this app's theme leaves --mat-sys-surface
+  // empty ("light-dark(, )"), so Material's own surface colour resolves to transparent and the
+  // dialog's title sat unreadable on the blurred page behind it.
+  background: #fff !important;
+  color: var(--ojas-text);
+  border-radius: 22px !important;
+  box-shadow:
+    0 24px 64px -16px rgba(24, 18, 14, 0.35),
+    0 2px 8px rgba(24, 18, 14, 0.08) !important;
+}
+
+.ojas-confirm-backdrop {
+  background: rgba(20, 14, 10, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 // ===== PROFILE MENU (mat-menu override) =====
 .mat-mdc-menu-panel.profile-menu {
   background: #fff !important;

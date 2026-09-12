@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { AdminDashboard } from './admin-dashboard';
 import { AuthService } from '../../services/auth.service';
+import { LogoutConfirmService } from '../../services/logout-confirm.service';
 import { OrderService } from '../../services/order.service';
 import { ProductService } from '../../services/product.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
@@ -659,10 +660,15 @@ describe('AdminDashboard', () => {
     expect(fixture.componentInstance.creatingStaff()).toBeFalse();
   });
 
-  it('logout delegates to auth.logout()', () => {
+  it('logout asks for confirmation rather than signing out on the click', () => {
     const { fixture } = create();
+    const confirm = TestBed.inject(LogoutConfirmService);
+    spyOn(confirm, 'request');
+
     fixture.componentInstance.logout();
-    expect(authServiceSpy.logout).toHaveBeenCalled();
+
+    expect(confirm.request).toHaveBeenCalled();
+    expect(authServiceSpy.logout).not.toHaveBeenCalled();
   });
 
   it('renders the products tab (real ProductManagement child) without error when switched to', () => {

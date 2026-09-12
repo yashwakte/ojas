@@ -1,0 +1,15 @@
+<div class="confirm" [class.confirm--danger]="data.tone === 'danger'">
+  @if (data.icon) {
+    <span class="confirm-icon" aria-hidden="true"><mat-icon>{{ data.icon }}</mat-icon></span>
+  }
+  <h2 class="confirm-title" [id]="titleId">{{ data.title }}</h2>
+  <p class="confirm-message" [id]="messageId">{{ data.message }}</p>
+  <div class="confirm-actions">
+    <button type="button" class="confirm-btn confirm-btn--cancel" cdkFocusInitial (click)="cancel()">
+      {{ data.cancelLabel }}
+    </button>
+    <button type="button" class="confirm-btn confirm-btn--confirm" (click)="confirm()">
+      {{ data.confirmLabel }}
+    </button>
+  </div>
+</div>

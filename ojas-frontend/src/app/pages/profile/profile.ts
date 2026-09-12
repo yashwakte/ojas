@@ -17,6 +17,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../services/auth.service';
+import { LogoutConfirmService } from '../../services/logout-confirm.service';
 import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
@@ -96,6 +97,7 @@ export class Profile implements OnInit {
   readonly serviceableStates = SERVICEABLE_STATES;
 
   private snackBar = inject(MatSnackBar);
+  private logoutConfirm = inject(LogoutConfirmService);
 
   readonly newCities = computed(() => citiesForState(this.newState));
   readonly editCities = computed(() => citiesForState(this.editState));
@@ -392,8 +394,9 @@ export class Profile implements OnInit {
     });
   }
 
+  /** Asks first — see LogoutConfirmService. */
   logout(): void {
-    this.auth.logout();
+    this.logoutConfirm.request();
   }
 
   getInitials(): string {

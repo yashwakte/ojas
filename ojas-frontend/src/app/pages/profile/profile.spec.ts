@@ -5,6 +5,7 @@ import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { Profile } from './profile';
 import { AuthService } from '../../services/auth.service';
+import { LogoutConfirmService } from '../../services/logout-confirm.service';
 import { UserService } from '../../services/user.service';
 import { AuthResponse, UserProfileResponse } from '../../models/interfaces';
 
@@ -275,10 +276,15 @@ describe('Profile', () => {
     expect(fixture.componentInstance.editingAddressIndex()).toBeNull();
   });
 
-  it('logout delegates to auth.logout()', () => {
+  it('logout asks for confirmation rather than signing out on the tap', () => {
     const fixture = create();
+    const confirm = TestBed.inject(LogoutConfirmService);
+    spyOn(confirm, 'request');
+
     fixture.componentInstance.logout();
-    expect(authServiceSpy.logout).toHaveBeenCalled();
+
+    expect(confirm.request).toHaveBeenCalled();
+    expect(authServiceSpy.logout).not.toHaveBeenCalled();
   });
 
   it('getInitials prefers the profile name, falling back to the auth user', () => {
