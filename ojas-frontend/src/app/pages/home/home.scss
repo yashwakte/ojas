@@ -1,5 +1,6 @@
 @use '../../styles/liquid-glass' as glass;
 @use '../../styles/cta-buttons' as cta;
+@use '../../styles/stage' as stage;
 
 // ============================================
 // HOME — MOBILE FIRST
@@ -73,6 +74,22 @@
   }
 }
 
+
+// ===== CAMPAIGN BANNERS =====
+// In the hero's column - same width, same inset - with a deliberate gap above each one, rather
+// than full-bleed and butted straight against the hero's figures.
+app-campaign-banner {
+  @include stage.column;
+  margin-top: 20px;
+
+  @media (min-width: 700px) {
+    margin-top: 28px;
+  }
+
+  @media (min-width: 1024px) {
+    margin-top: 36px;
+  }
+}
 
 // Holds the space the idle-rendered sections will fill, so the footer does not flash up under the
 // hero and then get pushed away.
