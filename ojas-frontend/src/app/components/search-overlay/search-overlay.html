@@ -1,0 +1,156 @@
+@if (ui.isOpen()) {
+  <div
+    class="search-backdrop"
+    [class.search-backdrop--closing]="closing()"
+    (click)="close()"
+    aria-hidden="true"
+  ></div>
+  <div
+    class="search-panel"
+    [class.search-panel--closing]="closing()"
+    [style.--sx]="originX()"
+    [style.--sy]="originY()"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Search products"
+  >
+    <div class="search-bar">
+      <button type="button" class="search-back" (click)="close()" aria-label="Close search">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div class="search-field">
+        <mat-icon class="search-field-icon" aria-hidden="true">search</mat-icon>
+        <input
+          #searchInput
+          type="search"
+          class="search-input"
+          placeholder="Search jowar, ragi, custard…"
+          [value]="query()"
+          (input)="onInput($any($event.target).value)"
+          (keydown)="onInputKeydown($event)"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          enterkeyhint="search"
+          role="combobox"
+          aria-label="Search products"
+          aria-autocomplete="list"
+          aria-controls="search-results"
+          [attr.aria-expanded]="preview().length > 0"
+          [attr.aria-activedescendant]="activeIndex() >= 0 ? 'search-opt-' + activeIndex() : null"
+        />
+        @if (hasQuery()) {
+          <button type="button" class="search-clear" (click)="clear()" aria-label="Clear search">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </div>
+      <button type="button" class="search-cancel" (click)="close()">Cancel</button>
+    </div>
+
+    <div class="search-body">
+      @if (!hasQuery()) {
+        @if (recent().length > 0) {
+          <section class="search-group">
+            <div class="search-group-head">
+              <h3>Recent searches</h3>
+              <button type="button" class="search-link" (click)="forgetRecent()">Clear</button>
+            </div>
+            <div class="search-chips">
+              @for (term of recent(); track term) {
+                <button type="button" class="search-chip" (click)="useSuggestion(term)">
+                  <mat-icon aria-hidden="true">history</mat-icon>{{ term }}
+                </button>
+              }
+            </div>
+          </section>
+        }
+
+        <section class="search-group">
+          <h3>Popular searches</h3>
+          <div class="search-chips">
+            @for (term of popular; track term) {
+              <button type="button" class="search-chip" (click)="useSuggestion(term)">
+                <mat-icon aria-hidden="true">trending_up</mat-icon>{{ term }}
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="search-group">
+          <h3>Shop by category</h3>
+          <div class="search-aisles">
+            @for (a of aisles(); track a.name) {
+              <button type="button" class="search-aisle" (click)="openAisle(a.name)">
+                <span class="search-aisle-ico" aria-hidden="true"><mat-icon>{{ a.icon }}</mat-icon></span>
+                <span class="search-aisle-text">
+                  <b>{{ a.name }}</b>
+                  <small>{{ a.desc }}</small>
+                </span>
+                <mat-icon class="search-aisle-go" aria-hidden="true">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        </section>
+      } @else if (preview().length > 0) {
+        <p class="search-count" aria-live="polite">
+          {{ matches().length }} {{ matches().length === 1 ? 'product' : 'products' }} found
+        </p>
+        <ul class="search-results" id="search-results" role="listbox" aria-label="Matching products">
+          @for (p of preview(); track p.id; let i = $index) {
+            <li
+              role="option"
+              class="search-result"
+              [id]="'search-opt-' + i"
+              [class.active]="activeIndex() === i"
+              [attr.aria-selected]="activeIndex() === i"
+              [style.animation-delay]="i * 35 + 'ms'"
+              (click)="openProduct(p)"
+              (mouseenter)="activeIndex.set(i)"
+            >
+              <img [src]="thumbnail(p.imageUrl)" alt="" width="64" height="48" decoding="async" />
+              <span class="search-result-text">
+                <b>{{ p.name }}</b>
+                <small>{{ p.weight }} · {{ p.category }}</small>
+              </span>
+              <span class="search-result-price">
+                @if (isOutOfStock(p)) {
+                  <em>Out of stock</em>
+                } @else {
+                  ₹{{ effectivePrice(p) | number: '1.0-2' }}
+                  @if (p.discount > 0) {
+                    <s>₹{{ p.price | number: '1.0-2' }}</s>
+                  }
+                }
+              </span>
+            </li>
+          }
+        </ul>
+        <button type="button" class="search-all" (click)="seeAll()">
+          See all {{ matches().length }} results for “{{ query().trim() }}”
+          <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+        </button>
+      } @else if (!catalogueReady()) {
+        <div class="search-empty" aria-live="polite">
+          <span class="search-spinner" aria-hidden="true"></span>
+          <p>Loading the shop…</p>
+        </div>
+      } @else {
+        <div class="search-empty" aria-live="polite">
+          <span class="search-empty-ico" aria-hidden="true"><mat-icon>search_off</mat-icon></span>
+          <h3>No products match “{{ query().trim() }}”</h3>
+          <p>Check the spelling, or try one of these.</p>
+          <div class="search-chips search-chips--centered">
+            @for (term of popular; track term) {
+              <button type="button" class="search-chip" (click)="useSuggestion(term)">{{ term }}</button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <p class="search-hint" aria-hidden="true">
+      <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>Enter</kbd> to open · <kbd>Esc</kbd> to close
+    </p>
+  </div>
+}

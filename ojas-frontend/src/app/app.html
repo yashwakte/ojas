@@ -26,6 +26,11 @@
   <router-outlet />
 </main>
 <app-footer />
+<!-- Loaded the first time someone opens search (and fetched ahead of that once the page is
+     idle), rather than with every page: most visits never search. -->
+@defer (when searchUi.isOpen(); prefetch on idle) {
+  <app-search-overlay />
+}
 <app-session-switch-notice />
 <app-site-intro />
 <app-welcome-celebration />

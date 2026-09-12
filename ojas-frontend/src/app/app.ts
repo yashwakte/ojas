@@ -10,9 +10,11 @@ import { GuestWelcome } from './components/guest-welcome/guest-welcome';
 import { AddressPicker } from './components/address-picker/address-picker';
 import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
 import { SessionSwitchNotice } from './components/session-switch-notice/session-switch-notice';
+import { SearchOverlay } from './components/search-overlay/search-overlay';
 import { AuthService } from './services/auth.service';
 import { DeliveryAddressService } from './services/delivery-address.service';
 import { AppRecoveryService } from './services/app-recovery.service';
+import { SearchUiService } from './services/search-ui.service';
 
 /** Let the login celebration finish before asking for an address. */
 const ADDRESS_PROMPT_DELAY_MS = 4200;
@@ -29,6 +31,7 @@ const ADDRESS_PROMPT_DELAY_MS = 4200;
     AddressPicker,
     ChatbotWidget,
     SessionSwitchNotice,
+    SearchOverlay,
     MatIconModule,
   ],
   templateUrl: './app.html',
@@ -39,6 +42,7 @@ export class App implements OnInit {
   private readonly deliveryAddress = inject(DeliveryAddressService);
   private readonly router = inject(Router);
   readonly recovery = inject(AppRecoveryService);
+  readonly searchUi = inject(SearchUiService);
   private promptTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
