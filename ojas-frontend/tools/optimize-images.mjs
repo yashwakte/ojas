@@ -55,7 +55,9 @@ const FORCE = process.argv.includes('--force');
 // a desktop monitor as well as a phone, so it gets a ladder for the browser to choose from;
 // everything else is only ever shown small.
 const RECIPES = {
-  hero: { widths: [640, 960, 1280, 1600], fallbackWidth: 1280, quality: 80 },
+  // 2400 because the home posters are 2400x1200 (tools/build-hero-posters.mjs) and fill a window up
+  // to 1304 CSS pixels wide - over 2600 device pixels on a 2x laptop, where 1600 looks soft.
+  hero: { widths: [640, 960, 1280, 1600, 2400], fallbackWidth: 1280, quality: 80 },
   default: { widths: [1000], fallbackWidth: 1000, quality: 80 },
 };
 
