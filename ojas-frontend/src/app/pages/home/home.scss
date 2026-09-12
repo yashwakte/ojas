@@ -29,7 +29,9 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  width: 62px;
+  // As wide as its name, so every aisle name sits on one line under its icon ("Traditional &
+  // Festive" used to break over two); the rail scrolls sideways for whatever does not fit.
+  min-width: 64px;
   color: var(--ojas-text);
   text-decoration: none;
   text-align: center;
@@ -62,9 +64,9 @@
   }
 }
 .quick-cat-chip-label {
-  font-size: 0.64rem;
+  font-size: 0.66rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
