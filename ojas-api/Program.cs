@@ -253,6 +253,29 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+
+    // Silent refresh gets a budget of its own, keyed by the refresh token it presents. It used to
+    // share "general", which counts anyone without a live access token by address - and an
+    // expired access token is precisely when refresh is called. Behind the Vercel rewrite and
+    // Render's proxy that address can be shared by every anonymous visitor at once, so other
+    // people's browsing used up the bucket, the refresh came back 429, and the frontend signed a
+    // perfectly valid session out (in every tab, since they share the cookie). A request with no
+    // refresh cookie has nothing to key on and falls back to the ordinary partition; it is
+    // answered 401 without touching the database anyway.
+    options.AddPolicy("refresh", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Request.Cookies.TryGetValue("ojas_refresh", out var refreshToken) &&
+                          !string.IsNullOrWhiteSpace(refreshToken)
+                ? $"refresh:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)))}"
+                : PartitionFor(context),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                // Far above anything honest: a browser refreshes about once per 15 minutes per
+                // tab, and a handful of tabs coming back at once is a handful of calls.
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 
 builder.Services.AddControllers();

@@ -370,9 +370,12 @@ public class AuthController : ControllerBase
 
     // Called automatically by the frontend's HTTP interceptor whenever the access token has
     // expired, so it needs more headroom than the 5/min "auth" policy - a user with several
-    // tabs open can otherwise trip that limit just from ordinary background use.
+    // tabs open can otherwise trip that limit just from ordinary background use. It has a policy
+    // of its own, keyed by the refresh token (see "refresh" in Program.cs): under "general" it was
+    // counted against the caller's address, which behind the proxy is shared by every anonymous
+    // visitor, and a 429 here is what signed valid sessions out.
     [HttpPost("refresh")]
-    [EnableRateLimiting("general")]
+    [EnableRateLimiting("refresh")]
     public async Task<ActionResult<AuthResponse>> Refresh()
     {
         if (!Request.Cookies.TryGetValue(RefreshCookieName, out var rawRefreshToken) || string.IsNullOrWhiteSpace(rawRefreshToken))
