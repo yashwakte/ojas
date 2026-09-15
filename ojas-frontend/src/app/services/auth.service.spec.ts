@@ -573,4 +573,77 @@ describe('AuthService', () => {
     service.updateUserInfo({ fullName: 'New Name' });
     expect(service.user()).toBeNull();
   });
+
+  // ---------- a silent refresh that fails ----------
+
+  function failRefresh(status: number) {
+    service.refreshOnce().subscribe({ error: () => {} });
+    httpMock
+      .expectOne(`${environment.apiUrl}/auth/refresh`)
+      .flush('refused', { status, statusText: 'Refused' });
+  }
+
+  it('a refused refresh ends the session here without asking the server to log out', () => {
+    setup();
+    service.saveAuth(authResponse);
+    spyOn(router, 'navigateByUrl');
+
+    failRefresh(401);
+
+    // Logout revokes whichever session the browser's cookie belongs to by the time it arrives,
+    // which may be a sign-in another tab has only just made. The server already cleared the
+    // cookie that failed, so there is nothing on its side left to end.
+    httpMock.expectNone(`${environment.apiUrl}/auth/logout`);
+    expect(service.user()).toBeNull();
+    expect(localStorage.getItem('ojas_user')).toBeNull();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/login');
+  });
+
+  it('a refused refresh moves onto the account another tab has since signed into', () => {
+    // The case behind "logging into another account in a second tab signed both out": this tab's
+    // refresh is refused because the browser's session now belongs to somebody else.
+    setup();
+    service.saveAuth(authResponse);
+    spyOn(router, 'navigateByUrl');
+    // Another tab's write - the storage event only fires elsewhere, never in the tab that wrote.
+    localStorage.setItem(
+      'ojas_user',
+      JSON.stringify({ ...authResponse, id: 'u2', fullName: 'Rajesh Kumar', csrfToken: 'csrf-other' }),
+    );
+
+    failRefresh(401);
+
+    httpMock.expectNone(`${environment.apiUrl}/auth/logout`);
+    expect(service.sessionChange()).toEqual({ kind: 'switched', name: 'Rajesh' });
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+
+    jasmine.clock().tick(SESSION_SWITCH_NOTICE_MS);
+    expect(reloadPage).toHaveBeenCalled();
+  });
+
+  it('a refused refresh takes the same account\'s newer tokens from a tab that refreshed first', () => {
+    setup();
+    service.saveAuth(authResponse);
+    spyOn(router, 'navigateByUrl');
+    localStorage.setItem('ojas_user', JSON.stringify({ ...authResponse, csrfToken: 'csrf-newer' }));
+
+    failRefresh(401);
+
+    expect(service.user()?.id).toBe('u1');
+    expect(service.getCsrfToken()).toBe('csrf-newer');
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('a throttled refresh leaves the session exactly as it was', () => {
+    setup();
+    service.saveAuth(authResponse);
+    spyOn(router, 'navigateByUrl');
+
+    failRefresh(429);
+
+    httpMock.expectNone(`${environment.apiUrl}/auth/logout`);
+    expect(service.user()).toEqual(authResponse);
+    expect(JSON.parse(localStorage.getItem('ojas_user')!)).toEqual(authResponse);
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
 });

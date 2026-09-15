@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../environments/environment';
@@ -139,22 +139,56 @@ describe('authInterceptor', () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it('logs out when the silent refresh itself fails', () => {
+  it('ends the session locally when the refresh is refused, without revoking it on the server', () => {
     auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'old-csrf' });
-    spyOn(auth, 'logout');
+    const navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
 
     let errorStatus: number | undefined;
     http.get(`${environment.apiUrl}/user/profile`).subscribe({ error: (err) => (errorStatus = err.status) });
 
-    const firstAttempt = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
-    firstAttempt.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+    httpMock
+      .expectOne(`${environment.apiUrl}/user/profile`)
+      .flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+    httpMock
+      .expectOne(`${environment.apiUrl}/auth/refresh`)
+      .flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
 
-    const refreshReq = httpMock.expectOne(`${environment.apiUrl}/auth/refresh`);
-    refreshReq.flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
-
-    expect(auth.logout).toHaveBeenCalled();
+    // No logout call. By the time it went out, the browser's cookie could belong to a sign-in made
+    // in another tab, and logout revokes whichever cookie it carries.
+    httpMock.expectNone(`${environment.apiUrl}/auth/logout`);
+    expect(auth.user()).toBeNull();
+    expect(localStorage.getItem('ojas_user')).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/login');
     expect(errorStatus).toBe(401);
   });
+
+  for (const [status, why] of [
+    [429, 'throttled'],
+    [503, 'answered by a server that is waking up'],
+    [0, 'unreachable'],
+  ] as const) {
+    it(`keeps the session when the refresh is ${why} (${status})`, () => {
+      auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'old-csrf' });
+
+      let errorStatus: number | undefined;
+      http.get(`${environment.apiUrl}/user/profile`).subscribe({ error: (err) => (errorStatus = err.status) });
+
+      httpMock
+        .expectOne(`${environment.apiUrl}/user/profile`)
+        .flush('unauthorized', { status: 401, statusText: 'Unauthorized' });
+      const refreshReq = httpMock.expectOne(`${environment.apiUrl}/auth/refresh`);
+      if (status === 0) refreshReq.error(new ProgressEvent('error'));
+      else refreshReq.flush('nope', { status, statusText: 'Nope' });
+
+      // Says nothing about whether the session is still good - so it is left exactly as it was,
+      // and the next request simply tries the refresh again.
+      httpMock.expectNone(`${environment.apiUrl}/auth/logout`);
+      expect(auth.user()?.id).toBe('u1');
+      // The caller hears what actually went wrong. Passing the original 401 on instead would have
+      // checkout tell the customer their session expired when it did nothing of the sort.
+      expect(errorStatus).toBe(status);
+    });
+  }
 
   it('shares a single refresh call across requests that 401 around the same time', () => {
     auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 'old-csrf' });
@@ -192,5 +226,18 @@ describe('authInterceptor', () => {
     const req = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
     req.flush('server error', { status: 500, statusText: 'Server Error' });
     expect(auth.logout).not.toHaveBeenCalled();
+  });
+
+  it('does not sign anyone out over a 401 from another host', () => {
+    auth.saveAuth({ id: 'u1', fullName: 'X', email: 'x@x.com', phone: '9999999999', role: 'customer', csrfToken: 't' });
+    spyOn(auth, 'logout');
+
+    http.get('https://other-domain.example.com/data').subscribe({ error: () => {} });
+    httpMock
+      .expectOne('https://other-domain.example.com/data')
+      .flush('no', { status: 401, statusText: 'Unauthorized' });
+
+    expect(auth.logout).not.toHaveBeenCalled();
+    expect(auth.user()?.id).toBe('u1');
   });
 });

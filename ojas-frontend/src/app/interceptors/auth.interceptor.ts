@@ -17,7 +17,7 @@ const SESSION_IDENTITY_HEADER = 'X-Ojas-User';
 
 // Session-bootstrap endpoints must never trigger a refresh attempt off their own 401/403 -
 // login/register have no session to refresh yet, and refresh itself failing shouldn't try to
-// refresh again (that failure already logs the user out inside AuthService.refreshOnce).
+// refresh again (AuthService.refreshOnce decides what a failed refresh means for the session).
 const NO_REFRESH_PATHS = ['/auth/login', '/auth/register', '/auth/verify-email-otp', '/auth/refresh', '/auth/logout'];
 
 function attachCredentials(req: HttpRequest<unknown>, csrfToken: string | null): HttpRequest<unknown> {
@@ -49,20 +49,18 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err: HttpErrorResponse) => {
       const isExempt = NO_REFRESH_PATHS.some((path) => req.url.includes(path));
 
+      // Only a 401 from our own API, on a signed-in session, is worth a refresh. Everything else
+      // goes back to the caller untouched. That includes a 401 from some other host, which says
+      // nothing about an Ojas session and used to sign the customer out regardless - and signing
+      // out revokes the session for every tab in the browser.
       if (err.status !== 401 || !isApiRequest || isExempt || !authService.isLoggedIn()) {
-        // Only auto-logout for a 401 on an already-authenticated, non-exempt session (i.e. the
-        // session expired server-side and there's nothing left to refresh). A 401 while logged
-        // out - e.g. wrong credentials on the login form - must not force a redirect away from
-        // the page the user is on.
-        if (err.status === 401 && authService.isLoggedIn() && !isExempt) {
-          authService.logout();
-        }
         return throwError(() => err);
       }
 
       // Access token likely expired - try a silent refresh, then replay the original request
-      // with the (possibly rotated) CSRF token that comes back with it. AuthService.refreshOnce
-      // already logs the user out if the refresh itself fails, so no separate handling needed here.
+      // with the (possibly rotated) CSRF token that comes back with it. If the refresh fails,
+      // AuthService.refreshOnce decides what that means for the session, and the error still
+      // comes back here so the caller knows its own request did not go through.
       return authService.refreshOnce().pipe(
         switchMap(() => next(attachCredentials(req, authService.getCsrfToken()))),
       );

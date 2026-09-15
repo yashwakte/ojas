@@ -465,8 +465,8 @@ export class AuthService {
     if (!this.refreshInFlight$) {
       this.refreshInFlight$ = this.refresh().pipe(
         tap((res) => this.saveAuth(res)),
-        catchError((err) => {
-          this.logout();
+        catchError((err: { status?: number }) => {
+          this.onRefreshFailed(err?.status);
           return throwError(() => err);
         }),
         finalize(() => {
@@ -476,6 +476,54 @@ export class AuthService {
       );
     }
     return this.refreshInFlight$;
+  }
+
+  /**
+   * What a failed silent refresh means depends entirely on why it failed.
+   *
+   * Only a 401 says the session is over. Anything else - a 429 from the rate limiter, a dropped
+   * connection, a cold Render instance answering 502 - says nothing about the session at all, and
+   * the next request simply tries again. This used to sign the browser out on any failure, and
+   * since signing out revokes whatever session the browser holds, one throttled refresh was
+   * enough to throw away a valid sign-in, in every tab at once.
+   */
+  private onRefreshFailed(status: number | undefined): void {
+    if (status === 401) this.endExpiredSession();
+  }
+
+  /**
+   * The server has said this tab's session can no longer be renewed. Two things make that less
+   * final than it sounds, and both are about other tabs.
+   *
+   * Another tab may already have replaced the session - signed into a different account, or
+   * simply refreshed first - and this 401 is only this tab arriving late with what it had. The
+   * cached user in localStorage is shared by every tab, so if it no longer matches this tab's copy,
+   * the newer session is the truth and this tab moves onto it instead of ending anything.
+   *
+   * And even when the session really is over, this must not call the server's logout. By the time
+   * it could, the browser's cookie may belong to a sign-in made in another tab moments ago, and
+   * logout revokes whichever cookie it is sent - which is how signing into a second account in one
+   * tab used to sign both tabs out. The refresh that failed has already had its cookie cleared by
+   * the server, so all that is left to end is local.
+   */
+  private endExpiredSession(): void {
+    const mine = this._user();
+    if (!mine || this.resyncing) return;
+
+    const shared = this.parseUser(localStorage.getItem(this.USER_KEY));
+    if (shared && shared.id !== mine.id) {
+      this.adoptSession(shared.fullName);
+      return;
+    }
+    if (shared && shared.csrfToken !== mine.csrfToken) {
+      // The same account, renewed by another tab since this one last looked. Take its copy; the
+      // next request goes out with the cookie that came with it.
+      this._user.set(shared);
+      return;
+    }
+
+    this.clearLocalSession();
+    this.router.navigateByUrl('/login');
   }
 
   createStaff(request: CreateStaffRequest) {
