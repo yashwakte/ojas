@@ -3,12 +3,10 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { of, throwError } from 'rxjs';
 import { AcceptInvite } from './accept-invite';
 import { AuthService } from '../../services/auth.service';
-import { WelcomeService } from '../../services/welcome.service';
 import { AuthResponse, InvitePreviewResponse } from '../../models/interfaces';
 
 describe('AcceptInvite', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
-  let welcomeSpy: jasmine.SpyObj<WelcomeService>;
   let router: Router;
 
   const invite: InvitePreviewResponse = {
@@ -34,14 +32,12 @@ describe('AcceptInvite', () => {
       'getDefaultRouteForRole',
     ]);
     authServiceSpy.getDefaultRouteForRole.and.returnValue('/delivery/orders');
-    welcomeSpy = jasmine.createSpyObj('WelcomeService', ['celebrate']);
 
     TestBed.configureTestingModule({
       imports: [AcceptInvite],
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: authServiceSpy },
-        { provide: WelcomeService, useValue: welcomeSpy },
         {
           provide: ActivatedRoute,
           useValue: {

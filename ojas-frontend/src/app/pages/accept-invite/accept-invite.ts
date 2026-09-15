@@ -7,7 +7,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
-import { WelcomeService } from '../../services/welcome.service';
 import { InvitePreviewResponse } from '../../models/interfaces';
 
 /**
@@ -34,7 +33,6 @@ export class AcceptInvite {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
-  private readonly welcome = inject(WelcomeService);
 
   readonly loading = signal(true);
   readonly invite = signal<InvitePreviewResponse | null>(null);
@@ -91,7 +89,6 @@ export class AcceptInvite {
         // Accepting the invite issues a session outright - no separate sign-in needed, and the
         // device is already bound.
         this.auth.saveAuth(res);
-        this.welcome.celebrate('login', res.fullName);
         this.router.navigateByUrl(this.auth.getDefaultRouteForRole(res.role));
       },
       error: (err) => {

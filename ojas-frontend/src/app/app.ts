@@ -5,7 +5,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { Header } from './components/header/header';
 import { Footer } from './components/footer/footer';
 import { SiteIntro } from './components/site-intro/site-intro';
-import { WelcomeCelebration } from './components/welcome-celebration/welcome-celebration';
 import { GuestWelcome } from './components/guest-welcome/guest-welcome';
 import { AddressPicker } from './components/address-picker/address-picker';
 import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
@@ -15,9 +14,14 @@ import { AuthService } from './services/auth.service';
 import { DeliveryAddressService } from './services/delivery-address.service';
 import { AppRecoveryService } from './services/app-recovery.service';
 import { SearchUiService } from './services/search-ui.service';
+import { WelcomeService } from './services/welcome.service';
 
-/** Let the login celebration finish before asking for an address. */
-const ADDRESS_PROMPT_DELAY_MS = 4200;
+/**
+ * A beat after the page has settled before the address sheet slides up. It waited 4.2 seconds
+ * for the sign-in celebration to finish; that overlay is gone (September 2026), so it now waits
+ * only for the arrival splash on the first page of a visit, and then this.
+ */
+const ADDRESS_PROMPT_DELAY_MS = 900;
 
 @Component({
   selector: 'app-root',
@@ -26,7 +30,6 @@ const ADDRESS_PROMPT_DELAY_MS = 4200;
     Header,
     Footer,
     SiteIntro,
-    WelcomeCelebration,
     GuestWelcome,
     AddressPicker,
     ChatbotWidget,
@@ -41,6 +44,7 @@ export class App implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly deliveryAddress = inject(DeliveryAddressService);
   private readonly router = inject(Router);
+  private readonly welcome = inject(WelcomeService);
   readonly recovery = inject(AppRecoveryService);
   readonly searchUi = inject(SearchUiService);
   private promptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -61,6 +65,9 @@ export class App implements OnInit {
         isCustomer && !this.deliveryAddress.hasAddress() && !this.deliveryAddress.prompted();
 
       if (!needsAddress) return;
+      // Never under the arrival splash: a sheet that opened behind it would be the first thing
+      // the doors part onto, before the page itself.
+      if (!this.welcome.introDone()) return;
       if (this.promptTimer) return;
 
       this.promptTimer = setTimeout(() => {

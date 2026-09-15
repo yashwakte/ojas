@@ -10,7 +10,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
 import { SlowHint } from '../../components/slow-hint/slow-hint';
 import { AuthService } from '../../services/auth.service';
-import { WelcomeService } from '../../services/welcome.service';
 import { timeout } from 'rxjs';
 
 @Component({
@@ -32,7 +31,6 @@ import { timeout } from 'rxjs';
   styleUrl: './login.scss',
 })
 export class Login implements OnDestroy {
-  private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
   private readonly turnstileWidget = viewChild(TurnstileWidget);
 
@@ -110,7 +108,6 @@ export class Login implements OnDestroy {
           this.slowConnection = false;
           this.cdr.detectChanges();
           this.auth.saveAuth(res);
-          this.welcome.celebrate('login', res.fullName);
 
           // Guards park the intended destination here (e.g. a guest sent to log
           // in from checkout), so return them to it rather than the role home.
@@ -302,7 +299,6 @@ export class Login implements OnDestroy {
         this.enrolling = false;
         this.cdr.detectChanges();
         this.auth.saveAuth(res);
-        this.welcome.celebrate('login', res.fullName);
         this.router.navigateByUrl(this.auth.getDefaultRouteForRole(res.role));
       },
       error: (err) => {
@@ -334,7 +330,6 @@ export class Login implements OnDestroy {
           this.enrolling = false;
           this.cdr.detectChanges();
           this.auth.saveAuth(res);
-          this.welcome.celebrate('login', res.fullName);
           this.router.navigateByUrl(this.auth.getDefaultRouteForRole(res.role));
         },
         error: (err) => {

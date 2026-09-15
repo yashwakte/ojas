@@ -113,7 +113,7 @@ describe('Login', () => {
     expect(fixture.componentInstance.turnstileToken).toBeNull();
   });
 
-  it('onSubmit logs in, saves auth, celebrates, and navigates to the role home on success', () => {
+  it('onSubmit logs in, saves auth and goes straight to the role home on success', () => {
     authServiceSpy.login.and.returnValue(of(authResponse));
     spyOn(router, 'navigateByUrl');
     const { fixture } = create();
@@ -122,7 +122,7 @@ describe('Login', () => {
     fixture.componentInstance.onSubmit();
 
     expect(authServiceSpy.saveAuth).toHaveBeenCalledWith(authResponse);
-    // The success snackbar was replaced by the welcome celebration overlay.
+    // No overlay in between: the owner removed the sign-in celebration (September 2026).
     expect(router.navigateByUrl).toHaveBeenCalledWith('/');
     expect(fixture.componentInstance.loading).toBeFalse();
   });
