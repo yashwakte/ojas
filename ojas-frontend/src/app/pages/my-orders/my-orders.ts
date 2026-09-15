@@ -52,6 +52,7 @@ import { CashfreeCheckoutService } from '../../services/cashfree-checkout.servic
 import { ReturnService } from '../../services/return.service';
 import { ReturnDraft, ReturnSheet } from '../../components/return-sheet/return-sheet';
 import { ReturnStatusCard } from '../../components/return-status-card/return-status-card';
+import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 /** Most payments answer on the very first call. These only matter for one the bank is still
  * deciding on — a UPI collect awaiting approval — which is exactly the case where telling the
@@ -71,7 +72,7 @@ const HIGHLIGHT_DURATION_MS = 6000;
 
 @Component({
   selector: 'app-my-orders',
-  imports: [
+  imports: [DigitsOnlyDirective, 
     RouterLink,
     ReturnSheet,
     ReturnStatusCard,

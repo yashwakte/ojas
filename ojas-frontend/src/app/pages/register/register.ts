@@ -17,10 +17,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TurnstileWidget } from '../../components/turnstile-widget/turnstile-widget';
 import { SlowHint } from '../../components/slow-hint/slow-hint';
 import { AuthService } from '../../services/auth.service';
-import { WelcomeService } from '../../services/welcome.service';
 import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { AuthResponse } from '../../models/interfaces';
 import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
+import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -33,7 +33,7 @@ const SLOW_REQUEST_MS = 5_000;
 
 @Component({
   selector: 'app-register',
-  imports: [
+  imports: [DigitsOnlyDirective, 
     ReactiveFormsModule,
     FormsModule,
     RouterLink,
@@ -49,7 +49,6 @@ const SLOW_REQUEST_MS = 5_000;
   styleUrl: './register.scss',
 })
 export class Register implements OnInit, OnDestroy {
-  private readonly welcome = inject(WelcomeService);
   private readonly route = inject(ActivatedRoute);
   private readonly turnstileWidget = viewChild(TurnstileWidget);
   private readonly msg91Widget = inject(Msg91WidgetService);
@@ -424,7 +423,6 @@ export class Register implements OnInit, OnDestroy {
   private completeRegistration(session: AuthResponse) {
     this.clearResendTimer();
     this.auth.saveAuth(session);
-    this.welcome.celebrate('register', session.fullName);
     this.router.navigate(['/']);
   }
 

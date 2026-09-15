@@ -370,7 +370,7 @@
                     <mat-label>Phone</mat-label>
                     <input
                       matInput
-                      type="tel"
+                      type="tel" appDigitsOnly
                       autocomplete="off"
                       [(ngModel)]="staffForm().phone"
                       (ngModelChange)="updateStaffField('phone', $event)"

@@ -255,7 +255,7 @@
 
           <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
             <mat-label>Phone Number</mat-label>
-            <input matInput formControlName="phone" placeholder="10-digit mobile number" />
+            <input matInput type="tel" appDigitsOnly formControlName="phone" placeholder="10-digit mobile number" autocomplete="tel-national" />
             <mat-icon matPrefix>phone</mat-icon>
             @if (phoneChecking) {
               <mat-hint class="checking-hint">

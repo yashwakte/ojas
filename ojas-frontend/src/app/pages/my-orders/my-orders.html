@@ -173,7 +173,7 @@
 
               <div class="edit-field">
                 <label [attr.for]="'phone-' + order.id">Phone</label>
-                <input [id]="'phone-' + order.id" type="tel" [(ngModel)]="editPhone" />
+                <input [id]="'phone-' + order.id" type="tel" appDigitsOnly [(ngModel)]="editPhone" />
               </div>
 
               <div class="edit-field">

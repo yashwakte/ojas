@@ -15,6 +15,7 @@ import {
   isValidPunePincode,
   pincodeError,
 } from '../../constants/serviceable-locations';
+import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 /**
  * The single "where should we deliver?" surface — used both for the post-login
@@ -23,7 +24,7 @@ import {
  */
 @Component({
   selector: 'app-address-picker',
-  imports: [FormsModule, MatIconModule, MapPicker],
+  imports: [DigitsOnlyDirective, FormsModule, MatIconModule, MapPicker],
   templateUrl: './address-picker.html',
   styleUrl: './address-picker.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

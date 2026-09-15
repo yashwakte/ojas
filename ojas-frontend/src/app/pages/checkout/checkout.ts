@@ -45,10 +45,11 @@ import {
   Coupon,
 } from '../../constants/pricing';
 import { thumbnailPackShot } from '../../constants/pack-shots';
+import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 @Component({
   selector: 'app-checkout',
-  imports: [FormsModule, MatIconModule, MapPicker, CouponPicker, DecimalPipe],
+  imports: [DigitsOnlyDirective, FormsModule, MatIconModule, MapPicker, CouponPicker, DecimalPipe],
   templateUrl: './checkout.html',
   styleUrl: './checkout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

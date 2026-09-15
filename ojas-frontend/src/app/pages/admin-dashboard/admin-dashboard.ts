@@ -40,6 +40,7 @@ import {
   paymentIcon,
   paymentLabel,
 } from '../../models/interfaces';
+import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 type AdminTab =
   | 'orders'
@@ -53,7 +54,7 @@ type AdminTab =
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [
+  imports: [DigitsOnlyDirective, 
     CommonModule,
     FormsModule,
     MatIconModule,

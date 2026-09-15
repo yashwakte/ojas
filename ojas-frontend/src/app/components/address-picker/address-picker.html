@@ -45,7 +45,7 @@
             <label for="apPhone">Phone Number *</label>
             <input
               id="apPhone"
-              type="tel"
+              type="tel" appDigitsOnly
               [(ngModel)]="phone"
               placeholder="10-digit mobile number"
               pattern="[0-9]{10}"
