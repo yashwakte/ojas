@@ -4,6 +4,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OjasApi.Models;
 
+/// <summary>
+/// A product in the catalogue.
+///
+/// Tolerates fields it does not know, as User does: without that, a document carrying one field a
+/// given build lacks makes EVERY product unreadable to that build, and the storefront goes dark.
+/// The slug made it concrete — once production documents carry "slug", an API build without
+/// Product.Slug fails every catalogue read with "Element 'slug' does not match any field or
+/// property". This attribute has to be live BEFORE any build that writes a new field, or a
+/// rollback past that build takes the shop down.
+/// </summary>
+[BsonIgnoreExtraElements]
 public class Product
 {
     [BsonId]
