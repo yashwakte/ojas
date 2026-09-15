@@ -414,9 +414,22 @@ public class ProductService
         {
             ["Flour"] = "Everyday Flours",
             ["Premium Atta"] = "Everyday Flours",
-            ["Grains"] = "Health & Breakfast",
-            ["Health Mix"] = "Health & Breakfast",
+            ["Grains"] = "Health & Nutrition",
+            ["Health Mix"] = "Health & Nutrition",
             ["Powder Box"] = "Baking & Desserts",
+        };
+
+    /// <summary>
+    /// Aisles that kept their contents and only changed their name, so everything in one moves
+    /// across as it is - the by-name table is not consulted, and an item the owner filed there
+    /// deliberately stays in that aisle under its new name. "Health & Breakfast" became "Health &
+    /// Nutrition" in September 2026: sattu, nachni satva and daliya are eaten at any meal, and the
+    /// old name said breakfast only. The storefront maps the old name too, for links.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> RenamedCategories =
+        new Dictionary<string, string>
+        {
+            ["Health & Breakfast"] = "Health & Nutrition",
         };
 
     /// <summary>
@@ -443,9 +456,9 @@ public class ProductService
             // Sendha namak is the fasting salt; the client's own Upwas poster puts it with the
             // fasting flours.
             ["Rock Salt"] = "Upwas",
-            ["Wheat Daliya"] = "Health & Breakfast",
-            ["Chana Sattu"] = "Health & Breakfast",
-            ["Ragi Malt (Sprouted)"] = "Health & Breakfast",
+            ["Wheat Daliya"] = "Health & Nutrition",
+            ["Chana Sattu"] = "Health & Nutrition",
+            ["Ragi Malt (Sprouted)"] = "Health & Nutrition",
             ["Custard Powder - Vanilla Flavour"] = "Baking & Desserts",
             ["Custard Powder - Mango Flavour"] = "Baking & Desserts",
             ["Custard Powder - Strawberry Flavour"] = "Baking & Desserts",
@@ -477,7 +490,7 @@ public class ProductService
         var filter = Builders<Product>.Filter;
 
         var stale = await _db.Products
-            .Find(filter.In(p => p.Category, RetiredCategories.Keys))
+            .Find(filter.In(p => p.Category, RetiredCategories.Keys.Concat(RenamedCategories.Keys)))
             .ToListAsync();
         if (stale.Count == 0) return;
 
@@ -486,9 +499,11 @@ public class ProductService
                 filter.Eq(x => x.Id, p.Id) & filter.Eq(x => x.Category, p.Category),
                 Builders<Product>.Update.Set(
                     x => x.Category,
-                    CategoryByProductName.TryGetValue(p.Name, out var aisle)
-                        ? aisle
-                        : RetiredCategories[p.Category])))
+                    RenamedCategories.TryGetValue(p.Category, out var renamed)
+                        ? renamed
+                        : CategoryByProductName.TryGetValue(p.Name, out var aisle)
+                            ? aisle
+                            : RetiredCategories[p.Category])))
             .ToList();
 
         await _db.Products.BulkWriteAsync(moves);

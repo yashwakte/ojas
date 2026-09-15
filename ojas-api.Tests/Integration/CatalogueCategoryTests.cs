@@ -81,8 +81,8 @@ public class CatalogueCategoryTests : IDisposable
         // Flour was too broad to translate on its own: the festive flours go to their own aisle.
         result["Modak Pith"].ShouldBe("Traditional & Festive");
         result["Anarasa Flour"].ShouldBe("Traditional & Festive");
-        result["Wheat Daliya"].ShouldBe("Health & Breakfast");
-        result["Chana Sattu"].ShouldBe("Health & Breakfast");
+        result["Wheat Daliya"].ShouldBe("Health & Nutrition");
+        result["Chana Sattu"].ShouldBe("Health & Nutrition");
         result["Custard Powder - Mango Flavour"].ShouldBe("Baking & Desserts");
         result["Corn Flour"].ShouldBe("Baking & Desserts");
         // ...and so was Powder Box: spices are not baking goods.
@@ -101,7 +101,23 @@ public class CatalogueCategoryTests : IDisposable
 
         result["Khapli Wheat Atta"].ShouldBe("Everyday Flours");
         result["Rose Syrup"].ShouldBe("Baking & Desserts");
-        result["Multigrain Mix"].ShouldBe("Health & Breakfast");
+        result["Multigrain Mix"].ShouldBe("Health & Nutrition");
+    }
+
+    /// <summary>"Health & Breakfast" was renamed, not broken up: everything in it moves to "Health &
+    /// Nutrition" as it is, including anything the by-name table would otherwise send elsewhere -
+    /// an item the owner filed in that aisle stays in that aisle.</summary>
+    [Fact]
+    public async Task TheRenamedAisle_MovesEverythingInItAcross()
+    {
+        var result = await MigrateAsync(
+            Make("Chana Sattu", "Health & Breakfast"),
+            Make("Multigrain Mix", "Health & Breakfast"),
+            Make("Modak Pith", "Health & Breakfast"));
+
+        result["Chana Sattu"].ShouldBe("Health & Nutrition");
+        result["Multigrain Mix"].ShouldBe("Health & Nutrition");
+        result["Modak Pith"].ShouldBe("Health & Nutrition");
     }
 
     [Fact]

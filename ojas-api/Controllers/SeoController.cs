@@ -45,7 +45,7 @@ public class SeoController : ControllerBase
         "Everyday Flours",
         "Traditional & Festive",
         "Upwas",
-        "Health & Breakfast",
+        "Health & Nutrition",
         "Baking & Desserts",
         "Spices & Essentials",
     ];
