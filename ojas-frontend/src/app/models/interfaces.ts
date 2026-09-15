@@ -3,6 +3,12 @@ import { roundMoney } from '../constants/pricing';
 export interface Product {
   id: string;
   name: string;
+  /**
+   * The readable address the API gave this product: /products/{slug}. Missing from a response by
+   * an API that predates slugs, and from a cart saved before then, which is why every link falls
+   * back to the id — the API answers either.
+   */
+  slug?: string | null;
   description: string;
   price: number;
   discount: number;

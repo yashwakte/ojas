@@ -32,4 +32,23 @@ public class ProductSerializationTests
 
         product.Name.ShouldBe("Modak Pith");
     }
+
+    [Fact]
+    public void ReadsTheSlug_AndReadsAProductWithoutOne()
+    {
+        var withSlug = ProductDocument();
+        withSlug.Add("slug", "modak-pith");
+
+        BsonSerializer.Deserialize<Product>(withSlug).Slug.ShouldBe("modak-pith");
+        BsonSerializer.Deserialize<Product>(ProductDocument()).Slug.ShouldBeNull();
+    }
+
+    [Fact]
+    public void DoesNotWriteASlugThatWasNeverGiven()
+    {
+        // BsonIgnoreIfNull: the partial unique index on slug must only ever see real addresses.
+        var product = BsonSerializer.Deserialize<Product>(ProductDocument());
+
+        product.ToBsonDocument().Contains("slug").ShouldBeFalse();
+    }
 }

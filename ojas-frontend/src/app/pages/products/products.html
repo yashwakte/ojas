@@ -145,7 +145,7 @@
           <div class="products-grid">
             @for (product of filteredProducts(); track product.id; let i = $index) {
               <div class="product-card" [style.animation-delay]="cardDelay(i)">
-                <a class="product-link" [routerLink]="['/products', product.id]">
+                <a class="product-link" [routerLink]="['/products', product.slug || product.id]">
                   <div class="product-image">
                     <!-- The first row is the page: left lazy, the browser would not start fetching
                          the photographs a customer is already looking at until layout settled. -->

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using OjasApi.Models;
 
@@ -49,6 +50,21 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Name = "product_category" }
             );
             Products.Indexes.CreateOne(productCategoryIndex);
+
+            // Serves every product page, which is looked up by its readable address
+            // (/products/modak-pith). Unique, so two products can never answer to one address;
+            // partial, so products not yet given one - the moments before the boot backfill runs -
+            // do not all collide on "no slug".
+            var productSlugIndex = new CreateIndexModel<Product>(
+                Builders<Product>.IndexKeys.Ascending(p => p.Slug),
+                new CreateIndexOptions<Product>
+                {
+                    Name = "product_slug",
+                    Unique = true,
+                    PartialFilterExpression = Builders<Product>.Filter.Type(p => p.Slug, BsonType.String),
+                }
+            );
+            Products.Indexes.CreateOne(productSlugIndex);
 
             var emailIndex = new CreateIndexModel<User>(
                 Builders<User>.IndexKeys.Ascending(u => u.Email),

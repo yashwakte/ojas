@@ -23,6 +23,11 @@ public class ProductsControllerTests
         _dbMock.Setup(d => d.Products).Returns(_productsMock.Object);
         _dbMock.Setup(d => d.Orders).Returns(_ordersMock.Object);
         _dbMock.Setup(d => d.CampaignBanners).Returns(_bannersMock.Object);
+        // An empty catalogue unless a test says otherwise. Creating a product reads the existing
+        // ones to find it a free storefront address, and an unconfigured mock answers that read
+        // with a null cursor rather than an empty one. Tests that need products call SetupFind
+        // again, which replaces this.
+        _productsMock.SetupFind(new List<Product>());
         var productService = new ProductService(_dbMock.Object);
         _sut = new ProductsController(productService);
     }

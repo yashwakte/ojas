@@ -443,7 +443,7 @@
             </button>
             <div #similarScroll class="similar-scroll" (scroll)="onSimilarScroll()">
             @for (sp of similarProducts(); track sp.id) {
-              <a class="similar-card" [routerLink]="['/products', sp.id]">
+              <a class="similar-card" [routerLink]="['/products', sp.slug || sp.id]">
                 <div class="similar-img">
                   <img
                     [src]="thumbnail(sp.imageUrl)"

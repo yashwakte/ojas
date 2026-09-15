@@ -33,7 +33,7 @@
           @for (item of cartService.items(); track item.product.id) {
             <div class="cart-item" [class.cart-item--selected]="isSelected(item.product.id)">
               <div class="item-media">
-                <a class="item-img" [routerLink]="['/products', item.product.id]">
+                <a class="item-img" [routerLink]="['/products', item.product.slug || item.product.id]">
                   <img
                     [src]="thumbnail(item.product.imageUrl)"
                     [alt]="item.product.name"
@@ -54,7 +54,7 @@
 
               <div class="item-body">
                 <div class="item-head">
-                  <a class="item-name" [routerLink]="['/products', item.product.id]">{{
+                  <a class="item-name" [routerLink]="['/products', item.product.slug || item.product.id]">{{
                     item.product.name
                   }}</a>
                   <button

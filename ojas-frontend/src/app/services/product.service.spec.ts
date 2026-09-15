@@ -226,4 +226,33 @@ describe('ProductService', () => {
       httpMock.expectOne((r) => r.url === url && r.params.has('_')).flush([fullProduct]);
     });
   });
+
+  describe('finding a product by its address', () => {
+    const productsUrl = environment.apiUrl + '/products';
+
+    it('finds it by slug, by id, and by a slug typed with capitals', () => {
+      flushInitialLoad([{ ...fullProduct, slug: 'ragi-flour' }]);
+
+      expect(service.getProduct('ragi-flour')?.id).toBe('p2');
+      expect(service.getProduct('p2')?.slug).toBe('ragi-flour');
+      expect(service.getProduct('Ragi-Flour')?.id).toBe('p2');
+    });
+
+    it('fetches a product it does not hold by the address it was asked for', () => {
+      flushInitialLoad([]);
+
+      service.ensureProduct('modak-pith');
+      httpMock
+        .expectOne(`${productsUrl}/modak-pith`)
+        .flush({ ...fullProduct, id: 'p9', slug: 'modak-pith' });
+
+      expect(service.getProduct('modak-pith')?.id).toBe('p9');
+    });
+
+    it('does not mistake one product for another whose slug is missing', () => {
+      flushInitialLoad([{ ...fullProduct, slug: undefined }]);
+
+      expect(service.getProduct('')).toBeUndefined();
+    });
+  });
 });

@@ -1,4 +1,4 @@
-<a class="pcard-link" [routerLink]="['/products', product().id]">
+<a class="pcard-link" [routerLink]="['/products', product().slug || product().id]">
   <div class="pimg">
     <img
       [src]="thumbnail()"

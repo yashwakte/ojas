@@ -46,6 +46,30 @@ public class ProductService
             .FirstOrDefaultAsync();
 
     /// <summary>
+    /// A product by its storefront address, which is either its slug (/products/modak-pith) or,
+    /// for links made before slugs existed — the Business Profile's product links among them —
+    /// its database id.
+    ///
+    /// The id is only tried when the key is shaped like one. Handing anything else to an id filter
+    /// throws while the filter is serialised, which is how a mistyped product link used to earn a
+    /// 500 instead of a 404.
+    /// </summary>
+    public async Task<Product?> GetByIdOrSlugAsync(string key, bool includeUnlisted = true)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+
+        if (ObjectId.TryParse(key, out _))
+        {
+            var byId = await GetByIdAsync(key, includeUnlisted);
+            if (byId != null) return byId;
+        }
+
+        var filter = Builders<Product>.Filter.Eq(p => p.Slug, key.Trim().ToLowerInvariant());
+        if (!includeUnlisted) filter &= Listed;
+        return await _db.Products.Find(filter).FirstOrDefaultAsync();
+    }
+
+    /// <summary>
     /// Products a customer may see. Written as "not explicitly unlisted" rather than "isListed is
     /// true" so that every document written before the field existed still matches — a plain
     /// equality filter would hide the entire live catalogue the moment this shipped.
@@ -88,8 +112,20 @@ public class ProductService
 
     public async Task<Product> CreateAsync(Product product)
     {
+        if (string.IsNullOrWhiteSpace(product.Slug))
+            product.Slug = ProductSlug.Unique(ProductSlug.From(product.Name), await TakenSlugsAsync());
+
         await _db.Products.InsertOneAsync(product);
         return product;
+    }
+
+    private async Task<HashSet<string>> TakenSlugsAsync()
+    {
+        var products = await _db.Products.Find(_ => true).ToListAsync();
+        return products
+            .Where(p => !string.IsNullOrEmpty(p.Slug))
+            .Select(p => p.Slug!)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     public async Task<Product?> UpdateAsync(string id, UpdateProductRequest request)
@@ -321,6 +357,50 @@ public class ProductService
             await IntroduceNewProductsAsync(packData);
             await BackfillPackContentAsync(packData);
         }
+
+        // Last, so the products introduced just above get an address in the same boot.
+        await EnsureSlugsAsync();
+    }
+
+    /// <summary>
+    /// Gives every product that has no storefront address yet one of its own.
+    ///
+    /// Only ever fills a gap: a product that already has a slug keeps it, which is what makes this
+    /// safe on every boot and is the whole point of an address — it must not move. Listed products
+    /// go first, oldest first, so that if two products would share an address the one customers
+    /// can already see keeps the plain one. The "still has no slug" condition on each write means
+    /// a product created between the read and the write keeps the address it was given.
+    /// </summary>
+    private async Task EnsureSlugsAsync()
+    {
+        var products = await _db.Products.Find(_ => true).ToListAsync();
+        var taken = products
+            .Where(p => !string.IsNullOrEmpty(p.Slug))
+            .Select(p => p.Slug!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = products
+            .Where(p => string.IsNullOrEmpty(p.Slug))
+            .OrderByDescending(p => p.IsListed)
+            .ThenBy(p => p.CreatedAt)
+            .ToList();
+        if (missing.Count == 0) return;
+
+        var writes = new List<WriteModel<Product>>();
+        foreach (var product in missing)
+        {
+            var slug = ProductSlug.Unique(ProductSlug.From(product.Name), taken);
+            taken.Add(slug);
+            writes.Add(new UpdateOneModel<Product>(
+                Builders<Product>.Filter.Eq(p => p.Id, product.Id)
+                    & Builders<Product>.Filter.Exists("slug", false),
+                Builders<Product>.Update.Set(p => p.Slug, slug)));
+        }
+
+        // Unordered, so one clash with a concurrent write does not stop the rest from landing; the
+        // next boot picks up anything that missed.
+        await _db.Products.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = false });
+        Console.WriteLine($"✅ {writes.Count} product(s) given a storefront address.");
     }
 
     /// <summary>

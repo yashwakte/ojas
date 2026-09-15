@@ -167,7 +167,7 @@ export class SearchOverlay {
   openProduct(product: Product): void {
     this.remember(this.query());
     this.ui.close();
-    this.router.navigate(['/products', product.id]);
+    this.router.navigate(['/products', product.slug || product.id]);
   }
 
   seeAll(): void {

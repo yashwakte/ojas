@@ -59,11 +59,36 @@ public class ProductServiceTests
     public async Task CreateAsync_InsertsProductAndReturnsIt()
     {
         var product = MakeProduct("507f1f77bcf86cd799439011");
+        _productsMock.SetupFind(new List<Product>());
 
         var result = await _sut.CreateAsync(product);
 
         _productsMock.Verify(c => c.InsertOneAsync(product, null, It.IsAny<CancellationToken>()), Times.Once);
         result.ShouldBe(product);
+    }
+
+    [Fact]
+    public async Task CreateAsync_GivesTheProductAStorefrontAddress_NumberedIfTheNameIsTaken()
+    {
+        var existing = MakeProduct("507f1f77bcf86cd799439012");
+        existing.Slug = "bajra-flour";
+        _productsMock.SetupFind(new List<Product> { existing });
+
+        var result = await _sut.CreateAsync(MakeProduct("507f1f77bcf86cd799439011"));
+
+        result.Slug.ShouldBe("bajra-flour-2");
+    }
+
+    [Fact]
+    public async Task CreateAsync_KeepsAnAddressTheCallerAlreadyChose()
+    {
+        var product = MakeProduct("507f1f77bcf86cd799439011");
+        product.Slug = "bajri-atta";
+        _productsMock.SetupFind(new List<Product>());
+
+        var result = await _sut.CreateAsync(product);
+
+        result.Slug.ShouldBe("bajri-atta");
     }
 
     [Fact]

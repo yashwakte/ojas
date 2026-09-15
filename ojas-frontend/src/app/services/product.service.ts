@@ -108,8 +108,15 @@ export class ProductService {
     return this.bypassCache ? { _: Date.now() } : undefined;
   }
 
-  getProduct(id: string): Product | undefined {
-    return this._products().find((p) => p.id === id);
+  /**
+   * A product by its storefront address: the slug (/products/modak-pith), or the id that links
+   * made before slugs carry. The slug is compared without case because the API matches it that
+   * way — a shared link typed with capitals must resolve here too, or the page would wait forever
+   * for a product it already holds.
+   */
+  getProduct(key: string): Product | undefined {
+    const slug = key.toLowerCase();
+    return this._products().find((p) => p.id === key || (!!p.slug && p.slug.toLowerCase() === slug));
   }
 
   /**

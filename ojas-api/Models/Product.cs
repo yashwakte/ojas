@@ -24,6 +24,21 @@ public class Product
     [BsonElement("name")]
     public required string Name { get; set; }
 
+    /// <summary>
+    /// The product's address on the storefront — /products/{slug}, e.g. /products/modak-pith.
+    ///
+    /// Given once, when the product is created (or by the boot backfill for products that predate
+    /// it), and deliberately NOT changed when the product is renamed. An address that moves loses
+    /// whatever Google had learned about it and breaks every link already shared on WhatsApp or
+    /// listed on the Business Profile. The id still works too: the API answers either, and the
+    /// storefront replaces an id in the address bar with the slug.
+    ///
+    /// Not written at all while unset, so the unique index on it only ever sees real addresses.
+    /// </summary>
+    [BsonElement("slug")]
+    [BsonIgnoreIfNull]
+    public string? Slug { get; set; }
+
     [BsonElement("description")]
     public required string Description { get; set; }
 

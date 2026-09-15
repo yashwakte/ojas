@@ -42,11 +42,12 @@ public class ProductsController : ControllerBase
         HttpContext?.User?.Identity?.IsAuthenticated == true
         && HttpContext.User.IsInRole(UserRoles.Admin);
 
+    /// <param name="id">The product's slug (modak-pith) or, for older links, its database id.</param>
     [HttpGet("{id}")]
     [AdminEditableCache]
     public async Task<ActionResult<Product>> GetById(string id)
     {
-        var product = await _productService.GetByIdAsync(id, includeUnlisted: IsAdmin);
+        var product = await _productService.GetByIdOrSlugAsync(id, includeUnlisted: IsAdmin);
         if (product == null) return NotFound();
         return Ok(product);
     }
