@@ -117,6 +117,7 @@ builder.Services.AddScoped<StaffInviteService>();
 builder.Services.AddScoped<ChatbotService>();
 builder.Services.AddHttpClient<CashfreeService>();
 builder.Services.AddScoped<WalletService>();
+builder.Services.AddScoped<CartService>();
 
 // Singletons: MediaService holds a byte-budgeted in-memory cache of the images the storefront
 // asks for, which is only worth having if it outlives a single request.

@@ -34,6 +34,8 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
     public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
     public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
+    // Keyed by user id, so every read and write is an _id lookup and needs no index of its own.
+    public IMongoCollection<Cart> Carts => _database.GetCollection<Cart>("carts");
     public IMongoCollection<MediaAsset> MediaAssets => _database.GetCollection<MediaAsset>("media_assets");
     public IMongoCollection<AppMigration> AppMigrations => _database.GetCollection<AppMigration>("app_migrations");
 
