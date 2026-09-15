@@ -76,7 +76,7 @@ public class AuthService
         _devices = devices;
     }
 
-    private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+    internal static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
     private static string NormalizePhone(string phone) => phone.Trim();
 
     public async Task<bool> EmailExistsAsync(string email) =>

@@ -28,13 +28,12 @@ public class UserProfileAndAddressesTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateProfile_Success_PersistsNewDetails()
+    public async Task UpdateProfile_Success_PersistsTheNewName()
     {
         using var client = _factory.CreateClient();
         var (auth, csrf) = await client.RegisterAsync();
 
-        var newEmailSuffix = Guid.NewGuid().ToString("N")[..8];
-        var request = new UpdateProfileRequest("Updated Name", $"updated.{newEmailSuffix}@example.com", auth.Phone);
+        var request = new UpdateProfileRequest("Updated Name");
 
         var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
 
@@ -43,7 +42,7 @@ public class UserProfileAndAddressesTests : IDisposable
         var profileResponse = await client.GetAsync("/api/user/profile");
         var profile = await profileResponse.Content.ReadFromJsonAsync<UserProfileResponse>();
         profile!.FullName.ShouldBe("Updated Name");
-        profile.Email.ShouldBe(request.Email);
+        profile.Email.ShouldBe(auth.Email);
     }
 
     /// <summary>Registration proves the phone and leaves the email unproved, and the profile
@@ -62,11 +61,11 @@ public class UserProfileAndAddressesTests : IDisposable
         profile.IsEmailVerified.ShouldBeFalse();
     }
 
-    /// <summary>The phone gate the whole of registration rests on is worthless if this form can
-    /// swap the number while keeping the flag - a customer could verify a number they own, then
-    /// change it to one they do not and still count as verified.</summary>
+    /// <summary>The trick the profile form used to allow: verify a number you own at signup, then
+    /// type any other number into the form. A copy of the site loaded before the fix still sends
+    /// the field, so the refusal has to be the server's, not just the form's.</summary>
     [Fact]
-    public async Task UpdateProfile_ChangingThePhone_ClearsItsVerification()
+    public async Task UpdateProfile_RefusesToChangeThePhone_AndKeepsTheVerifiedOne()
     {
         using var client = _factory.CreateClient();
         var (auth, csrf) = await client.RegisterAsync();
@@ -75,97 +74,45 @@ public class UserProfileAndAddressesTests : IDisposable
         var request = new UpdateProfileRequest(auth.FullName, auth.Email, differentPhone);
 
         var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
-        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         var profile = await (await client.GetAsync("/api/user/profile"))
             .Content.ReadFromJsonAsync<UserProfileResponse>();
-        profile!.Phone.ShouldBe(differentPhone);
-        profile.IsPhoneVerified.ShouldBeFalse();
+        profile!.Phone.ShouldBe(auth.Phone);
+        profile.IsPhoneVerified.ShouldBeTrue();
     }
 
-    /// <summary>Same reasoning for the address: a verified flag must describe the value actually
-    /// held, not one that was replaced afterwards.</summary>
     [Fact]
-    public async Task UpdateProfile_ChangingTheEmail_ClearsItsVerification()
+    public async Task UpdateProfile_RefusesToChangeTheEmail()
     {
         using var client = _factory.CreateClient();
         var (auth, csrf) = await client.RegisterAsync();
 
-        // Prove the address first, so there is a verification for the change to throw away.
-        var resend = await client.PostAsJsonAsync("/api/auth/resend-email-otp", new ResendEmailOtpRequest(auth.Email));
-        var devCode = (await resend.Content.ReadFromJsonAsync<ResendDevResponse>())!.DevCode!;
-        var verifyResponse = await client.PostAsJsonAsync(
-            "/api/auth/verify-email-otp", new VerifyEmailOtpRequest(auth.Email, devCode));
-
-        // Verifying the email re-issues the session, because the phone is already verified and
-        // CompleteRegistrationStepAsync issues one the moment both are true. That rotates the CSRF
-        // token, so the one captured at registration is now stale - the frontend has to swap in
-        // the returned session for exactly the same reason.
-        var step = await verifyResponse.Content.ReadFromJsonAsync<RegistrationStepResponse>();
-        var rotatedCsrf = step!.Session!.CsrfToken;
-
-        var verified = await (await client.GetAsync("/api/user/profile"))
-            .Content.ReadFromJsonAsync<UserProfileResponse>();
-        verified!.IsEmailVerified.ShouldBeTrue();
-
-        var request = new UpdateProfileRequest(
-            auth.FullName, $"changed.{Guid.NewGuid():N}@example.com".Replace("-", ""), auth.Phone);
-        var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, rotatedCsrf));
-        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var request = new UpdateProfileRequest(auth.FullName, $"changed.{Guid.NewGuid():N}@example.com", auth.Phone);
+        var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         var profile = await (await client.GetAsync("/api/user/profile"))
             .Content.ReadFromJsonAsync<UserProfileResponse>();
-        profile!.IsEmailVerified.ShouldBeFalse();
+        profile!.Email.ShouldBe(auth.Email);
     }
 
-    /// <summary>Editing only the name must not cost the customer their verifications.</summary>
+    /// <summary>An older copy of the site sends the unchanged email and phone back with the name;
+    /// that must still save, and must not cost the customer their verifications.</summary>
     [Fact]
     public async Task UpdateProfile_LeavingContactDetailsAlone_KeepsTheirVerification()
     {
         using var client = _factory.CreateClient();
         var (auth, csrf) = await client.RegisterAsync();
 
-        var request = new UpdateProfileRequest("Renamed Only", auth.Email, auth.Phone);
-        await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
+        var request = new UpdateProfileRequest("Renamed Only", auth.Email.ToUpperInvariant(), auth.Phone);
+        var response = await client.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, csrf));
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var profile = await (await client.GetAsync("/api/user/profile"))
             .Content.ReadFromJsonAsync<UserProfileResponse>();
         profile!.FullName.ShouldBe("Renamed Only");
         profile.IsPhoneVerified.ShouldBeTrue();
-    }
-
-    private record ResendDevResponse(string Message, string? DevCode);
-
-    [Fact]
-    public async Task UpdateProfile_EmailConflict_WithAnotherAccount_ReturnsConflict()
-    {
-        using var firstClient = _factory.CreateClient();
-        var (firstAuth, _) = await firstClient.RegisterAsync();
-
-        using var secondClient = _factory.CreateClient();
-        var (secondAuth, secondCsrf) = await secondClient.RegisterAsync();
-
-        var request = new UpdateProfileRequest("Second User", firstAuth.Email, secondAuth.Phone);
-
-        var response = await secondClient.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, secondCsrf));
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-    }
-
-    [Fact]
-    public async Task UpdateProfile_PhoneConflict_WithAnotherAccount_ReturnsConflict()
-    {
-        using var firstClient = _factory.CreateClient();
-        var (firstAuth, _) = await firstClient.RegisterAsync();
-
-        using var secondClient = _factory.CreateClient();
-        var (secondAuth, secondCsrf) = await secondClient.RegisterAsync();
-
-        var request = new UpdateProfileRequest("Second User", secondAuth.Email, firstAuth.Phone);
-
-        var response = await secondClient.SendAsync(Json(HttpMethod.Put, "/api/user/profile", request, secondCsrf));
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
     }
 
     [Fact]

@@ -73,6 +73,17 @@ public class User
 
     [BsonElement("pendingDeviceApprovalExpiresAt")]
     public DateTime? PendingDeviceApprovalExpiresAt { get; set; }
+
+    /// <summary>A number this customer has asked to move their account to, after re-entering
+    /// their password, but not yet proved with a text code. The code itself is sent and checked
+    /// by MSG91's widget in the browser, so there is no server-side step that could carry the
+    /// password check forward - this is what does. The number only replaces Phone once a widget
+    /// token verified for exactly this number comes back before PendingPhoneExpiresAt.</summary>
+    [BsonElement("pendingPhone")]
+    public string? PendingPhone { get; set; }
+
+    [BsonElement("pendingPhoneExpiresAt")]
+    public DateTime? PendingPhoneExpiresAt { get; set; }
 }
 
 public static class UserRoles

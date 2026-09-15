@@ -276,6 +276,22 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+
+    // Changing or confirming an email or phone on the profile. Every one of these callers is
+    // signed in, so it counts by account. The window is long because what it guards is mostly
+    // the email we send per request: changing both details with a mistyped code or two is well
+    // under a dozen calls, and the password cooldown and the per-code attempt cap are what stop
+    // guessing - this only stops one account from turning our mail budget into a spam cannon.
+    var contactChangePermitLimit = builder.Environment.IsProduction() ? 15 : 200;
+    options.AddPolicy("contact-change", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: PartitionFor(context),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = contactChangePermitLimit,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
 });
 
 builder.Services.AddControllers();

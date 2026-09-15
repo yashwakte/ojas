@@ -98,6 +98,34 @@ public class OtpService
         return code;
     }
 
+    /// <summary>The code a signed-in customer is sent to prove they receive mail at an address -
+    /// either the one already on their account (channel EmailConfirm) or one they want to move it
+    /// to (EmailChange). The target is bound to the account as well as the address, so a code sent
+    /// for one account can never be redeemed by another, even for the same address.</summary>
+    public async Task<string> SendContactEmailOtpAsync(string userId, string email, string channel)
+    {
+        var code = GenerateCode();
+        await StoreCodeAsync(ContactEmailTarget(userId, email), channel, code);
+
+        try
+        {
+            var html = $"""
+                <p>Use this code to confirm this email address for your Ojas account:</p>
+                <p style="font-size:28px;font-weight:700;letter-spacing:6px;">{code}</p>
+                <p>This code expires in 10 minutes. If you didn't ask for it, you can ignore this email - nothing on any account will change.</p>
+                """;
+            await _emailSender.SendAsync(email, "Confirm your email for Ojas", html);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not send contact email OTP to {Email}; the code was still generated.", email);
+        }
+
+        return code;
+    }
+
+    public static string ContactEmailTarget(string userId, string email) => $"{userId}:{email}";
+
     public async Task<bool> VerifyAsync(string target, string channel, string code)
     {
         var normalizedTarget = Normalize(target);

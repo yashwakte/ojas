@@ -41,4 +41,14 @@ public static class OtpChannels
     /// <summary>Password reset. Separate channel again, so requesting a reset never invalidates
     /// a device-approval code the same person is midway through using.</summary>
     public const string PasswordReset = "password-reset";
+
+    /// <summary>A signed-in customer confirming the email already on their account. Kept apart
+    /// from EmailChange on purpose: a confirmation code needs no password to request, so it must
+    /// never be redeemable as a change - if the account's email moves on after the code was sent,
+    /// the old code is looked up under the change channel, is not found there, and dies.</summary>
+    public const string EmailConfirm = "email-confirm";
+
+    /// <summary>A signed-in customer moving their account to a new email. Only ever issued after
+    /// the current password has been checked.</summary>
+    public const string EmailChange = "email-change";
 }

@@ -178,7 +178,35 @@ public record SavedAddressDto(string Label, string FullAddress, double Latitude,
 /// <summary>Each saved address carries its own delivery contact number - a customer may
 /// want a different person reached at their office address than at home.</summary>
 public record SaveAddressRequest(string Label, string FullAddress, [Required] double? Latitude, [Required] double? Longitude, bool IsDefault, [Required, MinLength(10), MaxLength(20)] string Phone);
-public record UpdateProfileRequest(string FullName, string Email, string Phone);
+/// <summary>Only the name is changed through this. Email and Phone are still accepted because a
+/// copy of the site loaded before the change sends all three - an unchanged value is ignored, a
+/// changed one is refused (see UserController.UpdateProfile) and has to go through
+/// ContactDetailsController, which proves it first.</summary>
+public record UpdateProfileRequest(
+	[Required, MinLength(2), MaxLength(80)] string FullName,
+	[MaxLength(120)] string? Email = null,
+	[MaxLength(20)] string? Phone = null);
+
+/// <summary>Email is either the account's own address (to confirm it) or a new one (to move the
+/// account to it). Either way the code goes to that address, and the code is the proof.</summary>
+public record SendEmailCodeRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email);
+
+public record VerifyEmailCodeRequest(
+	[Required, EmailAddress, MaxLength(120)] string Email,
+	[Required, RegularExpression(@"^\d{6}$")] string Code);
+
+/// <summary>A 10-digit Indian mobile number, as every number on Ojas is stored.</summary>
+public record StartPhoneChangeRequest(
+	[Required, RegularExpression(@"^[6-9]\d{9}$", ErrorMessage = "Enter a valid 10-digit mobile number.")] string Phone);
+
+public record VerifyPhoneChangeRequest(
+	[Required, RegularExpression(@"^[6-9]\d{9}$", ErrorMessage = "Enter a valid 10-digit mobile number.")] string Phone,
+	[Required, MaxLength(4096)] string WidgetToken);
+
+/// <summary>DevCode is the same local-only convenience as on the registration endpoints: filled in
+/// only when the API runs as Development, never on a real deployment.</summary>
+public record ContactCodeSentResponse(string Message, string? DevCode = null);
 
 /// <summary>IsEmailVerified and IsPhoneVerified are carried so the profile screen can say which
 /// contact details have actually been proved and offer to verify the email. Registration verifies

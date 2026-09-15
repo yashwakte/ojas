@@ -88,20 +88,35 @@ public class UserControllerTests
     // ---------- UpdateProfile ----------
 
     [Fact]
-    public async Task UpdateProfile_ReturnsConflict_WhenEmailAlreadyUsedByAnotherAccount()
+    public async Task UpdateProfile_RefusesAChangedEmail_WithoutWritingAnything()
     {
         var current = MakeUser();
         _usersMock.SetupFind(new List<User> { current });
-        SetConflictCheckResult(anyMatches: true);
 
-        var result = await _sut.UpdateProfile(new UpdateProfileRequest("Jane Doe", "taken@example.com", current.Phone));
+        var result = await _sut.UpdateProfile(new UpdateProfileRequest("Jane Doe", "someone.else@example.com", current.Phone));
 
-        var conflict = result.ShouldBeOfType<ConflictObjectResult>();
-        conflict.Value.ShouldNotBeNull();
+        result.ShouldBeOfType<BadRequestObjectResult>();
+        _usersMock.Verify(
+            c => c.UpdateOneAsync(It.IsAny<FilterDefinition<User>>(), It.IsAny<UpdateDefinition<User>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task UpdateProfile_ReturnsNoContent_WhenNoConflicts()
+    public async Task UpdateProfile_RefusesAChangedPhone_WithoutWritingAnything()
+    {
+        var current = MakeUser();
+        _usersMock.SetupFind(new List<User> { current });
+
+        var result = await _sut.UpdateProfile(new UpdateProfileRequest("Jane Doe", current.Email, "9000000001"));
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+        _usersMock.Verify(
+            c => c.UpdateOneAsync(It.IsAny<FilterDefinition<User>>(), It.IsAny<UpdateDefinition<User>>(), It.IsAny<UpdateOptions>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_ReturnsNoContent_WhenOnlyTheNameChanges()
     {
         var current = MakeUser();
         _usersMock.SetupFind(new List<User> { current });
