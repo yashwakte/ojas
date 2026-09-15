@@ -1,0 +1,183 @@
+<div class="cv-backdrop" (click)="close()"></div>
+
+<div class="cv-sheet" role="dialog" aria-modal="true" aria-labelledby="cvTitle">
+  <span class="cv-glow" aria-hidden="true"></span>
+  <span class="cv-grip" aria-hidden="true"></span>
+
+  <div class="cv-head">
+    <span class="cv-ico" aria-hidden="true">
+      <mat-icon>{{ isPhone() ? 'smartphone' : 'mark_email_read' }}</mat-icon>
+    </span>
+    <span class="cv-titles">
+      <strong id="cvTitle">{{ title() }}</strong>
+      <small>{{ subtitle() }}</small>
+    </span>
+    <button type="button" class="cv-close" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="cv-error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error() }}</span>
+    </div>
+  }
+
+  @if (isPhone() && widgetUnavailable()) {
+    <div class="cv-error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>Phone verification isn't available right now. Please try again shortly.</span>
+    </div>
+  }
+
+  @switch (step()) {
+    @case ('details') {
+      <form class="cv-step" (ngSubmit)="submitDetails()">
+        @if (isPhone()) {
+          <mat-form-field appearance="outline" class="cv-field" subscriptSizing="dynamic">
+            <mat-label>New mobile number</mat-label>
+            <span matTextPrefix>+91&nbsp;</span>
+            <input
+              matInput
+              name="newValue"
+              [(ngModel)]="newValue"
+              type="tel"
+              appDigitsOnly
+              autocomplete="tel-national"
+              placeholder="10-digit mobile number"
+            />
+            @if (newValue && sameAsCurrent) {
+              <mat-hint class="cv-hint-error">That's already the number on your account.</mat-hint>
+            }
+          </mat-form-field>
+        } @else {
+          <mat-form-field appearance="outline" class="cv-field" subscriptSizing="dynamic">
+            <mat-label>New email</mat-label>
+            <input
+              matInput
+              name="newValue"
+              [(ngModel)]="newValue"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+            />
+            @if (newValue && sameAsCurrent) {
+              <mat-hint class="cv-hint-error">That's already the email on your account.</mat-hint>
+            }
+          </mat-form-field>
+        }
+
+        <p class="cv-note">
+          <mat-icon>lock</mat-icon>
+          <span>
+            We'll send a code to the new {{ isPhone() ? 'number' : 'email' }} to confirm it's yours.
+          </span>
+        </p>
+
+        @if (isPhone() && !widgetReady() && !widgetUnavailable()) {
+          <p class="cv-loading" role="status">
+            <mat-spinner diameter="18"></mat-spinner>
+            <span>Setting up secure verification…</span>
+          </p>
+        } @else {
+          <button
+            mat-flat-button
+            class="cv-primary"
+            type="submit"
+            [disabled]="busy() || !detailsValid || (isPhone() && widgetUnavailable())"
+          >
+            @if (busy()) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              Send code
+            }
+          </button>
+        }
+      </form>
+    }
+
+    @case ('code') {
+      <form class="cv-step" (ngSubmit)="submitCode()">
+        <p class="cv-sent">
+          Enter the {{ codeLength() }}-digit code we sent to
+          <strong>{{ isPhone() ? '+91 ' + target() : target() }}</strong>
+        </p>
+
+        @if (devCode()) {
+          <p class="cv-dev">
+            <mat-icon>code</mat-icon>
+            <span>Dev mode — email isn't configured here. Your code is <strong>{{ devCode() }}</strong></span>
+          </p>
+        }
+
+        <mat-form-field appearance="outline" class="cv-field" subscriptSizing="dynamic">
+          <mat-label>Verification code</mat-label>
+          <input
+            matInput
+            class="cv-code"
+            name="code"
+            [(ngModel)]="code"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            [maxlength]="codeLength()"
+            autocomplete="one-time-code"
+          />
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          class="cv-primary"
+          type="submit"
+          [disabled]="busy() || code.trim().length !== codeLength()"
+        >
+          @if (busy()) {
+            <mat-spinner diameter="20"></mat-spinner>
+          } @else {
+            Verify
+          }
+        </button>
+
+        <div class="cv-links">
+          @if (isPhone()) {
+            <button type="button" class="cv-link" (click)="backToDetails()">
+              Didn't get it? Try again
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="cv-link"
+              (click)="resendEmailCode()"
+              [disabled]="cooldown() > 0 || busy()"
+            >
+              {{ cooldown() > 0 ? 'Resend in ' + cooldown() + 's' : 'Resend code' }}
+            </button>
+            @if (mode() === 'change-email') {
+              <button type="button" class="cv-link" (click)="backToDetails()">
+                Use a different email
+              </button>
+            }
+          }
+        </div>
+      </form>
+    }
+
+    @case ('done') {
+      <div class="cv-step cv-done" role="status">
+        <svg class="cv-check" viewBox="0 0 52 52" aria-hidden="true">
+          <circle cx="26" cy="26" r="23" />
+          <path d="M16 27.5l6.5 6.5L37 19.5" />
+        </svg>
+        <strong>{{ doneTitle() }}</strong>
+        <p>{{ doneText() }}</p>
+        <button mat-flat-button class="cv-primary" type="button" (click)="close()">Done</button>
+      </div>
+    }
+  }
+
+  <!-- MSG91 draws its captcha into this element by id, and it has to stay put across both steps:
+       the widget is set up once, against this node. -->
+  @if (isPhone()) {
+    <div [id]="captchaId" class="cv-captcha"></div>
+  }
+</div>

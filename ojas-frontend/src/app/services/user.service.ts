@@ -6,6 +6,11 @@ import {
   UpdateProfileRequest,
   SaveAddressRequest,
   OrderResponse,
+  SendEmailCodeRequest,
+  VerifyEmailCodeRequest,
+  StartPhoneChangeRequest,
+  VerifyPhoneChangeRequest,
+  ContactCodeSentResponse,
 } from '../models/interfaces';
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +26,26 @@ export class UserService {
 
   updateProfile(request: UpdateProfileRequest) {
     return this.http.put(`${this.baseUrl}/profile`, request);
+  }
+
+  /** Emails a 6-digit code to `email` - the account's own address to confirm it, or a new one
+   * (with the current password) to move the account to it. */
+  sendEmailCode(request: SendEmailCodeRequest) {
+    return this.http.post<ContactCodeSentResponse>(`${this.baseUrl}/email/send-code`, request);
+  }
+
+  /** Answers with the updated profile: the email verified, and replaced if it was a new one. */
+  verifyEmailCode(request: VerifyEmailCodeRequest) {
+    return this.http.post<UserProfileResponse>(`${this.baseUrl}/email/verify`, request);
+  }
+
+  /** Checks the password and reserves the number. The text itself is sent by MSG91's widget. */
+  startPhoneChange(request: StartPhoneChangeRequest) {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/phone/start`, request);
+  }
+
+  verifyPhoneChange(request: VerifyPhoneChangeRequest) {
+    return this.http.post<UserProfileResponse>(`${this.baseUrl}/phone/verify`, request);
   }
 
   saveAddress(request: SaveAddressRequest) {

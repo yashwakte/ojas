@@ -1,0 +1,445 @@
+// The quantity sheet's surface: same backdrop, radii and easing, bottom sheet on a phone and
+// centred card on a desktop. Confirming an email should feel like the same app as choosing a
+// quantity, not a system dialog dropped on top of it.
+:host {
+  display: contents;
+}
+
+.cv-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(28, 18, 12, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: cvFade 0.3s ease both;
+}
+
+.cv-sheet {
+  position: fixed;
+  z-index: 1301;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(94vw, 440px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px 22px 24px;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: var(--ojas-shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.12));
+  isolation: isolate;
+  animation: cvIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+// Kept up behind the header: any lower and it tints the first input, which has no background of
+// its own, and the field reads as muddy rather than lit.
+.cv-glow {
+  position: absolute;
+  top: -165px;
+  left: 50%;
+  translate: -50% 0;
+  width: 340px;
+  height: 250px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(242, 90, 26, 0.16), rgba(242, 90, 26, 0) 68%);
+  animation: cvBloom 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cv-grip {
+  display: none;
+}
+
+// ===== HEADER =====
+.cv-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  animation: cvRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+}
+
+.cv-ico {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--ojas-orange-light, #ffe6db);
+  color: var(--ojas-orange-dark, #c2410c);
+
+  mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.cv-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  strong {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+  }
+
+  small {
+    font-size: 0.8rem;
+    color: var(--ojas-text-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.cv-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #f5f2ef;
+  color: var(--ojas-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:hover {
+    background: #ece6e0;
+    transform: rotate(90deg);
+  }
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+// ===== STEPS =====
+// Each step rises into place as it replaces the last, so moving from "details" to "code" reads
+// as the next page of one conversation rather than a flash of new content.
+.cv-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: cvStep 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cv-field {
+  width: 100%;
+}
+
+.cv-code {
+  font-size: 1.35rem !important;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cv-hint-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.cv-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -2px 0 2px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+    color: var(--ojas-ink-soft);
+  }
+}
+
+.cv-sent {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--ojas-text-light);
+
+  // On its own line, so an address is only ever broken when it is genuinely wider than the
+  // sheet - never "example.co / m" because it happened to start at the end of the sentence.
+  strong {
+    display: block;
+    color: var(--ojas-text);
+    overflow-wrap: anywhere;
+  }
+}
+
+.cv-primary {
+  height: 48px;
+  border-radius: 50px !important;
+  background: var(--ojas-ink) !important;
+  color: #fff !important;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+
+  &:disabled {
+    opacity: 0.45;
+  }
+
+  mat-spinner {
+    margin: 0 auto;
+    --mdc-circular-progress-active-indicator-color: #fff;
+  }
+}
+
+.cv-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ojas-text-light);
+}
+
+.cv-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+}
+
+.cv-link {
+  border: none;
+  background: none;
+  padding: 6px 2px;
+  color: var(--ojas-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--ojas-text-light);
+    text-decoration: none;
+    cursor: default;
+  }
+}
+
+.cv-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.45;
+  animation: cvShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.cv-dev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed #e0ad4f;
+  border-radius: 10px;
+  background: #fff8ec;
+  color: #8a5c00;
+  font-size: 0.8rem;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// ===== DONE =====
+.cv-done {
+  align-items: center;
+  text-align: center;
+  padding: 6px 0 2px;
+
+  strong {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.12rem;
+    color: var(--ojas-text);
+  }
+
+  p {
+    margin: -4px 0 6px;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: var(--ojas-text-light);
+  }
+
+  .cv-primary {
+    align-self: stretch;
+  }
+}
+
+// The ring draws itself, then the tick - the one moment in the flow that has earned a flourish.
+.cv-check {
+  width: 64px;
+  height: 64px;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  circle {
+    stroke: #16a34a;
+    stroke-width: 2.5;
+    stroke-dasharray: 150;
+    stroke-dashoffset: 150;
+    animation: cvDraw 0.7s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards;
+  }
+
+  path {
+    stroke: #16a34a;
+    stroke-width: 3.5;
+    stroke-dasharray: 36;
+    stroke-dashoffset: 36;
+    animation: cvDraw 0.45s cubic-bezier(0.65, 0, 0.35, 1) 0.65s forwards;
+  }
+}
+
+.cv-captcha:empty {
+  display: none;
+}
+
+.cv-captcha {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+// ===== PHONE: BOTTOM SHEET =====
+@media (max-width: 599px) {
+  .cv-sheet {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    translate: none;
+    width: 100%;
+    max-height: calc(100dvh - 48px);
+    border-radius: 24px 24px 0 0;
+    padding: 12px 18px calc(22px + env(safe-area-inset-bottom));
+    animation-name: cvUp;
+  }
+
+  .cv-grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 14px;
+    border-radius: 4px;
+    background: #e4ddd6;
+  }
+}
+
+@keyframes cvFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cvIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+}
+
+@keyframes cvUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes cvBloom {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes cvRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes cvStep {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes cvShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes cvDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-backdrop,
+  .cv-sheet,
+  .cv-glow,
+  .cv-head,
+  .cv-step,
+  .cv-error {
+    animation: none;
+  }
+
+  .cv-check circle,
+  .cv-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

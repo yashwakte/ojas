@@ -14,7 +14,18 @@
       <div class="avatar-circle">{{ getInitials() }}</div>
       <div class="banner-info">
         <h2>{{ profile()?.fullName }}</h2>
-        <p>{{ profile()?.email }}</p>
+        <p>
+          <span class="banner-email">{{ profile()?.email }}</span>
+          @if (profile()?.isEmailVerified) {
+            <span class="banner-badge banner-badge--ok">
+              <mat-icon>verified</mat-icon>Verified
+            </span>
+          } @else {
+            <button type="button" class="banner-badge banner-badge--warn" (click)="openContactSheet('verify-email')">
+              <mat-icon>error_outline</mat-icon>Not verified
+            </button>
+          }
+        </p>
       </div>
     </div>
 
@@ -48,27 +59,65 @@
         }
       </div>
 
+      @if (!profile()?.isEmailVerified) {
+        <div class="verify-nudge" role="note">
+          <mat-icon>mark_email_unread</mat-icon>
+          <p>
+            <strong>Your email isn't verified yet.</strong>
+            Verify it so order receipts and password resets reach you.
+          </p>
+          <button type="button" class="row-btn row-btn--primary" (click)="openContactSheet('verify-email')">
+            Verify
+          </button>
+        </div>
+      }
+
       @if (!editingProfile()) {
         <div class="info-rows">
           <div class="info-row">
             <mat-icon>person</mat-icon>
-            <div>
+            <div class="info-body">
               <label>Full Name</label>
-              <span>{{ profile()?.fullName }}</span>
+              <span class="info-value">{{ profile()?.fullName }}</span>
             </div>
           </div>
           <div class="info-row">
             <mat-icon>email</mat-icon>
-            <div>
+            <div class="info-body">
               <label>Email</label>
-              <span>{{ profile()?.email }}</span>
+              <span class="info-value">{{ profile()?.email }}</span>
+              @if (profile()?.isEmailVerified) {
+                <span class="vbadge vbadge--ok"><mat-icon>verified</mat-icon>Verified</span>
+              } @else {
+                <span class="vbadge vbadge--warn"><mat-icon>error_outline</mat-icon>Not verified</span>
+              }
+            </div>
+            <div class="info-actions">
+              @if (!profile()?.isEmailVerified) {
+                <button type="button" class="row-btn row-btn--primary" (click)="openContactSheet('verify-email')">
+                  Verify
+                </button>
+              }
+              <button type="button" class="row-btn" (click)="openContactSheet('change-email')" aria-label="Change email">
+                Change
+              </button>
             </div>
           </div>
           <div class="info-row">
             <mat-icon>phone</mat-icon>
-            <div>
+            <div class="info-body">
               <label>Phone</label>
-              <span>{{ profile()?.phone }}</span>
+              <span class="info-value">+91 {{ profile()?.phone }}</span>
+              @if (profile()?.isPhoneVerified) {
+                <span class="vbadge vbadge--ok"><mat-icon>verified</mat-icon>Verified</span>
+              } @else {
+                <span class="vbadge vbadge--warn"><mat-icon>error_outline</mat-icon>Not verified</span>
+              }
+            </div>
+            <div class="info-actions">
+              <button type="button" class="row-btn" (click)="openContactSheet('change-phone')" aria-label="Change phone number">
+                Change
+              </button>
             </div>
           </div>
         </div>
@@ -76,23 +125,24 @@
         <div class="edit-form">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Full Name</mat-label>
-            <input matInput [(ngModel)]="editFullName" />
+            <input matInput [(ngModel)]="editFullName" autocomplete="name" />
           </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Email</mat-label>
-            <input matInput [(ngModel)]="editEmail" type="email" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Phone</mat-label>
-            <input matInput [(ngModel)]="editPhone" type="tel" />
-          </mat-form-field>
+          <p class="edit-hint">
+            <mat-icon>info</mat-icon>
+            <!-- One text run: the paragraph is a flex row (icon + text), and loose text beside a
+                 <strong> became three separate columns on a phone. -->
+            <span>
+              To change your email or mobile number, use <strong>Change</strong> next to it — we'll
+              send a code to confirm it's yours.
+            </span>
+          </p>
           <div class="edit-actions">
             <button mat-stroked-button (click)="editingProfile.set(false)">Cancel</button>
             <button
               mat-raised-button
               class="save-btn"
               (click)="saveProfile()"
-              [disabled]="savingProfile()"
+              [disabled]="savingProfile() || !isNameValid"
             >
               {{ savingProfile() ? 'Saving...' : 'Save Changes' }}
             </button>
@@ -133,7 +183,7 @@
                   <mat-label>Phone Number *</mat-label>
                   <input
                     matInput
-                    type="tel"
+                    type="tel" appDigitsOnly
                     [(ngModel)]="editAddressPhone"
                     placeholder="10-digit mobile number"
                   />
@@ -309,7 +359,7 @@
             <mat-label>Phone Number *</mat-label>
             <input
               matInput
-              type="tel"
+              type="tel" appDigitsOnly
               [(ngModel)]="newPhone"
               placeholder="10-digit mobile number"
             />
@@ -408,5 +458,15 @@
         </div>
       }
     </div>
+
+    @if (contactSheet(); as mode) {
+      <app-contact-verify-sheet
+        [mode]="mode"
+        [currentEmail]="profile()?.email ?? ''"
+        [currentPhone]="profile()?.phone ?? ''"
+        (completed)="onContactCompleted($event)"
+        (closed)="contactSheet.set(null)"
+      />
+    }
   }
 </div>

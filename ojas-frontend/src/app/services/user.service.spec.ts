@@ -16,6 +16,8 @@ describe('UserService', () => {
     phone: '9999999999',
     createdAt: '2024-01-01',
     savedAddresses: [],
+    isEmailVerified: false,
+    isPhoneVerified: true,
   };
 
   beforeEach(() => {
@@ -35,8 +37,38 @@ describe('UserService', () => {
     req.flush(profile);
   });
 
-  it('updateProfile() puts to /user/profile', () => {
-    const request: UpdateProfileRequest = { fullName: 'Jane D', email: 'jane@x.com', phone: '9999999999' };
+  it('sendEmailCode() posts the address', () => {
+    service.sendEmailCode({ email: 'new@x.com' }).subscribe();
+    const req = httpMock.expectOne(`${environment.apiUrl}/user/email/send-code`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'new@x.com' });
+    req.flush({ message: 'sent' });
+  });
+
+  it('verifyEmailCode() posts the code and answers with the updated profile', () => {
+    let result: UserProfileResponse | undefined;
+    service.verifyEmailCode({ email: 'new@x.com', code: '123456' }).subscribe((p) => (result = p));
+    const req = httpMock.expectOne(`${environment.apiUrl}/user/email/verify`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'new@x.com', code: '123456' });
+    req.flush({ ...profile, email: 'new@x.com', isEmailVerified: true });
+    expect(result?.isEmailVerified).toBeTrue();
+  });
+
+  it('startPhoneChange() and verifyPhoneChange() post to the phone endpoints', () => {
+    service.startPhoneChange({ phone: '9876501234' }).subscribe();
+    const start = httpMock.expectOne(`${environment.apiUrl}/user/phone/start`);
+    expect(start.request.body).toEqual({ phone: '9876501234' });
+    start.flush({ message: 'ok' });
+
+    service.verifyPhoneChange({ phone: '9876501234', widgetToken: 't' }).subscribe();
+    const verify = httpMock.expectOne(`${environment.apiUrl}/user/phone/verify`);
+    expect(verify.request.body).toEqual({ phone: '9876501234', widgetToken: 't' });
+    verify.flush(profile);
+  });
+
+  it('updateProfile() puts only the name to /user/profile', () => {
+    const request: UpdateProfileRequest = { fullName: 'Jane D' };
     service.updateProfile(request).subscribe();
     const req = httpMock.expectOne(`${environment.apiUrl}/user/profile`);
     expect(req.request.method).toBe('PUT');

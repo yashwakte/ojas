@@ -37,6 +37,8 @@
 }
 
 .banner-info {
+  min-width: 0;
+
   h2 {
     font-size: 1.4rem;
     font-weight: 700;
@@ -45,8 +47,219 @@
   }
   p {
     margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
     font-size: 0.88rem;
-    opacity: 0.85;
+  }
+}
+
+.banner-email {
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+.banner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 7px;
+  border-radius: 50px;
+  border: none;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+  }
+
+  &--ok {
+    background: rgba(134, 239, 172, 0.18);
+    color: #bbf7d0;
+  }
+
+  // A button, because it opens the verification: a badge that only says "not verified" and
+  // offers no way to fix it is a complaint, not a feature.
+  &--warn {
+    background: #fbbf24;
+    color: #3b2604;
+    cursor: pointer;
+    transition: transform 0.25s var(--ojas-ease), box-shadow 0.25s var(--ojas-ease);
+    animation: badgePulse 2.8s ease-in-out 1.2s 2;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(251, 191, 36, 0.4);
+    }
+  }
+}
+
+@keyframes badgePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(251, 191, 36, 0);
+  }
+}
+
+// ── Verification ─────────────────────────────────────────────────────
+.verify-nudge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0 20px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+
+  > mat-icon {
+    flex-shrink: 0;
+    color: #d97706;
+  }
+
+  p {
+    flex: 1;
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: #78350f;
+
+    strong {
+      display: block;
+      font-size: 0.86rem;
+    }
+  }
+}
+
+.vbadge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 9px 2px 6px;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+
+  mat-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    color: inherit;
+  }
+
+  &--ok {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &--warn {
+    background: #fef3c7;
+    color: #b45309;
+  }
+}
+
+.info-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.row-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 50px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  color: var(--ojas-ink);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.25s var(--ojas-ease);
+
+  &:hover {
+    border-color: var(--ojas-ink);
+    transform: translateY(-1px);
+  }
+
+  &--primary {
+    background: var(--ojas-ink);
+    border-color: var(--ojas-ink);
+    color: #fff;
+
+    &:hover {
+      background: #000;
+    }
+  }
+}
+
+// On a phone the buttons go under the detail rather than beside it. Beside it, Verify and Change
+// took 154px of a 310px card and left a long email 32px to wrap in - nine lines at 320px wide.
+@media (max-width: 520px) {
+  .info-row {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .info-body {
+    flex: 1 1 0;
+  }
+  // A line of its own, starting under the text (past the 24px icon and the 14px gap) - and
+  // narrowed by that same 38px, or the line is wider than the row it sits in.
+  .info-actions {
+    flex-basis: calc(100% - 38px);
+    justify-content: flex-start;
+    margin-left: 38px;
+  }
+
+  .verify-nudge {
+    flex-wrap: wrap;
+    row-gap: 10px;
+
+    // The text takes the whole line beside the icon, so Verify always drops beneath it - left
+    // beside it, the sentence was squeezed into a four-line column at 390px.
+    p {
+      flex: 1 1 calc(100% - 36px);
+    }
+    .row-btn {
+      margin-left: 36px; // under the text, past the 24px icon and the 12px gap
+    }
+  }
+}
+
+.edit-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -8px 0 4px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
   }
 }
 
@@ -202,16 +415,21 @@
   align-items: flex-start;
   gap: 14px;
 
-  mat-icon {
+  > mat-icon {
     color: var(--ojas-ink-soft);
     flex-shrink: 0;
     margin-top: 2px;
   }
 
-  div {
+  .info-body {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
+  }
+
+  .info-value {
+    overflow-wrap: anywhere;
   }
 
   label {

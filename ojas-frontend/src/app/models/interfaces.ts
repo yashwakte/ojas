@@ -1076,10 +1076,10 @@ export interface SaveAddressRequest {
   isDefault: boolean;
 }
 
+/** The name only. The email and phone are changed through the contact endpoints below, which
+ * store neither until a code sent to it has come back - the API refuses a changed one here. */
 export interface UpdateProfileRequest {
   fullName: string;
-  email: string;
-  phone: string;
 }
 
 export interface UserProfileResponse {
@@ -1089,6 +1089,36 @@ export interface UserProfileResponse {
   phone: string;
   createdAt: string;
   savedAddresses: SavedAddress[];
+  /** Registration proves the phone only, so most customers arrive with this false. */
+  isEmailVerified: boolean;
+  isPhoneVerified: boolean;
+}
+
+/** The account's own address to confirm it, or a new one to move the account to - the code sent
+ * there is the proof either way. */
+export interface SendEmailCodeRequest {
+  email: string;
+}
+
+export interface VerifyEmailCodeRequest {
+  email: string;
+  code: string;
+}
+
+export interface StartPhoneChangeRequest {
+  phone: string;
+}
+
+/** widgetToken is what MSG91's widget returns once the customer enters the texted code. */
+export interface VerifyPhoneChangeRequest {
+  phone: string;
+  widgetToken: string;
+}
+
+export interface ContactCodeSentResponse {
+  message: string;
+  /** Local development only - never filled in on a real deployment. */
+  devCode?: string | null;
 }
 
 /** Topic always comes from a quick-reply button the widget rendered - there is no free-text

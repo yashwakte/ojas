@@ -66,6 +66,8 @@ describe('Checkout', () => {
     phone: '9999999999',
     createdAt: '2024-01-01',
     savedAddresses: [defaultAddress],
+    isEmailVerified: false,
+    isPhoneVerified: true,
   };
 
   const order: OrderResponse = {

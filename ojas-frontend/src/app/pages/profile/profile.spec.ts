@@ -34,6 +34,8 @@ describe('Profile', () => {
         isDefault: true,
       },
     ],
+    isEmailVerified: false,
+    isPhoneVerified: true,
   };
 
   let authServiceSpy: any;
@@ -46,7 +48,13 @@ describe('Profile', () => {
       user: signal<AuthResponse | null>(authUser),
     });
     authServiceSpy.isLoggedIn.and.returnValue(true);
-    userServiceSpy = jasmine.createSpyObj('UserService', ['getProfile', 'updateProfile', 'saveAddress', 'deleteAddress']);
+    userServiceSpy = jasmine.createSpyObj('UserService', [
+      'getProfile',
+      'updateProfile',
+      'saveAddress',
+      'deleteAddress',
+      'sendEmailCode',
+    ]);
     userServiceSpy.getProfile.and.returnValue(of(profile));
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -89,43 +97,99 @@ describe('Profile', () => {
     expect(fixture.componentInstance.loading()).toBeFalse();
   });
 
-  it('startEdit populates edit fields from the current profile', () => {
+  it('startEdit populates the name from the current profile', () => {
     const fixture = create();
     fixture.componentInstance.startEdit();
     expect(fixture.componentInstance.editFullName).toBe('Jane Doe');
-    expect(fixture.componentInstance.editEmail).toBe('jane@x.com');
-    expect(fixture.componentInstance.editPhone).toBe('9999999999');
     expect(fixture.componentInstance.editingProfile()).toBeTrue();
   });
 
-  it('saveProfile updates auth info, exits edit mode, and reloads the profile on success', () => {
+  it('the edit form no longer offers the email or phone as free-text fields', () => {
+    const fixture = create();
+    fixture.componentInstance.startEdit();
+    fixture.detectChanges();
+
+    const form: HTMLElement = fixture.nativeElement.querySelector('.edit-form');
+    expect(form.querySelectorAll('input').length).toBe(1);
+    expect(form.querySelector('input[type="email"], input[type="tel"]')).toBeNull();
+  });
+
+  it('saveProfile sends only the name, updates auth info, exits edit mode and reloads', () => {
     userServiceSpy.updateProfile.and.returnValue(of({}));
     const fixture = create();
     fixture.componentInstance.startEdit();
-    fixture.componentInstance.editFullName = 'New Name';
+    fixture.componentInstance.editFullName = '  New Name ';
 
     fixture.componentInstance.saveProfile();
 
-    expect(authServiceSpy.updateUserInfo).toHaveBeenCalledWith({
-      fullName: 'New Name',
-      email: 'jane@x.com',
-      phone: '9999999999',
-    });
+    expect(userServiceSpy.updateProfile).toHaveBeenCalledWith({ fullName: 'New Name' });
+    expect(authServiceSpy.updateUserInfo).toHaveBeenCalledWith({ fullName: 'New Name' });
     expect(fixture.componentInstance.editingProfile()).toBeFalse();
     expect(fixture.componentInstance.savingProfile()).toBeFalse();
   });
 
-  it('saveProfile shows a duplicate-contact message on 409', () => {
+  it('saveProfile will not send a blank name', () => {
+    const fixture = create();
+    fixture.componentInstance.startEdit();
+    fixture.componentInstance.editFullName = ' ';
+
+    fixture.componentInstance.saveProfile();
+
+    expect(userServiceSpy.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("saveProfile shows the server's reason on a 400", () => {
     userServiceSpy.updateProfile.and.returnValue(
-      throwError(() => ({ status: 409, error: { message: 'Email taken' } })),
+      throwError(() => ({ status: 400, error: { message: 'Needs a verification code' } })),
     );
     const fixture = create();
     fixture.componentInstance.startEdit();
 
     fixture.componentInstance.saveProfile();
 
-    expect(snackBarSpy.open).toHaveBeenCalledWith('Email taken', 'Dismiss', jasmine.any(Object));
+    expect(snackBarSpy.open).toHaveBeenCalledWith('Needs a verification code', 'Dismiss', jasmine.any(Object));
     expect(fixture.componentInstance.savingProfile()).toBeFalse();
+  });
+
+  it('shows a "Not verified" badge and a Verify action while the email is unverified', () => {
+    const fixture = create();
+    const el: HTMLElement = fixture.nativeElement;
+
+    expect(el.querySelector('.vbadge--warn')?.textContent).toContain('Not verified');
+    expect(el.querySelector('.banner-badge--warn')).not.toBeNull();
+    expect(el.querySelector('.verify-nudge')).not.toBeNull();
+  });
+
+  it('shows "Verified" and no nudge once the email is verified', () => {
+    userServiceSpy.getProfile.and.returnValue(of({ ...profile, isEmailVerified: true }));
+    const fixture = create();
+    const el: HTMLElement = fixture.nativeElement;
+
+    expect(el.querySelector('.banner-badge--ok')?.textContent).toContain('Verified');
+    expect(el.querySelector('.verify-nudge')).toBeNull();
+    expect(el.querySelectorAll('.vbadge--warn').length).toBe(0);
+  });
+
+  it('Change opens the contact sheet for that detail', () => {
+    userServiceSpy.sendEmailCode.and.returnValue(of({ message: 'sent' }));
+    const fixture = create();
+
+    fixture.componentInstance.openContactSheet('change-email');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-contact-verify-sheet')).not.toBeNull();
+    fixture.componentInstance.contactSheet.set(null);
+    fixture.detectChanges();
+  });
+
+  it('a completed change replaces the profile and the signed-in user details', () => {
+    const fixture = create();
+    const changed = { ...profile, email: 'new@x.com', isEmailVerified: true };
+
+    fixture.componentInstance.onContactCompleted(changed);
+
+    expect(fixture.componentInstance.profile()).toEqual(changed);
+    expect(authServiceSpy.updateUserInfo).toHaveBeenCalledWith({ email: 'new@x.com', phone: '9999999999' });
   });
 
   it('saveProfile shows a generic error message on other failures', () => {

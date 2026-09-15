@@ -22,6 +22,10 @@ import { UserService } from '../../services/user.service';
 import { UserProfileResponse, SaveAddressRequest } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
 import {
+  ContactSheetMode,
+  ContactVerifySheet,
+} from '../../components/contact-verify-sheet/contact-verify-sheet';
+import {
   DEFAULT_CITY,
   DEFAULT_STATE,
   SERVICEABLE_STATES,
@@ -29,10 +33,11 @@ import {
   isValidPunePincode,
   pincodeError,
 } from '../../constants/serviceable-locations';
+import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 @Component({
   selector: 'app-profile',
-  imports: [
+  imports: [DigitsOnlyDirective, 
     RouterLink,
     FormsModule,
     MatIconModule,
@@ -42,6 +47,7 @@ import {
     MatCheckboxModule,
     MatSelectModule,
     MapPicker,
+    ContactVerifySheet,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
@@ -53,12 +59,14 @@ export class Profile implements OnInit {
   loading = signal(true);
   error = signal('');
 
-  // Edit profile
+  // Edit profile - the name only. The email and phone change through the contact sheet, which
+  // stores neither until a code sent to it has come back.
   editingProfile = signal(false);
   editFullName = '';
-  editEmail = '';
-  editPhone = '';
   savingProfile = signal(false);
+
+  /** Which contact sheet is open, if any. */
+  contactSheet = signal<ContactSheetMode | null>(null);
 
   // Add address
   showAddressForm = signal(false);
@@ -134,38 +142,46 @@ export class Profile implements OnInit {
     const p = this.profile();
     if (!p) return;
     this.editFullName = p.fullName;
-    this.editEmail = p.email;
-    this.editPhone = p.phone;
     this.editingProfile.set(true);
   }
 
+  get isNameValid(): boolean {
+    return this.editFullName.trim().length >= 2;
+  }
+
   saveProfile(): void {
+    if (!this.isNameValid) return;
+    const fullName = this.editFullName.trim();
     this.savingProfile.set(true);
-    this.userService
-      .updateProfile({ fullName: this.editFullName, email: this.editEmail, phone: this.editPhone })
-      .subscribe({
-        next: () => {
-          this.auth.updateUserInfo({
-            fullName: this.editFullName,
-            email: this.editEmail,
-            phone: this.editPhone,
-          });
-          this.editingProfile.set(false);
-          this.savingProfile.set(false);
-          this.loadProfile();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.savingProfile.set(false);
-          const message =
-            err.status === 409
-              ? (err.error?.message ?? 'This email or phone is already in use.')
-              : 'Failed to save changes. Please try again.';
-          this.snackBar.open(message, 'Dismiss', {
-            duration: 4000,
-            panelClass: 'snack-error',
-          });
-        },
-      });
+    this.userService.updateProfile({ fullName }).subscribe({
+      next: () => {
+        this.auth.updateUserInfo({ fullName });
+        this.editingProfile.set(false);
+        this.savingProfile.set(false);
+        this.loadProfile();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.savingProfile.set(false);
+        const message =
+          err.status === 400 && err.error?.message
+            ? err.error.message
+            : 'Failed to save changes. Please try again.';
+        this.snackBar.open(message, 'Dismiss', {
+          duration: 4000,
+          panelClass: 'snack-error',
+        });
+      },
+    });
+  }
+
+  openContactSheet(mode: ContactSheetMode): void {
+    this.contactSheet.set(mode);
+  }
+
+  /** The sheet has saved the change and hands back the profile as the server now has it. */
+  onContactCompleted(updated: UserProfileResponse): void {
+    this.profile.set(updated);
+    this.auth.updateUserInfo({ email: updated.email, phone: updated.phone });
   }
 
   onNewStateChange(): void {
