@@ -89,6 +89,13 @@
     </script>
     <link rel="icon" type="image/png" href="images/logo.png" />
     <link rel="apple-touch-icon" href="images/logo.png" />
+    <!-- The arrival screen draws the logo on its very first frame, so it is fetched with the page
+         rather than discovered after the stylesheet. Unlike a hero picture (see the note below),
+         this is never a wasted request: the header shows this same file on every page. -->
+    <link rel="preload" as="image" href="images/logo.png" fetchpriority="high" />
+    <!-- Without JavaScript nothing would ever take the arrival screen away, and it would sit over
+         the text below for good. -->
+    <noscript><style>#ojas-arrival { display: none; }</style></noscript>
     <!-- THERE IS DELIBERATELY NO HERO PRELOAD HERE ANY MORE.
 
          There used to be one, for /images/hero-banner-1280.webp, and its reasoning was sound while
@@ -154,86 +161,137 @@
       .boot-shell a {
         color: #b3541e;
       }
-      /* What a customer sees while the app downloads - on a slow phone connection, several
-         seconds that used to be a blank white page. The brand mark and a travelling line, drawn
-         from nothing but this HTML: no image, no script. Angular replaces it as it starts. */
-      .boot-splash {
+      /* THE ARRIVAL - the one screen a visitor sees before the shop, in the manner of
+         zerotoone.ai (the owner's pick, September 2026): a dark ground, the Ojas mark, and a single
+         thin line drawing out while the app downloads. Drawn by this HTML alone, so it is there
+         on the first frame; on 3G that covers what used to be seconds of blank white page.
+
+         It replaces two things that used to play one after the other - a cream splash here and a
+         separate intro the app drew on top of it. Now the app takes this same screen over
+         (components/site-intro): on the first page of a visit the mark glides up into the header
+         logo while the dark dissolves; on any other load it simply fades once the page is drawn.
+
+         The mark is logo.png cropped to its orange oval. The small motto arching over the oval is
+         dark maroon, drawn for a light background, and would read as a smudge here. */
+      .arrival {
         position: fixed;
         inset: 0;
+        z-index: 2000;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 12px;
-        background: #fffaf6;
-        font-family: 'Poppins', system-ui, sans-serif;
+        gap: 30px;
+        /* A load that has gone wrong must never leave a customer stuck behind this screen. */
+        animation: arrival-safety 0.4s ease 20s forwards;
       }
-      .boot-splash-mark {
-        font-size: 2.6rem;
-        font-weight: 700;
-        line-height: 1.1;
-        color: #f25a1a;
-      }
-      .boot-splash-line {
-        font-size: 0.8rem;
-        color: #8a7e75;
-      }
-      .boot-splash-bar {
-        position: relative;
-        width: 120px;
-        height: 3px;
-        margin-top: 6px;
-        border-radius: 3px;
-        background: #f3e4d9;
-        overflow: hidden;
-      }
-      .boot-splash-bar::after {
-        content: '';
+      .arrival-ground {
         position: absolute;
         inset: 0;
-        width: 40%;
-        border-radius: 3px;
-        background: #f25a1a;
-        animation: boot-slide 1.1s ease-in-out infinite;
+        background: radial-gradient(120% 90% at 50% 42%, #24160d 0%, #150e09 55%, #0d0906 100%);
       }
-      @keyframes boot-slide {
+      /* The mark is the logo's orange oval alone: a window exactly the oval's size - 217 x 143 of
+         the 330 x 210 file, its box starting at (56, 50), measured from the file's pixels - and
+         clipped to the oval's own shape. A square crop either cut the top off the oval or let the
+         ends of the maroon motto, which curve down beside it, show as crumbs in its corners; the
+         motto never enters the oval itself, so the ellipse takes it away cleanly.
+
+         Sized to stay close to the file's own resolution: the oval is 217px wide in the only logo
+         there is, and a phone draws two or three device pixels per CSS pixel. */
+      .arrival-mark {
+        position: relative;
+        display: block;
+        width: clamp(150px, 40vw, 190px);
+        aspect-ratio: 217 / 143;
+        overflow: hidden;
+        clip-path: ellipse(50% 50% at 50% 50%);
+        transform-origin: 0 0;
+      }
+      .arrival-mark img {
+        display: block;
+        /* The file at the scale where its oval fills the window (330 / 217 of the width), moved
+           up and left so the oval's box sits exactly on the window. Margins in percent are of
+           the window's width: 50 / 217 and 56 / 217. */
+        width: 152.07%;
+        max-width: none;
+        height: auto;
+        margin: -23.04% 0 0 -25.81%;
+        opacity: 0;
+        animation: arrival-mark-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+      }
+      .arrival-line {
+        position: relative;
+        display: block;
+        width: min(64vw, 300px);
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          rgba(247, 201, 139, 0) 0%,
+          rgba(247, 201, 139, 0.8) 50%,
+          rgba(247, 201, 139, 0) 100%
+        );
+        transform: scaleX(0);
+        animation: arrival-line-draw 2.4s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+      }
+      @keyframes arrival-mark-in {
         from {
-          transform: translateX(-100%);
+          opacity: 0;
+          transform: translateY(10px);
         }
         to {
-          transform: translateX(250%);
+          opacity: 1;
+          transform: none;
+        }
+      }
+      /* Most of the way, then it waits: the app finishes the line when the page is ready. */
+      @keyframes arrival-line-draw {
+        to {
+          transform: scaleX(0.72);
+        }
+      }
+      @keyframes arrival-safety {
+        to {
+          opacity: 0;
+          visibility: hidden;
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        .boot-splash-bar::after {
+        .arrival-mark img {
           animation: none;
-          width: 100%;
-          opacity: 0.5;
+          opacity: 1;
+        }
+        .arrival-line {
+          animation: none;
+          transform: scaleX(0.72);
         }
       }
     </style>
   </head>
   <body>
+    <!-- The arrival screen (styled above). It sits OUTSIDE app-root on purpose: Angular empties
+         app-root the moment it starts, which would snap this away mid-draw. Out here the app can
+         take the same screen over and end it properly - see components/site-intro. Decorative,
+         so hidden from assistive technology. -->
+    <div id="ojas-arrival" class="arrival" aria-hidden="true">
+      <span class="arrival-ground"></span>
+      <span class="arrival-mark"
+        ><img src="images/logo.png" alt="" width="330" height="210" fetchpriority="high" decoding="async"
+      /></span>
+      <span class="arrival-line"></span>
+    </div>
+
     <!-- No text inside app-root. An earlier version put the business description here, where it
          rendered as a wall of unstyled text for the moments before Angular booted - a poor first
-         impression on every single visit. What sits here now is the styled splash above: the
-         brand mark and a loading line, marked aria-hidden, which on 3G replaces what measured as
-         about six seconds of blank white page. Angular clears it as it starts.
+         impression on every single visit.
 
-         The noscript block below achieves the same thing without that cost. Its content is present
-         in the HTML as served, so anything that does not execute JavaScript still reads it -
+         The noscript block below carries that text without that cost. Its content is present in
+         the HTML as served, so anything that does not execute JavaScript still reads it -
          crawlers, link previewers, and the payment gateway's compliance check that previously
          rejected this domain as "inactive / not live" for having a literally empty body. A browser
          with JavaScript on never renders it, so a real customer sees only the app.
 
          Do not "simplify" this away: without it the served HTML has zero visible text again. -->
-    <app-root>
-      <div class="boot-splash" aria-hidden="true">
-        <span class="boot-splash-mark">ओजस्</span>
-        <span class="boot-splash-line">शुद्ध आहार… शुद्ध विचार</span>
-        <span class="boot-splash-bar"></span>
-      </div>
-    </app-root>
+    <app-root></app-root>
 
     <noscript>
       <div class="boot-shell">
