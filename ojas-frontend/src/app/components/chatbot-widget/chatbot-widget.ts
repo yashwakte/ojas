@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  computed,
   effect,
   inject,
   signal,
@@ -13,6 +14,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
 import { ChatbotService } from '../../services/chatbot.service';
 import { ChatbotUiService } from '../../services/chatbot-ui.service';
+import { CartService } from '../../services/cart.service';
 import { ChatbotQuickReply } from '../../models/interfaces';
 
 const CLOSE_MS = 260;
@@ -20,6 +22,14 @@ const DRAG_THRESHOLD_PX = 6;
 const BUBBLE_SIZE = 58;
 const EDGE_MARGIN = 4;
 const REMOVE_DROP_RADIUS_PX = 55;
+
+/** Matches cart.scss's breakpoint - at or below it the cart page pins its checkout bar to the
+ * bottom of the screen, above the bottom navigation. */
+const NARROW_VIEWPORT_QUERY = '(max-width: 900px)';
+
+/** Just clear of the cart page's checkout bar. Built from the same two tokens that place the bar
+ * itself, so it follows them - and the iPhone home-indicator inset - if either ever changes. */
+const ABOVE_CART_BAR = 'calc(var(--ojas-bottom-nav-clearance) + var(--ojas-cart-bar-h) + 10px)';
 
 interface ChatMessage {
   from: 'bot' | 'user';
@@ -47,6 +57,7 @@ interface ChatMessage {
 export class ChatbotWidget {
   private readonly chatbot = inject(ChatbotService);
   private readonly router = inject(Router);
+  private readonly cart = inject(CartService);
   readonly ui = inject(ChatbotUiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
@@ -61,6 +72,31 @@ export class ChatbotWidget {
   // entirely, panel included, rather than floating over the Turnstile widget or the form.
   readonly hiddenOnRoute = signal(this.isHiddenRoute(this.router.url));
 
+  readonly onCartRoute = signal(this.isCartRoute(this.router.url));
+  readonly narrowViewport = signal(
+    typeof window !== 'undefined' && !!window.matchMedia?.(NARROW_VIEWPORT_QUERY).matches,
+  );
+  /** Set once the customer drags the bubble themselves. From then on it stays where they put it,
+   * on the cart page too. */
+  private readonly movedByCustomer = signal(false);
+
+  /**
+   * On a phone, the cart page pins its "Proceed to Checkout" bar just above the bottom navigation -
+   * exactly where the bubble sits by default, so it covered the end of the button. There, and only
+   * there, the bubble moves up to sit clear of the bar. Every other page keeps the usual spot.
+   */
+  readonly liftedAboveCartBar = computed(
+    () =>
+      this.onCartRoute() &&
+      this.narrowViewport() &&
+      this.cart.items().length > 0 &&
+      !this.movedByCustomer(),
+  );
+
+  readonly bubbleBottom = computed(() =>
+    this.liftedAboveCartBar() ? ABOVE_CART_BAR : `${this.ui.position().bottom}px`,
+  );
+
   private hasStarted = false;
   private readonly timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -74,7 +110,17 @@ export class ChatbotWidget {
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((event) => this.hiddenOnRoute.set(this.isHiddenRoute(event.urlAfterRedirects)));
+      .subscribe((event) => {
+        this.hiddenOnRoute.set(this.isHiddenRoute(event.urlAfterRedirects));
+        this.onCartRoute.set(this.isCartRoute(event.urlAfterRedirects));
+      });
+
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const query = window.matchMedia(NARROW_VIEWPORT_QUERY);
+      const onChange = (event: MediaQueryListEvent) => this.narrowViewport.set(event.matches);
+      query.addEventListener('change', onChange);
+      this.destroyRef.onDestroy(() => query.removeEventListener('change', onChange));
+    }
 
     // Whatever opened the panel - the bubble itself, the hamburger menu, or My Orders - this is
     // where the very first greeting gets requested, exactly once per page session.
@@ -119,7 +165,9 @@ export class ChatbotWidget {
 
   onBubblePointerDown(event: PointerEvent): void {
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
-    const pos = this.ui.position();
+    // Lifted above the cart bar, the bubble is not where the stored position says it is - so a
+    // drag starts from where it actually sits on screen, or it would jump down under the finger.
+    const pos = this.liftedAboveCartBar() ? renderedPosition(event) : this.ui.position();
     this.dragStart = { pointerX: event.clientX, pointerY: event.clientY, right: pos.right, bottom: pos.bottom };
     this.dragMoved = false;
     this.lastPointer = { x: event.clientX, y: event.clientY };
@@ -134,6 +182,7 @@ export class ChatbotWidget {
 
     if (!this.dragMoved && Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
       this.dragMoved = true;
+      this.movedByCustomer.set(true);
       this.showRemoveTarget.set(true);
     }
 
@@ -183,6 +232,10 @@ export class ChatbotWidget {
     return url.startsWith('/login') || url.startsWith('/register');
   }
 
+  private isCartRoute(url: string): boolean {
+    return url === '/cart' || url.startsWith('/cart?') || url.startsWith('/cart#');
+  }
+
   private request(topic: string | undefined): void {
     this.busy.set(true);
     this.chatbot.ask({ topic }).subscribe({
@@ -211,4 +264,10 @@ export class ChatbotWidget {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+/** Where the bubble really is, as distances from the right and bottom edges of the viewport. */
+function renderedPosition(event: PointerEvent): { right: number; bottom: number } {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  return { right: window.innerWidth - rect.right, bottom: window.innerHeight - rect.bottom };
 }

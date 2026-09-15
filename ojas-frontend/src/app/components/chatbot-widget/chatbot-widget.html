@@ -5,7 +5,7 @@
       class="cw-bubble"
       [class.cw-bubble--open]="ui.open()"
       [style.right.px]="ui.position().right"
-      [style.bottom.px]="ui.position().bottom"
+      [style.bottom]="bubbleBottom()"
       (pointerdown)="onBubblePointerDown($event)"
       (pointermove)="onBubblePointerMove($event)"
       (pointerup)="onBubblePointerUp()"

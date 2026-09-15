@@ -7,7 +7,8 @@ import { of, throwError, Subject } from 'rxjs';
 import { ChatbotWidget } from './chatbot-widget';
 import { ChatbotService } from '../../services/chatbot.service';
 import { ChatbotUiService } from '../../services/chatbot-ui.service';
-import { ChatbotResponse } from '../../models/interfaces';
+import { CartService } from '../../services/cart.service';
+import { ChatbotResponse, Product } from '../../models/interfaces';
 
 // A trivial routed stub - the router just needs something to navigate to so NavigationEnd
 // actually fires and router.url actually updates, which an empty route table wouldn't do.
@@ -50,13 +51,14 @@ describe('ChatbotWidget', () => {
       imports: [ChatbotWidget],
       providers: [
         { provide: ChatbotService, useValue: chatbotServiceSpy },
-        provideRouter([
         // ChatbotUiService watches who is signed in, so the real AuthService comes along.
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideRouter([
           { path: 'login', component: BlankStubPage },
           { path: 'register', component: BlankStubPage },
           { path: 'products', component: BlankStubPage },
+          { path: 'cart', component: BlankStubPage },
         ]),
       ],
     });
@@ -312,6 +314,86 @@ describe('ChatbotWidget', () => {
       await router.navigateByUrl('/products');
       flush(fixture);
       expect(fixture.componentInstance.hiddenOnRoute()).toBeFalse();
+    });
+  });
+
+  // On a phone the cart page pins its "Proceed to Checkout" bar just above the bottom navigation,
+  // which is where the bubble sits by default - it covered the end of the button.
+  describe('on the cart page, clear of the checkout bar', () => {
+    const product: Product = {
+      id: 'p1',
+      name: 'Jowar Flour',
+      description: '',
+      price: 100,
+      discount: 0,
+      category: 'Everyday Flours',
+      imageUrl: '',
+      galleryImageUrls: [],
+      weight: '1kg',
+      isAvailable: true,
+      isListed: true,
+      stockQuantity: null,
+      lowStockThreshold: 5,
+      ingredients: '',
+      benefits: '',
+      storageInfo: '',
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    };
+
+    /** The runner's window width is whatever it is, so the phone/desktop split is set directly. */
+    async function open(url: string, options: { items: boolean; narrow: boolean }) {
+      if (options.items) TestBed.inject(CartService).addToCart(product);
+      await router.navigateByUrl(url);
+      const fixture = create();
+      fixture.componentInstance.narrowViewport.set(options.narrow);
+      flush(fixture);
+      return fixture;
+    }
+
+    const bubble = (fixture: ReturnType<typeof create>) =>
+      (fixture.nativeElement as HTMLElement).querySelector('.cw-bubble') as HTMLElement;
+
+    it('sits above the checkout bar on a phone with items in the cart', async () => {
+      const fixture = await open('/cart', { items: true, narrow: true });
+
+      expect(fixture.componentInstance.liftedAboveCartBar()).toBeTrue();
+      expect(bubble(fixture).style.bottom).toContain('--ojas-cart-bar-h');
+    });
+
+    it('keeps its usual spot on every other page', async () => {
+      const fixture = await open('/products', { items: true, narrow: true });
+
+      expect(fixture.componentInstance.liftedAboveCartBar()).toBeFalse();
+      expect(bubble(fixture).style.bottom).toBe(`${chatbotUi.position().bottom}px`);
+    });
+
+    it('keeps its usual spot on a wide screen, where the cart has no bar at the bottom', async () => {
+      const fixture = await open('/cart', { items: true, narrow: false });
+
+      expect(fixture.componentInstance.liftedAboveCartBar()).toBeFalse();
+    });
+
+    it('keeps its usual spot while the cart is empty and there is no bar to clear', async () => {
+      const fixture = await open('/cart', { items: false, narrow: true });
+
+      expect(fixture.componentInstance.liftedAboveCartBar()).toBeFalse();
+    });
+
+    it('goes where the customer drags it, even on the cart page, without jumping first', async () => {
+      const fixture = await open('/cart', { items: true, narrow: true });
+      const widget = fixture.componentInstance;
+      const el = bubble(fixture);
+      const liftedBottom = window.innerHeight - el.getBoundingClientRect().bottom;
+
+      widget.onBubblePointerDown({ ...pointerEvent(300, 700), currentTarget: el } as unknown as PointerEvent);
+      widget.onBubblePointerMove(pointerEvent(290, 690)); // 10px up and left - just past the threshold
+      widget.onBubblePointerUp();
+      flush(fixture);
+
+      expect(widget.liftedAboveCartBar()).toBeFalse();
+      // Picked up from where it actually was, not from the lower stored spot.
+      expect(chatbotUi.position().bottom).toBeCloseTo(liftedBottom + 10, 0);
     });
   });
 });
