@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { WalletService } from '../../services/wallet.service';
 import { MyOrders } from './my-orders';
@@ -101,6 +103,10 @@ describe('MyOrders', () => {
       imports: [MyOrders],
       providers: [
         provideRouter([]),
+        // The "need help?" link opens the shared chat, and ChatbotUiService watches who is signed
+        // in - so the real AuthService comes along.
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: UserService, useValue: userServiceSpy },
         { provide: OrderService, useValue: orderServiceSpy },
         { provide: ProductService, useValue: productServiceSpy },

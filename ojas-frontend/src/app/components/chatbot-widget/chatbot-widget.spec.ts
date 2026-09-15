@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError, Subject } from 'rxjs';
 import { ChatbotWidget } from './chatbot-widget';
 import { ChatbotService } from '../../services/chatbot.service';
@@ -49,6 +51,9 @@ describe('ChatbotWidget', () => {
       providers: [
         { provide: ChatbotService, useValue: chatbotServiceSpy },
         provideRouter([
+        // ChatbotUiService watches who is signed in, so the real AuthService comes along.
+        provideHttpClient(),
+        provideHttpClientTesting(),
           { path: 'login', component: BlankStubPage },
           { path: 'register', component: BlankStubPage },
           { path: 'products', component: BlankStubPage },

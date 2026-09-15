@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, effect, inject, signal, untracked } from '@angular/core';
+import { AuthService } from './auth.service';
 
 export interface ChatbotBubblePosition {
   /** Distance from the right/bottom viewport edges, in px - anchoring to edges (rather than
@@ -8,7 +9,8 @@ export interface ChatbotBubblePosition {
   bottom: number;
 }
 
-const REMOVED_KEY = 'ojas_chatbot_removed';
+/** Where removing the bubble used to be remembered. Only ever read now to delete it. */
+const LEGACY_REMOVED_KEY = 'ojas_chatbot_removed';
 
 // Matches header.scss's .mobile-bottom-nav breakpoint - below this width there's a fixed,
 // full-width bottom nav bar. The mobile default below is the user's own dragged position,
@@ -26,14 +28,19 @@ function defaultPosition(): ChatbotBubblePosition {
  * lets other entry points (the hamburger menu, a "need help?" link on My Orders) open the same
  * widget rather than each embedding their own copy.
  *
- * Only "removed" persists across page loads (via localStorage) - deliberately hiding the bubble
- * is a real choice worth remembering. Position is session-only: a drag lasts until the next full
- * page reload, then resets to the viewport-appropriate default, rather than a stale drag from a
- * different screen size (or an accidental one-off drag) sticking around forever.
+ * Nothing here outlives the page. Dragging the bubble onto the cross hides it until the next page
+ * load, or until someone signs in or out, and then it is back. It used to be remembered in
+ * localStorage, which turned one flick of a thumb into the chat disappearing for good: on a phone
+ * it is easy to do by accident while scrolling, the bubble is the way to reach support from most
+ * screens, and there was no way to bring it back short of clearing site data. Position is
+ * page-only for a similar reason - a drag lasts until the next reload, then resets to the
+ * viewport-appropriate default, rather than a stale drag from a different screen size sticking
+ * around forever.
  */
 @Injectable({ providedIn: 'root' })
 export class ChatbotUiService {
-  private readonly _removed = signal(this.loadRemoved());
+  private readonly auth = inject(AuthService);
+  private readonly _removed = signal(false);
   private readonly _open = signal(false);
   private readonly _position = signal<ChatbotBubblePosition>(defaultPosition());
 
@@ -41,10 +48,31 @@ export class ChatbotUiService {
   readonly open = this._open.asReadonly();
   readonly position = this._position.asReadonly();
 
+  constructor() {
+    // Retire the flag the old behaviour left behind. Without this, a phone that removed the
+    // bubble before this change would carry the key forever, doing nothing.
+    try {
+      localStorage.removeItem(LEGACY_REMOVED_KEY);
+    } catch {
+      // Storage unavailable (private browsing) - then there is nothing stored to retire either.
+    }
+
+    // Signing in or out brings the bubble back too. It may be a different person at the device
+    // now, and "I can't find the chat since I logged in" is exactly the complaint this avoids.
+    let lastUserId: string | null | undefined;
+    effect(() => {
+      const userId = this.auth.user()?.id ?? null;
+      if (lastUserId !== undefined && userId !== lastUserId) {
+        untracked(() => this._removed.set(false));
+      }
+      lastUserId = userId;
+    });
+  }
+
   /** Un-hides the bubble if it had been removed, then opens the panel - the entry point every
    * "talk to support" link outside the bubble itself should call. */
   openChat(): void {
-    if (this._removed()) this.setRemoved(false);
+    this._removed.set(false);
     this._open.set(true);
   }
 
@@ -53,29 +81,11 @@ export class ChatbotUiService {
   }
 
   remove(): void {
-    this.setRemoved(true);
+    this._removed.set(true);
     this._open.set(false);
   }
 
   setPosition(position: ChatbotBubblePosition): void {
     this._position.set(position);
-  }
-
-  private setRemoved(removed: boolean): void {
-    this._removed.set(removed);
-    try {
-      localStorage.setItem(REMOVED_KEY, removed ? '1' : '0');
-    } catch {
-      // Storage can be unavailable (private browsing, quota exceeded) - non-fatal, it just
-      // won't be remembered next visit.
-    }
-  }
-
-  private loadRemoved(): boolean {
-    try {
-      return localStorage.getItem(REMOVED_KEY) === '1';
-    } catch {
-      return false;
-    }
   }
 }

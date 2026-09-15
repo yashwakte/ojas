@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChatbotUiService } from './chatbot-ui.service';
+import { AuthService } from './auth.service';
 
 describe('ChatbotUiService', () => {
   let service: ChatbotUiService;
@@ -10,9 +14,14 @@ describe('ChatbotUiService', () => {
   const expectedDefaultPosition = () =>
     window.innerWidth <= 900 ? { right: 8, bottom: 70 } : { right: 20, bottom: 20 };
 
+  /** A second instance stands in for the next page load: nothing carries over but storage. */
+  const freshPageLoad = () => TestBed.runInInjectionContext(() => new ChatbotUiService());
+
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
     service = TestBed.inject(ChatbotUiService);
   });
 
@@ -56,12 +65,47 @@ describe('ChatbotUiService', () => {
     expect(service.open()).toBeFalse();
   });
 
-  it('remove persists across a fresh service instance (new "page load")', () => {
+  it('a removed bubble is back on the next page load', () => {
     service.remove();
 
-    const reloaded = new ChatbotUiService();
+    expect(freshPageLoad().removed()).toBeFalse();
+  });
 
-    expect(reloaded.removed()).toBeTrue();
+  it('forgets the "removed" flag an older version stored, so a phone that hid it gets it back', () => {
+    localStorage.setItem('ojas_chatbot_removed', '1');
+
+    const reloaded = freshPageLoad();
+
+    expect(reloaded.removed()).toBeFalse();
+    expect(localStorage.getItem('ojas_chatbot_removed')).toBeNull();
+  });
+
+  it('signing in brings a removed bubble back', () => {
+    TestBed.flushEffects();
+    service.remove();
+
+    TestBed.inject(AuthService).saveAuth({
+      id: 'u1',
+      fullName: 'Jane',
+      email: 'j@x.com',
+      phone: '9999999999',
+      role: 'customer',
+    });
+    TestBed.flushEffects();
+
+    expect(service.removed()).toBeFalse();
+  });
+
+  it('a token refresh for the same account does not undo a removal', () => {
+    const auth = TestBed.inject(AuthService);
+    auth.saveAuth({ id: 'u1', fullName: 'Jane', email: 'j@x.com', phone: '9999999999', role: 'customer', csrfToken: 'a' });
+    TestBed.flushEffects();
+    service.remove();
+
+    auth.saveAuth({ id: 'u1', fullName: 'Jane', email: 'j@x.com', phone: '9999999999', role: 'customer', csrfToken: 'b' });
+    TestBed.flushEffects();
+
+    expect(service.removed()).toBeTrue();
   });
 
   it('setPosition updates the live position', () => {
@@ -73,8 +117,6 @@ describe('ChatbotUiService', () => {
   it('a dragged position does NOT carry over to a fresh service instance (a real page refresh)', () => {
     service.setPosition({ right: 140, bottom: 260 });
 
-    const reloaded = new ChatbotUiService();
-
-    expect(reloaded.position()).toEqual(expectedDefaultPosition());
+    expect(freshPageLoad().position()).toEqual(expectedDefaultPosition());
   });
 });
