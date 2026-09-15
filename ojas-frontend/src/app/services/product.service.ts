@@ -201,7 +201,9 @@ export class ProductService {
     this._error.set(null);
   }
 
-  private normalizeProduct(product: Product): Product {
+  /** Public because a basket fetched from the server carries products too, and they must come out
+   * the same as every other product in the app - same defaults, same pack-shot revision. */
+  normalizeProduct(product: Product): Product {
     return {
       ...product,
       // Retired category names are translated here, at the one point every product enters the

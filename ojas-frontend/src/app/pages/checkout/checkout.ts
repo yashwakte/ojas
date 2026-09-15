@@ -177,7 +177,24 @@ export class Checkout implements OnInit {
         this.appliedCouponCode.set(null);
       }
     });
+
+    // Nothing to check out - but decided only once the selection has actually arrived. On a
+    // device the customer has not used before it comes from the server a moment after the page
+    // opens, and judging the empty list before then sent them away from a checkout that was about
+    // to fill. Checked once per visit: emptying the list on this page is handled where it happens.
+    effect(() => {
+      const pending = this.arrivalCheckPending();
+      const ready = this.checkoutService.ready();
+      const empty = this.checkoutService.items().length === 0;
+      if (!pending || !ready) return;
+
+      this.arrivalCheckPending.set(false);
+      if (empty) this.router.navigate(['/products']);
+    });
   }
+
+  /** Set by ngOnInit once this visit is a real checkout, and cleared by the first arrival check. */
+  private readonly arrivalCheckPending = signal(false);
 
   ngOnInit(): void {
     // Back from the payment page without paying, on a browser that rebuilt the app rather than
@@ -221,10 +238,9 @@ export class Checkout implements OnInit {
       error: () => {},
     });
 
-    // Redirect if nothing to checkout
-    if (this.checkoutService.items().length === 0) {
-      this.router.navigate(['/products']);
-    }
+    // Redirect if nothing to checkout - once the selection is known; see the arrival check in
+    // the constructor.
+    this.arrivalCheckPending.set(true);
   }
 
   get isAddressValid(): boolean {

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, effect, untracked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -63,6 +63,12 @@ export class Cart implements OnInit {
 
   selectedIds = signal<Set<string>>(new Set<string>());
 
+  /** Lines the selection has already made up its mind about. A line that turns up after the page
+   * opened - the customer's cart arriving from the server a moment later, on a device they have
+   * not used before - starts ticked, like everything that was there on arrival. One the customer
+   * has unticked stays unticked. */
+  private readonly seenIds = new Set<string>();
+
   selectedCount = computed(
     () => this.cartService.items().filter((i) => this.selectedIds().has(i.product.id)).length,
   );
@@ -87,9 +93,21 @@ export class Cart implements OnInit {
     public auth: AuthService,
     private checkoutService: CheckoutService,
     private router: Router,
-  ) {}
+  ) {
+    effect(() => {
+      const arrived = this.cartService
+        .items()
+        .map((i) => i.product.id)
+        .filter((id) => !this.seenIds.has(id));
+      if (arrived.length === 0) return;
+
+      arrived.forEach((id) => this.seenIds.add(id));
+      untracked(() => this.selectedIds.update((ids) => new Set([...ids, ...arrived])));
+    });
+  }
 
   ngOnInit(): void {
+    this.cartService.items().forEach((i) => this.seenIds.add(i.product.id));
     this.selectedIds.set(new Set(this.cartService.items().map((i) => i.product.id)));
   }
 

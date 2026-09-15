@@ -104,15 +104,20 @@ describe('Checkout', () => {
   let walletServiceSpy: jasmine.SpyObj<WalletService>;
   let walletBalance: ReturnType<typeof signal<number>>;
   let router: Router;
+  /** Whether the checkout selection has arrived - false while a signed-in customer's is still
+   * coming from the server. */
+  let ready: ReturnType<typeof signal<boolean>>;
 
   beforeEach(() => {
     items = signal<CheckoutItem[]>([{ product, quantity: 2 }]);
+    ready = signal(true);
     cartServiceSpy = jasmine.createSpyObj('CartService', ['removeFromCart']);
     checkoutServiceSpy = jasmine.createSpyObj(
       'CheckoutService',
       ['updateQuantity', 'removeItem', 'clear', 'addItem', 'mergeItems'],
       {
         items,
+        ready,
       },
     );
     orderServiceSpy = jasmine.createSpyObj('OrderService', ['placeOrder']);
@@ -217,6 +222,35 @@ describe('Checkout', () => {
     items.set([]);
     spyOn(router, 'navigate');
     create();
+    expect(router.navigate).toHaveBeenCalledWith(['/products']);
+  });
+
+  it('waits for the selection to arrive before deciding there is nothing to check out', () => {
+    // A signed-in customer on a device they have not used before: the selection is still on its
+    // way from the server when the page opens, so the list is empty for a moment.
+    items.set([]);
+    ready.set(false);
+    spyOn(router, 'navigate');
+    const fixture = create();
+    expect(router.navigate).not.toHaveBeenCalledWith(['/products']);
+
+    items.set([{ product, quantity: 1 }]);
+    ready.set(true);
+    fixture.detectChanges();
+
+    expect(router.navigate).not.toHaveBeenCalledWith(['/products']);
+    expect(fixture.componentInstance.totalAmount()).toBeGreaterThan(0);
+  });
+
+  it('still leaves once the selection has arrived and really is empty', () => {
+    items.set([]);
+    ready.set(false);
+    spyOn(router, 'navigate');
+    const fixture = create();
+
+    ready.set(true);
+    fixture.detectChanges();
+
     expect(router.navigate).toHaveBeenCalledWith(['/products']);
   });
 
