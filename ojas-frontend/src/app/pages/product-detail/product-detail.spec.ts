@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { ProductDetail } from './product-detail';
+import { SeoService } from '../../services/seo.service';
 import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
@@ -106,6 +107,57 @@ describe('ProductDetail', () => {
   it('should create and resolve the product from the id input', () => {
     const fixture = create();
     expect(fixture.componentInstance.product()).toEqual(product);
+  });
+
+  describe('what it tells search engines', () => {
+    let seo: SeoService;
+
+    beforeEach(() => {
+      seo = TestBed.inject(SeoService);
+      spyOn(seo, 'apply');
+    });
+
+    it('describes the product once it is in hand, under its readable address', () => {
+      productServiceSpy.getProduct.and.returnValue({ ...product, slug: 'bajra-flour' });
+
+      create('bajra-flour');
+
+      expect(seo.apply).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          title: 'Bajra Flour (Bajri Atta) 500 g – बाजरी पीठ | Ojas, Pune',
+          canonicalPath: '/products/bajra-flour',
+          type: 'product',
+        }),
+      );
+    });
+
+    it('replaces an id in the address with the slug, without leaving the id form in history', () => {
+      productServiceSpy.getProduct.and.returnValue({ ...product, slug: 'bajra-flour' });
+      const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+
+      create('p1');
+
+      expect(navigate).toHaveBeenCalledWith(['/products', 'bajra-flour'], { replaceUrl: true });
+      expect(seo.apply).not.toHaveBeenCalled();
+    });
+
+    it('keeps an address that is not a product out of the index', () => {
+      productServiceSpy.getProduct.and.returnValue(undefined);
+      productServiceSpy.isUnknown.and.returnValue(true);
+
+      create('no-such-product');
+
+      expect(seo.apply).toHaveBeenCalledWith(jasmine.objectContaining({ noindex: true }));
+    });
+
+    it('says nothing while it is still finding out whether the product exists', () => {
+      productServiceSpy.getProduct.and.returnValue(undefined);
+      productServiceSpy.isUnknown.and.returnValue(false);
+
+      create('bajra-flour');
+
+      expect(seo.apply).not.toHaveBeenCalled();
+    });
   });
 
   it('discountedPrice applies the discount percentage', () => {

@@ -4,6 +4,7 @@ import {
   DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -12,6 +13,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Params, Router, RouterLink, Scroll } from '@angular/router';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { filter } from 'rxjs';
+import { productsPageSeo } from '../../constants/product-seo';
+import { SeoService } from '../../services/seo.service';
 import { MatIconModule } from '@angular/material/icon';
 import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
@@ -127,6 +130,8 @@ export class Products {
   readonly sortOptions = SORT_OPTIONS;
   readonly skeletons = Array.from({ length: 8 }, (_, i) => i);
 
+  private readonly seo = inject(SeoService);
+
   readonly picking = this.orderEditDraft.picking;
   readonly justAdded = signal<string | null>(null);
 
@@ -176,6 +181,11 @@ export class Products {
       this.inStockOnly.set(params.get('stock') === '1');
       this.onOfferOnly.set(params.get('offer') === '1');
     });
+
+    // Each aisle is its own search result — "modak peeth", "upwas flours" — so the title,
+    // description and canonical address follow the open category. Sort and filter changes never
+    // reach the canonical, and a search (?q=) is kept out of the index altogether.
+    effect(() => this.seo.apply(productsPageSeo(this.selectedCategory(), this.query())));
 
     // Changing a filter is a router navigation, and the router answers every forward navigation
     // by scrolling to the top of the page. On a shop that is exactly wrong: someone half-way down

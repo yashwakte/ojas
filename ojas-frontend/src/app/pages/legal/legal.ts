@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Title, Meta } from '@angular/platform-browser';
 import { LEGAL_DOCUMENTS, POLICY_LAST_UPDATED, LegalDocument } from './legal-content';
+import { SeoService } from '../../services/seo.service';
 
 /**
  * Renders all four policy pages - Contact, Terms, Refunds and Cancellations, Privacy - from one
@@ -21,8 +21,7 @@ import { LEGAL_DOCUMENTS, POLICY_LAST_UPDATED, LegalDocument } from './legal-con
 })
 export class Legal {
   private readonly route = inject(ActivatedRoute);
-  private readonly titleService = inject(Title);
-  private readonly meta = inject(Meta);
+  private readonly seo = inject(SeoService);
 
   protected readonly lastUpdated = POLICY_LAST_UPDATED;
   protected readonly doc: LegalDocument;
@@ -33,7 +32,12 @@ export class Legal {
     // navigation between them and there is no in-place slug change to subscribe to.
     const slug = this.route.snapshot.data['slug'] as string;
     this.doc = LEGAL_DOCUMENTS[slug];
-    this.titleService.setTitle(`${this.doc.title} · Ojas`);
-    this.meta.updateTag({ name: 'description', content: this.doc.intro });
+    // The path is passed rather than read from the router: this runs while the router is still
+    // activating the route, before its idea of the current address has settled.
+    this.seo.apply({
+      title: `${this.doc.title} · Ojas`,
+      description: this.doc.intro,
+      canonicalPath: `/${slug}`,
+    });
   }
 }

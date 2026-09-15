@@ -6,7 +6,12 @@
       <mat-icon>chevron_right</mat-icon>
       <a routerLink="/products">Products</a>
       <mat-icon>chevron_right</mat-icon>
-      <span class="breadcrumb-category">{{ p.category }}</span>
+      <a
+        class="breadcrumb-category"
+        routerLink="/products"
+        [queryParams]="{ category: p.category }"
+        >{{ p.category }}</a
+      >
       <mat-icon>chevron_right</mat-icon>
       <span class="breadcrumb-current">{{ p.name }}</span>
     </nav>

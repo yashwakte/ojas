@@ -1,4 +1,10 @@
-import { ApplicationConfig, inject, provideBrowserGlobalErrorListeners } from '@angular/core';
+import {
+  ApplicationConfig,
+  Injector,
+  inject,
+  provideAppInitializer,
+  provideBrowserGlobalErrorListeners,
+} from '@angular/core';
 import {
   provideRouter,
   withComponentInputBinding,
@@ -17,6 +23,17 @@ import { StorefrontPreloadStrategy } from './preload-storefront';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    // SeoService keeps each page's title, description and canonical address right. It is fetched
+    // in its own chunk rather than the first download, because nothing it does is needed to draw
+    // the first screen — index.html already carries the home page's title and description — and
+    // that download is at its size budget. It describes whichever page is open when it arrives.
+    // Not awaited, so it never holds up the app; a failed fetch only means default tags.
+    provideAppInitializer(() => {
+      const injector = inject(Injector);
+      void import('./services/seo.service')
+        .then(({ SeoService }) => injector.get(SeoService))
+        .catch(() => undefined);
+    }),
     provideRouter(
       routes,
       withComponentInputBinding(),

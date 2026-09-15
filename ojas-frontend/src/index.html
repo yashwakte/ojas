@@ -2,14 +2,91 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Ojas - शुद्ध आहार...शुद्ध विचार</title>
+    <!-- The home page's title and description, and what every page carries until the app has
+         started. KEEP IN STEP WITH HOME_SEO in src/app/constants/seo.ts, which SeoService applies
+         once it runs. A link previewer (WhatsApp, Instagram) never runs it, so for a shared link
+         these lines ARE the preview. There is deliberately no canonical tag here: this file is
+         served for every address, and SeoService sets the right one per page. -->
+    <title>Ojas Aata – Stone-Ground Atta, Modak Peeth &amp; Upwas Flours in Pune</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Ojas - Premium quality flours and healthy food products. शुद्ध आहार...शुद्ध विचार"
+      content="Ojas (ओजस्) makes chakki-fresh jowar, bajra, ragi and rice flour, modak peeth, anarase pith and upwas flours in Pune since 2007. Order online, delivered in 1–2 days."
     />
     <meta name="theme-color" content="#F25A1A" />
+    <meta property="og:site_name" content="Ojas" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Ojas Aata – Stone-Ground Atta, Modak Peeth &amp; Upwas Flours in Pune"
+    />
+    <meta
+      property="og:description"
+      content="Ojas (ओजस्) makes chakki-fresh jowar, bajra, ragi and rice flour, modak peeth, anarase pith and upwas flours in Pune since 2007. Order online, delivered in 1–2 days."
+    />
+    <meta property="og:image" content="https://www.ojasaata.com/images/hero-banner-framed-1280.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:alt" content="The Ojas range of flours and food products" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Who Ojas is, for Google: the shop (with its return policy, declared once for every
+         product) and the website (so results show the site name "Ojas"). A data block, not a
+         script - it is never executed, so the CSP's script-src does not apply to it. The address,
+         phone and return window must match business.ts and the Refunds page. Delivery pricing is
+         deliberately absent: Google can only describe an Indian delivery area by country and
+         state, and delivery here is by distance within Pune. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "OnlineStore",
+            "@id": "https://www.ojasaata.com/#organization",
+            "name": "Ojas",
+            "alternateName": ["Ojas Aata", "ओजस्"],
+            "legalName": "Asha Marketing",
+            "url": "https://www.ojasaata.com/",
+            "logo": "https://www.ojasaata.com/images/logo.png",
+            "image": "https://www.ojasaata.com/images/hero-banner-framed-1280.jpg",
+            "description": "Ojas is a Pune food brand making stone-ground flours and traditional Maharashtrian food products since 2007 - jowar, bajra, ragi and rice flour, modak peeth, anarase pith and upwas flours - sold online with delivery across Pune and stocked in over 1,200 retail outlets.",
+            "slogan": "शुद्ध आहार… शुद्ध विचार",
+            "foundingDate": "2007",
+            "email": "wecare@ojasaata.com",
+            "telephone": "+91-8657781526",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "Near Chhatrapati Shivaji Maharaj Udyan, Madhuban Society Lane No. 9, Old Sanghvi",
+              "addressLocality": "Pune",
+              "addressRegion": "MH",
+              "postalCode": "411027",
+              "addressCountry": "IN"
+            },
+            "areaServed": { "@type": "City", "name": "Pune" },
+            "sameAs": ["https://www.instagram.com/ojas.aata/"],
+            "hasMerchantReturnPolicy": {
+              "@type": "MerchantReturnPolicy",
+              "applicableCountry": "IN",
+              "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+              "merchantReturnDays": 3,
+              "returnMethod": "https://schema.org/ReturnByMail",
+              "returnFees": "https://schema.org/FreeReturn",
+              "merchantReturnLink": "https://www.ojasaata.com/refunds"
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.ojasaata.com/#website",
+            "name": "Ojas",
+            "alternateName": ["Ojas Aata", "ojasaata.com"],
+            "url": "https://www.ojasaata.com/",
+            "inLanguage": "en-IN",
+            "publisher": { "@id": "https://www.ojasaata.com/#organization" }
+          }
+        ]
+      }
+    </script>
     <link rel="icon" type="image/png" href="images/logo.png" />
     <link rel="apple-touch-icon" href="images/logo.png" />
     <!-- THERE IS DELIBERATELY NO HERO PRELOAD HERE ANY MORE.

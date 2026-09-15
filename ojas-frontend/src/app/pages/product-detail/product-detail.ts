@@ -34,6 +34,8 @@ import {
 } from '../../models/interfaces';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
 import { packShotSrcset, thumbnailPackShot } from '../../constants/pack-shots';
+import { PRODUCT_NOT_FOUND_SEO, productPageSeo } from '../../constants/product-seo';
+import { SeoService } from '../../services/seo.service';
 
 /** How many products the "You May Also Like" rail carries at most. Enough that the rail is worth
  * scrolling on a wide screen and still a bounded number of images to fetch. */
@@ -55,6 +57,7 @@ export class ProductDetail {
   private auth = inject(AuthService);
   private router = inject(Router);
   private orderEditDraft = inject(OrderEditDraftService);
+  private seo = inject(SeoService);
   // Public so the template can show the "Deliver to" bar and open the picker.
   readonly deliveryAddress = inject(DeliveryAddressService);
   readonly picking = this.orderEditDraft.picking;
@@ -197,6 +200,24 @@ export class ProductDetail {
     afterRenderEffect(() => {
       this.similarProducts();
       this.onSimilarScroll();
+    });
+
+    // What search engines and link previews are told about this page — and, for a link that
+    // still carries the product's database id (the Business Profile's product links, anything
+    // shared before slugs existed), the readable address that replaces it.
+    effect(() => {
+      const key = this.id();
+      const p = this.product();
+      if (p) {
+        if (p.slug && key !== p.slug) {
+          // replaceUrl, so Back does not land on the id form and bounce straight forward again.
+          void this.router.navigate(['/products', p.slug], { replaceUrl: true });
+          return;
+        }
+        this.seo.apply(productPageSeo(p));
+      } else if (!this.resolving()) {
+        this.seo.apply(PRODUCT_NOT_FOUND_SEO);
+      }
     });
   }
 
