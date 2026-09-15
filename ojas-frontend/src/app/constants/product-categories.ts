@@ -9,7 +9,10 @@
  * cinnamon thinks to open a box called Powder Box.
  *
  * The replacement follows the way BigBasket and Blinkit group the same goods: everyday flours
- * apart from festive ones, a fasting aisle, a breakfast-and-health aisle, baking, and spices.
+ * apart from festive ones, a fasting aisle, a health-and-nutrition aisle, baking, and spices.
+ *
+ * That aisle was "Health & Breakfast" until September 2026. The owner renamed it: sattu, nachni
+ * satva and daliya are eaten at any meal, not only at breakfast, and the name said otherwise.
  * The API moves existing products across on boot (ProductService.RecategoriseCatalogueAsync), and
  * `normalizeCategory` below covers the gap until it has.
  *
@@ -20,7 +23,7 @@ export const PRODUCT_CATEGORIES = [
   'Everyday Flours',
   'Traditional & Festive',
   'Upwas',
-  'Health & Breakfast',
+  'Health & Nutrition',
   'Baking & Desserts',
   'Spices & Essentials',
 ] as const;
@@ -35,8 +38,9 @@ export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 export const LEGACY_CATEGORY_NAMES: Readonly<Record<string, ProductCategory>> = {
   Flour: 'Everyday Flours',
   'Premium Atta': 'Everyday Flours',
-  Grains: 'Health & Breakfast',
-  'Health Mix': 'Health & Breakfast',
+  Grains: 'Health & Nutrition',
+  'Health Mix': 'Health & Nutrition',
+  'Health & Breakfast': 'Health & Nutrition',
   'Powder Box': 'Baking & Desserts',
 };
 
@@ -81,10 +85,10 @@ export const PRODUCT_CATEGORY_DETAILS: ProductCategoryDetail[] = [
     blurb: 'Grain-free flours for your fasting days: rajgira, shingada, kuttu and more.',
   },
   {
-    name: 'Health & Breakfast',
-    icon: 'breakfast_dining',
+    name: 'Health & Nutrition',
+    icon: 'rice_bowl',
     desc: 'Sattu, ragi malt & daliya',
-    blurb: 'Chana sattu, sprouted ragi malt and daliya for a nourishing start to the day.',
+    blurb: 'Chana sattu, sprouted ragi malt and daliya: wholesome at breakfast, lunch or dinner, whenever you want them.',
   },
   {
     name: 'Baking & Desserts',

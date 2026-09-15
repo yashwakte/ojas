@@ -10,8 +10,10 @@ describe('product categories', () => {
   it('translates every retired category into one that exists', () => {
     expect(normalizeCategory('Flour')).toBe('Everyday Flours');
     expect(normalizeCategory('Premium Atta')).toBe('Everyday Flours');
-    expect(normalizeCategory('Grains')).toBe('Health & Breakfast');
-    expect(normalizeCategory('Health Mix')).toBe('Health & Breakfast');
+    expect(normalizeCategory('Grains')).toBe('Health & Nutrition');
+    expect(normalizeCategory('Health Mix')).toBe('Health & Nutrition');
+    // Renamed September 2026 - a link or a product still carrying the old name lands in the aisle.
+    expect(normalizeCategory('Health & Breakfast')).toBe('Health & Nutrition');
     expect(normalizeCategory('Powder Box')).toBe('Baking & Desserts');
 
     for (const target of Object.values(LEGACY_CATEGORY_NAMES)) {

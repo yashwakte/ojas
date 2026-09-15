@@ -374,7 +374,7 @@ export class ProductDetail {
           { icon: 'celebration', text: 'A Festival Favourite' },
           { icon: 'restaurant', text: 'Traditional Maharashtrian Recipes' },
         ];
-      case 'Health & Breakfast':
+      case 'Health & Nutrition':
         return [
           ...base,
           { icon: 'favorite', text: 'Nutrient-Rich Superfood' },

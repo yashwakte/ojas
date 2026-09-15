@@ -35,7 +35,7 @@ describe('Products', () => {
   const modak: Product = { ...base, id: 'p2', name: 'Modak Pith', price: 65, category: 'Traditional & Festive', createdAt: '2026-03-01' };
   const custard: Product = { ...base, id: 'p3', name: 'Custard Powder - Mango Flavour', price: 40, discount: 10, category: 'Baking & Desserts', weight: '100g' };
   const rajgira: Product = { ...base, id: 'p4', name: 'Rajgira (Amaranth) Flour', price: 65, category: 'Upwas', weight: '200g', stockQuantity: 0 };
-  const sattu: Product = { ...base, id: 'p5', name: 'Chana Sattu', price: 55, category: 'Health & Breakfast', weight: '200 g', createdAt: '2026-05-01' };
+  const sattu: Product = { ...base, id: 'p5', name: 'Chana Sattu', price: 55, category: 'Health & Nutrition', weight: '200 g', createdAt: '2026-05-01' };
   const anarasa: Product = { ...base, id: 'p6', name: 'Anarasa Flour', price: 115, category: 'Traditional & Festive' };
   const catalogue = [bajra, modak, custard, rajgira, sattu, anarasa];
 

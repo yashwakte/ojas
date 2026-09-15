@@ -193,11 +193,11 @@ const CATEGORY_SEO: Readonly<Record<ProductCategory, Pick<PageSeo, 'title' | 'de
       'Fasting-friendly उपवास flours: rajgira (राजगिरा), shingada (शिंगाडा), kuttu (कुट्टू) and ' +
       'upwas bhajani for Navratri, Ekadashi and every upwas day. Delivered across Pune in 1–2 days.',
   },
-  'Health & Breakfast': {
+  'Health & Nutrition': {
     title: 'Chana Sattu, Ragi Malt & Wheat Daliya Online in Pune | Ojas',
     description:
-      'Chana sattu, sprouted ragi malt (नाचणी सत्व) and wheat daliya for a nourishing start to the ' +
-      'day. From Ojas, delivered across Pune in 1–2 days.',
+      'Chana sattu, sprouted ragi malt (नाचणी सत्व) and wheat daliya, wholesome at any meal from ' +
+      'breakfast to dinner. From Ojas, delivered across Pune in 1–2 days.',
   },
   'Baking & Desserts': {
     title: 'Custard Powder & Corn Flour Online in Pune | Ojas',

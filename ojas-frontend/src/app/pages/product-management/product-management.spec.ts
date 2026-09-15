@@ -75,7 +75,7 @@ describe('ProductManagement', () => {
       description: 'A wonderful new product description',
       price: 50,
       discount: 5,
-      category: 'Health & Breakfast' as const,
+      category: 'Health & Nutrition' as const,
       imageUrl: '/images/new.jpg',
       galleryImageUrls: [],
       weight: '1kg',
@@ -99,7 +99,7 @@ describe('ProductManagement', () => {
   it('filteredProducts returns all when filter is All, or the matching category otherwise', () => {
     const { fixture } = create();
     expect(fixture.componentInstance.filteredProducts()).toEqual([product]);
-    fixture.componentInstance.selectCategoryFilter('Health & Breakfast');
+    fixture.componentInstance.selectCategoryFilter('Health & Nutrition');
     expect(fixture.componentInstance.filteredProducts()).toEqual([]);
   });
 
@@ -298,7 +298,7 @@ describe('ProductManagement', () => {
   it('widens the category filter when the saved product no longer matches it', () => {
     productServiceSpy.updateProduct.and.returnValue(of(product)); // product.category === 'Everyday Flours'
     const { fixture } = create();
-    fixture.componentInstance.selectCategoryFilter('Health & Breakfast');
+    fixture.componentInstance.selectCategoryFilter('Health & Nutrition');
     fixture.componentInstance.editProduct(product);
     fixture.componentInstance.formData.set(validFormData());
 

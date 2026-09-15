@@ -34,7 +34,7 @@ describe('product search', () => {
     product('Bhagar (Varai) Peeth', 'Upwas'),
     product('Modak Pith', 'Traditional & Festive'),
     product('Custard Powder - Mango Flavour', 'Baking & Desserts'),
-    product('Chana Sattu', 'Health & Breakfast', 'Roasted gram, with a little rice for body.'),
+    product('Chana Sattu', 'Health & Nutrition', 'Roasted gram, with a little rice for body.'),
   ];
   const find = (q: string) => searchProducts(catalogue, q).map((p) => p.name);
 

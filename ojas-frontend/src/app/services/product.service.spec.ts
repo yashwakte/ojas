@@ -26,7 +26,7 @@ describe('ProductService', () => {
     description: 'desc2',
     price: 200,
     discount: 10,
-    category: 'Health & Breakfast',
+    category: 'Health & Nutrition',
     imageUrl: '/images/ragi.jpg',
     galleryImageUrls: ['/images/g1.jpg'],
     weight: '1kg',
@@ -122,7 +122,7 @@ describe('ProductService', () => {
 
   it('getByCategory filters by category from the signal', () => {
     flushInitialLoad([rawProduct, fullProduct]);
-    expect(service.getByCategory('Health & Breakfast')).toEqual([fullProduct]);
+    expect(service.getByCategory('Health & Nutrition')).toEqual([fullProduct]);
     expect(service.getByCategory('Nope')).toEqual([]);
   });
 
@@ -135,7 +135,7 @@ describe('ProductService', () => {
   it('offers every category until the catalogue arrives, then only those with products', () => {
     expect(service.categoriesInUse().length).toBe(6);
     flushInitialLoad([rawProduct, fullProduct]);
-    expect(service.categoriesInUse()).toEqual(['Everyday Flours', 'Health & Breakfast']);
+    expect(service.categoriesInUse()).toEqual(['Everyday Flours', 'Health & Nutrition']);
   });
 
   it('getBestsellers issues a GET with a limit param and normalizes the response', () => {
