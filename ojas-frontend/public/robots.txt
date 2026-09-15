@@ -1,0 +1,20 @@
+# What crawlers may read on www.ojasaata.com.
+#
+# Kept out: sign-in, cart, checkout, account and staff screens - nothing a search result should
+# ever lead to. /api/ is deliberately NOT disallowed: Google draws each product page by calling
+# it, and blocking it here would leave every product page rendering empty for Google.
+
+User-agent: *
+Disallow: /admin
+Disallow: /delivery/
+Disallow: /checkout
+Disallow: /cart
+Disallow: /profile
+Disallow: /my-orders
+Disallow: /wallet
+Disallow: /login
+Disallow: /register
+Disallow: /accept-invite
+Allow: /
+
+Sitemap: https://www.ojasaata.com/sitemap.xml

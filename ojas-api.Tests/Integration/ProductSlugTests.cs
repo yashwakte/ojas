@@ -149,4 +149,28 @@ public class ProductSlugTests : IDisposable
         // A draft stays invisible to customers by address just as it does by id.
         (await client.GetAsync("/api/products/amla-candy-draft")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Sitemap_ListsTheListedProductsAndTheirAisles()
+    {
+        await BackfillAsync(
+            Make("Kokum Sherbet Mix"),
+            Make("Amla Candy Draft", listed: false, category: "Upwas"));
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/seo/sitemap.xml");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.ShouldBe("application/xml");
+        response.Headers.GetValues("Vercel-CDN-Cache-Control").Single().ShouldContain("max-age=3600");
+
+        var xml = await response.Content.ReadAsStringAsync();
+        xml.ShouldContain("<loc>https://www.ojasaata.com/products/kokum-sherbet-mix</loc>");
+        xml.ShouldContain("<image:loc>https://www.ojasaata.com/images/kokum-front.webp</image:loc>");
+        xml.ShouldContain("<loc>https://www.ojasaata.com/products?category=Traditional%20%26%20Festive</loc>");
+
+        // The draft is neither listed itself nor enough to open its aisle.
+        xml.ShouldNotContain("amla-candy-draft");
+        xml.ShouldNotContain("category=Upwas");
+    }
 }
