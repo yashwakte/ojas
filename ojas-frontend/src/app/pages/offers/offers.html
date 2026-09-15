@@ -1,0 +1,93 @@
+<section class="offers-page" aria-labelledby="offersTitle">
+  <header class="offers-head">
+    <span class="offers-eyebrow">
+      <mat-icon aria-hidden="true">local_offer</mat-icon>
+      Offers &amp; Deals
+    </span>
+    <h1 id="offersTitle">Save more on bigger orders</h1>
+    <p>
+      Choose a coupon at checkout, under <strong>Coupons &amp; Offers</strong>. One coupon per
+      order.
+    </p>
+  </header>
+
+  <ul class="offer-list">
+    @for (offer of couponOffers(); track offer.coupon.code; let i = $index) {
+      <li class="offer-card" [class.offer-card--ready]="offer.qualifies" [style.--i]="i">
+        <div class="offer-badge" aria-hidden="true">
+          {{ offer.coupon.discountPercentage }}%<span>OFF</span>
+        </div>
+        <div class="offer-body">
+          <h2>
+            {{ offer.coupon.discountPercentage }}% off orders of
+            ₹{{ offer.coupon.minCartValue | number: '1.0-0' }} or more
+          </h2>
+          <p class="offer-example">
+            Save ₹{{ offer.savingAtMinimum | number: '1.0-0' }} on a
+            ₹{{ offer.coupon.minCartValue | number: '1.0-0' }} order, and more on bigger ones.
+          </p>
+          <p class="offer-code">
+            Coupon <span class="offer-code-chip">{{ offer.coupon.code }}</span>
+          </p>
+          @if (offer.qualifies) {
+            <p class="offer-status offer-status--ready">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              Your cart qualifies
+            </p>
+          } @else if (offer.shortfall !== null) {
+            <p class="offer-status">
+              Add ₹{{ offer.shortfall | number: '1.0-2' }} more to your cart to use this
+            </p>
+          }
+        </div>
+      </li>
+    }
+
+    <li
+      class="offer-card offer-card--auto"
+      [class.offer-card--ready]="qualifiesForFreeDelivery()"
+      [style.--i]="couponOffers().length"
+    >
+      <div class="offer-badge offer-badge--ink" aria-hidden="true">
+        <mat-icon>local_shipping</mat-icon>
+      </div>
+      <div class="offer-body">
+        <h2>Free delivery on orders of ₹{{ freeDeliveryThreshold }} or more</h2>
+        <p class="offer-example">Applied automatically, no coupon needed.</p>
+        @if (qualifiesForFreeDelivery()) {
+          <p class="offer-status offer-status--ready">
+            <mat-icon aria-hidden="true">check_circle</mat-icon>
+            Your cart qualifies
+          </p>
+        } @else if (freeDeliveryShortfall(); as shortfall) {
+          <p class="offer-status">
+            Add ₹{{ shortfall | number: '1.0-2' }} more to your cart for free delivery
+          </p>
+        }
+      </div>
+    </li>
+  </ul>
+
+  <section class="offer-terms" aria-labelledby="offerTermsTitle">
+    <h2 id="offerTermsTitle">How it works</h2>
+    <ul>
+      <li>Coupons are never applied on their own. Pick one on the checkout page.</li>
+      <li>Only one coupon can be used on an order.</li>
+      <li>
+        The minimum is counted on the items in your order, after any product discount and before
+        delivery.
+      </li>
+      <li>Free delivery is added automatically once an order reaches ₹{{ freeDeliveryThreshold }}.</li>
+    </ul>
+  </section>
+
+  <div class="offer-actions">
+    <a routerLink="/products" class="offer-cta">
+      Shop products
+      <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+    </a>
+    @if (cartTotal() > 0) {
+      <a routerLink="/cart" class="offer-secondary">Go to cart</a>
+    }
+  </div>
+</section>

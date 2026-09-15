@@ -1,51 +1,60 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import {
+  COUPONS,
+  Coupon,
+  FREE_DELIVERY_CART_THRESHOLD,
+  calculateCouponDiscount,
+  roundMoney,
+} from '../../constants/pricing';
+import { CartService } from '../../services/cart.service';
 
+interface CouponOffer {
+  coupon: Coupon;
+  /** What the coupon is worth on an order that only just qualifies. A rupee figure is what a
+   * shopper compares, not a percentage. */
+  savingAtMinimum: number;
+  qualifies: boolean;
+  /** How much more the cart needs, when there is a cart and it is not there yet. */
+  shortfall: number | null;
+}
+
+/**
+ * The offers the shop actually runs. Everything on it is read from `constants/pricing.ts` - the
+ * same catalogue the checkout's coupon picker uses, which mirrors `OrderPricing.cs` on the server -
+ * so this page cannot advertise a coupon, a minimum or a percentage that checkout would not honour.
+ */
 @Component({
   selector: 'app-offers',
-  imports: [MatIconModule],
-  template: `
-    <div class="offers-page">
-      <div class="coming-soon">
-        <mat-icon>local_offer</mat-icon>
-        <h2>Offers &amp; Deals</h2>
-        <p>Exciting offers are on the way! Stay tuned.</p>
-      </div>
-    </div>
-  `,
-  styles: [
-    `
-      .offers-page {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 90px 24px 40px;
-      }
-      .coming-soon {
-        text-align: center;
-        color: var(--ojas-text-light);
-        mat-icon {
-          font-size: 4rem;
-          width: 4rem;
-          height: 4rem;
-          color: var(--ojas-ink-soft);
-          display: block;
-          margin: 0 auto 16px;
-        }
-        h2 {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: var(--ojas-text);
-          font-family: 'Poppins', sans-serif;
-          margin: 0 0 8px;
-        }
-        p {
-          margin: 0;
-          font-size: 0.95rem;
-        }
-      }
-    `,
-  ],
+  imports: [DecimalPipe, RouterLink, MatIconModule],
+  templateUrl: './offers.html',
+  styleUrl: './offers.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Offers {}
+export class Offers {
+  private readonly cart = inject(CartService);
+
+  readonly freeDeliveryThreshold = FREE_DELIVERY_CART_THRESHOLD;
+  readonly cartTotal = this.cart.totalAmount;
+
+  readonly couponOffers = computed<CouponOffer[]>(() => {
+    const total = this.cartTotal();
+    return COUPONS.map((coupon) => ({
+      coupon,
+      savingAtMinimum: calculateCouponDiscount(coupon, coupon.minCartValue).amount,
+      qualifies: total >= coupon.minCartValue,
+      shortfall: total > 0 && total < coupon.minCartValue ? roundMoney(coupon.minCartValue - total) : null,
+    }));
+  });
+
+  readonly qualifiesForFreeDelivery = computed(() => this.cartTotal() >= FREE_DELIVERY_CART_THRESHOLD);
+
+  readonly freeDeliveryShortfall = computed(() => {
+    const total = this.cartTotal();
+    return total > 0 && total < FREE_DELIVERY_CART_THRESHOLD
+      ? roundMoney(FREE_DELIVERY_CART_THRESHOLD - total)
+      : null;
+  });
+}

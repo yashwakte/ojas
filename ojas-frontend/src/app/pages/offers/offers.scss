@@ -1,0 +1,305 @@
+:host {
+  display: block;
+}
+
+.offers-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 96px 20px 56px;
+
+  @media (max-width: 900px) {
+    padding: 84px 16px calc(40px + var(--ojas-bottom-nav-clearance));
+  }
+}
+
+.offers-head {
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 10px 0 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: clamp(1.45rem, 3.4vw, 2rem);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--ojas-text);
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--ojas-text-light);
+
+    strong {
+      color: var(--ojas-text);
+      font-weight: 600;
+    }
+  }
+}
+
+.offers-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 999px;
+  background: var(--ojas-orange-bg);
+  color: var(--ojas-orange-dark);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.offer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+// The same ticket the checkout's coupon picker draws, so the offer advertised here is recognisably
+// the one they tap there.
+.offer-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  background: var(--ojas-white);
+  border: 1.5px dashed var(--ojas-ink-border);
+  border-radius: var(--ojas-radius-lg);
+  box-shadow: var(--ojas-shadow-sm);
+  transition:
+    border-color var(--ojas-transition),
+    background var(--ojas-transition);
+  animation: offerIn 0.5s var(--ojas-ease) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+
+  &--ready {
+    border-style: solid;
+    border-color: var(--ojas-orange);
+    background: var(--ojas-orange-bg);
+  }
+
+  @media (max-width: 480px) {
+    gap: 12px;
+    padding: 14px;
+  }
+}
+
+.offer-badge {
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--ojas-orange-glass);
+  box-shadow: var(--ojas-shadow-orange);
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  line-height: 1;
+
+  span {
+    margin-top: 2px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  &--ink {
+    background: var(--ojas-ink-glass);
+    box-shadow: var(--ojas-shadow-ink);
+  }
+
+  @media (max-width: 480px) {
+    width: 50px;
+    height: 50px;
+    font-size: 0.95rem;
+  }
+}
+
+.offer-body {
+  flex: 1;
+  min-width: 0;
+
+  h2 {
+    margin: 2px 0 4px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--ojas-text);
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.offer-example {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light);
+}
+
+.offer-code {
+  margin-top: 10px !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--ojas-text-light);
+}
+
+.offer-code-chip {
+  padding: 3px 10px;
+  border-radius: var(--ojas-radius-sm);
+  border: 1px dashed var(--ojas-orange);
+  background: var(--ojas-white);
+  color: var(--ojas-orange-dark);
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+
+.offer-status {
+  margin-top: 10px !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ojas-orange-dark);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  &--ready {
+    color: #1f7a3d;
+  }
+}
+
+.offer-terms {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border-radius: var(--ojas-radius);
+  background: var(--ojas-ink-bg);
+
+  h2 {
+    margin: 0 0 10px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 6px;
+  }
+
+  li {
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ojas-ink-soft);
+  }
+}
+
+.offer-actions {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.offer-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: var(--ojas-orange-glass);
+  box-shadow: var(--ojas-shadow-orange);
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  transition: transform var(--ojas-transition);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--ojas-orange-glass-hover);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange-dark);
+    outline-offset: 3px;
+  }
+}
+
+.offer-secondary {
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ojas-ink-border);
+  color: var(--ojas-text);
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--ojas-ink-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange-dark);
+    outline-offset: 3px;
+  }
+}
+
+@keyframes offerIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer-card {
+    animation: none;
+  }
+
+  .offer-cta {
+    transition: none;
+  }
+}
