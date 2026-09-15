@@ -876,9 +876,11 @@ export function deliveryBetweenLabel(placedAt = new Date()): string {
   return `${day(from)} - ${day(to)}`;
 }
 
-/** The pre-purchase promise: "Arriving in 1–2 days". */
+/** The promise made before anything is bought: "Delivery in 1–2 days". Deliberately not
+ * "Arriving", which describes a parcel already on its way - on a product page there is no order
+ * yet for anything to arrive from. Placed orders say "Arriving" (see deliveryEstimate). */
 export function deliveryPromiseLabel(): string {
-  return `Arriving in ${deliveryDaysLabel()}`;
+  return `Delivery in ${deliveryDaysLabel()}`;
 }
 
 /** The outer edge of that window as a date, so the promise is checkable rather than vague. */
@@ -914,7 +916,8 @@ export function deliveryEstimate(order: OrderResponse, now = new Date()): Delive
   }
   if (today === to.getTime()) return { label: 'Arriving today', delayed: false };
   if (today === from.getTime()) return { label: 'Arriving today or tomorrow', delayed: false };
-  return { label: `${deliveryPromiseLabel()}, by ${formatDay(to)}`, delayed: false };
+  // An order that exists is on its way, so here - unlike on a product page - it does "arrive".
+  return { label: `Arriving in ${deliveryDaysLabel()}, by ${formatDay(to)}`, delayed: false };
 }
 
 /** Orders placed before Cash on Delivery was retired. No new order can be one, but these still

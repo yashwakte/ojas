@@ -335,8 +335,10 @@ describe('ProductDetail', () => {
     const fixture = create();
 
     const rendered = fixture.nativeElement.textContent as string;
-    expect(deliveryPromiseLabel()).toBe('Arriving in 1–2 days');
-    expect(rendered).toContain('Arriving in 1–2 days');
+    // "Delivery in", not "Arriving in": nothing has been ordered yet, so nothing is on its way.
+    expect(deliveryPromiseLabel()).toBe('Delivery in 1–2 days');
+    expect(rendered).toContain('Delivery in 1–2 days');
+    expect(rendered).not.toContain('Arriving in');
     // Vague on its own, so the outer edge of the window is named as a real date too.
     expect(rendered).toContain(deliveryPromiseByDate());
   });
