@@ -140,7 +140,11 @@ export const routes: Routes = [
     canActivate: [deliveryGuard],
   },
   {
+    // A real "not found" page rather than a redirect home. Sending every unknown address to the
+    // home page is what Google calls a soft 404: a wrong or retired link answering with a real
+    // page, which turns each one into a duplicate of the home page.
     path: '**',
-    redirectTo: '',
+    loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),
+    data: { seo: 'not-found' satisfies RouteSeoKey },
   },
 ];
