@@ -1,0 +1,54 @@
+<section class="story" aria-label="Our story">
+  <!-- A stone chakki, turning very slowly behind the text. Decorative, inert. -->
+  <svg class="story-chakki" viewBox="0 0 200 200" aria-hidden="true">
+    <circle cx="100" cy="100" r="96" />
+    <circle cx="100" cy="100" r="64" />
+    <circle cx="100" cy="100" r="14" />
+    @for (a of grooves; track a) {
+      <line x1="100" y1="36" x2="100" y2="6" [attr.transform]="'rotate(' + a + ' 100 100)'" />
+    }
+  </svg>
+  <span class="story-glow" aria-hidden="true"></span>
+
+  <div class="story-inner">
+    <div class="story-lead">
+      <div class="story-tag" appScrollReveal revealVariant="pill"><span>OUR STORY</span></div>
+      <h2 class="story-title" appRevealWords="A farming family's *chakki,* ten years on."></h2>
+      <p class="story-motto" [appScrollReveal]="350" revealVariant="blur">
+        <span lang="mr">शुद्ध आहार… शुद्ध विचार</span>
+        <small>Pure food, pure thoughts.</small>
+      </p>
+    </div>
+
+    <div class="story-body">
+      <p [appScrollReveal]="120">
+        Ojas began as one small outlet in Pune, grinding fresh flour on a stone chakki for the
+        families in the lane. We come from farmers, so we still choose grain by handling it — and
+        still grind it slowly, so the taste and the goodness stay in.
+      </p>
+      <ul
+        class="story-stats"
+        appScrollReveal
+        revealVariant="children"
+        #storyStats="appScrollReveal"
+        aria-label="Ojas in numbers"
+      >
+        <li>
+          <b [appCountUp]="10" countUpSuffix="+" [countUpActive]="storyStats.visible()"></b>
+          <span>Years at the chakki</span>
+        </li>
+        <li>
+          <b [appCountUp]="1200" countUpSuffix="+" [countUpActive]="storyStats.visible()"></b>
+          <span>Retail outlets stock Ojas</span>
+        </li>
+        <li>
+          <b>Pune</b>
+          <span>Our home since day one</span>
+        </li>
+      </ul>
+      <a routerLink="/about" class="story-link" [appScrollReveal]="200">
+        Read our story <mat-icon>arrow_forward</mat-icon>
+      </a>
+    </div>
+  </div>
+</section>

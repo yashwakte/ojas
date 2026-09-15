@@ -12,11 +12,17 @@
 <!-- Everything below the first screen is built once the browser is idle, not with the page.
      On a budget phone over 3G, building every section down to the reviews before anything
      appeared held the main thread for seconds - the lag a customer feels as a page that will
-     not respond. The first screen (the hero with its posters, the categories) is drawn at once. -->
+     not respond. The first screen (the hero with its posters, the categories) is drawn at once.
+
+     Every block below makes an entrance as it scrolls into view - tags pop, headings rise word
+     by word, rows of cards slide in one after another. The motion is in styles.scss under
+     "ENTRANCE MOTION"; ScrollRevealDirective and RevealWordsDirective only say when. -->
 @defer (on idle) {
   <!-- CAMPAIGNS (each active campaign renders its own banner + featured row) -->
   @for (c of activeCampaigns(); track c.id) {
     <app-campaign-banner
+      appScrollReveal
+      revealVariant="window"
       [title]="c.title"
       [subtitle]="c.subtitle"
       [ctaText]="c.ctaText"
@@ -27,15 +33,18 @@
 
     <!-- CAMPAIGN FEATURED PRODUCTS -->
     @if (featuredProductsFor(c).length > 0) {
-      <section class="section products-section campaign-featured-section" [appScrollReveal]="0">
-        <div class="tag"><span>FEATURED</span></div>
-        <h2 class="stitle">Handpicked for {{ c.featuredSectionTitle || 'This Campaign' }}</h2>
+      <section class="section products-section campaign-featured-section">
+        <div class="tag" appScrollReveal revealVariant="pill"><span>FEATURED</span></div>
+        <h2
+          class="stitle"
+          [appRevealWords]="'Handpicked for ' + (c.featuredSectionTitle || 'This Campaign')"
+        ></h2>
 
         <div class="pscroll-wrap">
           <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFeatured.scrollBy({ left: -320, behavior: 'smooth' })">
             <mat-icon>chevron_left</mat-icon>
           </button>
-          <div class="pscroll coverflow" #pscrollFeatured appCoverflow>
+          <div class="pscroll coverflow" #pscrollFeatured appCoverflow appScrollReveal revealVariant="row">
             @for (p of featuredProductsFor(c); track p.id) {
               <app-product-card
                 class="cf-item"
@@ -58,16 +67,16 @@
   <!-- MOST LOVED — 3D coverflow: the centred card sits flat and full-size, its
        neighbours rotate away into the distance as you scroll, à la a card deck fanned in
        space rather than a flat list. -->
-  <section class="section products-section" [appScrollReveal]="0">
-    <div class="tag"><span>BESTSELLERS</span></div>
-    <h2 class="stitle">Most Loved by Our Customers</h2>
+  <section class="section products-section">
+    <div class="tag" appScrollReveal revealVariant="pill"><span>BESTSELLERS</span></div>
+    <h2 class="stitle" appRevealWords="Most Loved by Our *Customers*"></h2>
 
     @if (!bestsellersLoading() && bestsellers().length > 0) {
       <div class="pscroll-wrap">
         <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollBestsellers.scrollBy({ left: -320, behavior: 'smooth' })">
           <mat-icon>chevron_left</mat-icon>
         </button>
-        <div class="pscroll coverflow" #pscrollBestsellers appCoverflow>
+        <div class="pscroll coverflow" #pscrollBestsellers appCoverflow appScrollReveal revealVariant="row">
           @for (p of bestsellers(); track p.id) {
             <app-product-card
               class="cf-item"
@@ -84,40 +93,27 @@
         </button>
       </div>
     }
-    <div class="ctr">
+    <div class="ctr" [appScrollReveal]="150">
       <a routerLink="/products" class="btn-primary sm"
         >View All Products <mat-icon>arrow_forward</mat-icon></a
       >
     </div>
   </section>
 
-  <!-- WHY OJAS -->
-  <section class="section why-section" [appScrollReveal]="0">
-    <div class="tag"><span>WHY OJAS</span></div>
-    <div class="why-scroll">
-      @for (f of features; track f.title) {
-        <div class="why-card">
-          <div class="why-ico">
-            <mat-icon>{{ f.icon }}</mat-icon>
-          </div>
-          <h3>{{ f.title }}</h3>
-          <p>{{ f.desc }}</p>
-        </div>
-      }
-    </div>
-  </section>
+  <!-- OUR STORY — who is behind the flour (the owner's own account, as on the About page). -->
+  <app-home-story />
 
-  <!-- FESTIVE SAVINGS -->
+  <!-- FESTIVE SAVINGS — only while something is discounted. -->
   @if (festiveSavings().length > 0) {
-    <section class="section products-section festive-section" [appScrollReveal]="0">
-      <div class="tag"><span>LIMITED TIME</span></div>
-      <h2 class="stitle">Festive Savings</h2>
+    <section class="section products-section festive-section" appScrollReveal revealVariant="panel">
+      <div class="tag" appScrollReveal revealVariant="pill"><span>LIMITED TIME</span></div>
+      <h2 class="stitle" appRevealWords="Festive *Savings*"></h2>
 
       <div class="pscroll-wrap">
         <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollFestive.scrollBy({ left: -320, behavior: 'smooth' })">
           <mat-icon>chevron_left</mat-icon>
         </button>
-        <div class="pscroll coverflow" #pscrollFestive appCoverflow>
+        <div class="pscroll coverflow" #pscrollFestive appCoverflow appScrollReveal revealVariant="row">
           @for (p of festiveSavings(); track p.id) {
             <app-product-card
               class="cf-item"
@@ -134,50 +130,17 @@
         </button>
       </div>
     </section>
-  } @else if (everydayEssentials().length > 0) {
-    <!-- Nothing is on offer today. Rather than dropping a row and leaving a gap in the page,
-         the slot shows the staples — always in stock, and what most returning customers came
-         to reorder anyway. -->
-    <section class="section products-section festive-section" [appScrollReveal]="0">
-      <div class="tag"><span>KITCHEN STAPLES</span></div>
-      <h2 class="stitle">Everyday Essentials</h2>
-      <p class="section-subtitle">The flours that run out first — back in your kitchen in 1–2 days</p>
-
-      <div class="pscroll-wrap">
-        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollEssentials.scrollBy({ left: -320, behavior: 'smooth' })">
-          <mat-icon>chevron_left</mat-icon>
-        </button>
-        <div class="pscroll coverflow" #pscrollEssentials appCoverflow>
-          @for (p of everydayEssentials(); track p.id) {
-            <app-product-card
-              class="cf-item"
-              [product]="p"
-              [justAdded]="justAdded() === p.id"
-              (addToCart)="addToCart($event)"
-              (buyNow)="buyNow($event)"
-            />
-          }
-        </div>
-        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollEssentials.scrollBy({ left: 320, behavior: 'smooth' })">
-          <mat-icon>chevron_right</mat-icon>
-        </button>
-      </div>
-    </section>
   }
 
-  <!-- SHOP BY CATEGORY -->
-  <section class="section category-section" [appScrollReveal]="0">
-    <div class="tag"><span>CATEGORIES</span></div>
-    <h2 class="stitle">Shop by Category</h2>
+  <!-- SHOP BY CATEGORY — the index of the aisles below. Desktop only: on a phone the same index
+       is the chip rail right under the hero, and a second one here would just be repetition. -->
+  <section class="section category-section" appScrollReveal revealVariant="panel">
+    <div class="tag" appScrollReveal revealVariant="pill"><span>CATEGORIES</span></div>
+    <h2 class="stitle" appRevealWords="Shop by *Category*"></h2>
 
-    <div class="category-tiles">
-      @for (c of categoryTiles(); track c.name; let i = $index) {
-        <a
-          class="category-tile"
-          [routerLink]="['/products']"
-          [queryParams]="{ category: c.name }"
-          [appScrollReveal]="i * 70"
-        >
+    <div class="category-tiles" appScrollReveal revealVariant="children">
+      @for (c of categoryTiles(); track c.name) {
+        <a class="category-tile" [routerLink]="['/products']" [queryParams]="{ category: c.name }">
           <div class="category-tile-ico">
             <mat-icon>{{ c.icon }}</mat-icon>
           </div>
@@ -187,19 +150,37 @@
     </div>
   </section>
 
-  <!-- UPWAS SPECIALS -->
-  @if (upwasSpecials().length > 0) {
-    <section class="section products-section upwas-section" [appScrollReveal]="0">
-      <div class="tag"><span>FASTING SPECIALS</span></div>
-      <h2 class="stitle">Upwas Specials</h2>
-      <p class="section-subtitle">Pure, grain-free flours crafted for your fasting days</p>
+  <!-- THE AISLES — one section per category, each with its own products. -->
+  @for (a of aisles(); track a.name) {
+    <section class="aisle" [attr.data-tone]="a.tone" appScrollReveal revealVariant="panel">
+      <mat-icon class="aisle-mark" aria-hidden="true">{{ a.icon }}</mat-icon>
+
+      <header class="aisle-head">
+        <div class="aisle-head-text">
+          <p class="aisle-kicker" [appScrollReveal]="120" revealVariant="fade">
+            <span class="aisle-num">{{ a.number }}</span>
+            <span class="aisle-mr" lang="mr">{{ a.kicker }}</span>
+          </p>
+          <h2 class="aisle-title" [appRevealWords]="a.name" [revealDelay]="160"></h2>
+          <p class="aisle-blurb" [appScrollReveal]="300">{{ a.blurb }}</p>
+        </div>
+        <a
+          class="aisle-all"
+          [routerLink]="['/products']"
+          [queryParams]="{ category: a.name }"
+          [appScrollReveal]="380"
+          [attr.aria-label]="'See all ' + a.name"
+        >
+          See all <mat-icon>arrow_forward</mat-icon>
+        </a>
+      </header>
 
       <div class="pscroll-wrap">
-        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="pscrollUpwas.scrollBy({ left: -320, behavior: 'smooth' })">
+        <button type="button" class="pscroll-arrow prev" aria-label="Scroll left" (click)="aisleRow.scrollBy({ left: -320, behavior: 'smooth' })">
           <mat-icon>chevron_left</mat-icon>
         </button>
-        <div class="pscroll coverflow" #pscrollUpwas appCoverflow>
-          @for (p of upwasSpecials(); track p.id) {
+        <div class="pscroll coverflow" #aisleRow appCoverflow appScrollReveal revealVariant="row">
+          @for (p of a.products; track p.id) {
             <app-product-card
               class="cf-item"
               [product]="p"
@@ -209,20 +190,50 @@
             />
           }
         </div>
-        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="pscrollUpwas.scrollBy({ left: 320, behavior: 'smooth' })">
+        <button type="button" class="pscroll-arrow next" aria-label="Scroll right" (click)="aisleRow.scrollBy({ left: 320, behavior: 'smooth' })">
           <mat-icon>chevron_right</mat-icon>
         </button>
       </div>
     </section>
   }
 
+  <!-- THROUGH THE YEAR — which flour belongs to which festival. -->
+  @if (seasons().length > 0) {
+    <section class="section seasons-section">
+      <div class="tag" appScrollReveal revealVariant="pill"><span>THROUGH THE YEAR</span></div>
+      <h2 class="stitle" appRevealWords="A flour for every *festival*"></h2>
+      <p class="section-subtitle" [appScrollReveal]="250">
+        The Maharashtrian kitchen runs on its calendar. Here's what we grind for each season.
+      </p>
+
+      <app-season-rail [seasons]="seasons()" />
+    </section>
+  }
+
+  <!-- WHY OJAS -->
+  <section class="section why-section">
+    <div class="tag" appScrollReveal revealVariant="pill"><span>WHY OJAS</span></div>
+    <h2 class="stitle" appRevealWords="Ground the way *aaji* did it"></h2>
+    <div class="why-scroll" appScrollReveal revealVariant="children">
+      @for (f of features; track f.title) {
+        <div class="why-card">
+          <div class="why-ico">
+            <mat-icon>{{ f.icon }}</mat-icon>
+          </div>
+          <h3>{{ f.title }}</h3>
+          <p>{{ f.desc }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
   <!-- PROCESS -->
-  <section class="section process-section" [appScrollReveal]="0">
-    <div class="tag"><span>OUR PROCESS</span></div>
-    <h2 class="stitle">From Farm to Your Table</h2>
-    <div class="steps">
+  <section class="section process-section">
+    <div class="tag" appScrollReveal revealVariant="pill"><span>OUR PROCESS</span></div>
+    <h2 class="stitle" appRevealWords="From Farm to Your *Table*"></h2>
+    <div class="steps" appScrollReveal revealVariant="children">
       @for (s of processSteps; track s.title; let i = $index) {
-        <div class="step" [appScrollReveal]="i * 80">
+        <div class="step">
           <div class="snum">{{ i + 1 }}</div>
           <div class="sico">
             <mat-icon>{{ s.icon }}</mat-icon>
@@ -235,10 +246,10 @@
   </section>
 
   <!-- REVIEWS -->
-  <section class="section reviews-section" [appScrollReveal]="0">
-    <div class="tag"><span>REVIEWS</span></div>
-    <h2 class="stitle">Loved by Families</h2>
-    <div class="rscroll">
+  <section class="section reviews-section">
+    <div class="tag" appScrollReveal revealVariant="pill"><span>REVIEWS</span></div>
+    <h2 class="stitle" appRevealWords="Loved by *Families*"></h2>
+    <div class="rscroll" appScrollReveal revealVariant="row">
       @for (t of testimonials; track t.name) {
         <div class="rcard">
           <div class="rstars">
@@ -256,11 +267,16 @@
     </div>
   </section>
 
+  <!-- RIBBON — decorative, hidden from screen readers. -->
+  <app-home-ribbon [words]="ribbonWords" />
+
   <!-- CTA -->
-  <section class="cta-section" [appScrollReveal]="0">
-    <h2>Ready to taste the <span>purity</span>?</h2>
-    <p>Join families who trust Ojas for daily nutrition.</p>
-    <a routerLink="/register" class="btn-white">Create Account <mat-icon>arrow_forward</mat-icon></a>
+  <section class="cta-section">
+    <h2 appRevealWords="Ready to taste the *purity?*"></h2>
+    <p [appScrollReveal]="250">Join families who trust Ojas for daily nutrition.</p>
+    <a routerLink="/register" class="btn-white" [appScrollReveal]="380">
+      Create Account <mat-icon>arrow_forward</mat-icon>
+    </a>
   </section>
 } @placeholder {
   <div class="home-rest-placeholder" aria-hidden="true"></div>

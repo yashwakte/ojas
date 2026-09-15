@@ -1,0 +1,16 @@
+<div class="seasons" appScrollReveal revealVariant="row">
+  @for (s of seasons(); track s.festival) {
+    <a
+      class="season"
+      [attr.data-tone]="s.tone"
+      [routerLink]="['/products']"
+      [queryParams]="{ category: s.category }"
+    >
+      <span class="season-ico"><mat-icon>{{ s.icon }}</mat-icon></span>
+      <span class="season-mr" lang="mr">{{ s.marathi }}</span>
+      <strong class="season-name">{{ s.festival }}</strong>
+      <span class="season-dish">{{ s.dish }}</span>
+      <span class="season-made">{{ s.made }} <mat-icon>arrow_forward</mat-icon></span>
+    </a>
+  }
+</div>

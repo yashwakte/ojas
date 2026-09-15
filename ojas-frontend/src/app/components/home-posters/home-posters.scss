@@ -26,6 +26,10 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   touch-action: pan-y;
+  // The hero's arrival sets --posters-zoom: the picture settles back from a slight zoom while the
+  // card opens around it. Left alone, it is 1 and this does nothing.
+  scale: var(--posters-zoom, 1);
+  transition: scale 1.8s var(--reveal-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
 .poster {
@@ -245,6 +249,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .posters-deck {
+    transition: none;
+  }
+
   .poster {
     transition: none;
     transform: none;

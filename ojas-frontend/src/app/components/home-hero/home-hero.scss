@@ -49,6 +49,26 @@ $stage-2: #26190f;
     linear-gradient(180deg, $stage 0%, #160e08 100%);
 }
 
+// ===== ARRIVAL =====
+// The picture opens like a window: the card's edges draw back from a rounded inset to its full
+// size while the poster inside settles from a slight zoom (--posters-zoom, read by the posters
+// deck). Then the buttons rise, then the strip of figures, one after another - the same language
+// as every other entrance on the page ("ENTRANCE MOTION" in styles.scss).
+//
+// Nothing here changes the picture's opacity. The poster is the largest thing on the first
+// screen, and a browser does not count a transparent element as painted - fading it in would
+// push back the moment the page is considered loaded.
+.hero-card {
+  --posters-zoom: 1.12;
+  clip-path: inset(4% 6% 4% 6% round 28px);
+  transition: clip-path 1.3s var(--reveal-ease);
+}
+
+.hero--revealed .hero-card {
+  --posters-zoom: 1;
+  clip-path: inset(0 0 0 0 round 0px);
+}
+
 .hero-actions {
   display: flex;
   flex-direction: column;
@@ -66,12 +86,14 @@ $stage-2: #26190f;
   }
 }
 
+// After the window has mostly opened, so the buttons arrive on a settled picture.
 .hero--revealed .hero-actions > * {
   opacity: 1;
   transform: none;
+  transition-delay: 420ms;
 
   &:nth-child(2) {
-    transition-delay: 90ms;
+    transition-delay: 510ms;
   }
 }
 
@@ -181,6 +203,36 @@ $stage-2: #26190f;
     font-size: 0.6rem;
     line-height: 1.25;
     color: rgba(255, 241, 230, 0.62);
+  }
+}
+
+// The strip comes in under the opened window, then its four figures rise one after another. While
+// the window is still drawn in, an empty dark strip beneath it would read as a gap.
+.hero-stats {
+  opacity: 0;
+  transition: opacity 0.7s var(--reveal-ease) 300ms;
+
+  li {
+    opacity: 0;
+    translate: 0 14px;
+    transition:
+      opacity 0.6s var(--reveal-ease),
+      translate 0.75s var(--reveal-ease);
+  }
+}
+
+.hero--revealed .hero-stats {
+  opacity: 1;
+
+  li {
+    opacity: 1;
+    translate: 0 0;
+
+    @for $i from 1 through 4 {
+      &:nth-child(#{$i}) {
+        transition-delay: #{480 + $i * 80}ms;
+      }
+    }
   }
 }
 
@@ -329,7 +381,15 @@ $stage-2: #26190f;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-actions > * {
+  .hero-card {
+    --posters-zoom: 1;
+    clip-path: none;
+    transition: none;
+  }
+
+  .hero-actions > *,
+  .hero-stats,
+  .hero-stats li {
     transition: none;
   }
 

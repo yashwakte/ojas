@@ -9,7 +9,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { AuthService } from '../../services/auth.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { Product, CampaignBannerConfig } from '../../models/interfaces';
-import { PRODUCT_CATEGORIES } from '../../constants/product-categories';
+import { PRODUCT_CATEGORIES, ProductCategory } from '../../constants/product-categories';
 
 describe('Home', () => {
   const product: Product = {
@@ -35,6 +35,7 @@ describe('Home', () => {
   const upwasProduct: Product = { ...product, id: 'p2', category: 'Upwas', discount: 0 };
 
   let productsSignal: ReturnType<typeof signal<Product[]>>;
+  let categoriesSignal: ReturnType<typeof signal<readonly ProductCategory[]>>;
   let campaignsSignal: ReturnType<typeof signal<CampaignBannerConfig[]>>;
   let productServiceSpy: jasmine.SpyObj<ProductService>;
   let cartServiceSpy: jasmine.SpyObj<CartService>;
@@ -45,12 +46,13 @@ describe('Home', () => {
 
   beforeEach(() => {
     productsSignal = signal<Product[]>([product, upwasProduct]);
+    categoriesSignal = signal<readonly ProductCategory[]>(PRODUCT_CATEGORIES);
     campaignsSignal = signal<CampaignBannerConfig[]>([]);
 
     productServiceSpy = jasmine.createSpyObj('ProductService', ['getBestsellers'], {
       products: productsSignal,
       loading: signal(false),
-      categoriesInUse: signal(PRODUCT_CATEGORIES),
+      categoriesInUse: categoriesSignal,
     });
     productServiceSpy.getBestsellers.and.returnValue(of([product]));
 
@@ -99,9 +101,30 @@ describe('Home', () => {
     expect(fixture.componentInstance.festiveSavings()).toEqual([product]);
   });
 
-  it('upwasSpecials filters by Upwas category', () => {
+  it('aisles group the available products by category, in shop order, numbered', () => {
     const fixture = create();
-    expect(fixture.componentInstance.upwasSpecials()).toEqual([upwasProduct]);
+    const aisles = fixture.componentInstance.aisles();
+
+    // The 'Flour' product is filed under its new name, Everyday Flours.
+    expect(aisles.map((a) => a.name)).toEqual(['Everyday Flours', 'Upwas']);
+    expect(aisles[0].products).toEqual([product]);
+    expect(aisles[1].products).toEqual([upwasProduct]);
+    expect(aisles.map((a) => a.number)).toEqual(['01', '02']);
+    expect(aisles[1].kicker).toBe('उपवासासाठी');
+  });
+
+  it('aisles leave out a category with nothing available in it', () => {
+    productsSignal.set([product, { ...upwasProduct, isAvailable: false }]);
+    const fixture = create();
+    expect(fixture.componentInstance.aisles().map((a) => a.name)).toEqual(['Everyday Flours']);
+  });
+
+  it('seasons only link to aisles that have something in them', () => {
+    categoriesSignal.set(['Upwas']);
+    const fixture = create();
+    const seasons = fixture.componentInstance.seasons();
+    expect(seasons.length).toBe(1);
+    expect(seasons[0].category).toBe('Upwas');
   });
 
   const makeCampaign = (overrides: Partial<CampaignBannerConfig> = {}): CampaignBannerConfig => ({

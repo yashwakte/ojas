@@ -194,21 +194,20 @@ app-campaign-banner {
   margin: 0 20px;
   width: auto;
 }
-.products-section.upwas-section {
-  @include organic-blobs(var(--ojas-blob-sage-1), var(--ojas-blob-sage-2));
-  background: #fdf4ec;
-  border-radius: 24px;
-  margin: 0 20px;
-  width: auto;
-}
-
 // ===== SHOP BY CATEGORY =====
+// Desktop only - on a phone the chip rail under the hero is the same index.
 .category-section {
   @include organic-blobs(var(--ojas-blob-cream-1), var(--ojas-blob-rose-2));
+  display: none;
   background: #fffaf6;
   border-radius: 24px;
   margin: 0 20px;
   width: auto;
+
+  @media (min-width: 901px) {
+    display: block;
+    margin-top: 24px;
+  }
 }
 .category-tiles {
   display: flex;
@@ -356,47 +355,6 @@ app-campaign-banner {
 .products-section {
   @include organic-blobs(var(--ojas-blob-cream-2), var(--ojas-blob-sage-2));
   background: #fdfaf7;
-}
-
-// Loading & Error States
-.loading-state,
-.error-state {
-  text-align: center;
-  padding: 48px 20px;
-}
-.loading-state p,
-.error-state p {
-  font-size: 0.88rem;
-  color: var(--ojas-text-light);
-  margin-top: 12px;
-}
-.error-state {
-  mat-icon {
-    font-size: 48px;
-    width: 48px;
-    height: 48px;
-    color: var(--ojas-text-light);
-    opacity: 0.5;
-  }
-  button {
-    margin-top: 16px;
-    cursor: pointer;
-    border: none;
-  }
-}
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--ojas-ink-bg);
-  border-top-color: var(--ojas-ink-soft);
-  border-radius: 50%;
-  margin: 0 auto;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 // Horizontal-scroll product carousel: ~2.2 compact cards on mobile, 4 cards at desktop width.
@@ -680,9 +638,8 @@ app-campaign-banner {
     color: #fff;
     margin-bottom: 8px;
     line-height: 1.35;
-    span {
-      color: #e8c9a0;
-    }
+    text-wrap: balance;
+    --rw-accent: linear-gradient(100deg, #f7c98b 0%, #e8c9a0 100%);
   }
   p {
     color: rgba(255, 255, 255, 0.5);
@@ -797,5 +754,171 @@ app-campaign-banner {
   }
   .cta-section h2 {
     font-size: 2.1rem;
+  }
+}
+
+// ===== HEADINGS =====
+// Headings are now split into words (RevealWordsDirective), so let the browser balance the
+// lines rather than leave one word stranded on the last.
+.stitle {
+  text-wrap: balance;
+}
+.why-section .stitle {
+  margin-top: 4px;
+}
+
+// ===== THE AISLES =====
+// One room per category. The tones rotate so a run of five reads as a sequence of rooms, and
+// each carries its aisle's icon, very large and very faint, as a watermark.
+.aisle {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin: 14px 12px 0;
+  padding: 30px 0 14px;
+  border-radius: 28px;
+  background: var(--aisle-bg);
+
+  &[data-tone='cream'] {
+    --aisle-bg: linear-gradient(170deg, #fffaf4 0%, #fdecd9 100%);
+    --aisle-ink: #b4441f;
+  }
+  &[data-tone='sage'] {
+    --aisle-bg: linear-gradient(170deg, #f8fbf4 0%, #e5eed8 100%);
+    --aisle-ink: #4a6a2c;
+  }
+  &[data-tone='rose'] {
+    --aisle-bg: linear-gradient(170deg, #fff8f6 0%, #fbe1d8 100%);
+    --aisle-ink: #a13d2b;
+  }
+}
+.aisle-mark {
+  position: absolute;
+  z-index: -1;
+  top: -22px;
+  right: -26px;
+  width: 170px !important;
+  height: 170px !important;
+  font-size: 170px !important;
+  color: var(--aisle-ink);
+  opacity: 0.07;
+  rotate: -12deg;
+  pointer-events: none;
+}
+.aisle-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 20px;
+}
+.aisle-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.aisle-num {
+  padding: 2px 9px;
+  border: 1px solid currentColor;
+  border-radius: 50px;
+  color: var(--aisle-ink);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  opacity: 0.75;
+}
+.aisle-mr {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--aisle-ink);
+}
+.aisle-title {
+  margin: 0 0 8px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 800;
+  font-size: 1.62rem;
+  line-height: 1.14;
+  letter-spacing: -0.5px;
+  color: #2b1d14;
+}
+.aisle-blurb {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--ojas-text-light);
+}
+.aisle-all {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px 9px 18px;
+  border-radius: 50px;
+  background: #2b1d14;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    gap 0.35s var(--ojas-ease),
+    background 0.2s ease;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+  &:hover {
+    gap: 12px;
+    background: #000;
+  }
+}
+.aisle .pscroll.coverflow {
+  padding-top: 22px;
+}
+
+// ===== THROUGH THE YEAR =====
+.seasons-section {
+  @include organic-blobs(var(--ojas-blob-cream-1), var(--ojas-blob-sage-1));
+  background: #fffdfb;
+  padding-right: 0;
+}
+// ===== AISLES & SEASONS: LARGER SCREENS =====
+@media (min-width: 900px) {
+  .aisle {
+    margin: 22px 32px 0;
+    padding: 50px 0 26px;
+    border-radius: 36px;
+  }
+  .aisle-mark {
+    top: -40px;
+    right: -30px;
+    width: 300px !important;
+    height: 300px !important;
+    font-size: 300px !important;
+  }
+  .aisle-head {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 48px;
+    box-sizing: content-box;
+  }
+  .aisle-title {
+    font-size: 2.5rem;
+  }
+  .aisle-all {
+    align-self: auto;
+  }
+}
+
+@media (min-width: 960px) {
+  .seasons-section {
+    padding-right: 48px;
   }
 }

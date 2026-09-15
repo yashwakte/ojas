@@ -1,0 +1,204 @@
+// The chakki behind the words turns - slowly enough that it reads as the mill at rest.
+:host {
+  display: block;
+}
+
+.story {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin: 14px 12px 0;
+  padding: 42px 22px 38px;
+  border-radius: 28px;
+  background: radial-gradient(120% 90% at 0% 0%, #3d2b1f 0%, #1e1611 58%, #161110 100%);
+  color: #f6ede4;
+  --rw-accent: linear-gradient(100deg, #f7c98b 0%, #f25a1a 100%);
+}
+
+.story-tag {
+  margin-bottom: 10px;
+
+  span {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 50px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f7c98b;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+  }
+}
+
+.story-chakki {
+  position: absolute;
+  z-index: -1;
+  width: 300px;
+  height: 300px;
+  right: -120px;
+  top: -80px;
+  fill: none;
+  stroke: rgba(232, 201, 160, 0.14);
+  stroke-width: 1.2;
+  animation: chakkiTurn 90s linear infinite;
+}
+
+.story-glow {
+  position: absolute;
+  z-index: -1;
+  width: 380px;
+  height: 380px;
+  left: -140px;
+  bottom: -190px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 90, 26, 0.34) 0%, rgba(242, 90, 26, 0) 66%);
+  animation: storyDrift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.story-inner {
+  display: grid;
+  gap: 26px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.story-title {
+  margin: 0 0 16px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 800;
+  font-size: 1.95rem;
+  line-height: 1.12;
+  letter-spacing: -0.6px;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.story-motto {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  span {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #f7c98b;
+  }
+  small {
+    font-size: 0.8rem;
+    letter-spacing: 0.3px;
+    color: rgba(246, 237, 228, 0.6);
+  }
+}
+
+.story-body > p {
+  margin: 0 0 22px;
+  font-size: 0.93rem;
+  line-height: 1.75;
+  color: rgba(246, 237, 228, 0.8);
+}
+
+.story-stats {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  b {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  span {
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: rgba(246, 237, 228, 0.62);
+  }
+}
+
+.story-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #f7c98b;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    transition: translate 0.35s var(--ojas-ease);
+  }
+  &:hover mat-icon {
+    translate: 5px 0;
+  }
+}
+
+@keyframes chakkiTurn {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes storyDrift {
+  to {
+    translate: 90px -60px;
+    scale: 1.15;
+  }
+}
+
+@media (min-width: 900px) {
+  .story {
+    margin: 28px 32px 0;
+    padding: 84px 64px;
+    border-radius: 36px;
+  }
+  .story-inner {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 64px;
+    align-items: end;
+  }
+  .story-title {
+    font-size: 3.1rem;
+  }
+  .story-motto span {
+    font-size: 1.6rem;
+  }
+  .story-chakki {
+    width: 580px;
+    height: 580px;
+    right: -170px;
+    top: -150px;
+  }
+  .story-stats {
+    b {
+      font-size: 1.85rem;
+    }
+    span {
+      font-size: 0.76rem;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-chakki,
+  .story-glow {
+    animation: none;
+  }
+}

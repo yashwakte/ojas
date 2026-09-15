@@ -330,24 +330,203 @@ body.intro-locked {
 // transform and is the difference between content sliding up a page and content standing up
 // off it. The perspective lives in the transform itself rather than on a parent, so any
 // element anywhere can carry the class without its ancestors needing to know.
-.reveal {
+// ===== ENTRANCE MOTION =====
+// Measured off zerotoone.ai in a real browser (September 2026), the site the owner held up as
+// the bar: blocks rise about 40px as they fade in, headlines arrive word by word from behind a
+// mask, display type sharpens out of a blur, and cards follow one another in a short stagger -
+// all on long ease-outs, nothing rotating or bouncing. ScrollRevealDirective and
+// RevealWordsDirective decide when; this decides how.
+//
+// Keyframe animations, not transitions, deliberately. Cards and tiles carry their own
+// `transition` for hover, and a transition declared here loses to any of them - which is how the
+// category tiles and process steps used to pop in with no animation at all. An `animation` does
+// not compete with a `transition`. Only `from` frames, filled backwards: once an entrance ends,
+// the element is back on its own styles, so a card that dims itself (say, out of stock) is not
+// pinned at full opacity by a finished animation. And `translate`/`scale` rather than
+// `transform`, so an entrance composes with whatever owns transform on the same element - the
+// coverflow's tilt, a hover lift - instead of fighting it for the property.
+:root {
+  --reveal-rise: 42px;
+  --reveal-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 600px) {
+  :root {
+    --reveal-rise: 28px;
+  }
+}
+
+.reveal:not(.reveal-group):not(.reveal-visible),
+.reveal-group:not(.reveal-visible) > * {
   opacity: 0;
-  transform: perspective(1200px) translate3d(0, 34px, -60px) rotateX(7deg) scale(0.975);
-  transform-origin: 50% 100%;
-  transition:
-    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
 }
-.reveal-visible {
-  opacity: 1;
-  transform: perspective(1200px) translate3d(0, 0, 0) rotateX(0deg) scale(1);
+
+.reveal-visible:not(.reveal-group),
+.reveal-group.reveal-visible > * {
+  animation: revealUp 1.05s var(--reveal-ease) var(--reveal-delay, 0ms) backwards;
 }
+.reveal-group.reveal-visible > * {
+  animation-duration: 0.95s;
+  animation-delay: calc(var(--reveal-delay, 0ms) + var(--reveal-i, 0) * 80ms);
+}
+.reveal-visible[data-reveal='fade'] {
+  animation-name: revealFade;
+  animation-duration: 1.2s;
+}
+.reveal-visible[data-reveal='blur'] {
+  animation-name: revealBlur;
+  animation-duration: 1.3s;
+}
+.reveal-visible[data-reveal='panel'] {
+  animation-name: revealPanel;
+  animation-duration: 1.15s;
+}
+.reveal-visible[data-reveal='pill'] {
+  animation-name: revealPill;
+  animation-duration: 0.8s;
+}
+.reveal-visible[data-reveal='row'] > * {
+  animation-name: revealSlide;
+}
+// A campaign banner: its picture opens like a window and settles back from a slight zoom, then
+// whatever is laid over it (a title, the button) rises in once the window is open. The same
+// arrival the hero's posters make at the top of the page.
+.reveal-visible[data-reveal='window'] {
+  animation-name: revealWindow;
+  animation-duration: 1.25s;
+}
+.reveal-visible[data-reveal='window'] img {
+  animation: revealZoom 1.8s var(--reveal-ease) var(--reveal-delay, 0ms) backwards;
+}
+.reveal-visible[data-reveal='window'] .campaign-banner-inner > * {
+  animation: revealUp 0.9s var(--reveal-ease) calc(var(--reveal-delay, 0ms) + 450ms) backwards;
+}
+
+@keyframes revealUp {
+  from {
+    opacity: 0;
+    translate: 0 var(--reveal-rise);
+  }
+}
+@keyframes revealFade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes revealBlur {
+  from {
+    opacity: 0;
+    translate: 0 calc(var(--reveal-rise) * 0.5);
+    filter: blur(14px);
+  }
+}
+@keyframes revealPanel {
+  from {
+    opacity: 0;
+    translate: 0 calc(var(--reveal-rise) * 1.2);
+    scale: 0.965;
+  }
+}
+@keyframes revealPill {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+}
+@keyframes revealSlide {
+  from {
+    opacity: 0;
+    translate: calc(var(--reveal-rise) * 1.6) 0;
+  }
+}
+@keyframes revealWindow {
+  from {
+    opacity: 0;
+    clip-path: inset(6% 7% 6% 7% round 28px);
+    translate: 0 calc(var(--reveal-rise) * 0.6);
+  }
+}
+@keyframes revealZoom {
+  from {
+    scale: 1.14;
+  }
+}
+
+// Words of a RevealWordsDirective heading. Each word sits in a mask that clips it, and rises
+// from below the mask's edge - from 140% of its height, so not even the top of a letter shows in
+// the mask's padding before it moves. Poppins draws well outside its own line box - the tail of a y or a
+// j hangs about a quarter of an em under the baseline - so the mask is padded out that far and
+// pulled back by the same margin, which leaves the line exactly where it was. At 0.16em it
+// sliced the bottom off the headings in production.
+.rw {
+  display: inline-block;
+  overflow: hidden;
+  overflow: clip;
+  vertical-align: top;
+  padding: 0.12em 0.05em 0.32em;
+  margin: -0.12em -0.05em -0.32em;
+}
+.rw-i {
+  display: inline-block;
+}
+.rw-host:not(.rw-in) .rw-i {
+  opacity: 0;
+  translate: 0 140%;
+}
+.rw-in .rw-i {
+  animation: rwRise 1s var(--reveal-ease) calc(var(--rw-delay, 0ms) + var(--rw-i, 0) * 65ms) backwards;
+}
+// The blur is for large screens only. On a budget phone a filter on every word of every heading
+// is paint work the rise alone does not need.
+@media (min-width: 768px) {
+  .rw-in .rw-i {
+    animation-name: rwRiseBlur;
+  }
+}
+@keyframes rwRise {
+  from {
+    opacity: 0;
+    translate: 0 140%;
+  }
+}
+@keyframes rwRiseBlur {
+  from {
+    opacity: 0;
+    translate: 0 140%;
+    filter: blur(8px);
+  }
+}
+// The accented word of a heading. A section can restyle it through --rw-accent.
+//
+// `background-clip: text` paints a letter only where it overlaps the element's own box, and
+// Poppins' letters overflow that box top and bottom - so without this padding the parts of
+// "festival" or "aaji" outside the line box were simply not drawn. Padded to take in the whole
+// letter, and pulled back by the same margin so nothing moves.
+.rw-accent {
+  padding: 0.12em 0.05em 0.32em;
+  margin: -0.12em -0.05em -0.32em;
+  background: var(--rw-accent, linear-gradient(100deg, #f25a1a 0%, #b8391a 100%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
+  .reveal:not(.reveal-group):not(.reveal-visible),
+  .reveal-group:not(.reveal-visible) > * {
     opacity: 1;
-    transform: none;
-    transition: none;
+  }
+  .reveal-visible:not(.reveal-group),
+  .reveal-group.reveal-visible > *,
+  .reveal-visible[data-reveal='window'] img,
+  .reveal-visible[data-reveal='window'] .campaign-banner-inner > * {
+    animation: none;
+  }
+  .rw-host:not(.rw-in) .rw-i {
+    opacity: 1;
+    translate: none;
+  }
+  .rw-in .rw-i {
+    animation: none;
   }
 }
 

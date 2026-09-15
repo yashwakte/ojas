@@ -52,12 +52,18 @@ export class HomeHero {
    */
   readonly rangeSize = 30;
 
-  /** The buttons have arrived. They wait their turn behind the intro and any welcome overlay. */
+  /**
+   * The hero has made its entrance: the picture's window has opened and the buttons and figures
+   * are in (see "ARRIVAL" in home-hero.scss). It waits its turn behind the intro curtain and the
+   * first-visit greeting.
+   */
   readonly revealed = signal(false);
 
   /** True once the browser has painted; nothing may animate before this. */
   private readonly painted = signal(false);
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** Whether something else had the screen first, so there is a moment to hand over from. */
+  private waited = false;
 
   /**
    * Listed products only. An admin browsing the shop also receives unpriced drafts, and those are
@@ -75,9 +81,11 @@ export class HomeHero {
   constructor() {
     afterNextRender(() => this.painted.set(true));
 
-    // THE HANDOVER. The branded intro curtain, the first-visit greeting, the post-auth welcome
-    // overlay and this hero all want the first two seconds of the page. So the hero goes last:
-    // whoever is on screen owns the moment and hands it on when they are done.
+    // THE HANDOVER. The branded intro curtain, the first-visit greeting and this hero all want
+    // the first seconds of the page. So the hero goes last: whoever is on screen owns the
+    // moment and hands it on when they are done. When nobody else was on screen there is nothing
+    // to hand over from, and the hero opens at once - a returning customer should not sit looking
+    // at a half-open window for a third of a second.
     effect(() => {
       if (!this.painted()) return;
 
@@ -86,19 +94,22 @@ export class HomeHero {
         return;
       }
 
-      const someoneElsesTurn =
-        !this.welcome.introDone() || !!this.welcome.celebration() || this.welcome.stageHeld();
+      const someoneElsesTurn = !this.welcome.introDone() || this.welcome.stageHeld();
 
       if (someoneElsesTurn) {
+        this.waited = true;
         if (!this.revealed()) this.cancel();
         return;
       }
 
       if (this.revealed() || this.timer) return;
-      this.timer = setTimeout(() => {
-        this.timer = null;
-        this.revealed.set(true);
-      }, HANDOVER_MS);
+      this.timer = setTimeout(
+        () => {
+          this.timer = null;
+          this.revealed.set(true);
+        },
+        this.waited ? HANDOVER_MS : 0,
+      );
     });
 
     inject(DestroyRef).onDestroy(() => this.cancel());

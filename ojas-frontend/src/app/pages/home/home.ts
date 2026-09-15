@@ -6,12 +6,48 @@ import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
 import { CampaignBannerConfig, Product } from '../../models/interfaces';
-import { PRODUCT_CATEGORY_DETAILS } from '../../constants/product-categories';
+import {
+  PRODUCT_CATEGORY_DETAILS,
+  ProductCategory,
+  ProductCategoryDetail,
+  normalizeCategory,
+} from '../../constants/product-categories';
 import { ProductCard } from '../../components/product-card/product-card';
 import { ScrollRevealDirective } from '../../directives/scroll-reveal.directive';
+import { RevealWordsDirective } from '../../directives/reveal-words.directive';
 import { CoverflowDirective } from '../../directives/coverflow.directive';
 import { CampaignBanner } from '../../components/campaign-banner/campaign-banner';
 import { HomeHero } from '../../components/home-hero/home-hero';
+import { HomeStory } from '../../components/home-story/home-story';
+import { SeasonRail } from '../../components/season-rail/season-rail';
+import { HomeRibbon } from '../../components/home-ribbon/home-ribbon';
+import { SEASONS, Season } from '../../constants/seasons';
+
+/**
+ * A line of Marathi over each aisle: what the aisle is *for*, in the words a customer here uses
+ * for it ("for the everyday bhakri", "for fasting days", "for everyday nourishment" - never
+ * "for breakfast": that aisle is eaten at any meal). The English name underneath carries
+ * the meaning for everyone else.
+ */
+const AISLE_KICKERS: Record<ProductCategory, string> = {
+  'Everyday Flours': 'रोजच्या भाकरीसाठी',
+  'Traditional & Festive': 'सणासुदीसाठी',
+  Upwas: 'उपवासासाठी',
+  'Health & Nutrition': 'रोजच्या पोषणासाठी',
+  'Baking & Desserts': 'गोडधोडासाठी',
+  'Spices & Essentials': 'रोजच्या स्वयंपाकासाठी',
+};
+
+/** Rotated through so a run of aisles reads as a sequence of rooms, not one repeated strip. */
+const AISLE_TONES = ['cream', 'sage', 'rose'] as const;
+
+export interface HomeAisle extends ProductCategoryDetail {
+  kicker: string;
+  products: Product[];
+  /** "01", "02"… - the aisle's place on the page. */
+  number: string;
+  tone: (typeof AISLE_TONES)[number];
+}
 
 @Component({
   selector: 'app-home',
@@ -20,9 +56,13 @@ import { HomeHero } from '../../components/home-hero/home-hero';
     MatIconModule,
     ProductCard,
     ScrollRevealDirective,
+    RevealWordsDirective,
     CoverflowDirective,
     CampaignBanner,
     HomeHero,
+    HomeStory,
+    SeasonRail,
+    HomeRibbon,
   ],
   templateUrl: './home.html',
   styleUrl: './home.scss',
@@ -61,31 +101,50 @@ export class Home implements OnInit {
       .slice(0, 8),
   );
 
-  // Festive Savings only exists while something is discounted, and when nothing is the page
-  // used to lose a whole row and leave a visible hole between Why Ojas and Shop by Category.
-  // This stands in for it: the staples, which are always in the catalogue and are what most
-  // people are actually here to reorder. Deliberately excludes anything discounted (that is the
-  // other section's job, and showing the same product twice makes a small catalogue look
-  // smaller) and anything filed under Upwas, which has its own row further down.
-  readonly everydayEssentials = computed(() =>
-    this.productService
-      .products()
-      .filter((p) => p.isAvailable && p.discount === 0 && p.category !== 'Upwas')
-      .slice(0, 8),
-  );
-
-  readonly upwasSpecials = computed(() =>
-    this.productService
-      .products()
-      .filter((p) => p.category === 'Upwas' && p.isAvailable)
-      .slice(0, 8),
-  );
-
   /** Only the aisles with something in them - see ProductService.categoriesInUse. */
   readonly categoryTiles = computed(() => {
     const inUse = new Set<string>(this.productService.categoriesInUse());
     return PRODUCT_CATEGORY_DETAILS.filter((c) => inUse.has(c.name));
   });
+
+  /**
+   * One section per aisle, in shop order, each with its own products. These replace the two
+   * rows that used to stand in for the catalogue - "Everyday Essentials" and "Upwas Specials" -
+   * which between them left four aisles with no presence on the home page at all. An aisle with
+   * nothing available today is left out rather than shown empty.
+   */
+  readonly aisles = computed<HomeAisle[]>(() => {
+    const available = this.productService.products().filter((p) => p.isAvailable);
+    return this.categoryTiles()
+      .map((category) => ({
+        ...category,
+        kicker: AISLE_KICKERS[category.name],
+        products: available.filter((p) => normalizeCategory(p.category) === category.name).slice(0, 8),
+      }))
+      .filter((aisle) => aisle.products.length > 0)
+      .map((aisle, index) => ({
+        ...aisle,
+        number: String(index + 1).padStart(2, '0'),
+        tone: AISLE_TONES[index % AISLE_TONES.length],
+      }));
+  });
+
+  /** The festival calendar, minus any festival whose aisle has nothing in it - every card is a
+   * link, and a link to an empty aisle is a dead end. */
+  readonly seasons = computed<Season[]>(() => {
+    const inUse = new Set<string>(this.productService.categoriesInUse());
+    return SEASONS.filter((s) => inUse.has(s.category));
+  });
+
+  /** The ribbon above the closing call to action. */
+  readonly ribbonWords = [
+    'Stone-ground on a chakki',
+    'शुद्ध आहार · शुद्ध विचार',
+    'From a farming family',
+    'Upwas-ready flours',
+    'Rooted in Pune',
+    'Delivered in 1–2 days',
+  ];
 
   ngOnInit(): void {
     this.productService.getBestsellers(6).subscribe({

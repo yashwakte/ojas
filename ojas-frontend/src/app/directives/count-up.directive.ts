@@ -71,6 +71,7 @@ export class CountUpDirective {
 
   private write(value: number): void {
     this.shown = value;
-    this.el.nativeElement.textContent = `${value}${untracked(this.countUpSuffix)}`;
+    // Indian digit grouping, so 1200 reads "1,200" the way it is written everywhere else on Ojas.
+    this.el.nativeElement.textContent = `${value.toLocaleString('en-IN')}${untracked(this.countUpSuffix)}`;
   }
 }

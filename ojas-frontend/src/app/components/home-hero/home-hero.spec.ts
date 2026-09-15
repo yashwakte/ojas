@@ -59,7 +59,6 @@ describe('HomeHero', () => {
           provide: WelcomeService,
           useValue: {
             introDone: introDone.asReadonly(),
-            celebration: signal(null).asReadonly(),
             stageHeld: () => false,
           },
         },
@@ -126,6 +125,22 @@ describe('HomeHero', () => {
       TestBed.flushEffects();
       jasmine.clock().tick(400);
       expect(fixture.componentInstance.revealed()).toBeTrue();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('opens at once when nothing else had the screen, with no hand-over pause', () => {
+    jasmine.clock().install();
+    try {
+      const fixture = create();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      jasmine.clock().tick(1);
+      expect(fixture.componentInstance.revealed()).toBeTrue();
+
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.hero').classList).toContain('hero--revealed');
     } finally {
       jasmine.clock().uninstall();
     }

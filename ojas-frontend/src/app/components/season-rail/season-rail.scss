@@ -1,0 +1,136 @@
+:host {
+  display: block;
+}
+
+.seasons {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 20px 12px 0;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.season {
+  flex: 0 0 72%;
+  max-width: 280px;
+  min-height: 214px;
+  scroll-snap-align: start;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 18px 18px;
+  border-radius: 22px;
+  background: var(--season-bg);
+  color: #2b1d14;
+  text-decoration: none;
+  transition:
+    transform 0.5s var(--ojas-ease),
+    box-shadow 0.5s var(--ojas-ease);
+
+  &[data-tone='saffron'] {
+    --season-bg: linear-gradient(160deg, #fff3e3 0%, #ffd8a8 100%);
+    --season-ink: #b45309;
+  }
+  &[data-tone='sage'] {
+    --season-bg: linear-gradient(160deg, #f5f9ef 0%, #d9e8c6 100%);
+    --season-ink: #4a6a2c;
+  }
+  &[data-tone='rose'] {
+    --season-bg: linear-gradient(160deg, #fff4f1 0%, #f8cfc3 100%);
+    --season-ink: #a13d2b;
+  }
+  &[data-tone='amber'] {
+    --season-bg: linear-gradient(160deg, #fffbea 0%, #fde68a 100%);
+    --season-ink: #92400e;
+  }
+  &[data-tone='sky'] {
+    --season-bg: linear-gradient(160deg, #f1f8fc 0%, #cfe6f3 100%);
+    --season-ink: #1e5a7a;
+  }
+
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 18px 40px rgba(60, 30, 10, 0.14);
+
+    .season-ico {
+      rotate: -8deg;
+      scale: 1.08;
+    }
+    .season-made mat-icon {
+      translate: 4px 0;
+    }
+  }
+}
+
+.season-ico {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--season-ink);
+  transition:
+    rotate 0.5s var(--ojas-ease),
+    scale 0.5s var(--ojas-ease);
+}
+
+.season-mr {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--season-ink);
+}
+
+.season-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(43, 29, 20, 0.58);
+}
+
+.season-dish {
+  flex: 1;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.season-made {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--season-ink);
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    transition: translate 0.35s var(--ojas-ease);
+  }
+}
+
+@media (min-width: 960px) {
+  .seasons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    max-width: 1100px;
+    margin: 0 auto;
+    overflow: visible;
+    padding: 6px 0 12px;
+  }
+  .season {
+    max-width: none;
+  }
+}
