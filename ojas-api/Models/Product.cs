@@ -120,6 +120,17 @@ public class Product
     [BsonElement("storageInfo")]
     public string StorageInfo { get; set; } = string.Empty;
 
+    /// <summary>The average of this product's public reviews, to one decimal, and how many there
+    /// are - kept on the product so every card in the catalogue can show its stars without a
+    /// request per card. Written only by <see cref="Services.ReviewService"/> whenever a review is
+    /// posted, edited, deleted, hidden or restored (and rebuilt at boot); never by the admin form.
+    /// </summary>
+    [BsonElement("ratingAverage")]
+    public double RatingAverage { get; set; }
+
+    [BsonElement("ratingCount")]
+    public int RatingCount { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

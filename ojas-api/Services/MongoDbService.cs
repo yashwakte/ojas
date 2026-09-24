@@ -36,6 +36,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
     // Keyed by user id, so every read and write is an _id lookup and needs no index of its own.
     public IMongoCollection<Cart> Carts => _database.GetCollection<Cart>("carts");
+    public IMongoCollection<ProductReview> ProductReviews => _database.GetCollection<ProductReview>("product_reviews");
     public IMongoCollection<MediaAsset> MediaAssets => _database.GetCollection<MediaAsset>("media_assets");
     public IMongoCollection<AppMigration> AppMigrations => _database.GetCollection<AppMigration>("app_migrations");
 
@@ -151,6 +152,38 @@ public class MongoDbService : IMongoDbService
                 "Could not create unique indexes on users collection: {Message}. " +
                 "Remove duplicate email/phone entries from the database to enforce uniqueness.",
                 ex.Message);
+        }
+
+        // Reviews: the product page's read (a product's visible reviews, newest first) and the
+        // newest-first admin list. The one-review-per-purchase unique index is built at boot by
+        // ReviewService.CollapseDuplicatesAndRebuildRatingsAsync, after any duplicates an earlier
+        // build allowed have been collapsed - it cannot be created while they exist.
+        try
+        {
+            // Earlier builds' unique indexes allowed one review per customer per product; the rule
+            // is one per purchase, so neither may survive - either would refuse the review of a
+            // second purchase of the same product.
+            foreach (var stale in new[] { "review_user_product", "review_one_per_customer_product" })
+            {
+                try { ProductReviews.Indexes.DropOne(stale); }
+                catch (MongoCommandException) { /* never built here */ }
+            }
+
+            ProductReviews.Indexes.CreateMany([
+                new CreateIndexModel<ProductReview>(
+                    Builders<ProductReview>.IndexKeys
+                        .Ascending(r => r.ProductId)
+                        .Ascending(r => r.IsHidden)
+                        .Descending(r => r.CreatedAt),
+                    new CreateIndexOptions { Name = "review_product_visible_newest" }),
+                new CreateIndexModel<ProductReview>(
+                    Builders<ProductReview>.IndexKeys.Descending(r => r.CreatedAt),
+                    new CreateIndexOptions { Name = "review_newest" }),
+            ]);
+        }
+        catch (MongoCommandException ex)
+        {
+            _logger.LogWarning("Could not create review indexes: {Message}.", ex.Message);
         }
     }
 }

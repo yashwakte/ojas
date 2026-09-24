@@ -595,3 +595,42 @@ public record ReturnSettlementResponse(
 	decimal RefundedToSource,
 	decimal RefundQueued,
 	string? RefundError = null);
+
+// ===== PRODUCT REVIEWS =====
+
+/// <summary>One review as the storefront shows it. <c>IsHidden</c> is only ever true on the
+/// author's own read and the admin list - a hidden review is not served anywhere public.
+/// <c>OrderId</c> is admin only.</summary>
+public record ReviewResponse(
+	string Id,
+	string ProductId,
+	string ProductName,
+	string AuthorName,
+	int Rating,
+	string Comment,
+	DateTime CreatedAt,
+	DateTime? UpdatedAt,
+	bool IsHidden = false,
+	string? OrderId = null,
+	DateTime? PurchasedAt = null);
+
+/// <summary>A product's average, its review count, and how many reviews gave each star -
+/// <c>Distribution[0]</c> is one star, <c>Distribution[4]</c> five.</summary>
+public record ReviewSummaryResponse(double Average, int Count, int[] Distribution);
+
+/// <summary>A product page's reviews: <c>Top</c> is the best few (sent with the first page only,
+/// empty after it); <c>Reviews</c> is one page, newest first, which may repeat a top review.</summary>
+public record ProductReviewsResponse(
+	ReviewSummaryResponse Summary,
+	List<ReviewResponse> Reviews,
+	List<ReviewResponse>? Top = null);
+
+/// <summary>A customer's own reviews, and every product they have had delivered and so may
+/// review - the orders page and the product page both draw their "Rate this" from it.</summary>
+public record MyReviewsResponse(List<ReviewResponse> Reviews, List<string> ReviewableProductIds);
+
+public record WriteReviewRequest(
+	[Range(1, 5)] int Rating,
+	[MaxLength(1000)] string? Comment = null);
+
+public record SetReviewVisibilityRequest(bool Hidden);

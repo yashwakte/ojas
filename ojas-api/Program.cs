@@ -107,6 +107,7 @@ builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<OrderPaymentOutcomeService>();
 builder.Services.AddScoped<OrderCancellationService>();
 builder.Services.AddScoped<ReturnService>();
+builder.Services.AddScoped<ReviewService>();
 builder.Services.AddScoped<OrderStatusEmailService>();
 builder.Services.AddScoped<DeliveryChargesService>();
 builder.Services.AddScoped<CampaignBannerService>();
@@ -374,6 +375,24 @@ _ = Task.Run(async () =>
     catch (Exception ex)
     {
         Console.WriteLine($"⚠️ Could not seed products: {ex.Message}");
+    }
+});
+
+// One review per purchase: collapse duplicates an earlier build allowed, build the unique index,
+// and write every product's rating onto it for the catalogue cards (non-blocking).
+_ = Task.Run(async () =>
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var reviews = scope.ServiceProvider.GetRequiredService<ReviewService>();
+        var removed = await reviews.CollapseDuplicatesAndRebuildRatingsAsync();
+        if (removed > 0)
+            Console.WriteLine($"Reviews: collapsed {removed} duplicate review(s) to one per purchase.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Could not rebuild product reviews: {ex.Message}");
     }
 });
 
