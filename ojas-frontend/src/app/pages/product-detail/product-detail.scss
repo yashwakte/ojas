@@ -3,7 +3,8 @@
 .product-detail-page {
   min-height: 80vh;
   padding-top: 80px;
-  background: var(--ojas-white, #fff);
+  // No surface of its own, so the ambient scene shows in the page's margins as on every other
+  // storefront page. The panels on it keep their white.
 }
 
 // ─── Breadcrumb ───

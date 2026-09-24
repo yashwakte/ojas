@@ -1,3 +1,8 @@
+<!-- The 3D scene behind every storefront page. Its own small chunk, fetched once the page is idle,
+     so it adds nothing to the first load; see AmbientScene for when it stays off. -->
+@defer (on idle) {
+  <app-ambient-scene />
+}
 <app-header />
 <main class="main-content">
   <!-- A route that would not load used to leave this space empty: no page, no error, nothing to

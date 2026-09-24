@@ -10,6 +10,7 @@ import { AddressPicker } from './components/address-picker/address-picker';
 import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
 import { SessionSwitchNotice } from './components/session-switch-notice/session-switch-notice';
 import { SearchOverlay } from './components/search-overlay/search-overlay';
+import { AmbientScene } from './components/ambient-scene/ambient-scene';
 import { AuthService } from './services/auth.service';
 import { DeliveryAddressService } from './services/delivery-address.service';
 import { AppRecoveryService } from './services/app-recovery.service';
@@ -35,6 +36,7 @@ const ADDRESS_PROMPT_DELAY_MS = 900;
     ChatbotWidget,
     SessionSwitchNotice,
     SearchOverlay,
+    AmbientScene,
     MatIconModule,
   ],
   templateUrl: './app.html',

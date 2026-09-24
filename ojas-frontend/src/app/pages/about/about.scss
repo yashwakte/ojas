@@ -116,8 +116,10 @@
 }
 
 // ===== STORY =====
+// The near-white section fills are translucent so the storefront backdrop (the saffron aurora
+// behind every page) shows through them, as on the home page. Cards on them stay solid.
 .story-section {
-  background: #fdfaf7;
+  background: rgba(253, 250, 247, 0.55);
 }
 .story-inner {
   max-width: 680px;
@@ -171,7 +173,7 @@
 
 // ===== VALUES =====
 .values-section {
-  background: #fffdfb;
+  background: rgba(255, 253, 251, 0.55);
 }
 .values-grid {
   display: grid;
@@ -235,7 +237,7 @@
 
 // ===== JOURNEY / TIMELINE =====
 .journey-section {
-  background: #fdfaf7;
+  background: rgba(253, 250, 247, 0.55);
 }
 .timeline {
   max-width: 480px;
