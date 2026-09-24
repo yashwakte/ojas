@@ -132,7 +132,16 @@ export class Products {
   readonly justAdded = signal<string | null>(null);
 
   // ----- What the URL says -----
-  readonly selectedCategory = signal<string>('All');
+  /** The aisles picked in the filter - any number, like price and pack size. Empty is "All".
+   * In the URL each is its own `category=` (the names carry "&" and could one day carry a comma,
+   * so they are not joined), which keeps the header's one-aisle links working unchanged. */
+  readonly selectedCategories = signal<ReadonlySet<string>>(new Set());
+  /** The one aisle being browsed, for the heading, the search hint and the page's SEO - 'All'
+   * when none is picked or several are. */
+  readonly selectedCategory = computed(() => {
+    const picked = this.selectedCategories();
+    return picked.size === 1 ? [...picked][0] : 'All';
+  });
   readonly query = signal('');
   readonly sort = signal<SortKey>('relevance');
   readonly priceBands = signal<ReadonlySet<PriceBand>>(new Set());
@@ -158,8 +167,16 @@ export class Products {
     // query params), so the state is read from the live stream, not a one-time snapshot -
     // otherwise clicking another category in the header while already here would do nothing.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
-      const category = normalizeCategory(params.get('category'));
-      this.selectedCategory.set(isProductCategory(category) ? category : 'All');
+      this.selectedCategories.set(
+        new Set(
+          params
+            .getAll('category')
+            .flatMap((raw) => {
+              const category = normalizeCategory(raw);
+              return isProductCategory(category) ? [category] : [];
+            }),
+        ),
+      );
 
       const q = (params.get('q') ?? '').trim();
       this.query.set(q);
@@ -229,8 +246,8 @@ export class Products {
   /** Whether a product passes every filter, optionally ignoring one - which is how each group's
    * counts are worked out: "how many would I get if I also picked this?" */
   private passes(p: Product, ignore?: Facet): boolean {
-    const category = this.selectedCategory();
-    if (ignore !== 'category' && category !== 'All' && p.category !== category) return false;
+    const picked = this.selectedCategories();
+    if (ignore !== 'category' && picked.size > 0 && !picked.has(p.category)) return false;
 
     const bands = this.priceBands();
     if (ignore !== 'price' && bands.size > 0) {
@@ -325,7 +342,7 @@ export class Products {
 
   readonly activeFilterCount = computed(
     () =>
-      (this.selectedCategory() !== 'All' ? 1 : 0) +
+      this.selectedCategories().size +
       this.priceBands().size +
       this.sizes().size +
       (this.inStockOnly() ? 1 : 0) +
@@ -336,8 +353,9 @@ export class Products {
     const pills: FilterPill[] = [];
     const q = this.query();
     if (q) pills.push({ id: 'q', label: `“${q}”`, facet: 'q' });
-    const category = this.selectedCategory();
-    if (category !== 'All') pills.push({ id: 'category', label: category, facet: 'category' });
+    for (const category of this.selectedCategories()) {
+      pills.push({ id: `category-${category}`, label: category, facet: 'category', value: category });
+    }
     for (const b of PRICE_BANDS) {
       if (this.priceBands().has(b.id)) pills.push({ id: `price-${b.id}`, label: b.label, facet: 'price', value: b.id });
     }
@@ -362,9 +380,17 @@ export class Products {
   readonly title = computed(() => {
     const q = this.query();
     const category = this.selectedCategory();
-    if (q && category === 'All') return `“${q}”`;
+    const picked = this.selectedCategories().size;
+    if (q && picked === 0) return `“${q}”`;
+    if (picked > 1) return `${picked} categories`;
     return category === 'All' ? 'All products' : category;
   });
+
+  /** Whether an option in the category filter is ticked: "All" when nothing is picked. */
+  isCategoryOn(category: string): boolean {
+    const picked = this.selectedCategories();
+    return category === 'All' ? picked.size === 0 : picked.has(category);
+  }
 
   readonly showSkeleton = computed(
     () => this.productService.loading() && this.productService.products().length === 0,
@@ -375,8 +401,21 @@ export class Products {
 
   // ----- Commands -----
 
+  /** Browses one aisle on its own ('All' clears the pick) - what a link to a category does. */
   selectCategory(category: string): void {
     this.patchQuery({ category: category === 'All' ? null : category }, { scroll: true });
+  }
+
+  /** Adds an aisle to the pick, or takes it out; 'All' clears it. Several aisles show together. */
+  toggleCategory(category: string): void {
+    if (category === 'All') {
+      this.selectCategory('All');
+      return;
+    }
+    const next = new Set(this.selectedCategories());
+    if (next.has(category)) next.delete(category);
+    else next.add(category);
+    this.patchQuery({ category: next.size ? [...next] : null }, { replaceUrl: true, scroll: true });
   }
 
   setSort(key: string): void {
@@ -414,7 +453,7 @@ export class Products {
         this.clearSearch();
         return;
       case 'category':
-        this.selectCategory('All');
+        this.toggleCategory(pill.value ?? 'All');
         return;
       case 'price':
         this.toggleBand(pill.value as PriceBand);

@@ -420,6 +420,50 @@
   }
 }
 
+/* A tick box: an aisle is one of several that can be picked at once. */
+.fcheck {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid #cfc5bb;
+  flex-shrink: 0;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 0;
+    width: 5px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) scale(0);
+    transition: transform 0.18s ease;
+  }
+
+  .on & {
+    background: var(--ojas-orange);
+    border-color: var(--ojas-orange);
+
+    &::after {
+      transform: rotate(45deg) scale(1);
+    }
+  }
+}
+
+.fgroup-title small {
+  font-weight: 500;
+  font-size: 1em;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ojas-text-light);
+  margin-left: 4px;
+}
+
 .fopt-label {
   flex: 1;
   min-width: 0;

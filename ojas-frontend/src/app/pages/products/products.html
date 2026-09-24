@@ -64,9 +64,9 @@
         <button
           type="button"
           class="chip"
-          [class.on]="selectedCategory() === cat"
-          [attr.aria-pressed]="selectedCategory() === cat"
-          (click)="selectCategory(cat)"
+          [class.on]="isCategoryOn(cat)"
+          [attr.aria-pressed]="isCategoryOn(cat)"
+          (click)="toggleCategory(cat)"
         >
           {{ cat }}<span class="chip-count">{{ categoryCount(cat) }}</span>
         </button>
@@ -219,17 +219,18 @@
   <!-- One set of filter controls, drawn in the desktop sidebar and in the phone's filter sheet. -->
   <ng-template #filterPanel>
     <div class="fgroup">
-      <h3 class="fgroup-title">Category</h3>
+      <h3 class="fgroup-title">Category <small>pick any</small></h3>
       <div class="fopts">
         @for (cat of categories(); track cat) {
           <button
             type="button"
             class="fopt"
-            [class.on]="selectedCategory() === cat"
-            [attr.aria-pressed]="selectedCategory() === cat"
-            (click)="selectCategory(cat)"
+            [class.on]="isCategoryOn(cat)"
+            [attr.aria-pressed]="isCategoryOn(cat)"
+            (click)="toggleCategory(cat)"
           >
-            <span class="fradio" aria-hidden="true"></span>
+            <!-- "All" is a round mark; every aisle is a tick box, since several can be picked. -->
+            <span [class]="cat === 'All' ? 'fradio' : 'fcheck'" aria-hidden="true"></span>
             <span class="fopt-label">{{ cat === 'All' ? 'All products' : cat }}</span>
             <span class="fopt-count">{{ categoryCount(cat) }}</span>
           </button>

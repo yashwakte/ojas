@@ -131,6 +131,36 @@ describe('Products', () => {
       expect(page.categories()[0]).toBe('All');
     });
 
+    it('opens on several categories at once, showing every product in any of them', () => {
+      configure({ category: ['Traditional & Festive', 'Everyday Flours'] });
+      const page = create().componentInstance;
+
+      expect(page.selectedCategory()).toBe('All');
+      expect(page.title()).toBe('2 categories');
+      expect(names(page.filteredProducts()).sort()).toEqual(['Anarasa Flour', 'Bajra Flour', 'Modak Pith']);
+      expect(page.activeFilterCount()).toBe(2);
+      expect(page.isCategoryOn('Upwas')).toBeFalse();
+      expect(page.isCategoryOn('All')).toBeFalse();
+    });
+
+    it('toggleCategory adds an aisle to the pick and takes it out again', () => {
+      configure({ category: 'Upwas' });
+      spyOn(router, 'navigate');
+      const page = create().componentInstance;
+
+      page.toggleCategory('Everyday Flours');
+      expect(router.navigate).toHaveBeenCalledWith(
+        [],
+        jasmine.objectContaining({ queryParams: { category: ['Upwas', 'Everyday Flours'] } }),
+      );
+
+      page.toggleCategory('Upwas');
+      expect(router.navigate).toHaveBeenCalledWith(
+        [],
+        jasmine.objectContaining({ queryParams: { category: null } }),
+      );
+    });
+
     it('selectCategory navigates, and All clears the parameter', () => {
       configure();
       spyOn(router, 'navigate');
