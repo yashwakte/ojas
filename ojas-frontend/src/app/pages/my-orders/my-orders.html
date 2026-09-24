@@ -343,6 +343,12 @@
               }
             </div>
 
+            <!-- The review section after purchase: once the order is in the customer's kitchen,
+                 each product gets a row of stars, two taps from a posted review. -->
+            @if (order.status === 'Delivered') {
+              <app-order-review-prompt [items]="order.items" [orderId]="order.id" />
+            }
+
             <div class="order-footer">
               <div class="delivery-details">
                 <div class="delivery-info">

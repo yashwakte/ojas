@@ -9,6 +9,7 @@ import {
   effect,
   inject,
   viewChild,
+  untracked,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -36,6 +37,9 @@ import { OrderPickingBanner } from '../../components/order-picking-banner/order-
 import { packShotSrcset, thumbnailPackShot } from '../../constants/pack-shots';
 import { PRODUCT_NOT_FOUND_SEO, productPageSeo } from '../../constants/product-seo';
 import { SeoService } from '../../services/seo.service';
+import { ProductReviews } from '../../components/product-reviews/product-reviews';
+import { StarRating } from '../../components/star-rating/star-rating';
+import { ReviewSummary } from '../../models/interfaces';
 
 /** How many products the "You May Also Like" rail carries at most. Enough that the rail is worth
  * scrolling on a wide screen and still a bounded number of images to fetch. */
@@ -43,7 +47,15 @@ const SIMILAR_RAIL_SIZE = 12;
 
 @Component({
   selector: 'app-product-detail',
-  imports: [RouterLink, MatIconModule, DecimalPipe, OrderPickingBanner, ImageLightbox],
+  imports: [
+    RouterLink,
+    MatIconModule,
+    DecimalPipe,
+    OrderPickingBanner,
+    ImageLightbox,
+    ProductReviews,
+    StarRating,
+  ],
   templateUrl: './product-detail.html',
   styleUrl: './product-detail.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -99,6 +111,16 @@ export class ProductDetail {
   readonly maxQuantity = computed(() => this.product()?.stockQuantity ?? Infinity);
 
   product = computed(() => this.productService.getProduct(this.id()));
+
+  /** The reviews block's summary, reported up so the rating can sit under the product name and
+   * go into the page's structured data. Null until the reviews have loaded. */
+  readonly reviewSummary = signal<ReviewSummary | null>(null);
+  private readonly shownProductId = computed(() => this.product()?.id ?? null);
+
+  /** Jumps to the reviews block from the rating under the name. */
+  scrollToReviews(): void {
+    document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   /**
    * True while it is not yet known whether this product exists.
@@ -202,6 +224,14 @@ export class ProductDetail {
       this.onSimilarScroll();
     });
 
+    // A hop to another product must not carry the last one's rating while its own loads.
+    // Tracked through a computed id, so a catalogue refresh that hands back the same product
+    // does not wipe a rating that will not be sent again.
+    effect(() => {
+      this.shownProductId();
+      untracked(() => this.reviewSummary.set(null));
+    });
+
     // What search engines and link previews are told about this page — and, for a link that
     // still carries the product's database id (the Business Profile's product links, anything
     // shared before slugs existed), the readable address that replaces it.
@@ -214,7 +244,7 @@ export class ProductDetail {
           void this.router.navigate(['/products', p.slug], { replaceUrl: true });
           return;
         }
-        this.seo.apply(productPageSeo(p));
+        this.seo.apply(productPageSeo(p, this.reviewSummary()));
       } else if (!this.resolving()) {
         this.seo.apply(PRODUCT_NOT_FOUND_SEO);
       }

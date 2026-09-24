@@ -68,7 +68,10 @@ describe('AdminDashboard', () => {
       'revokeStaffDevice',
       'resendStaffInvite',
       'approveNextDevice',
+      'user',
     ]);
+    // ReviewService reads who is signed in, to drop one account's reviews when another signs in.
+    authServiceSpy.user.and.returnValue(null);
     // Every partner card looks up its bound device on load, so this needs a default.
     authServiceSpy.getStaffDevices.and.returnValue(of([]));
     orderServiceSpy = jasmine.createSpyObj('OrderService', [
@@ -286,6 +289,9 @@ describe('AdminDashboard', () => {
     expect(fixture.componentInstance.getTabIndex()).toBe(1);
 
     fixture.componentInstance.onTabChange({ index: 2 });
+    expect(fixture.componentInstance.activeTab()).toBe('reviews');
+
+    fixture.componentInstance.onTabChange({ index: 3 });
     expect(fixture.componentInstance.activeTab()).toBe('products');
   });
 

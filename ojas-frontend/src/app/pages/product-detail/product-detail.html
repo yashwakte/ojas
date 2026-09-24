@@ -127,6 +127,15 @@
         <div class="info-section">
           <span class="category-badge">{{ p.category }}</span>
           <h1 class="detail-name">{{ p.name }}</h1>
+          @if (reviewSummary(); as rs) {
+            @if (rs.count > 0) {
+              <button type="button" class="detail-rating" (click)="scrollToReviews()">
+                <app-star-rating [value]="rs.average" />
+                <strong>{{ rs.average.toFixed(1) }}</strong>
+                <span>· {{ rs.count }} {{ rs.count === 1 ? 'review' : 'reviews' }}</span>
+              </button>
+            }
+          }
 
           <!-- Availability. Reads isPurchasable, not isAvailable alone: a tracked product that
                has sold out has isAvailable = true and stockQuantity = 0, and saying "In Stock"
@@ -415,6 +424,18 @@
           </div>
         </div>
       </div>
+
+      <!-- Reviews. Verified purchases only, with the way in for a customer who has had this
+           product delivered. Keyed on the product so a hop to another product starts fresh. -->
+      @for (key of [p.id]; track key) {
+        <app-product-reviews
+          [productId]="p.id"
+          [productName]="p.name"
+          [imageUrl]="p.imageUrl || null"
+          [returnUrl]="'/products/' + (p.slug || p.id)"
+          (summaryChange)="reviewSummary.set($event)"
+        />
+      }
 
       <!-- Similar Products -->
       @if (similarProducts().length > 0) {

@@ -50,6 +50,7 @@ import {
 } from '../../constants/business';
 import { CashfreeCheckoutService } from '../../services/cashfree-checkout.service';
 import { ReturnService } from '../../services/return.service';
+import { OrderReviewPrompt } from '../../components/order-review-prompt/order-review-prompt';
 import { ReturnDraft, ReturnSheet } from '../../components/return-sheet/return-sheet';
 import { ReturnStatusCard } from '../../components/return-status-card/return-status-card';
 import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
@@ -76,6 +77,7 @@ const HIGHLIGHT_DURATION_MS = 6000;
     RouterLink,
     ReturnSheet,
     ReturnStatusCard,
+    OrderReviewPrompt,
     DatePipe,
     CurrencyPipe,
     FormsModule,

@@ -1,0 +1,167 @@
+:host {
+  display: block;
+}
+
+.orp {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid #f3e2c8;
+  border-radius: var(--ojas-radius);
+  background:
+    radial-gradient(110% 120% at 100% 0%, rgba(240, 160, 32, 0.12), transparent 55%),
+    #fffcf7;
+}
+
+.orp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ojas-text);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #e08a10;
+  }
+}
+
+.orp-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orp-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 6px 4px 4px;
+  border-radius: 12px;
+  transition: background 0.4s ease;
+
+  &.saved {
+    background: rgba(46, 139, 87, 0.08);
+  }
+}
+
+.orp-thumb {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f7f5f3;
+  color: var(--ojas-text-light);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.orp-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ojas-text);
+}
+
+// Five stars to tap. Hovering one lights it and every star before it.
+.orp-stars {
+  flex-shrink: 0;
+  display: inline-flex;
+
+  button {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 38px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: #e6dccf;
+    cursor: pointer;
+    transition:
+      color 0.2s ease,
+      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+    mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  &:hover button {
+    color: #f0a020;
+  }
+
+  button:hover ~ button {
+    color: #e6dccf;
+  }
+
+  button:hover {
+    transform: scale(1.15);
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--ojas-orange);
+    outline-offset: -2px;
+    border-radius: 8px;
+  }
+}
+
+.orp-done {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--ojas-border);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ojas-text-light);
+  cursor: pointer;
+
+  &:hover {
+    border-color: #f0c27a;
+    color: var(--ojas-text);
+  }
+}
+
+@media (max-width: 380px) {
+  .orp-stars button {
+    width: 30px;
+  }
+
+  .orp-stars button mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+}

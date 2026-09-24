@@ -1,0 +1,103 @@
+<section class="reviews-pane">
+  <header class="pane-head">
+    <div class="pane-titles">
+      <h3>Reviews</h3>
+      <p>
+        Every review is from a customer whose order was delivered, and goes live the moment they
+        post it. Hide one that is abusive, shares a phone number, or is a complaint for support —
+        you cannot change what a customer wrote.
+      </p>
+    </div>
+
+    @if (publicCount() > 0) {
+      <div class="pane-score">
+        <span>Shop rating</span>
+        <strong>{{ average().toFixed(1) }} <app-star-rating [value]="average()" /></strong>
+        <small>{{ publicCount() }} public</small>
+      </div>
+    }
+  </header>
+
+  <div class="pane-filters" role="tablist" aria-label="Filter reviews">
+    @for (option of filters; track option.id) {
+      <button
+        type="button"
+        role="tab"
+        class="filter-chip"
+        [class.active]="filter() === option.id"
+        [attr.aria-selected]="filter() === option.id"
+        (click)="filter.set(option.id)"
+      >
+        {{ option.label }}
+        <span class="filter-count">{{ countFor(option.id) }}</span>
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="pane-state">
+      <mat-spinner diameter="34"></mat-spinner>
+      <p>Loading reviews…</p>
+    </div>
+  } @else if (error()) {
+    <div class="pane-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+      <button mat-stroked-button (click)="reload()">Try again</button>
+    </div>
+  } @else if (visible().length === 0) {
+    <div class="pane-state">
+      <mat-icon>rate_review</mat-icon>
+      <p>
+        @if (filter() === 'all') {
+          No reviews yet. Customers are asked for one on each delivered order.
+        } @else {
+          No reviews here.
+        }
+      </p>
+    </div>
+  } @else {
+    <div class="review-list">
+      @for (review of visible(); track review.id) {
+        <article class="review-row" [class.hidden]="review.isHidden">
+          <div class="row-head">
+            <app-star-rating [value]="review.rating" />
+            <strong class="row-product">{{ review.productName }}</strong>
+            @if (review.isHidden) {
+              <span class="row-badge">Hidden</span>
+            }
+            <time class="row-date">{{ review.createdAt | date: 'd MMM yyyy, h:mm a' }}</time>
+          </div>
+
+          @if (review.comment) {
+            <p class="row-comment">{{ review.comment }}</p>
+          } @else {
+            <p class="row-comment empty">No written review — stars only.</p>
+          }
+
+          <div class="row-foot">
+            <span class="row-author">
+              {{ review.authorName }}
+              @if (review.orderId) {
+                <span class="row-order">· order …{{ review.orderId.slice(-6) }}</span>
+              }
+              @if (review.purchasedAt) {
+                <span class="row-order">· purchased {{ review.purchasedAt | date: 'd MMM yyyy' }}</span>
+              }
+            </span>
+            <button
+              mat-stroked-button
+              type="button"
+              [class.restore]="review.isHidden"
+              [disabled]="busyId() === review.id"
+              (click)="toggle(review)"
+            >
+              <mat-icon>{{ review.isHidden ? 'visibility' : 'visibility_off' }}</mat-icon>
+              {{ review.isHidden ? 'Show in shop' : 'Hide from shop' }}
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

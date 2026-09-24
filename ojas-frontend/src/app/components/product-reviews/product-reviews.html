@@ -1,0 +1,171 @@
+<section class="pr" id="reviews" aria-labelledby="prTitle">
+  <div class="pr-label" appScrollReveal revealVariant="pill">
+    <span class="pr-line"></span>
+    <span class="pr-label-text">REVIEWS</span>
+    <span class="pr-line"></span>
+  </div>
+  <h2 id="prTitle" [appScrollReveal]="80">What families say</h2>
+
+  @if (loaded()) {
+    <div class="pr-grid">
+      <!-- The overview: the average, how the stars are spread, and the way in for a buyer. -->
+      <aside class="pr-overview" [appScrollReveal]="140">
+        @if (summary(); as s) {
+          @if (s.count > 0) {
+            <div class="pr-average">
+              <strong>{{ s.average.toFixed(1) }}</strong>
+              <div>
+                <app-star-rating [value]="s.average" style="--star-size: 20px" />
+                <span class="pr-based">
+                  {{ s.count }} verified {{ s.count === 1 ? 'review' : 'reviews' }}
+                </span>
+              </div>
+            </div>
+
+            <ul class="pr-bars" aria-label="How the ratings are spread">
+              @for (bar of bars(); track bar.stars) {
+                <li>
+                  <span class="pr-bar-label">{{ bar.stars }}<mat-icon>star</mat-icon></span>
+                  <span class="pr-bar-track">
+                    <span class="pr-bar-fill" [style.--pr-w.%]="bar.percent"></span>
+                  </span>
+                  <span class="pr-bar-count">{{ bar.count }}</span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <div class="pr-empty">
+              <mat-icon>rate_review</mat-icon>
+              <p>
+                <strong>No reviews yet.</strong>
+                Reviews here come only from customers whose order has been delivered.
+              </p>
+            </div>
+          }
+        }
+
+        @if (myLatest()?.isHidden) {
+          <small class="pr-mine-hidden">
+            Your latest review is not shown publicly — our team has taken it down. Call us if you
+            think that is a mistake.
+          </small>
+        }
+        @if (canReview()) {
+          <div class="pr-invite">
+            <span>You bought this — how was it?</span>
+            <div class="pr-invite-stars" role="group" aria-label="Rate this product">
+              @for (s of [1, 2, 3, 4, 5]; track s) {
+                <button
+                  type="button"
+                  [attr.aria-label]="'Rate ' + s + (s === 1 ? ' star' : ' stars')"
+                  (click)="openSheet(s)"
+                >
+                  <mat-icon>star</mat-icon>
+                </button>
+              }
+            </div>
+            <button type="button" class="pr-write" (click)="openSheet()">
+              <mat-icon>rate_review</mat-icon> Write a review
+            </button>
+          </div>
+        } @else if (myLatest(); as mine) {
+          <!-- Already reviewed - here or from My Orders: their latest review, never a second prompt. -->
+          <div class="pr-invite">
+            <span class="pr-mine-head">
+              Your review
+              <app-star-rating [value]="mine.rating" />
+            </span>
+            @if (mine.comment) {
+              <p class="pr-mine-text">“{{ mine.comment }}”</p>
+            }
+            @if (mine.purchasedAt) {
+              <small class="pr-mine-when">For your order of {{ mine.purchasedAt | date: 'd MMM yyyy' }}</small>
+            }
+            <button type="button" class="pr-write ghost" (click)="openSheet(0, mine)">
+              <mat-icon>edit</mat-icon> Edit your review
+            </button>
+          </div>
+        } @else if (isGuest()) {
+          <p class="pr-signin">
+            Bought this from us?
+            <a routerLink="/login" [queryParams]="{ redirect: returnUrl() }">Sign in</a>
+            to review it.
+          </p>
+        }
+      </aside>
+
+      <!-- The two best reviews, then - on request - every review, newest first, ten at a time. -->
+      @if (top().length > 0) {
+        <div class="pr-list">
+          <p class="pr-list-label">Top reviews</p>
+          @for (review of top(); track review.id; let i = $index) {
+            <ng-container *ngTemplateOutlet="card; context: { $implicit: review, i: i }" />
+          }
+
+          @if (expanded()) {
+            @if (rest().length > 0) {
+              <p class="pr-list-label">All reviews · newest first</p>
+            }
+            @for (review of rest(); track review.id) {
+              <ng-container *ngTemplateOutlet="card; context: { $implicit: review, i: 0 }" />
+            }
+            @if (hasMore()) {
+              <button type="button" class="pr-more" (click)="loadMore()" [disabled]="loadingMore()">
+                {{ loadingMore() ? 'Loading…' : 'Show more reviews' }}
+                <mat-icon>expand_more</mat-icon>
+              </button>
+            }
+          } @else if (moreCount() > 0) {
+            <button type="button" class="pr-more" (click)="seeAll()">
+              See all {{ summary()?.count }} reviews <mat-icon>arrow_forward</mat-icon>
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+</section>
+
+<ng-template #card let-review let-i="i">
+  <article class="pr-card" [appScrollReveal]="160 + i * 70">
+    <header>
+      <span class="pr-avatar" aria-hidden="true">{{ initial(review.authorName) }}</span>
+      <span class="pr-who">
+        <strong>{{ review.authorName }}</strong>
+        <span class="pr-verified">
+          <mat-icon>verified</mat-icon>
+          @if (review.purchasedAt) {
+            Purchased {{ review.purchasedAt | date: 'd MMM yyyy' }}
+          } @else {
+            Verified purchase
+          }
+        </span>
+      </span>
+      <time [attr.datetime]="review.createdAt">{{ review.createdAt | date: 'd MMM yyyy, h:mm a' }}</time>
+    </header>
+    <div class="pr-card-stars">
+      <app-star-rating [value]="review.rating" />
+      @if (mineIds().has(review.id)) {
+        <button type="button" class="pr-edit" (click)="openSheet(0, review)">
+          <mat-icon>edit</mat-icon> Edit
+        </button>
+      }
+    </div>
+    @if (review.comment) {
+      <p>{{ review.comment }}</p>
+    }
+  </article>
+</ng-template>
+
+@if (sheetOpen()) {
+  <app-review-sheet
+    [productId]="productId()"
+    [productName]="productName()"
+    [imageUrl]="imageUrl()"
+    [existing]="editing()"
+    [initialRating]="sheetRating()"
+    (saved)="onSaved($event)"
+    (removed)="onRemoved()"
+    (closed)="closeSheet()"
+  />
+}

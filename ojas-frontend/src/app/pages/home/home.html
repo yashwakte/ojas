@@ -245,24 +245,31 @@
     </div>
   </section>
 
-  <!-- REVIEWS -->
+  <!-- REVIEWS. Customers' own reviews first, newest first with their date and time, topped up
+       with the owner's starter testimonials until there are three. -->
   <section class="section reviews-section">
     <div class="tag" appScrollReveal revealVariant="pill"><span>REVIEWS</span></div>
     <h2 class="stitle" appRevealWords="Loved by *Families*"></h2>
     <div class="rscroll" appScrollReveal revealVariant="row">
-      @for (t of testimonials; track t.name) {
-        <div class="rcard">
-          <div class="rstars">
+      @for (r of wall(); track r.id) {
+        <article class="rcard">
+          <div class="rstars" role="img" [attr.aria-label]="'Rated ' + r.rating + ' out of 5'">
             @for (s of [1, 2, 3, 4, 5]; track s) {
-              <mat-icon>star</mat-icon>
+              <mat-icon aria-hidden="true">{{ s <= r.rating ? 'star' : 'star_border' }}</mat-icon>
             }
           </div>
-          <p>"{{ t.text }}"</p>
+          <p>"{{ r.comment }}"</p>
           <div class="rauthor">
-            <div class="ravatar">{{ t.name[0] }}</div>
-            <span>{{ t.name }}</span>
+            <div class="ravatar" aria-hidden="true">{{ r.authorName[0] }}</div>
+            <span>
+              {{ r.authorName }}
+              <a class="rproduct" [routerLink]="r.productLink">{{ r.productName }}</a>
+              @if (r.createdAt) {
+                <time class="rdate" [attr.datetime]="r.createdAt">{{ r.when }}</time>
+              }
+            </span>
           </div>
-        </div>
+        </article>
       }
     </div>
   </section>

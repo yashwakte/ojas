@@ -124,6 +124,33 @@
   letter-spacing: 0.3px;
 }
 
+// Stars from real reviews, under the name; only once a product has any.
+.prating {
+  display: flex;
+  align-items: center;
+  height: 15px;
+  gap: 2px;
+  margin-bottom: 2px;
+  font-size: 0.62rem;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+    color: #f0a020;
+  }
+
+  b {
+    font-weight: 600;
+    color: var(--ojas-text);
+  }
+
+  @media (min-width: 640px) {
+    font-size: 0.74rem;
+  }
+}
+
 .pbody-top {
   // Tightened when the picture went square: the height the well gained is taken back here,
   // so a bigger product does not cost a longer card.

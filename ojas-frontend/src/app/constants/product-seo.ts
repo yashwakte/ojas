@@ -94,7 +94,10 @@ export function categoryPath(category: string): string {
  * by country and state — it would tell a shopper in Mumbai we deliver to them. The return policy
  * is declared once for the whole shop, on the organisation block in index.html.
  */
-export function productJsonLd(product: Product): Record<string, unknown>[] {
+export function productJsonLd(
+  product: Product,
+  rating?: { average: number; count: number } | null,
+): Record<string, unknown>[] {
   const url = SITE_URL + productPath(product);
   const local = localNameFor(product.name);
   const alternateNames = [local?.marathi, local?.also].filter((n): n is string => !!n);
@@ -126,6 +129,19 @@ export function productJsonLd(product: Product): Record<string, unknown>[] {
       itemCondition: 'https://schema.org/NewCondition',
       seller: { '@id': ORGANIZATION_ID },
     },
+    // Star ratings in search results. Only once a real review exists: the reviews are verified
+    // purchases shown on this same page, which is what Google requires of a rating it displays.
+    ...(rating && rating.count > 0
+      ? {
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: rating.average.toFixed(1),
+            reviewCount: rating.count,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
   };
 
   // Mirrors the breadcrumb drawn at the top of the product page: Home › Products › aisle › product.
@@ -156,7 +172,10 @@ export const PRODUCT_NOT_FOUND_SEO: PageSeo = {
   noindex: true,
 };
 
-export function productPageSeo(product: Product): PageSeo {
+export function productPageSeo(
+  product: Product,
+  rating?: { average: number; count: number } | null,
+): PageSeo {
   const image = product.imageUrl && !product.imageUrl.startsWith('data:')
     ? absoluteUrl(product.imageUrl)
     : undefined;
@@ -166,7 +185,7 @@ export function productPageSeo(product: Product): PageSeo {
     canonicalPath: productPath(product),
     image,
     type: 'product',
-    jsonLd: productJsonLd(product),
+    jsonLd: productJsonLd(product, rating),
   };
 }
 

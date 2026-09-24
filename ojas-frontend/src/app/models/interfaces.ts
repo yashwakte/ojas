@@ -10,6 +10,10 @@ export interface Product {
    */
   slug?: string | null;
   description: string;
+  /** Average of the product's public reviews (one decimal) and how many there are, kept on the
+   * product by the API so every card can show its stars. Absent from an API that predates it. */
+  ratingAverage?: number;
+  ratingCount?: number;
   price: number;
   discount: number;
   category: string;
@@ -1138,4 +1142,51 @@ export interface ChatbotResponse {
   reply: string;
   escalate: boolean;
   quickReplies: ChatbotQuickReply[];
+}
+
+// ===== PRODUCT REVIEWS =====
+
+/** One review as the storefront shows it. `isHidden` is only ever true on the author's own read
+ * and the admin list; `orderId` is admin only. */
+export interface ProductReview {
+  id: string;
+  productId: string;
+  productName: string;
+  /** First name and last initial ("Priya S."), fixed when the review was written. */
+  authorName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  updatedAt: string | null;
+  isHidden?: boolean;
+  orderId?: string | null;
+  /** When the purchase this review is about was made. Two reviews by one customer are two
+   * purchases; this is what tells them apart. Null on reviews older than the field. */
+  purchasedAt?: string | null;
+}
+
+/** `distribution[0]` counts one-star reviews, `distribution[4]` five-star ones. */
+export interface ReviewSummary {
+  average: number;
+  count: number;
+  distribution: number[];
+}
+
+export interface ProductReviewsResponse {
+  summary: ReviewSummary;
+  /** One page of reviews, newest first. May repeat a top review. */
+  reviews: ProductReview[];
+  /** The product's best reviews (most stars, then the fullest words) - on the first page only. */
+  top?: ProductReview[] | null;
+}
+
+export interface MyReviewsResponse {
+  reviews: ProductReview[];
+  /** Every product this customer has had delivered, and so may review. */
+  reviewableProductIds: string[];
+}
+
+export interface WriteReviewRequest {
+  rating: number;
+  comment: string;
 }

@@ -68,8 +68,9 @@ describe('ProductDetail', () => {
 
     cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn', 'user']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn', 'user', 'role']);
     authServiceSpy.isLoggedIn.and.returnValue(true);
+    authServiceSpy.role.and.returnValue('customer');
     // DeliveryAddressService (injected for the "Deliver to" bar) reads user().
     authServiceSpy.user.and.returnValue(null);
     deliveryChargesServiceSpy = { config: signal<DeliveryChargesConfig | null>(null) };

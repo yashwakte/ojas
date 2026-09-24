@@ -1,0 +1,449 @@
+// The same surface as the quantity and address sheets - backdrop, radii, easing, bottom sheet on
+// a phone and centred card on a desktop - so rating a flour feels like the same app as choosing
+// how much of it to buy.
+:host {
+  display: contents;
+}
+
+.rs-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(28, 18, 12, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: rsFade 0.3s ease both;
+}
+
+.rs-sheet {
+  position: fixed;
+  z-index: 1301;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(94vw, 460px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 20px 22px 22px;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: var(--ojas-shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.12));
+  isolation: isolate;
+  animation: rsIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rs-glow {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  translate: -50% 0;
+  width: 340px;
+  height: 260px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(240, 160, 32, 0.2), rgba(240, 160, 32, 0) 68%);
+  animation: rsBloom 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rs-grip {
+  display: none;
+}
+
+.rs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  animation: rsRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+}
+
+.rs-product {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rs-thumb {
+  flex-shrink: 0;
+  width: 46px;
+  height: 54px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f7f5f3;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.rs-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  small {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ojas-orange-dark);
+  }
+
+  strong {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--ojas-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+.rs-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ojas-ink-bg);
+  color: var(--ojas-text);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover {
+    background: var(--ojas-orange-bg);
+    color: var(--ojas-orange-dark);
+    transform: rotate(90deg);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// ===== THE STARS =====
+.rs-stars {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 22px 0 4px;
+}
+
+.rs-star {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  // Each star arrives a beat after the one before it.
+  animation: rsPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) calc(120ms + var(--rs-i, 1) * 45ms) both;
+
+  svg {
+    width: 38px;
+    height: 38px;
+    transition:
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 0.35s ease;
+  }
+
+  path {
+    fill: #efe7dd;
+    transition: fill 0.25s ease;
+  }
+
+  &.on path {
+    fill: #f0a020;
+  }
+
+  &.on svg {
+    filter: drop-shadow(0 4px 10px rgba(240, 160, 32, 0.35));
+  }
+
+  &:hover svg {
+    transform: translateY(-2px) scale(1.08);
+  }
+
+  &.picked svg {
+    animation: rsStamp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ojas-orange);
+    outline-offset: 2px;
+  }
+}
+
+.rs-word {
+  margin: 0 0 18px;
+  min-height: 1.3em;
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ojas-text-light);
+}
+
+// ===== THE WORDS =====
+.rs-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: rsRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 104px;
+    padding: 12px 14px 26px;
+    border: 1.5px solid #e8e2db;
+    border-radius: 14px;
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--ojas-text);
+    background: #fffdfb;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: var(--ojas-orange-light);
+      box-shadow: 0 0 0 4px rgba(242, 90, 26, 0.08);
+    }
+  }
+}
+
+.rs-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ojas-text);
+
+  em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--ojas-text-light);
+  }
+}
+
+.rs-count {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: #b4aca3;
+
+  &.low {
+    color: var(--ojas-orange-dark);
+  }
+}
+
+.rs-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #2e8b57;
+  }
+}
+
+.rs-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.07);
+  color: #b42318;
+  font-size: 0.85rem;
+}
+
+.rs-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.rs-remove {
+  margin-right: auto;
+  padding: 10px 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #b42318;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.rs-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 150px;
+  height: 48px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ojas-orange-glass);
+  box-shadow: var(--ojas-shadow-orange);
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--ojas-orange-glass-hover);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+}
+
+.rs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: rsSpin 0.8s linear infinite;
+}
+
+// ===== PHONE: a bottom sheet, thumb-reachable =====
+@media (max-width: 600px) {
+  .rs-sheet {
+    top: auto;
+    bottom: 0;
+    translate: -50% 0;
+    width: 100vw;
+    max-height: 92dvh;
+    border-radius: 26px 26px 0 0;
+    padding: 10px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+    animation: rsUp 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .rs-grip {
+    display: block;
+    width: 42px;
+    height: 4px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: #e2dcd5;
+  }
+
+  .rs-star {
+    width: 50px;
+    height: 50px;
+  }
+
+  .rs-submit {
+    flex: 1;
+  }
+}
+
+@keyframes rsFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rsIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+}
+
+@keyframes rsUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes rsBloom {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes rsRise {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+}
+
+@keyframes rsPop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6);
+  }
+}
+
+@keyframes rsStamp {
+  40% {
+    transform: scale(1.28);
+  }
+}
+
+@keyframes rsSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-backdrop,
+  .rs-sheet,
+  .rs-glow,
+  .rs-head,
+  .rs-star,
+  .rs-star svg,
+  .rs-field {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,86 @@
+<div class="rs-backdrop" (click)="close()"></div>
+
+<div class="rs-sheet" role="dialog" aria-modal="true" aria-labelledby="rsTitle">
+  <span class="rs-glow" aria-hidden="true"></span>
+  <span class="rs-grip" aria-hidden="true"></span>
+
+  <div class="rs-head">
+    <div class="rs-product">
+      @if (imageUrl(); as image) {
+        <span class="rs-thumb"><img [src]="image" alt="" aria-hidden="true" /></span>
+      }
+      <span class="rs-titles">
+        <small>{{ existing() ? 'Edit your review' : 'Rate your purchase' }}</small>
+        <strong id="rsTitle">{{ productName() }}</strong>
+      </span>
+    </div>
+    <button type="button" class="rs-close" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div
+    class="rs-stars"
+    role="radiogroup"
+    aria-label="Your rating"
+    (mouseleave)="hover.set(0)"
+    (keydown)="onStarKey($event)"
+  >
+    @for (s of five; track s) {
+      <button
+        type="button"
+        class="rs-star"
+        role="radio"
+        [class.on]="s <= shown()"
+        [class.picked]="s === rating()"
+        [attr.aria-checked]="s === rating()"
+        [attr.aria-label]="s + (s === 1 ? ' star' : ' stars')"
+        [attr.tabindex]="s === (rating() || 1) ? 0 : -1"
+        [style.--rs-i]="s"
+        (mouseenter)="hover.set(s)"
+        (click)="pick(s)"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.6l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5L2.5 9.4l6.6-.8z" />
+        </svg>
+      </button>
+    }
+  </div>
+  <p class="rs-word" aria-live="polite">{{ word() || 'Tap a star to rate' }}</p>
+
+  <label class="rs-field">
+    <span class="rs-label">Tell other families about it <em>(optional)</em></span>
+    <textarea
+      rows="4"
+      [maxlength]="maxLength"
+      [ngModel]="comment()"
+      (ngModelChange)="comment.set($event)"
+      placeholder="How did it cook? How did it taste? Would you buy it again?"
+    ></textarea>
+    <span class="rs-count" [class.low]="remaining() < 40">{{ remaining() }}</span>
+  </label>
+
+  <p class="rs-note">
+    <mat-icon>verified</mat-icon>
+    Shown on the product page as a verified purchase, under your first name and last initial.
+  </p>
+
+  @if (error(); as message) {
+    <p class="rs-error" role="alert">{{ message }}</p>
+  }
+
+  <div class="rs-actions">
+    @if (existing()) {
+      <button type="button" class="rs-remove" [disabled]="saving()" (click)="remove()">
+        {{ confirmingRemove() ? 'Tap again to delete' : 'Delete review' }}
+      </button>
+    }
+    <button type="button" class="rs-submit" [disabled]="saving()" (click)="submit()">
+      @if (saving()) {
+        <span class="rs-spinner" aria-hidden="true"></span> Saving…
+      } @else {
+        {{ existing() ? 'Update review' : 'Post review' }}
+      }
+    </button>
+  </div>
+</div>

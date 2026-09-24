@@ -25,6 +25,8 @@ import { DeliveryChargesManagement } from '../delivery-charges-management/delive
 import { CampaignBannerManagement } from '../campaign-banner-management/campaign-banner-management';
 import { HeroSlideManagement } from '../hero-slide-management/hero-slide-management';
 import { ReturnManagement } from '../return-management/return-management';
+import { ReviewManagement } from '../review-management/review-management';
+import { ReviewService } from '../../services/review.service';
 import {
   AdminStatusChangeResponse,
   CancellationPreviewResponse,
@@ -45,6 +47,7 @@ import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 type AdminTab =
   | 'orders'
   | 'returns'
+  | 'reviews'
   | 'products'
   | 'delivery-partners'
   | 'delivery-charges'
@@ -75,6 +78,7 @@ type AdminTab =
     CampaignBannerManagement,
     HeroSlideManagement,
     ReturnManagement,
+    ReviewManagement,
   ],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.scss',
@@ -93,6 +97,7 @@ export class AdminDashboard implements OnInit {
   private campaignBannerService = inject(CampaignBannerService);
   private heroSlideService = inject(HeroSlideService);
   private returnService = inject(ReturnService);
+  private reviewService = inject(ReviewService);
   private snackBar = inject(MatSnackBar);
   private logoutConfirm = inject(LogoutConfirmService);
   /** Lets a header Refresh discard an in-progress add/edit form instead of leaving it open with stale data. */
@@ -101,6 +106,7 @@ export class AdminDashboard implements OnInit {
   readonly tabs = [
     { id: 'orders', label: 'Orders', shortLabel: 'Orders', icon: 'receipt_long' },
     { id: 'returns', label: 'Returns', shortLabel: 'Returns', icon: 'assignment_return' },
+    { id: 'reviews', label: 'Reviews', shortLabel: 'Reviews', icon: 'rate_review' },
     { id: 'products', label: 'Products', shortLabel: 'Products', icon: 'inventory_2' },
     { id: 'delivery-partners', label: 'Delivery Partners', shortLabel: 'Partners', icon: 'delivery_dining' },
     { id: 'delivery-charges', label: 'Delivery Charges', shortLabel: 'Charges', icon: 'local_shipping' },
@@ -243,6 +249,8 @@ export class AdminDashboard implements OnInit {
       this.loadOrders();
     } else if (tab === 'returns') {
       this.returnService.loadQueue();
+    } else if (tab === 'reviews') {
+      this.reviewService.loadAll();
     } else if (tab === 'delivery-partners') {
       this.loadDeliveryPartners();
     } else if (tab === 'products') {

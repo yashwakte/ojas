@@ -359,6 +359,32 @@
   line-height: 1.2;
 }
 
+// The rating under the name: a link down to the reviews, so it reads as a button and not a badge.
+.detail-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 12px;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid var(--ojas-border);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ojas-text-light);
+  cursor: pointer;
+  transition: border-color var(--ojas-transition), background var(--ojas-transition);
+
+  strong {
+    color: var(--ojas-text);
+  }
+
+  &:hover {
+    border-color: #f0c27a;
+    background: #fffaf2;
+  }
+}
+
 // ─── Availability ───
 .availability {
   display: flex;

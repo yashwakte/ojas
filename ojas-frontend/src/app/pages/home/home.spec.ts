@@ -58,8 +58,10 @@ describe('Home', () => {
 
     cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn', 'user', 'role']);
     authServiceSpy.isLoggedIn.and.returnValue(true);
+    authServiceSpy.user.and.returnValue(null);
+    authServiceSpy.role.and.returnValue('customer');
     campaignBannerServiceSpy = { campaigns: campaignsSignal };
 
     TestBed.configureTestingModule({

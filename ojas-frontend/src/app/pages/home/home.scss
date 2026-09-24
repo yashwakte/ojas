@@ -567,6 +567,12 @@ app-campaign-banner {
     line-height: 1.6;
     font-style: italic;
     margin-bottom: 14px;
+    // A review can run to 600 characters; the wall shows the opening lines of each.
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   // Alternate a bold dark "spotlight" card among the cream ones, matching the
@@ -613,6 +619,23 @@ app-campaign-banner {
     font-size: 0.78rem;
     color: var(--ojas-text);
   }
+}
+// Which product the review is about, under the name - a link, so the wall leads somewhere.
+.rproduct {
+  display: block;
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: var(--ojas-orange-dark);
+  text-decoration: none;
+}
+.rdate {
+  display: block;
+  font-weight: 400;
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+.rcard:nth-child(3n + 2) .rproduct {
+  color: #ffd6b0;
 }
 .ravatar {
   width: 30px;

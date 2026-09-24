@@ -1,0 +1,59 @@
+<div class="orp">
+  <p class="orp-title">
+    <mat-icon>{{ allRated() ? 'favorite' : 'rate_review' }}</mat-icon>
+    {{ allRated() ? 'Thank you for your reviews' : 'How was it? Rate what you bought' }}
+  </p>
+
+  <ul class="orp-lines">
+    @for (line of lines(); track line.productId) {
+      <li class="orp-line" [class.saved]="justSaved() === line.productId">
+        <span class="orp-thumb">
+          @if (line.image) {
+            <img [src]="line.image" alt="" loading="lazy" decoding="async" />
+          } @else {
+            <mat-icon>inventory_2</mat-icon>
+          }
+        </span>
+        <span class="orp-name">{{ line.productName }}</span>
+
+        @if (line.review; as review) {
+          <button
+            type="button"
+            class="orp-done"
+            (click)="rate(line)"
+            [attr.aria-label]="'Edit your review of ' + line.productName"
+          >
+            <app-star-rating [value]="review.rating" />
+            <span>Edit</span>
+          </button>
+        } @else {
+          <span class="orp-stars" role="group" [attr.aria-label]="'Rate ' + line.productName">
+            @for (s of five; track s) {
+              <button
+                type="button"
+                [attr.aria-label]="s + (s === 1 ? ' star' : ' stars')"
+                (click)="rate(line, s)"
+              >
+                <mat-icon>star</mat-icon>
+              </button>
+            }
+          </span>
+        }
+      </li>
+    }
+  </ul>
+</div>
+
+@if (open(); as o) {
+  <app-review-sheet
+    [productId]="o.line.productId"
+    [productName]="o.line.productName"
+    [imageUrl]="o.line.image"
+    [existing]="o.line.review"
+    [orderId]="orderId()"
+    [initialRating]="o.rating"
+    (saved)="onSaved($event)"
+    (removed)="open.set(null)"
+    (closed)="open.set(null)"
+  />
+}

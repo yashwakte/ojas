@@ -1,0 +1,232 @@
+// The same furniture as the returns pane - card rows, hairline borders, chip filters - so the
+// admin console reads as one console.
+.reviews-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pane-titles {
+  h3 {
+    margin: 0 0 4px;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--ojas-text, #2d2d2d);
+  }
+
+  p {
+    margin: 0;
+    max-width: 60ch;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--ojas-text-light, #6b6b6b);
+  }
+}
+
+.pane-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(240, 160, 32, 0.08);
+  border: 1px solid rgba(240, 160, 32, 0.24);
+
+  span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #b36b00;
+  }
+
+  strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ojas-text, #2d2d2d);
+  }
+
+  small {
+    font-size: 0.72rem;
+    color: var(--ojas-text-light, #6b6b6b);
+  }
+}
+
+.pane-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--ojas-border, #e7e2dc);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ojas-text-light, #6b6b6b);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.active {
+    border-color: var(--ojas-orange, #f25a1a);
+    background: var(--ojas-orange-bg, #fff8f6);
+    color: var(--ojas-orange-dark, #d14500);
+  }
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f0ebe5;
+  font-size: 0.7rem;
+  font-weight: 800;
+
+  .active & {
+    background: rgba(242, 90, 26, 0.16);
+  }
+}
+
+.pane-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--ojas-text-light, #6b6b6b);
+
+  mat-icon {
+    font-size: 2rem;
+    width: 2rem;
+    height: 2rem;
+    color: #cfc7bf;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.88rem;
+  }
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--ojas-border, #e7e2dc);
+  border-radius: 16px;
+  background: #fff;
+
+  &.hidden {
+    background: #faf8f6;
+    border-style: dashed;
+
+    .row-comment {
+      color: var(--ojas-text-light, #6b6b6b);
+    }
+  }
+}
+
+.row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.row-product {
+  font-size: 0.9rem;
+  color: var(--ojas-text, #2d2d2d);
+}
+
+.row-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.08);
+  color: #b42318;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.row-date {
+  margin-left: auto;
+  font-size: 0.74rem;
+  color: var(--ojas-text-light, #6b6b6b);
+}
+
+.row-comment {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--ojas-text, #2d2d2d);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+
+  &.empty {
+    font-style: italic;
+    color: var(--ojas-text-light, #6b6b6b);
+  }
+}
+
+.row-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  button.restore {
+    color: #2e7d4f;
+  }
+}
+
+.row-author {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ojas-text, #2d2d2d);
+}
+
+.row-order {
+  font-weight: 400;
+  color: var(--ojas-text-light, #6b6b6b);
+}
+
+@media (max-width: 600px) {
+  .row-date {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .row-foot button {
+    width: 100%;
+  }
+}

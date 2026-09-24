@@ -17,6 +17,16 @@
   </div>
   <div class="pbody-top">
     <h3>{{ product().name }}</h3>
+    @if (product().ratingCount) {
+      <span class="prating" [attr.aria-label]="'Rated ' + product().ratingAverage + ' out of 5'">
+        <mat-icon aria-hidden="true">star</mat-icon>
+        <b>{{ product().ratingAverage | number: '1.1-1' }}</b>
+        <span>({{ product().ratingCount }})</span>
+      </span>
+    } @else {
+      <!-- Kept empty so neighbouring cards' prices and buttons stay level. -->
+      <span class="prating prating--none" aria-hidden="true"></span>
+    }
     <div class="pmeta">
       <span>{{ product().weight }}</span>
       <span class="pprice">

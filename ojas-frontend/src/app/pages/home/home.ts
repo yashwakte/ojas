@@ -5,7 +5,8 @@ import { ProductService } from '../../services/product.service';
 import { CartService } from '../../services/cart.service';
 import { CheckoutService } from '../../services/checkout.service';
 import { CampaignBannerService } from '../../services/campaign-banner.service';
-import { CampaignBannerConfig, Product } from '../../models/interfaces';
+import { CampaignBannerConfig, Product, ProductReview } from '../../models/interfaces';
+import { ReviewService } from '../../services/review.service';
 import {
   PRODUCT_CATEGORY_DETAILS,
   ProductCategory,
@@ -49,6 +50,79 @@ export interface HomeAisle extends ProductCategoryDetail {
   tone: (typeof AISLE_TONES)[number];
 }
 
+/** One card on the home page's review wall. */
+interface WallCard {
+  id: string;
+  authorName: string;
+  rating: number;
+  comment: string;
+  productName: string;
+  productLink: string[];
+  /** When a customer posted it, as an ISO string, and as the card shows it. Null on the owner's
+   * starter testimonials. */
+  createdAt: string | null;
+  when?: string;
+}
+
+/**
+ * "21 Sept 2026, 6:42 pm". The browser's own formatter rather than Angular's DatePipe: importing
+ * the pipe here pulled about 47 kB into the first download of every page, which this one line
+ * does not need.
+ */
+const WALL_TIME = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+function reviewTime(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : WALL_TIME.format(date);
+}
+
+/** The wall always shows at least this many cards. */
+const MIN_WALL_CARDS = 3;
+
+/**
+ * Testimonials the owner supplied on 2026-09-23 for the wall until customers' own reviews
+ * arrive; each one drops off as a real review takes its place. The names are the owner's.
+ * The words are placeholders - replace them with what each person actually said.
+ */
+const STARTER_TESTIMONIALS: WallCard[] = [
+  {
+    id: 'starter-sneha',
+    authorName: 'Sneha Dhoran',
+    rating: 5,
+    comment:
+      'The modak pith is so fine and smooth - the ukadiche modak came out soft and did not crack once. It tastes just like home.',
+    productName: 'Modak Pith',
+    productLink: ['/products', 'modak-pith'],
+    createdAt: null,
+  },
+  {
+    id: 'starter-shubham',
+    authorName: 'Shubham Wakte',
+    rating: 5,
+    comment:
+      'Upvas bhajani with the right roast and aroma. The thalipeeth were crisp outside and soft inside - our fasting days are sorted.',
+    productName: 'Upvas Bhajani',
+    productLink: ['/products', 'upvas-bhajani'],
+    createdAt: null,
+  },
+  {
+    id: 'starter-shraddha',
+    authorName: 'Shraddha Sharma',
+    rating: 5,
+    comment:
+      'Fresh, stone-ground and neatly packed. The ragi flour makes lovely soft bhakri, and delivery was quick.',
+    productName: 'Ragi Flour',
+    productLink: ['/products', 'ragi-flour'],
+    createdAt: null,
+  },
+];
+
 @Component({
   selector: 'app-home',
   imports: [
@@ -73,6 +147,7 @@ export class Home implements OnInit {
   private checkoutService = inject(CheckoutService);
   private router = inject(Router);
   private campaignBannerService = inject(CampaignBannerService);
+  private reviewService = inject(ReviewService);
 
   justAdded = signal<string | null>(null);
 
@@ -154,6 +229,12 @@ export class Home implements OnInit {
       },
       error: () => this.bestsellersLoading.set(false),
     });
+
+    // Quiet on failure: the wall is simply left out, as it is before any reviews exist.
+    this.reviewService.featured().subscribe({
+      next: (reviews) => this.liveReviews.set(reviews),
+      error: () => {},
+    });
   }
 
   addToCart(product: Product): void {
@@ -211,21 +292,26 @@ export class Home implements OnInit {
     { icon: 'home', title: 'Delivered', desc: 'Straight to your doorstep with care and speed' },
   ];
 
-  testimonials = [
-    {
-      name: 'Priya Sharma',
-      text: 'The bajra flour quality is unmatched. My rotis have never tasted this good!',
-      rating: 5,
-    },
-    {
-      name: 'Amit Kulkarni',
-      text: 'Finally found pure, stone-ground flour. Ojas is now a staple in our kitchen.',
-      rating: 5,
-    },
-    {
-      name: 'Sneha Patil',
-      text: 'Love the ragi flour! My kids enjoy the ragi dosas every weekend.',
-      rating: 5,
-    },
-  ];
+  /** Verified-purchase reviews from the API, newest first. */
+  private readonly liveReviews = signal<ProductReview[]>([]);
+
+  /**
+   * The "Loved by Families" wall: customers' own reviews first, newest first, each with its date
+   * and time, then the owner's starter testimonials until there are at least three cards.
+   * The starters carry no "verified" mark and no date - they are not reviews from the shop.
+   */
+  readonly wall = computed<WallCard[]>(() => {
+    const live: WallCard[] = this.liveReviews().map((r) => ({
+      id: r.id,
+      authorName: r.authorName,
+      rating: r.rating,
+      comment: r.comment,
+      productName: r.productName,
+      productLink: ['/products', r.productId],
+      createdAt: r.createdAt,
+      when: reviewTime(r.createdAt),
+    }));
+    const needed = Math.max(0, MIN_WALL_CARDS - live.length);
+    return [...live, ...STARTER_TESTIMONIALS.slice(0, needed)];
+  });
 }
