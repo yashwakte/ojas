@@ -22,11 +22,7 @@ import { CheckoutService } from '../../services/checkout.service';
 import { OrderEditDraftService } from '../../services/order-edit-draft.service';
 import { ScrollLockService } from '../../services/scroll-lock.service';
 import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../models/interfaces';
-import {
-  categoryDetail,
-  isProductCategory,
-  normalizeCategory,
-} from '../../constants/product-categories';
+import { isProductCategory, normalizeCategory } from '../../constants/product-categories';
 import { searchProducts } from '../../constants/product-search';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
 import { thumbnailPackShot } from '../../constants/pack-shots';
@@ -368,16 +364,6 @@ export class Products {
     const category = this.selectedCategory();
     if (q && category === 'All') return `“${q}”`;
     return category === 'All' ? 'All products' : category;
-  });
-
-  readonly subtitle = computed(() => {
-    const category = this.selectedCategory();
-    if (this.query() && category === 'All') {
-      const n = this.filteredProducts().length;
-      return `${n} ${n === 1 ? 'product matches' : 'products match'} your search.`;
-    }
-    if (category !== 'All') return categoryDetail(category)?.blurb ?? '';
-    return 'Stone-ground flours, fasting staples and kitchen essentials, packed fresh and delivered across Pune.';
   });
 
   readonly showSkeleton = computed(

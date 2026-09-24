@@ -5,50 +5,30 @@
 }
 
 // ===== HEADING =====
-// Starts under the fixed header (64px on phones, 56px on desktops) and carries the page title, the
-// breadcrumb and a line about the aisle - short, so the products start within the first screen.
+// Just the page's name, centred: the label saying what kind of page this is, and the name under
+// it at a modest size. Starts under the fixed header (64px on phones, 56px on desktops).
 .shop-head {
-  position: relative;
-  overflow: hidden;
-  padding: 78px 16px 16px;
-  background: linear-gradient(160deg, #fff8f4 0%, #ffece2 55%, #ffe0d2 100%);
-}
-
-.shop-head-glow {
-  position: absolute;
-  width: 360px;
-  height: 360px;
-  right: -120px;
-  top: -140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(242, 90, 26, 0.18), transparent 65%);
-  pointer-events: none;
-}
-
-.shop-head-inner {
-  position: relative;
-  max-width: 1320px;
-  margin: 0 auto;
+  padding: 76px 16px 0;
+  text-align: center;
   animation: rise 0.6s var(--ojas-ease) both;
 
   h1 {
-    margin: 6px 0 8px;
+    margin: 4px 0 0;
     font-family: 'Poppins', sans-serif;
-    font-size: 1.5rem;
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.025em;
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
     color: #231a14;
     word-break: break-word;
   }
 }
 
-// What kind of page this is - the pantry, a category, a search - so the title can simply be the
-// name, with a hairline dash in the brand's colour ahead of it.
+// A hairline in the brand's colour either side of the label.
 .shop-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
   font-size: 0.66rem;
   font-weight: 700;
@@ -56,56 +36,13 @@
   text-transform: uppercase;
   color: var(--ojas-orange-dark);
 
-  &::before {
+  &::before,
+  &::after {
     content: '';
     width: 18px;
     height: 2px;
     border-radius: 2px;
     background: currentColor;
-    opacity: 0.6;
-  }
-}
-
-.shop-sub {
-  margin: 0;
-  max-width: 52ch;
-  font-size: 0.86rem;
-  line-height: 1.6;
-  color: #6f655d;
-  // Two lines at most on a phone, so the heading never pushes the products off the first screen.
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-// Desktop and tablet only: on a phone the label above the title does the job in less space.
-.crumbs {
-  display: none;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  font-size: 0.76rem;
-  color: var(--ojas-text-light);
-
-  a {
-    color: var(--ojas-text-light);
-    text-decoration: none;
-
-    &:hover {
-      color: var(--ojas-orange-dark);
-    }
-  }
-
-  span {
-    color: var(--ojas-text);
-    font-weight: 600;
-  }
-
-  mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
     opacity: 0.6;
   }
 }
@@ -117,16 +54,18 @@
 }
 
 // ===== SEARCH =====
+// In the toolbar: it takes whatever the row leaves after the sort and filter buttons.
 .shop-search {
   position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
 }
 
 .shop-search-icon {
   position: absolute;
-  left: 16px;
+  left: 12px;
   color: var(--ojas-text-light);
   font-size: 20px;
   width: 20px;
@@ -136,11 +75,12 @@
 
 .shop-search-input {
   width: 100%;
-  height: 48px;
-  padding: 0 48px 0 46px;
-  border-radius: 16px;
-  border: 1.5px solid var(--ojas-border);
+  height: 40px;
+  padding: 0 38px 0 40px;
+  border-radius: 12px;
+  border: 1px solid var(--ojas-border);
   background: #fff;
+  // 16px, or iOS zooms the page when the box is focused.
   font: 500 1rem 'Poppins', sans-serif;
   color: var(--ojas-text);
   box-shadow: var(--ojas-shadow-sm);
@@ -166,9 +106,9 @@
 
 .shop-search-clear {
   position: absolute;
-  right: 8px;
-  width: 36px;
-  height: 36px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 10px;
   background: transparent;
@@ -244,12 +184,13 @@
 }
 
 // ===== TOOLBAR =====
+// Phones: search, then sort and filter as icons, on one row, with the count kept for screen
+// readers. Wider screens put the count back at the start of the row.
 .toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 10px 0 10px;
+  gap: 8px;
+  margin: 0 0 10px;
   scroll-margin-top: 80px;
 }
 
@@ -263,7 +204,19 @@
   }
 }
 
+// Read out, not drawn: the count and the button labels on a phone.
+.toolbar-count,
+.tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .toolbar-actions {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -273,9 +226,11 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   min-height: 40px;
-  padding: 0 12px;
+  min-width: 40px;
+  padding: 0 10px;
   border-radius: 12px;
   border: 1px solid var(--ojas-border);
   background: #fff;
@@ -292,6 +247,9 @@
 }
 
 .tool-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -672,10 +630,14 @@
   gap: 12px;
 }
 
+// The link stretches and the price row sits at its foot, so neighbouring cards line up their
+// prices and buttons whatever the length of the name.
 .product-link {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   text-decoration: none;
   color: inherit;
-  display: block;
 }
 
 .product-card {
@@ -782,6 +744,9 @@
 }
 
 .product-info-top {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   padding: 12px 12px 0;
 }
 
@@ -796,6 +761,37 @@
   text-overflow: ellipsis;
 }
 
+// Stars from real reviews, on the photograph's bottom-left corner - drawn only once a product has
+// any, and taking no room in the text below, so every card's name sits straight on its description.
+.product-rating {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 4px rgba(35, 26, 20, 0.14);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--ojas-text-light);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: #f0a020;
+  }
+
+  b {
+    font-weight: 700;
+    color: var(--ojas-text);
+  }
+}
+
 .product-desc {
   margin: 0 0 10px;
   font-size: 0.76rem;
@@ -808,6 +804,7 @@
 }
 
 .product-meta {
+  margin-top: auto;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -853,7 +850,6 @@
 
 .product-info {
   padding: 0 12px 12px;
-  margin-top: auto;
 }
 
 .product-actions {
@@ -1011,16 +1007,6 @@
 
 // Short phones (a 320x568 screen, or any phone with a lot of browser chrome): the sentence under
 // the title goes, so the first products still start on the first screen.
-@media (max-width: 599px) and (max-height: 640px) {
-  .shop-sub {
-    display: none;
-  }
-
-  .shop-head {
-    padding-bottom: 12px;
-  }
-}
-
 // ===== WIDER SCREENS =====
 @media (min-width: 380px) {
   .products-grid {
@@ -1060,58 +1046,110 @@
   }
 }
 
-// Phone-sized: no description, a two-line name, tighter spacing - a card a thumb can scan.
+// Phone-sized: a two-line name, two lines of description (the owner asked for them back on
+// 2026-09-23 so a shopper knows what a flour is for before tapping in), and everything a notch
+// tighter so two cards and more of the next row fit on the screen.
 @container card (max-width: 210px) {
-  .product-desc {
-    display: none;
+  .product-image {
+    aspect-ratio: 5 / 4;
+  }
+
+  .product-rating {
+    left: 6px;
+    bottom: 6px;
+    padding: 2px 6px 2px 4px;
+    font-size: 0.66rem;
+
+    mat-icon {
+      font-size: 12px;
+      width: 12px;
+      height: 12px;
+    }
   }
 
   .product-info-top {
-    padding: 10px 10px 0;
+    padding: 8px 9px 0;
   }
 
   .product-name {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    min-height: 2.5em;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
     white-space: normal;
-    font-size: 0.86rem;
+    font-size: 0.82rem;
     line-height: 1.25;
   }
 
+  .product-desc {
+    margin-bottom: 6px;
+    font-size: 0.68rem;
+    line-height: 1.4;
+  }
+
   .product-meta {
-    padding-top: 8px;
-    margin-bottom: 8px;
+    padding-top: 6px;
+    margin-bottom: 7px;
+  }
+
+  .product-weight {
+    font-size: 0.72rem;
+  }
+
+  .product-price .sale-price {
+    font-size: 0.92rem;
   }
 
   .product-info {
-    padding: 0 10px 10px;
+    padding: 0 9px 9px;
+  }
+
+  .add-to-cart-btn,
+  .buy-now-btn {
+    min-height: 34px;
+    border-radius: 10px;
+  }
+
+  .product-actions > .buy-now-btn {
+    flex-basis: 34px;
   }
 }
 
 @media (min-width: 600px) {
   .shop-head {
-    padding: 84px 24px 26px;
+    padding: 80px 24px 0;
+
+    h1 {
+      font-size: 1.4rem;
+    }
   }
 
-  .crumbs {
-    display: flex;
-    margin-bottom: 14px;
+  // Room for the count and the button labels again.
+  .toolbar-count,
+  .tool-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
   }
 
-  .shop-head-inner h1 {
-    font-size: 1.9rem;
+  .toolbar-count {
+    flex-shrink: 0;
+    order: -1;
   }
 
-  .shop-sub {
-    display: block;
-    font-size: 0.95rem;
+  .shop-search {
+    max-width: 440px;
+    margin-left: auto;
+  }
+
+  .tool-badge {
+    position: static;
   }
 
   .shop-body {
-    padding: 20px 24px 80px;
+    padding: 16px 24px 80px;
   }
 
   .chip-rail {
@@ -1127,15 +1165,15 @@
 
 @media (min-width: 1024px) {
   .shop-head {
-    padding: 78px 32px 22px;
-  }
+    padding: 76px 32px 0;
 
-  .shop-head-inner h1 {
-    font-size: 2.2rem;
+    h1 {
+      font-size: 1.5rem;
+    }
   }
 
   .shop-body {
-    padding: 22px 32px 90px;
+    padding: 16px 32px 90px;
   }
 
   // The sidebar carries categories on a desktop, so the rail and the phone buttons step aside.
@@ -1148,18 +1186,44 @@
     display: inline-flex;
   }
 
-  .toolbar {
-    margin-top: 6px;
+  // The sidebar runs down the left from the toolbar's row, and the toolbar, the applied filters
+  // and the products share the column to its right - so the filters start level with the search
+  // instead of under a full-width toolbar row.
+  .shop-body {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: 28px;
+    align-items: start;
+
+    > * {
+      grid-column: 1 / -1;
+    }
   }
 
   .shop-layout {
-    display: grid;
-    grid-template-columns: 250px minmax(0, 1fr);
-    gap: 28px;
-    align-items: start;
+    display: contents;
+  }
+
+  .toolbar {
+    grid-column: 2;
+    grid-row: 2;
+    margin-bottom: 14px;
+  }
+
+  .pills {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .grid-wrap {
+    grid-column: 2;
+    grid-row: 4;
   }
 
   .side-filters {
+    grid-column: 1;
+    grid-row: 2 / span 3;
     display: block;
     position: sticky;
     top: 76px;
@@ -1257,7 +1321,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .product-card,
-  .shop-head-inner,
+  .shop-head,
   .pill,
   .sheet,
   .sheet-backdrop,

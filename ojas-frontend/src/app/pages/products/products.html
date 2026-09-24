@@ -1,49 +1,62 @@
 <section class="shop">
   <header class="shop-head">
-    <div class="shop-head-glow" aria-hidden="true"></div>
-    <div class="shop-head-inner">
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a routerLink="/">Home</a>
-        <mat-icon aria-hidden="true">chevron_right</mat-icon>
-        @if (selectedCategory() === 'All') {
-          <span aria-current="page">Shop</span>
-        } @else {
-          <a routerLink="/products">Shop</a>
-          <mat-icon aria-hidden="true">chevron_right</mat-icon>
-          <span aria-current="page">{{ selectedCategory() }}</span>
-        }
-      </nav>
-      <p class="shop-eyebrow">{{ eyebrow() }}</p>
-      <h1>{{ title() }}</h1>
-      <p class="shop-sub">{{ subtitle() }}</p>
-    </div>
+    <p class="shop-eyebrow">{{ eyebrow() }}</p>
+    <h1>{{ title() }}</h1>
   </header>
 
   <div class="shop-body">
     <app-order-picking-banner />
 
-    <div class="shop-search" role="search">
-      <mat-icon class="shop-search-icon" aria-hidden="true">search</mat-icon>
-      <input
-        type="search"
-        class="shop-search-input"
-        [value]="searchDraft()"
-        (input)="onSearchInput($any($event.target).value)"
-        (keydown.enter)="commitSearch()"
-        [attr.placeholder]="
-          selectedCategory() === 'All' ? 'Search jowar, ragi, custard…' : 'Search in ' + selectedCategory() + '…'
-        "
-        aria-label="Search products"
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        enterkeyhint="search"
-      />
-      @if (searchDraft()) {
-        <button type="button" class="shop-search-clear" (click)="clearSearch()" aria-label="Clear search">
-          <mat-icon>close</mat-icon>
+    <!-- Search sits in the toolbar beside sorting rather than on a row of its own, so the first
+         screen spends its height on products. -->
+    <div class="toolbar" #resultsTop>
+      <p class="toolbar-count" aria-live="polite">
+        Showing <b>{{ filteredProducts().length }}</b>
+        {{ filteredProducts().length === 1 ? 'product' : 'products' }}
+      </p>
+      <div class="shop-search" role="search">
+        <mat-icon class="shop-search-icon" aria-hidden="true">search</mat-icon>
+        <input
+          type="search"
+          class="shop-search-input"
+          [value]="searchDraft()"
+          (input)="onSearchInput($any($event.target).value)"
+          (keydown.enter)="commitSearch()"
+          [attr.placeholder]="
+            selectedCategory() === 'All' ? 'Search jowar, ragi, custard…' : 'Search in ' + selectedCategory() + '…'
+          "
+          aria-label="Search products"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          enterkeyhint="search"
+        />
+        @if (searchDraft()) {
+          <button type="button" class="shop-search-clear" (click)="clearSearch()" aria-label="Clear search">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </div>
+      <div class="toolbar-actions">
+        <label class="sort-select">
+          <span>Sort by</span>
+          <select [value]="sort()" (change)="setSort($any($event.target).value)" aria-label="Sort products">
+            @for (o of sortOptions; track o.key) {
+              <option [value]="o.key" [selected]="sort() === o.key">{{ o.label }}</option>
+            }
+          </select>
+          <mat-icon aria-hidden="true">expand_more</mat-icon>
+        </label>
+        <button type="button" class="tool-btn tool-btn--sort" (click)="openSortSheet()">
+          <mat-icon aria-hidden="true">swap_vert</mat-icon><span class="tool-label">{{ sortLabel() }}</span>
         </button>
-      }
+        <button type="button" class="tool-btn tool-btn--filter" (click)="openFilterSheet()">
+          <mat-icon aria-hidden="true">tune</mat-icon><span class="tool-label">Filter</span>
+          @if (activeFilterCount() > 0) {
+            <span class="tool-badge">{{ activeFilterCount() }}</span>
+          }
+        </button>
+      </div>
     </div>
 
     <div class="chip-rail" role="group" aria-label="Categories">
@@ -58,33 +71,6 @@
           {{ cat }}<span class="chip-count">{{ categoryCount(cat) }}</span>
         </button>
       }
-    </div>
-
-    <div class="toolbar" #resultsTop>
-      <p class="toolbar-count" aria-live="polite">
-        Showing <b>{{ filteredProducts().length }}</b>
-        {{ filteredProducts().length === 1 ? 'product' : 'products' }}
-      </p>
-      <div class="toolbar-actions">
-        <label class="sort-select">
-          <span>Sort by</span>
-          <select [value]="sort()" (change)="setSort($any($event.target).value)" aria-label="Sort products">
-            @for (o of sortOptions; track o.key) {
-              <option [value]="o.key" [selected]="sort() === o.key">{{ o.label }}</option>
-            }
-          </select>
-          <mat-icon aria-hidden="true">expand_more</mat-icon>
-        </label>
-        <button type="button" class="tool-btn tool-btn--sort" (click)="openSortSheet()">
-          <mat-icon aria-hidden="true">swap_vert</mat-icon>{{ sortLabel() }}
-        </button>
-        <button type="button" class="tool-btn tool-btn--filter" (click)="openFilterSheet()">
-          <mat-icon aria-hidden="true">tune</mat-icon>Filter
-          @if (activeFilterCount() > 0) {
-            <span class="tool-badge">{{ activeFilterCount() }}</span>
-          }
-        </button>
-      </div>
     </div>
 
     @if (activePills().length > 0) {
@@ -163,6 +149,16 @@
                     <div class="product-overlay">
                       <span class="product-badge">{{ product.category }}</span>
                     </div>
+                    @if (product.ratingCount) {
+                      <span
+                        class="product-rating"
+                        [attr.aria-label]="'Rated ' + product.ratingAverage + ' out of 5 from ' + product.ratingCount + ' reviews'"
+                      >
+                        <mat-icon aria-hidden="true">star</mat-icon>
+                        <b>{{ product.ratingAverage | number: '1.1-1' }}</b>
+                        <span>({{ product.ratingCount }})</span>
+                      </span>
+                    }
                     @if (isOutOfStock(product)) {
                       <span class="stock-veil"><span>Out of Stock</span></span>
                     }

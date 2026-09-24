@@ -211,7 +211,6 @@ describe('Products', () => {
       expect(page.searchDraft()).toBe('custard');
       expect(page.eyebrow()).toBe('Search results');
       expect(page.title()).toBe('“custard”');
-      expect(page.subtitle()).toBe('1 product matches your search.');
     });
   });
 
