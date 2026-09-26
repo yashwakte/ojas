@@ -1094,8 +1094,15 @@
 // 2026-09-23 so a shopper knows what a flour is for before tapping in), and everything a notch
 // tighter so two cards and more of the next row fit on the screen.
 @container card (max-width: 210px) {
+  // The card photos are 4:3; left at `contain` in this shorter frame they letterboxed, showing a
+  // pale band of the frame's own background above and below every photo. `cover` fills the frame
+  // and trims about 3% of plain backdrop off each side - the pack sits in the middle, untouched.
   .product-image {
     aspect-ratio: 5 / 4;
+
+    img {
+      object-fit: cover;
+    }
   }
 
   .product-rating {
