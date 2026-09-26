@@ -37,4 +37,6 @@ export const environment = {
   // lives only in the API's configuration and is never sent to a browser.
   msg91WidgetId: '3668436b4156363032343133',
   msg91TokenAuth: '562938TjibpKmLOJku6a92d768P1',
+  // Real texts only. See environment.ts.
+  msg91DevBypassCode: null as string | null,
 };

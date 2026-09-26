@@ -12,6 +12,10 @@ const CAPTCHA_ELEMENT_ID = 'msg91-phone-captcha';
 const SendOtpWatchdogMs = 30_000;
 const VerifyOtpWatchdogMs = 15_000;
 
+/** The token the local test mode hands the API in place of MSG91's. Msg91WidgetVerifier accepts it
+ * only in Development, and only for the number it names. */
+const DEV_TOKEN_PREFIX = 'ojas-dev-otp:';
+
 /** MSG91's own message for a valid-but-not-yet-entered state, distinct from a wrong code. */
 export class Msg91WidgetError extends Error {}
 
@@ -30,6 +34,11 @@ export class Msg91WidgetError extends Error {}
 export class Msg91WidgetService {
   private initPromise: Promise<void> | null = null;
   private scriptPromise: Promise<void> | null = null;
+
+  /** Set on a developer's machine only (see environment.ts): no script is loaded, no text is
+   * sent, and this code is the right one. Null in production. */
+  readonly devBypassCode = environment.msg91DevBypassCode;
+  private devPhone = '';
 
   get captchaElementId(): string {
     return CAPTCHA_ELEMENT_ID;
@@ -61,12 +70,14 @@ export class Msg91WidgetService {
    * an error against a step the customer has not asked for yet. initialize() runs the same
    * loadScript() promise later and reports the failure then, in context. */
   preload(): void {
+    if (this.devBypassCode) return;
     this.loadScript().catch(() => {});
   }
 
   /** Loads the script and calls initSendOTP exactly once. Safe to call repeatedly - subsequent
    * calls reuse the same in-flight/completed promise. */
   initialize(): Promise<void> {
+    if (this.devBypassCode) return Promise.resolve();
     this.initPromise ??= this.loadScript().then(
       () =>
         new Promise<void>((resolve, reject) => {
@@ -94,6 +105,10 @@ export class Msg91WidgetService {
   /** identifier must carry the country code with no "+" (MSG91's own requirement) - Ojas stores
    * bare 10-digit numbers, so callers pass the raw phone and this prefixes it. */
   sendOtp(phone: string): Promise<void> {
+    if (this.devBypassCode) {
+      this.devPhone = phone;
+      return Promise.resolve();
+    }
     return withWatchdog(
       new Promise((resolve, reject) => {
         if (!window.sendOtp) {
@@ -120,6 +135,11 @@ export class Msg91WidgetService {
   /** Resolves with the access token Ojas's backend verifies server-side - never trusted as proof
    * of anything on its own here, only forwarded. */
   verifyOtp(code: string): Promise<string> {
+    if (this.devBypassCode) {
+      return code === this.devBypassCode
+        ? Promise.resolve(`${DEV_TOKEN_PREFIX}${this.devPhone}:${crypto.randomUUID()}`)
+        : Promise.reject(new Msg91WidgetError('That code is invalid or has expired.'));
+    }
     return withWatchdog(
       new Promise<string>((resolve, reject) => {
         if (!window.verifyOtp) {

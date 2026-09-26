@@ -10,4 +10,8 @@ export const environment = {
   // any less readable, since it is shipped to every browser that opens the register page.
   msg91WidgetId: '3668436b4156363032343133',
   msg91TokenAuth: '562938TjibpKmLOJku6a92d768P1',
+  // MSG91's widget cannot send from localhost - its hCaptcha refuses to validate there - so on a
+  // developer's machine no text is sent and this code always works. The API accepts the token it
+  // produces only when running in Development; see Msg91WidgetVerifier.
+  msg91DevBypassCode: '1234' as string | null,
 };
