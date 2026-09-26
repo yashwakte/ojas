@@ -27,15 +27,28 @@ public class Msg91WidgetVerifier
 {
     private const string VerifyUrl = "https://control.msg91.com/api/v5/widget/verifyAccessToken";
 
+    /// <summary>What the website's local test mode sends instead of a MSG91 token, followed by the
+    /// number and a random suffix. MSG91's widget cannot send a text from localhost, so this is the only way to walk a
+    /// phone step on a developer's machine. Honoured in Development alone - the same line the
+    /// Development-only email devCode draws - so on any real deployment it is just an invalid
+    /// token.</summary>
+    public const string DevTokenPrefix = "ojas-dev-otp:";
+
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
     private readonly ILogger<Msg91WidgetVerifier> _logger;
+    private readonly bool _isDevelopment;
 
-    public Msg91WidgetVerifier(HttpClient http, IConfiguration config, ILogger<Msg91WidgetVerifier> logger)
+    public Msg91WidgetVerifier(
+        HttpClient http,
+        IConfiguration config,
+        ILogger<Msg91WidgetVerifier> logger,
+        IWebHostEnvironment? env = null)
     {
         _http = http;
         _config = config;
         _logger = logger;
+        _isDevelopment = env?.IsDevelopment() == true;
     }
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_config["Msg91:WidgetAuthKey"]);
@@ -45,6 +58,19 @@ public class Msg91WidgetVerifier
     /// country-code prefix (e.g. 91XXXXXXXXXX) while Ojas stores the bare 10-digit number.</summary>
     public async Task<Msg91VerificationResult> VerifyAsync(string accessToken, string expectedPhone)
     {
+        if (accessToken.StartsWith(DevTokenPrefix, StringComparison.Ordinal))
+        {
+            // "<prefix><phone>:<nonce>" - the nonce keeps each test sign-in a fresh token, since
+            // a token is only ever redeemed once (see AuthService.ClaimPhoneTokenAsync).
+            var devPhone = accessToken[DevTokenPrefix.Length..].Split(':')[0];
+            if (_isDevelopment && PhoneMatches(devPhone, expectedPhone))
+                return new Msg91VerificationResult(true, devPhone, null);
+
+            if (!_isDevelopment)
+                _logger.LogWarning("A local-testing phone token was presented outside Development and refused.");
+            return new Msg91VerificationResult(false, null, "That code is invalid or has expired.");
+        }
+
         if (!IsConfigured)
             return new Msg91VerificationResult(false, null, "Phone login is not available yet.");
 

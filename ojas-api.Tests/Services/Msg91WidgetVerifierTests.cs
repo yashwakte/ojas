@@ -1,6 +1,9 @@
 using System.Net;
 using System.Text;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Moq;
 using Microsoft.Extensions.Logging.Abstractions;
 using OjasApi.Services;
 using Shouldly;
@@ -190,5 +193,58 @@ public class Msg91WidgetVerifierTests
         var result = await verifier.VerifyAsync("some-token", Phone);
 
         result.Success.ShouldBeTrue();
+    }
+
+    // ---------- Local test mode ----------
+
+    private static Msg91WidgetVerifier VerifierIn(string environmentName, Action? onNetwork = null)
+    {
+        var env = new Mock<IWebHostEnvironment>();
+        env.SetupGet(e => e.EnvironmentName).Returns(environmentName);
+        return new(
+            new HttpClient(new FakeHandler(_ => { onNetwork?.Invoke(); return Json(HttpStatusCode.OK, "{}"); })),
+            ConfiguredSettings(),
+            NullLogger<Msg91WidgetVerifier>.Instance,
+            env.Object);
+    }
+
+    [Fact]
+    public async Task ALocalTestToken_IsAcceptedInDevelopment_ForItsOwnNumber_WithoutCallingMsg91()
+    {
+        var called = false;
+        var result = await VerifierIn(Environments.Development, () => called = true)
+            .VerifyAsync(Msg91WidgetVerifier.DevTokenPrefix + Phone, Phone);
+
+        result.Success.ShouldBeTrue();
+        called.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ALocalTestToken_IsRefusedInDevelopment_ForAnotherNumber()
+    {
+        var result = await VerifierIn(Environments.Development)
+            .VerifyAsync(Msg91WidgetVerifier.DevTokenPrefix + "9000000000", Phone);
+
+        result.Success.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public async Task ALocalTestToken_IsRefusedOutsideDevelopment(string environmentName)
+    {
+        var result = await VerifierIn(environmentName)
+            .VerifyAsync(Msg91WidgetVerifier.DevTokenPrefix + Phone, Phone);
+
+        result.Success.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ALocalTestToken_IsRefused_WhenNoEnvironmentIsKnown()
+    {
+        var result = await MakeVerifier(_ => Json(HttpStatusCode.OK, "{}"))
+            .VerifyAsync(Msg91WidgetVerifier.DevTokenPrefix + Phone, Phone);
+
+        result.Success.ShouldBeFalse();
     }
 }
