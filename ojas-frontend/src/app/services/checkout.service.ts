@@ -18,7 +18,7 @@ export interface CheckoutItem {
 @Injectable({ providedIn: 'root' })
 export class CheckoutService {
   private readonly basket = new SyncedBasket(
-    { list: 'checkout', storagePrefix: 'ojas_checkout' },
+    { list: 'checkout', storagePrefix: 'ojas_checkout', guestLinesOnSignIn: 'replace' },
     inject(AuthService),
     inject(BasketSyncService),
   );

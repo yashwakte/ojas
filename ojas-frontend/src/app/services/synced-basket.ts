@@ -11,6 +11,13 @@ export interface SyncedBasketOptions {
   list: BasketList;
   /** `${prefix}_guest` holds a signed-out visitor's lines; `${prefix}_${userId}` caches an account's. */
   storagePrefix: string;
+  /**
+   * What a signed-out visitor's lines do to the account's when they sign in. The cart merges -
+   * both are things the customer meant to buy. The checkout selection replaces: it is what they
+   * are paying for on the screen in front of them, and adding an older selection from the
+   * account on top would change their order under them (and double any product in both).
+   */
+  guestLinesOnSignIn?: 'merge' | 'replace';
 }
 
 /**
@@ -94,7 +101,7 @@ export class SyncedBasket {
 
     const guest = this.read(this.guestKey);
     this.cachedAtSignIn = this.read(this.userKey(userId));
-    this._lines.set(guest.length ? mergeLines(this.cachedAtSignIn, guest) : this.cachedAtSignIn);
+    this._lines.set(guest.length ? this.adoptGuest(this.cachedAtSignIn, guest) : this.cachedAtSignIn);
 
     if (!serverBacked) {
       this.retireGuestLines(userId);
@@ -144,7 +151,7 @@ export class SyncedBasket {
       let next = firstSync && !server.updatedAt ? this.cachedAtSignIn : serverLines;
       if (firstSync) {
         const guest = this.read(this.guestKey);
-        if (guest.length) next = mergeLines(next, guest);
+        if (guest.length) next = this.adoptGuest(next, guest);
         for (const change of this.queued) next = change(next);
         this.queued = [];
       }
@@ -154,6 +161,12 @@ export class SyncedBasket {
       this.retireGuestLines(userId);
       if (!sameLines(next, serverLines)) this.sync.save(this.options.list, userId, next);
     });
+  }
+
+  private adoptGuest(account: BasketLine[], guest: BasketLine[]): BasketLine[] {
+    return this.options.guestLinesOnSignIn === 'replace'
+      ? guest.map((line) => ({ ...line }))
+      : mergeLines(account, guest);
   }
 
   private get guestKey(): string {

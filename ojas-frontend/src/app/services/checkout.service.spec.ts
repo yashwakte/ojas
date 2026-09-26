@@ -62,6 +62,23 @@ describe('CheckoutService', () => {
     expect(service.items()).toEqual([{ product, quantity: 2 }]);
   });
 
+  it('keeps the selection a guest is paying for when they sign in, rather than adding an older one to it', () => {
+    service.addItem(product, 2);
+
+    login('u1');
+    httpMock.expectOne((r) => r.method === 'GET' && r.url.endsWith('/cart')).flush({
+      items: [],
+      checkoutItems: [
+        { product, quantity: 3 },
+        { product: product2, quantity: 1 },
+      ],
+      updatedAt: '2026-09-01T00:00:00Z',
+    });
+
+    // Merged, this would have been 5 bags of the same flour plus a product they never chose.
+    expect(service.items().map((i) => [i.product.id, i.quantity])).toEqual([['p1', 2]]);
+  });
+
   it('resets on logout', () => {
     login('u1');
     service.addItem(product);
