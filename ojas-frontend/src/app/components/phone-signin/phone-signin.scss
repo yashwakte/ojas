@@ -3,13 +3,16 @@
 @use '../../styles/liquid-glass' as glass;
 
 :host {
-  display: block;
-}
-
-.ps-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+// The forms' children are laid out by the host, so MSG91's captcha - which has to sit outside
+// both steps, see the template - can still be ordered in just above the button. On the live
+// domain it is a visible "I am human" box, and below the button it was ticked too late.
+.ps-form {
+  display: contents;
 }
 
 .ps-field {
@@ -179,11 +182,18 @@
 }
 
 .ps-captcha {
+  order: 1;
   display: flex;
   justify-content: center;
+
+  // hCaptcha's passive check usually renders nothing; an empty slot must not add a second gap.
+  &:empty {
+    margin-top: -14px;
+  }
 }
 
 .ps-btn {
+  order: 2;
   width: 100%;
   min-height: 50px;
   display: flex;
@@ -251,6 +261,7 @@
 }
 
 .ps-resend {
+  order: 3;
   margin: 0;
   text-align: center;
   font-size: 0.82rem;
@@ -283,8 +294,9 @@
   white-space: nowrap;
 }
 
-// The code step settles in rather than snapping in.
-.ps-reveal {
+// The code step settles in rather than snapping in. Its form is display: contents, so the
+// motion goes on what it holds.
+.ps-reveal > * {
   animation: psRise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -300,7 +312,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ps-reveal {
+  .ps-reveal > * {
     animation: none;
   }
 }
