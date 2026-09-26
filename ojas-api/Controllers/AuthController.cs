@@ -276,12 +276,70 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
         }
 
+        if (!await _authService.ClaimPhoneTokenAsync(request.WidgetToken))
+            return BadRequest(new { message = "That code has already been used. Please request a new one." });
+
         var step = await _authService.CompletePhoneVerificationAsync(request.Phone);
         if (step == null)
             return NotFound();
 
         return Ok(RegistrationStepResponseFor(step));
     }
+
+    /// <summary>
+    /// Signs in with a verified mobile number - step one of checkout for a customer who is not
+    /// signed in. Only checkout sends these codes, since each one costs money; the login page stays
+    /// on passwords. A number with an account opens it; a new number creates one from the name,
+    /// email and password sent with it, as the registration page would. See
+    /// AuthService.SignInWithVerifiedPhoneAsync for who gets what.
+    ///
+    /// Anything that can be refused without the code is refused first, so a typo in the email
+    /// never burns the customer's one-use token. The token is then checked with MSG91, bound to
+    /// this number, and claimed so it can never be presented a second time.
+    /// </summary>
+    [HttpPost("phone-signin")]
+    public async Task<ActionResult<PhoneSignInResponse>> PhoneSignIn([FromBody] PhoneSignInRequest request)
+    {
+        var refusal = await _authService.CheckPhoneSignInAsync(
+            request.Phone, request.FullName, request.Email, request.Password);
+        if (refusal != null)
+            return PhoneSignInRefusal(refusal);
+
+        var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
+        if (!verification.Success)
+        {
+            _logger.LogWarning(
+                "Phone sign-in rejected at the MSG91 verification step for {Phone}: {Error}",
+                request.Phone, verification.Error);
+            return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
+        }
+
+        if (!await _authService.ClaimPhoneTokenAsync(request.WidgetToken))
+        {
+            _logger.LogWarning("A MSG91 token was presented a second time for {Phone}.", request.Phone);
+            return BadRequest(new { message = "That code has already been used. Please request a new one." });
+        }
+
+        var result = await _authService.SignInWithVerifiedPhoneAsync(
+            request.Phone, request.FullName, request.Email, request.Password);
+        if (result.Session == null)
+            return PhoneSignInRefusal(result);
+
+        if (result.Outcome == PhoneSignInOutcome.Created)
+            _logger.LogInformation("Account {UserId} created by phone sign-in.", result.Session.User.Id);
+
+        return Ok(new PhoneSignInResponse(
+            IssueSession(result.Session),
+            result.Outcome == PhoneSignInOutcome.Created,
+            result.EmailVerified));
+    }
+
+    private ActionResult PhoneSignInRefusal(PhoneSignInResult refusal) => refusal.Outcome switch
+    {
+        PhoneSignInOutcome.EmailTaken => Conflict(new { message = refusal.Message, field = "email" }),
+        PhoneSignInOutcome.StaffAccount => StatusCode(StatusCodes.Status403Forbidden, new { message = refusal.Message }),
+        _ => BadRequest(new { message = refusal.Message, needsDetails = true }),
+    };
 
     private RegistrationStepResponse RegistrationStepResponseFor(RegistrationStepResult step)
     {

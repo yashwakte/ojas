@@ -173,6 +173,197 @@ public class AuthService
         return new RegistrationStepResult(session, user.IsEmailVerified, user.IsPhoneVerified, user.Email, user.Phone);
     }
 
+    public async Task<User?> FindByPhoneAsync(string phone) =>
+        await _db.Users.Find(u => u.Phone == NormalizePhone(phone)).FirstOrDefaultAsync();
+
+    /// <summary>Matches RegisterRequest's rule for the password.</summary>
+    private const int MinPasswordLength = 10;
+
+    private static readonly System.Text.RegularExpressions.Regex EmailShape =
+        new(@"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Everything about a phone sign-in that can be settled before a text code is spent on it:
+    /// a staff number, and - for a number with no account yet - a missing name, email or password,
+    /// or an email that already belongs to someone else. Returns null when the sign-in may go ahead.
+    ///
+    /// Run before the widget token is checked, so that a customer who mistyped their email is
+    /// told so and can fix it, rather than having their one-use token consumed by a request that
+    /// was always going to be refused.
+    /// </summary>
+    public async Task<PhoneSignInResult?> CheckPhoneSignInAsync(
+        string phone, string? fullName, string? email, string? password)
+    {
+        var existing = await FindByPhoneAsync(phone);
+        if (existing != null)
+        {
+            return DeviceService.IsRestrictedRole(existing.Role)
+                ? new PhoneSignInResult(PhoneSignInOutcome.StaffAccount,
+                    Message: "Staff accounts sign in with their password.")
+                : null;
+        }
+
+        var name = fullName?.Trim() ?? string.Empty;
+        var normalizedEmail = NormalizeEmail(email ?? string.Empty);
+        if (name.Length < 2 || !EmailShape.IsMatch(normalizedEmail))
+        {
+            return new PhoneSignInResult(PhoneSignInOutcome.DetailsRequired,
+                Message: "Please enter your name and a valid email address.");
+        }
+
+        // The same rule as the registration page - this is the same account being opened.
+        if ((password ?? string.Empty).Length < MinPasswordLength)
+        {
+            return new PhoneSignInResult(PhoneSignInOutcome.DetailsRequired,
+                Message: $"Please choose a password of at least {MinPasswordLength} characters.");
+        }
+
+        if (await EmailExistsAsync(normalizedEmail))
+        {
+            return new PhoneSignInResult(PhoneSignInOutcome.EmailTaken,
+                Message: "This email is already on another Ojas account. Use a different email, or sign in to that account.");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Records a MSG91 widget token as spent. True only for the first caller to present it; the
+    /// insert is atomic on the token's hash, so two requests racing with the same token cannot
+    /// both win. A day comfortably outlives any token MSG91 would still honour.
+    /// </summary>
+    public async Task<bool> ClaimPhoneTokenAsync(string widgetToken)
+    {
+        try
+        {
+            await _db.UsedPhoneTokens.InsertOneAsync(new UsedPhoneToken
+            {
+                TokenHash = HashToken(widgetToken),
+                ExpiresAt = DateTime.UtcNow.AddDays(1),
+            });
+            return true;
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Signs a customer in on a mobile number whose text code has been checked and bound to this
+    /// number - opening the account that number belongs to, or creating one with the same details
+    /// the registration page asks for.
+    ///
+    /// <para><b>Existing, verified account.</b> Opened as it is. The name, email and password typed
+    /// at checkout are ignored; moving an account's email goes through its own code check on the
+    /// profile, and a checkout form must not be a way round that.</para>
+    ///
+    /// <para><b>Existing account whose phone was never verified.</b> A registration somebody
+    /// started with this number and abandoned before the code step. Whoever has just proved the
+    /// number is its real owner; the person who typed it in has proved nothing. So the account
+    /// is claimed rather than simply opened: the password set by that earlier person is replaced
+    /// by the one typed now (or removed, if none was), any sessions are ended, and an email nobody
+    /// ever verified is replaced by the one typed now. Otherwise anyone could pre-register a stranger's number, wait for them to shop, and
+    /// then sign into their orders and addresses with the password they chose.</para>
+    ///
+    /// <para><b>New number.</b> An account is created from the name, email and password given,
+    /// with the phone verified and the email not. The customer can confirm the email whenever they
+    /// like, and sign in with the password next time without spending a text code.</para>
+    /// </summary>
+    public async Task<PhoneSignInResult> SignInWithVerifiedPhoneAsync(
+        string phone, string? fullName, string? email, string? password)
+    {
+        var refusal = await CheckPhoneSignInAsync(phone, fullName, email, password);
+        var existing = await FindByPhoneAsync(phone);
+
+        if (existing != null)
+        {
+            if (refusal != null)
+                return refusal;
+
+            if (!existing.IsPhoneVerified)
+                existing = await ClaimUnverifiedAccountAsync(existing, fullName, email, password);
+
+            if (string.IsNullOrWhiteSpace(existing.Role))
+                existing.Role = UserRoles.Customer;
+
+            return new PhoneSignInResult(
+                PhoneSignInOutcome.SignedIn, await IssueSessionAsync(existing, null), existing.IsEmailVerified);
+        }
+
+        if (refusal != null)
+            return refusal;
+
+        var user = new User
+        {
+            FullName = fullName!.Trim(),
+            Email = NormalizeEmail(email!),
+            Phone = NormalizePhone(phone),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = UserRoles.Customer,
+            IsPhoneVerified = true,
+            IsEmailVerified = false,
+        };
+
+        try
+        {
+            await _db.Users.InsertOneAsync(user);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // Lost a race: the same number or email was registered between the check above and
+            // this insert. If it was this number, it is the same person on a second tab - open
+            // whatever now holds it. If it was the email, say so.
+            var winner = await FindByPhoneAsync(phone);
+            if (winner != null && !DeviceService.IsRestrictedRole(winner.Role) && winner.IsPhoneVerified)
+                return new PhoneSignInResult(
+                    PhoneSignInOutcome.SignedIn, await IssueSessionAsync(winner, null), winner.IsEmailVerified);
+
+            return new PhoneSignInResult(PhoneSignInOutcome.EmailTaken,
+                Message: "This email is already on another Ojas account. Use a different email, or sign in to that account.");
+        }
+
+        return new PhoneSignInResult(PhoneSignInOutcome.Created, await IssueSessionAsync(user, null), false);
+    }
+
+    private async Task<User> ClaimUnverifiedAccountAsync(User user, string? fullName, string? email, string? password)
+    {
+        var passwordHash = (password ?? string.Empty).Length >= MinPasswordLength
+            ? BCrypt.Net.BCrypt.HashPassword(password)
+            : string.Empty;
+
+        var update = Builders<User>.Update
+            .Set(u => u.IsPhoneVerified, true)
+            .Set(u => u.PasswordHash, passwordHash)
+            .Set(u => u.FailedLoginCount, 0)
+            .Set(u => u.LoginBlockedUntil, (DateTime?)null);
+
+        var name = fullName?.Trim() ?? string.Empty;
+        if (name.Length >= 2)
+        {
+            update = update.Set(u => u.FullName, name);
+            user.FullName = name;
+        }
+
+        // Only an email nobody ever proved is replaced, and only by one no other account holds.
+        var normalizedEmail = NormalizeEmail(email ?? string.Empty);
+        if (!user.IsEmailVerified &&
+            EmailShape.IsMatch(normalizedEmail) &&
+            normalizedEmail != user.Email &&
+            !await EmailExistsAsync(normalizedEmail))
+        {
+            update = update.Set(u => u.Email, normalizedEmail);
+            user.Email = normalizedEmail;
+        }
+
+        await _db.Users.UpdateOneAsync(Builders<User>.Filter.Eq(u => u.Id, user.Id), update);
+        await RevokeAllRefreshTokensForUserAsync(user.Id!);
+
+        user.IsPhoneVerified = true;
+        user.PasswordHash = passwordHash;
+        return user;
+    }
+
     public async Task<LoginServiceResult> LoginAsync(LoginRequest request, string? rawDeviceId)
     {
         var user = await FindByCredentialsAsync(request.Identifier, request.Password);

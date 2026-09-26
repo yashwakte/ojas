@@ -31,6 +31,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<HeroSlide> HeroSlides => _database.GetCollection<HeroSlide>("hero_slides");
     public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
+    public IMongoCollection<UsedPhoneToken> UsedPhoneTokens => _database.GetCollection<UsedPhoneToken>("used_phone_tokens");
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
     public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
     public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
@@ -103,6 +104,15 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { Name = "refresh_token_family" }
             );
             RefreshTokens.Indexes.CreateMany([refreshTokenTtlIndex, refreshTokenUserIdIndex, refreshTokenFamilyIndex]);
+
+            // A redeemed MSG91 token only has to be remembered for as long as it could still be
+            // presented; Mongo drops the row after that. The _id is the token's hash, so the
+            // uniqueness that makes a second redemption fail needs no index of its own.
+            var usedPhoneTokenTtlIndex = new CreateIndexModel<UsedPhoneToken>(
+                Builders<UsedPhoneToken>.IndexKeys.Ascending(t => t.ExpiresAt),
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "used_phone_token_ttl" }
+            );
+            UsedPhoneTokens.Indexes.CreateOne(usedPhoneTokenTtlIndex);
 
             // Every wallet statement reads one customer's rows newest-first, so index the pair
             // rather than the user alone - this collection only ever grows.

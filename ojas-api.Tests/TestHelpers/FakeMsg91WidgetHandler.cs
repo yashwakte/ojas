@@ -25,6 +25,16 @@ public sealed class FakeMsg91WidgetHandler : HttpMessageHandler
 
     private readonly ConcurrentDictionary<string, string> _tokens = new();
     private readonly ConcurrentDictionary<string, bool> _redeemed = new();
+    private readonly ConcurrentDictionary<string, string> _reusable = new();
+
+    /// <summary>A token this handler verifies as often as it is asked - standing in for the case
+    /// where MSG91 itself does not refuse a second redemption, so a test can prove the API does.</summary>
+    public string IssueReusableToken(string phone)
+    {
+        var token = $"reusable-widget-token-{Guid.NewGuid():N}";
+        _reusable[token] = phone;
+        return token;
+    }
 
     /// <summary>Registers a token that verifies successfully, once, for the given phone.</summary>
     public string IssueToken(string phone)
@@ -44,6 +54,9 @@ public sealed class FakeMsg91WidgetHandler : HttpMessageHandler
         var body = request.Content == null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
         var token = doc.RootElement.TryGetProperty("access-token", out var el) ? el.GetString() ?? "" : "";
+
+        if (_reusable.TryGetValue(token, out var reusablePhone))
+            return Json(HttpStatusCode.OK, JsonSerializer.Serialize(new { type = "success", identifier = reusablePhone }));
 
         if (!_redeemed.TryAdd(token, true))
             return Json(HttpStatusCode.OK, """{"type":"error","message":"That code is invalid or has expired."}""");

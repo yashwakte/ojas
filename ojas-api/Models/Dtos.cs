@@ -149,6 +149,41 @@ public record VerifyPhoneRegistrationRequest(
 	[Required, MinLength(10), MaxLength(20)] string Phone,
 	[Required] string WidgetToken);
 
+/// <summary>Signs in with a verified mobile number - step one of checkout for a customer who is not
+/// signed in. A number that already has an account opens it, and the other fields are ignored. A
+/// new number creates the account from them, exactly as the registration page would, so all three
+/// are then required; the email is stored unverified, to be confirmed whenever the customer
+/// chooses.</summary>
+public record PhoneSignInRequest(
+	[Required, RegularExpression(@"^[6-9]\d{9}$")] string Phone,
+	[Required] string WidgetToken,
+	[MaxLength(80)] string? FullName = null,
+	[MaxLength(120)] string? Email = null,
+	[MaxLength(128)] string? Password = null);
+
+/// <summary>IsNewAccount tells the page whether to greet a returning customer or a new one;
+/// EmailVerified whether to offer the email check.</summary>
+public record PhoneSignInResponse(AuthResponse Session, bool IsNewAccount, bool EmailVerified);
+
+public enum PhoneSignInOutcome
+{
+	SignedIn,
+	Created,
+	/// <summary>The number is new, and the name, email or password needed to open an account for
+	/// it is missing or malformed.</summary>
+	DetailsRequired,
+	/// <summary>The number is new, but the email typed already belongs to another account.</summary>
+	EmailTaken,
+	/// <summary>Staff sign in with a password on a bound device, never by text code.</summary>
+	StaffAccount,
+}
+
+public record PhoneSignInResult(
+	PhoneSignInOutcome Outcome,
+	AuthResult? Session = null,
+	bool EmailVerified = false,
+	string? Message = null);
+
 /// <summary>Registration now requires both steps - verify-email-otp and
 /// verify-phone-registration - completable in either order. Whichever one finishes second
 /// carries Session; the other reports what's still outstanding so the frontend knows which

@@ -14,6 +14,7 @@ public interface IMongoDbService
     IMongoCollection<HeroSlide> HeroSlides { get; }
     IMongoCollection<OtpCode> OtpCodes { get; }
     IMongoCollection<RefreshToken> RefreshTokens { get; }
+    IMongoCollection<UsedPhoneToken> UsedPhoneTokens { get; }
     IMongoCollection<StaffDevice> StaffDevices { get; }
     IMongoCollection<StaffInvite> StaffInvites { get; }
     IMongoCollection<WalletTransaction> WalletTransactions { get; }

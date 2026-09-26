@@ -514,6 +514,9 @@ app.Use(async (context, next) =>
         path.StartsWithSegments("/api/auth/device/send-otp") ||
         path.StartsWithSegments("/api/auth/device/enroll") ||
         path.StartsWithSegments("/api/auth/accept-invite") ||
+        // Signing in by text code at checkout is a login like any other, and a guest's browser can
+        // still be holding an old session's cookie that the page itself no longer knows about.
+        path.StartsWithSegments("/api/auth/phone-signin") ||
         // Email verification is anonymous by design and verify-email-otp can itself issue a
         // session, so it belongs with the others above. It also has a second caller now: a
         // customer who signed in with only their phone verified and later confirms their address
