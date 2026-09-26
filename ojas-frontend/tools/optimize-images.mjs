@@ -175,6 +175,31 @@ async function detectEdgeTrim(source, meta) {
 const PACK_SHOT_WIDTH = 420;
 
 /**
+ * Extra backdrop above the pack in the card-sized picture only, as a share of the photograph's
+ * height.
+ *
+ * The photographs leave the pouch's sealed top about 6% below the frame. On the product page that
+ * is plenty; on a card it is not. The card's corner is rounded, its badge sits at the top-left, and
+ * on a phone the home rails tilt each card in 3D - so a pack 6% from the edge reads as a pack with
+ * its top cut off, which is how the owner described it on 2026-09-26. Continuing the backdrop
+ * upwards by copying its top row is the same operation as the sideways widening above: nothing of
+ * the pack is touched, and the near-flat top of the gradient continues without a seam. The
+ * picture is then widened again so the card still gets 4:3.
+ */
+const PACK_SHOT_CARD_HEADROOM = 0.12;
+
+/** Widens to the published aspect by continuing the backdrop outwards. Never narrows, and never
+ * touches the pack: a picture already wider than 4:3 is left exactly as it is. */
+async function widenToPackShotAspect(image) {
+  const { width, height } = await sharp(image).metadata();
+  const wanted = Math.round(height * PACK_SHOT_ASPECT);
+  const pad = Math.max(0, Math.round((wanted - width) / 2));
+  return pad > 0
+    ? sharp(image).extend({ left: pad, right: pad, extendWith: 'copy' }).toBuffer()
+    : image;
+}
+
+/**
  * What the product page's image well actually needs.
  *
  * The full size exists so the lightbox can be zoomed into and still be showing the pack's own
@@ -252,13 +277,15 @@ async function optimizePackShots(sourceDir) {
         .toBuffer();
       const inner = await sharp(trimmed).metadata();
 
-      // Widen to the published aspect by continuing the backdrop outwards. Never narrows, and
-      // never touches the pack: a photograph already wider than 4:3 is left exactly as it is.
-      const wanted = Math.round(inner.height * PACK_SHOT_ASPECT);
-      const pad = Math.max(0, Math.round((wanted - inner.width) / 2));
-      const framed = pad > 0
-        ? await sharp(trimmed).extend({ left: pad, right: pad, extendWith: 'copy' }).toBuffer()
-        : trimmed;
+      const framed = await widenToPackShotAspect(trimmed);
+
+      // The card's picture gets headroom above the pack - see PACK_SHOT_CARD_HEADROOM.
+      const cardFramed = await widenToPackShotAspect(
+        await sharp(trimmed)
+          .extend({ top: Math.round(inner.height * PACK_SHOT_CARD_HEADROOM), extendWith: 'copy' })
+          .toBuffer(),
+      );
+      const cardFramedWidth = (await sharp(cardFramed).metadata()).width;
 
       // Never enlarge: upscaling invents no detail and only costs bytes.
       const framedWidth = (await sharp(framed).metadata()).width;
@@ -269,8 +296,8 @@ async function optimizePackShots(sourceDir) {
         .webp({ quality: PACK_SHOT_QUALITY })
         .toFile(full);
 
-      const cardInfo = await sharp(framed)
-        .resize({ width: Math.min(PACK_SHOT_WIDTH, framedWidth) })
+      const cardInfo = await sharp(cardFramed)
+        .resize({ width: Math.min(PACK_SHOT_WIDTH, cardFramedWidth) })
         .webp({ quality: PACK_SHOT_CARD_QUALITY })
         .toFile(card);
 

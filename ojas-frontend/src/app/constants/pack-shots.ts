@@ -59,7 +59,7 @@ export function thumbnailPackShot(url: string | null | undefined): string {
  * BUMP THIS whenever `npm run images:optimize` changes what a pack shot contains. Leaving it
  * unchanged after a re-shoot is the failure mode; changing it needlessly only costs one refetch.
  */
-export const PACK_SHOT_REVISION = '20260907';
+export const PACK_SHOT_REVISION = '20260926';
 
 /**
  * A pack-shot URL with the current revision on it. Anything that is not one of the committed pack
