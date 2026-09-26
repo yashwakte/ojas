@@ -21,6 +21,171 @@
   border: 1px solid #f0ede9;
   border-radius: 20px;
   padding: 32px;
+  // Signing in at step one scrolls here; this keeps the welcome line clear of the fixed header.
+  scroll-margin-top: 96px;
+}
+
+// ===== GUEST STEPS =====
+// A guest sees step one (verify the number) with step two waiting, locked, below it - the
+// Flipkart/Amazon checkout rhythm, so it is obvious there is one short thing to do first.
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+
+  h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ojas-text);
+  }
+}
+
+.step-num {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ojas-ink);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.step-lede {
+  margin: 0 0 18px 36px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light);
+}
+
+.step-locked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 1.5px dashed #e8e4e0;
+  border-radius: 14px;
+  color: var(--ojas-text-light);
+  font-size: 0.9rem;
+  font-weight: 600;
+
+  .step-num {
+    background: #e8e4e0;
+    color: var(--ojas-text-light);
+  }
+
+  mat-icon {
+    margin-left: auto;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// ===== ACCOUNT STRIP =====
+.account-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--ojas-ink-bg);
+  border: 1px solid var(--ojas-ink-border);
+  animation: stripIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.account-strip-icon {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+  color: var(--ojas-ink);
+  flex-shrink: 0;
+}
+
+.account-strip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-strip-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ojas-text);
+}
+
+.account-strip-sub {
+  font-size: 0.78rem;
+  color: var(--ojas-text-light);
+}
+
+.account-strip-email {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--ojas-text);
+}
+
+.account-strip-email-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.email-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #a1560b;
+  font-size: 0.7rem;
+  font-weight: 700;
+
+  &--ok {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+}
+
+.email-verify-btn {
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ojas-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@keyframes stripIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-strip {
+    animation: none;
+  }
 }
 
 // ===== SAVED ADDRESSES =====
@@ -947,7 +1112,9 @@
 // ===== RESPONSIVE =====
 @media (max-width: 860px) {
   .checkout-layout {
-    grid-template-columns: 1fr;
+    // minmax(0, …) rather than 1fr: a bare 1fr column is never narrower than its widest item's
+    // min-content, which pushed a 320px phone 12px wider than its screen.
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .summary-section {
@@ -975,5 +1142,9 @@
 
   .form-section {
     padding: 20px;
+  }
+
+  .step-lede {
+    margin-left: 0;
   }
 }

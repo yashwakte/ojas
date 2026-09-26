@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { Checkout } from './checkout';
 import { CartService } from '../../services/cart.service';
@@ -12,6 +12,7 @@ import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { WalletService } from '../../services/wallet.service';
+import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import {
   AuthResponse,
   OrderResponse,
@@ -138,7 +139,13 @@ describe('Checkout', () => {
     // No marker by default: an ordinary visit to checkout, not a return from the payment page.
     cashfreeCheckoutServiceSpy.awaitingPayment.and.returnValue(null);
     productServiceSpy = jasmine.createSpyObj('ProductService', ['loadProducts']);
-    authServiceSpy = { user: signal<AuthResponse | null>(authUser) };
+    const user = signal<AuthResponse | null>(authUser);
+    authServiceSpy = {
+      user,
+      isLoggedIn: computed(() => !!user()),
+      checkPhone: jasmine.createSpy('checkPhone').and.returnValue(of({ exists: false })),
+      checkEmail: jasmine.createSpy('checkEmail').and.returnValue(of({ exists: false })),
+    };
     userServiceSpy = jasmine.createSpyObj('UserService', ['getProfile', 'saveAddress']);
     userServiceSpy.getProfile.and.returnValue(of(profile));
     deliveryChargesServiceSpy = jasmine.createSpyObj('DeliveryChargesService', ['previewCharge']);
@@ -164,6 +171,16 @@ describe('Checkout', () => {
         { provide: AuthService, useValue: authServiceSpy },
         { provide: UserService, useValue: userServiceSpy },
         { provide: DeliveryChargesService, useValue: deliveryChargesServiceSpy },
+        // The guest step renders the phone sign-in, which would otherwise pull MSG91's real
+        // script into the test browser.
+        {
+          provide: Msg91WidgetService,
+          useValue: {
+            captchaElementId: 'msg91-test-captcha',
+            preload: () => {},
+            initialize: () => Promise.resolve(),
+          },
+        },
       ],
     });
     router = TestBed.inject(Router);
@@ -722,5 +739,79 @@ describe('Checkout', () => {
 
     expect(checkoutServiceSpy.removeItem).toHaveBeenCalledWith('p1');
     expect(router.navigate).toHaveBeenCalledWith(['/cart']);
+  });
+  describe('as a guest', () => {
+    beforeEach(() => {
+      authServiceSpy.user.set(null);
+      // Signing in scrolls the page to step two. Left real, it scrolls the test runner's own
+      // page, and the specs that run afterwards and measure what is on screen start failing.
+      spyOn(Element.prototype, 'scrollIntoView');
+    });
+
+    it('starts at step one - verifying the number - and loads no account data', () => {
+      const fixture = create();
+      const el: HTMLElement = fixture.nativeElement;
+
+      expect(el.querySelector('app-phone-signin')).not.toBeNull();
+      expect(el.querySelector('.step-locked')).not.toBeNull();
+      // Step two - the address form and the pay button - waits until they are signed in.
+      expect(el.querySelector('.place-order-btn')).toBeNull();
+      expect(userServiceSpy.getProfile).not.toHaveBeenCalled();
+      expect(walletServiceSpy.load).not.toHaveBeenCalled();
+    });
+
+    it('opens step two on the account the number belongs to once it is verified', () => {
+      const fixture = create();
+      const component = fixture.componentInstance;
+
+      authServiceSpy.user.set(authUser);
+      component.onSignedIn({ session: authUser, isNewAccount: false, emailVerified: false });
+      fixture.detectChanges();
+
+      expect(userServiceSpy.getProfile).toHaveBeenCalled();
+      expect(walletServiceSpy.load).toHaveBeenCalled();
+      expect(component.signedInNote()).toBe('returning');
+      expect(component.selectedSavedAddress()).toEqual(defaultAddress);
+      expect(fixture.nativeElement.querySelector('app-phone-signin')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.place-order-btn')).not.toBeNull();
+    });
+
+    it('keeps the first address of a new account for next time, as its default', () => {
+      userServiceSpy.getProfile.and.returnValue(of({ ...profile, savedAddresses: [] }));
+      userServiceSpy.saveAddress.and.returnValue(of({}));
+      orderServiceSpy.placeOrder.and.returnValue(of(order));
+      const fixture = create();
+      const component = fixture.componentInstance;
+
+      authServiceSpy.user.set(authUser);
+      component.onSignedIn({ session: authUser, isNewAccount: true, emailVerified: false });
+
+      expect(component.signedInNote()).toBe('created');
+      expect(component.saveNewAddress).toBeTrue();
+      expect(component.saveNewAddressLabel).toBe('Home');
+
+      component.houseNo = 'Flat 4B';
+      component.street = 'MG Road';
+      component.area = 'Kharadi';
+      component.pincode = '411014';
+      component.onManualLocationConfirmed({ lat: 18.55, lng: 73.94 });
+      component.placeOrder();
+
+      expect(userServiceSpy.saveAddress).toHaveBeenCalledWith(
+        jasmine.objectContaining({ label: 'Home', isDefault: true }),
+      );
+    });
+  });
+
+  it('offers to verify an unverified email, and shows it verified once it is', () => {
+    const fixture = create();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.email-verify-btn')).not.toBeNull();
+
+    fixture.componentInstance.onEmailVerified({ ...profile, isEmailVerified: true });
+    fixture.detectChanges();
+
+    expect(el.querySelector('.email-verify-btn')).toBeNull();
+    expect(el.querySelector('.email-badge--ok')).not.toBeNull();
   });
 });

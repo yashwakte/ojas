@@ -2,320 +2,369 @@
   <div class="checkout-layout">
     <!-- ===== ORDER FORM ===== -->
     <div class="form-section">
-      <div class="section-label">
-        <mat-icon>local_shipping</mat-icon>
-        <h2>Delivery Details</h2>
-      </div>
-
-      @if (savedAddresses().length > 0) {
-        <div class="saved-addresses-section">
-          <p class="saved-addr-title"><mat-icon>bookmark</mat-icon> Saved Addresses</p>
-          <div class="saved-addr-scroll">
-            @for (addr of savedAddresses(); track addr.label) {
-              <button
-                type="button"
-                class="addr-chip"
-                [class.addr-chip--selected]="selectedSavedAddress()?.label === addr.label"
-                (click)="selectAddress(addr)"
-              >
-                <mat-icon class="addr-chip-icon">{{
-                  addr.isDefault ? 'home' : 'location_on'
-                }}</mat-icon>
-                <div class="addr-chip-body">
-                  <span class="addr-chip-label">{{ addr.label }}</span>
-                  <span class="addr-chip-text">{{ addr.fullAddress }}</span>
-                  @if (isUnsetPin(addr)) {
-                    <span class="addr-chip-warning">
-                      <mat-icon inline="true">warning</mat-icon>
-                      Needs re-pin — edit in profile before using
-                    </span>
-                  }
-                </div>
-                @if (selectedSavedAddress()?.label === addr.label) {
-                  <mat-icon class="addr-chip-check">check_circle</mat-icon>
-                }
-              </button>
-            }
-          </div>
+      @if (!auth.isLoggedIn()) {
+        <!-- Step one for a guest: the mobile number is the account. Verifying it signs them into
+             the account it already has, or creates one from what they type here. -->
+        <div class="step-head">
+          <span class="step-num">1</span>
+          <h2>Your details</h2>
         </div>
-      }
+        <p class="step-lede">
+          New here? Create your Ojas account right here — verify your mobile number and your details
+          are saved for next time.
+        </p>
+        <app-phone-signin (signedIn)="onSignedIn($event)" />
 
-      <form class="checkout-form" (ngSubmit)="placeOrder()">
-        <!-- Contact Info -->
-        <div class="form-row">
-          <div class="form-group">
-            <label for="fullName">Full Name *</label>
-            <input
-              id="fullName"
-              type="text"
-              [(ngModel)]="fullName"
-              name="fullName"
-              required
-              placeholder="Your full name"
-            />
-          </div>
-          <div class="form-group">
-            <label for="phone">Phone Number *</label>
-            <input
-              id="phone"
-              type="tel" appDigitsOnly
-              [(ngModel)]="phone"
-              name="phone"
-              required
-              placeholder="10-digit mobile number"
-              pattern="[0-9]{10}"
-            />
-          </div>
+        <div class="step-locked" aria-disabled="true">
+          <span class="step-num">2</span>
+          <span>Delivery address &amp; payment</span>
+          <mat-icon>lock</mat-icon>
         </div>
-
-        <!-- Delivery Address -->
-        <div class="address-section">
-          <p class="address-section-title"><mat-icon>location_on</mat-icon> Delivery Address *</p>
-
-          @if (selectedSavedAddress()) {
-            <!-- Selected saved address card -->
-            <div class="selected-addr-card">
-              <div class="selected-addr-header">
-                <mat-icon>{{
-                  selectedSavedAddress()!.isDefault ? 'home' : 'location_on'
-                }}</mat-icon>
-                <span class="selected-addr-label">{{ selectedSavedAddress()!.label }}</span>
-                <span class="selected-addr-badge">Selected</span>
-              </div>
-              <p class="selected-addr-text">{{ selectedSavedAddress()!.fullAddress }}</p>
-              @if (selectedSavedAddress()!.mapLink) {
-                <a
-                  class="selected-addr-map-link"
-                  [href]="selectedSavedAddress()!.mapLink"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <mat-icon>map</mat-icon>
-                  Open saved map pin
-                </a>
-              }
-              <button type="button" class="use-new-addr-btn" (click)="useNewAddress()">
-                <mat-icon>edit_location_alt</mat-icon> Enter a different address
-              </button>
-            </div>
-          } @else {
-            <!-- Structured address form -->
-            <div class="address-grid">
-              <div class="form-group">
-                <label for="houseNo">Flat / House No., Building Name *</label>
-                <input
-                  id="houseNo"
-                  type="text"
-                  [(ngModel)]="houseNo"
-                  name="houseNo"
-                  required
-                  placeholder="e.g. Flat 4B, Sunrise Apartments"
-                />
-              </div>
-              <div class="form-group">
-                <label for="street">Street / Road Name *</label>
-                <input
-                  id="street"
-                  type="text"
-                  [(ngModel)]="street"
-                  name="street"
-                  required
-                  placeholder="e.g. 12, MG Road"
-                />
-              </div>
-              <div class="form-group">
-                <label for="area">Area / Locality / Colony *</label>
-                <input
-                  id="area"
-                  type="text"
-                  [(ngModel)]="area"
-                  name="area"
-                  required
-                  placeholder="e.g. Koramangala"
-                />
-              </div>
-              <div class="form-group">
-                <label for="landmark">Landmark <span class="optional">(optional)</span></label>
-                <input
-                  id="landmark"
-                  type="text"
-                  [(ngModel)]="landmark"
-                  name="landmark"
-                  placeholder="e.g. Near City Mall"
-                />
-              </div>
-              <div class="form-group">
-                <label for="city">City *</label>
-                <select id="city" [(ngModel)]="city" name="city" required>
-                  <option value="" disabled>Select city</option>
-                  @for (c of citiesForSelectedState; track c) {
-                    <option [value]="c">{{ c }}</option>
-                  }
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="state">State *</label>
-                <select
-                  id="state"
-                  [(ngModel)]="state"
-                  name="state"
-                  required
-                  (ngModelChange)="onStateChange()"
-                >
-                  <option value="" disabled>Select state</option>
-                  @for (s of serviceableStates; track s) {
-                    <option [value]="s">{{ s }}</option>
-                  }
-                </select>
-              </div>
-              <div class="form-group form-group--pincode">
-                <label for="pincode">Pincode *</label>
-                <input
-                  id="pincode"
-                  type="text"
-                  inputmode="numeric"
-                  [(ngModel)]="pincode"
-                  name="pincode"
-                  required
-                  placeholder="411001–411062"
-                  pattern="[0-9]{6}"
-                  maxlength="6"
-                  [attr.aria-invalid]="pincodeMessage ? 'true' : null"
-                  [attr.aria-describedby]="pincodeMessage ? 'pincodeError' : null"
-                />
-                @if (pincodeMessage; as msg) {
-                  <p class="field-error" id="pincodeError" role="alert">{{ msg }}</p>
-                }
-              </div>
-            </div>
-
-            <div class="pin-location-block">
-              <p class="pin-location-label">Pin Your Exact Location *</p>
-              @if (showManualMapPicker()) {
-                <app-map-picker
-                  [initialLat]="manualLat"
-                  [initialLng]="manualLng"
-                  [enforceServiceArea]="true"
-                  (locationConfirmed)="onManualLocationConfirmed($event)"
-                  (cancelled)="showManualMapPicker.set(false)"
-                />
-              } @else if (manualLat !== null && manualLng !== null) {
-                <div class="pin-confirmed">
-                  <mat-icon>location_on</mat-icon>
-                  <span>Location pinned</span>
-                  <button
-                    type="button"
-                    class="change-pin-btn"
-                    (click)="showManualMapPicker.set(true)"
-                  >
-                    Change
-                  </button>
-                </div>
+      } @else {
+        @if (auth.user(); as user) {
+          <div class="account-strip">
+            <mat-icon class="account-strip-icon">account_circle</mat-icon>
+            <div class="account-strip-body">
+              @if (signedInNote() === 'created') {
+                <span class="account-strip-title">Welcome to Ojas, {{ user.fullName }}!</span>
+                <span class="account-strip-sub">Your account is ready — next time, sign in with your number and password.</span>
+              } @else if (signedInNote() === 'returning') {
+                <span class="account-strip-title">Welcome back, {{ user.fullName }}</span>
+                <span class="account-strip-sub">Signed in with +91 {{ user.phone }}</span>
               } @else {
+                <span class="account-strip-title">Ordering as {{ user.fullName }}</span>
+                <span class="account-strip-sub">+91 {{ user.phone }}</span>
+              }
+              <span class="account-strip-email">
+                <span class="account-strip-email-text">{{ user.email }}</span>
+                @if (emailVerified() === true) {
+                  <span class="email-badge email-badge--ok"><mat-icon inline="true">verified</mat-icon> Verified</span>
+                } @else if (emailVerified() === false) {
+                  <span class="email-badge">Not verified</span>
+                  <button type="button" class="email-verify-btn" (click)="verifyEmailOpen.set(true)">
+                    Verify
+                  </button>
+                }
+              </span>
+            </div>
+          </div>
+        }
+
+        <div class="section-label">
+          <mat-icon>local_shipping</mat-icon>
+          <h2>Delivery Details</h2>
+        </div>
+
+        @if (savedAddresses().length > 0) {
+          <div class="saved-addresses-section">
+            <p class="saved-addr-title"><mat-icon>bookmark</mat-icon> Saved Addresses</p>
+            <div class="saved-addr-scroll">
+              @for (addr of savedAddresses(); track addr.label) {
                 <button
                   type="button"
-                  class="pin-location-btn"
-                  (click)="showManualMapPicker.set(true)"
+                  class="addr-chip"
+                  [class.addr-chip--selected]="selectedSavedAddress()?.label === addr.label"
+                  (click)="selectAddress(addr)"
                 >
-                  <mat-icon>add_location_alt</mat-icon>
-                  Pin location on map
+                  <mat-icon class="addr-chip-icon">{{
+                    addr.isDefault ? 'home' : 'location_on'
+                  }}</mat-icon>
+                  <div class="addr-chip-body">
+                    <span class="addr-chip-label">{{ addr.label }}</span>
+                    <span class="addr-chip-text">{{ addr.fullAddress }}</span>
+                    @if (isUnsetPin(addr)) {
+                      <span class="addr-chip-warning">
+                        <mat-icon inline="true">warning</mat-icon>
+                        Needs re-pin — edit in profile before using
+                      </span>
+                    }
+                  </div>
+                  @if (selectedSavedAddress()?.label === addr.label) {
+                    <mat-icon class="addr-chip-check">check_circle</mat-icon>
+                  }
                 </button>
               }
             </div>
+          </div>
+        }
 
-            <!-- Save address prompt -->
-            <div class="save-addr-prompt">
-              <label class="save-toggle">
-                <input type="checkbox" [(ngModel)]="saveNewAddress" name="saveNewAddress" />
-                <mat-icon>bookmark_add</mat-icon>
-                <span>Save this address for later</span>
-              </label>
-              @if (saveNewAddress) {
-                <input
-                  type="text"
-                  class="save-label-input"
-                  [(ngModel)]="saveNewAddressLabel"
-                  name="saveNewAddressLabel"
-                  placeholder="Label — e.g. Home, Work, Mom's place"
-                />
+        <form class="checkout-form" (ngSubmit)="placeOrder()">
+          <!-- Contact Info -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fullName">Full Name *</label>
+              <input
+                id="fullName"
+                type="text"
+                [(ngModel)]="fullName"
+                name="fullName"
+                required
+                placeholder="Your full name"
+              />
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone Number *</label>
+              <input
+                id="phone"
+                type="tel" appDigitsOnly
+                [(ngModel)]="phone"
+                name="phone"
+                required
+                placeholder="10-digit mobile number"
+                pattern="[0-9]{10}"
+              />
+            </div>
+          </div>
+
+          <!-- Delivery Address -->
+          <div class="address-section">
+            <p class="address-section-title"><mat-icon>location_on</mat-icon> Delivery Address *</p>
+
+            @if (selectedSavedAddress()) {
+              <!-- Selected saved address card -->
+              <div class="selected-addr-card">
+                <div class="selected-addr-header">
+                  <mat-icon>{{
+                    selectedSavedAddress()!.isDefault ? 'home' : 'location_on'
+                  }}</mat-icon>
+                  <span class="selected-addr-label">{{ selectedSavedAddress()!.label }}</span>
+                  <span class="selected-addr-badge">Selected</span>
+                </div>
+                <p class="selected-addr-text">{{ selectedSavedAddress()!.fullAddress }}</p>
+                @if (selectedSavedAddress()!.mapLink) {
+                  <a
+                    class="selected-addr-map-link"
+                    [href]="selectedSavedAddress()!.mapLink"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <mat-icon>map</mat-icon>
+                    Open saved map pin
+                  </a>
+                }
+                <button type="button" class="use-new-addr-btn" (click)="useNewAddress()">
+                  <mat-icon>edit_location_alt</mat-icon> Enter a different address
+                </button>
+              </div>
+            } @else {
+              <!-- Structured address form -->
+              <div class="address-grid">
+                <div class="form-group">
+                  <label for="houseNo">Flat / House No., Building Name *</label>
+                  <input
+                    id="houseNo"
+                    type="text"
+                    [(ngModel)]="houseNo"
+                    name="houseNo"
+                    required
+                    placeholder="e.g. Flat 4B, Sunrise Apartments"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="street">Street / Road Name *</label>
+                  <input
+                    id="street"
+                    type="text"
+                    [(ngModel)]="street"
+                    name="street"
+                    required
+                    placeholder="e.g. 12, MG Road"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="area">Area / Locality / Colony *</label>
+                  <input
+                    id="area"
+                    type="text"
+                    [(ngModel)]="area"
+                    name="area"
+                    required
+                    placeholder="e.g. Koramangala"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="landmark">Landmark <span class="optional">(optional)</span></label>
+                  <input
+                    id="landmark"
+                    type="text"
+                    [(ngModel)]="landmark"
+                    name="landmark"
+                    placeholder="e.g. Near City Mall"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="city">City *</label>
+                  <select id="city" [(ngModel)]="city" name="city" required>
+                    <option value="" disabled>Select city</option>
+                    @for (c of citiesForSelectedState; track c) {
+                      <option [value]="c">{{ c }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="state">State *</label>
+                  <select
+                    id="state"
+                    [(ngModel)]="state"
+                    name="state"
+                    required
+                    (ngModelChange)="onStateChange()"
+                  >
+                    <option value="" disabled>Select state</option>
+                    @for (s of serviceableStates; track s) {
+                      <option [value]="s">{{ s }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group form-group--pincode">
+                  <label for="pincode">Pincode *</label>
+                  <input
+                    id="pincode"
+                    type="text"
+                    inputmode="numeric"
+                    [(ngModel)]="pincode"
+                    name="pincode"
+                    required
+                    placeholder="411001–411062"
+                    pattern="[0-9]{6}"
+                    maxlength="6"
+                    [attr.aria-invalid]="pincodeMessage ? 'true' : null"
+                    [attr.aria-describedby]="pincodeMessage ? 'pincodeError' : null"
+                  />
+                  @if (pincodeMessage; as msg) {
+                    <p class="field-error" id="pincodeError" role="alert">{{ msg }}</p>
+                  }
+                </div>
+              </div>
+
+              <div class="pin-location-block">
+                <p class="pin-location-label">Pin Your Exact Location *</p>
+                @if (showManualMapPicker()) {
+                  <app-map-picker
+                    [initialLat]="manualLat"
+                    [initialLng]="manualLng"
+                    [enforceServiceArea]="true"
+                    (locationConfirmed)="onManualLocationConfirmed($event)"
+                    (cancelled)="showManualMapPicker.set(false)"
+                  />
+                } @else if (manualLat !== null && manualLng !== null) {
+                  <div class="pin-confirmed">
+                    <mat-icon>location_on</mat-icon>
+                    <span>Location pinned</span>
+                    <button
+                      type="button"
+                      class="change-pin-btn"
+                      (click)="showManualMapPicker.set(true)"
+                    >
+                      Change
+                    </button>
+                  </div>
+                } @else {
+                  <button
+                    type="button"
+                    class="pin-location-btn"
+                    (click)="showManualMapPicker.set(true)"
+                  >
+                    <mat-icon>add_location_alt</mat-icon>
+                    Pin location on map
+                  </button>
+                }
+              </div>
+
+              <!-- Save address prompt -->
+              <div class="save-addr-prompt">
+                <label class="save-toggle">
+                  <input type="checkbox" [(ngModel)]="saveNewAddress" name="saveNewAddress" />
+                  <mat-icon>bookmark_add</mat-icon>
+                  <span>Save this address for later</span>
+                </label>
+                @if (saveNewAddress) {
+                  <input
+                    type="text"
+                    class="save-label-input"
+                    [(ngModel)]="saveNewAddressLabel"
+                    name="saveNewAddressLabel"
+                    placeholder="Label — e.g. Home, Work, Mom's place"
+                  />
+                }
+              </div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="notes">Order Notes <span class="optional">(optional)</span></label>
+            <textarea
+              id="notes"
+              [(ngModel)]="notes"
+              name="notes"
+              rows="2"
+              placeholder="Any special instructions for delivery?"
+            ></textarea>
+          </div>
+
+          <!-- Coupons & Offers -->
+          <button type="button" class="coupon-trigger" (click)="couponPickerOpen.set(true)">
+            <div class="coupon-trigger-left">
+              <mat-icon>local_offer</mat-icon>
+              @if (appliedCoupon(); as coupon) {
+                <span class="coupon-trigger-label coupon-trigger-label--applied"
+                  >{{ coupon.code }} applied</span
+                >
+              } @else {
+                <span class="coupon-trigger-label">Apply Coupon</span>
               }
             </div>
+            <div class="coupon-trigger-right">
+              @if (appliedCoupon()) {
+                <span class="coupon-trigger-savings"
+                  >−₹{{ discount().amount | number: '1.2-2' }}</span
+                >
+              } @else {
+                <span class="coupon-trigger-hint">{{ coupons.length }} offers</span>
+              }
+              <mat-icon>chevron_right</mat-icon>
+            </div>
+          </button>
+
+          @if (errorMsg()) {
+            <div class="error-banner">
+              <mat-icon>error_outline</mat-icon>
+              {{ errorMsg() }}
+            </div>
           }
-        </div>
 
-        <div class="form-group">
-          <label for="notes">Order Notes <span class="optional">(optional)</span></label>
-          <textarea
-            id="notes"
-            [(ngModel)]="notes"
-            name="notes"
-            rows="2"
-            placeholder="Any special instructions for delivery?"
-          ></textarea>
-        </div>
+          @if (outOfServiceArea()) {
+            <div class="error-banner">
+              <mat-icon>wrong_location</mat-icon>
+              We deliver only within {{ maxRadiusKm() }} km of our store. This address is
+              {{ deliveryDistanceKm()?.toFixed(1) }} km away — please pick a closer one.
+            </div>
+          }
 
-        <!-- Coupons & Offers -->
-        <button type="button" class="coupon-trigger" (click)="couponPickerOpen.set(true)">
-          <div class="coupon-trigger-left">
-            <mat-icon>local_offer</mat-icon>
-            @if (appliedCoupon(); as coupon) {
-              <span class="coupon-trigger-label coupon-trigger-label--applied"
-                >{{ coupon.code }} applied</span
-              >
+          <button
+            type="submit"
+            class="place-order-btn"
+            [disabled]="loading() || !fullName || !phone || !isAddressValid || outOfServiceArea()"
+          >
+            @if (loading()) {
+              <mat-icon class="spin">hourglass_empty</mat-icon>
+              {{ amountDueOnline() > 0 ? 'Starting Payment...' : 'Placing Order...' }}
             } @else {
-              <span class="coupon-trigger-label">Apply Coupon</span>
+              <mat-icon>lock</mat-icon>
+              {{ amountDueOnline() > 0 ? 'Proceed to Pay' : 'Place Order' }}
             }
-          </div>
-          <div class="coupon-trigger-right">
-            @if (appliedCoupon()) {
-              <span class="coupon-trigger-savings"
-                >−₹{{ discount().amount | number: '1.2-2' }}</span
-              >
+          </button>
+
+          <p class="cod-note">
+            <mat-icon>info</mat-icon>
+            @if (amountDueOnline() > 0) {
+              You'll be taken to our secure payment page. Pay by UPI, card, net banking or wallet.
             } @else {
-              <span class="coupon-trigger-hint">{{ coupons.length }} offers</span>
+              Your wallet balance covers this order in full — nothing more to pay.
             }
-            <mat-icon>chevron_right</mat-icon>
-          </div>
-        </button>
-
-        @if (errorMsg()) {
-          <div class="error-banner">
-            <mat-icon>error_outline</mat-icon>
-            {{ errorMsg() }}
-          </div>
-        }
-
-        @if (outOfServiceArea()) {
-          <div class="error-banner">
-            <mat-icon>wrong_location</mat-icon>
-            We deliver only within {{ maxRadiusKm() }} km of our store. This address is
-            {{ deliveryDistanceKm()?.toFixed(1) }} km away — please pick a closer one.
-          </div>
-        }
-
-        <button
-          type="submit"
-          class="place-order-btn"
-          [disabled]="loading() || !fullName || !phone || !isAddressValid || outOfServiceArea()"
-        >
-          @if (loading()) {
-            <mat-icon class="spin">hourglass_empty</mat-icon>
-            {{ amountDueOnline() > 0 ? 'Starting Payment...' : 'Placing Order...' }}
-          } @else {
-            <mat-icon>lock</mat-icon>
-            {{ amountDueOnline() > 0 ? 'Proceed to Pay' : 'Place Order' }}
-          }
-        </button>
-
-        <p class="cod-note">
-          <mat-icon>info</mat-icon>
-          @if (amountDueOnline() > 0) {
-            You'll be taken to our secure payment page. Pay by UPI, card, net banking or wallet.
-          } @else {
-            Your wallet balance covers this order in full — nothing more to pay.
-          }
-        </p>
-      </form>
+          </p>
+        </form>
+      }
     </div>
 
     <!-- ===== ORDER SUMMARY ===== -->
@@ -448,6 +497,16 @@
       </div>
     </div>
   </div>
+
+  @if (verifyEmailOpen() && auth.user(); as user) {
+    <app-contact-verify-sheet
+      mode="verify-email"
+      [currentEmail]="user.email"
+      [currentPhone]="user.phone"
+      (completed)="onEmailVerified($event)"
+      (closed)="verifyEmailOpen.set(false)"
+    />
+  }
 
   @if (couponPickerOpen()) {
     <app-coupon-picker

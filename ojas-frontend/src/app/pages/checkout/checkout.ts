@@ -21,13 +21,17 @@ import { UserService } from '../../services/user.service';
 import { DeliveryChargesService } from '../../services/delivery-charges.service';
 import { DeliveryAddressService } from '../../services/delivery-address.service';
 import {
+  PhoneSignInResponse,
   PlaceOrderRequest,
   SaveAddressRequest,
   SavedAddress,
+  UserProfileResponse,
   effectivePrice,
 } from '../../models/interfaces';
 import { MapPicker } from '../../components/map-picker/map-picker';
 import { CouponPicker } from '../../components/coupon-picker/coupon-picker';
+import { PhoneSignIn } from '../../components/phone-signin/phone-signin';
+import { ContactVerifySheet } from '../../components/contact-verify-sheet/contact-verify-sheet';
 import {
   DEFAULT_CITY,
   DEFAULT_STATE,
@@ -49,7 +53,16 @@ import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 @Component({
   selector: 'app-checkout',
-  imports: [DigitsOnlyDirective, FormsModule, MatIconModule, MapPicker, CouponPicker, DecimalPipe],
+  imports: [
+    DigitsOnlyDirective,
+    FormsModule,
+    MatIconModule,
+    MapPicker,
+    CouponPicker,
+    DecimalPipe,
+    PhoneSignIn,
+    ContactVerifySheet,
+  ],
   templateUrl: './checkout.html',
   styleUrl: './checkout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -93,6 +106,13 @@ export class Checkout implements OnInit {
 
   loading = signal(false);
   errorMsg = signal('');
+
+  /** Whether the account's email has been confirmed - null until the profile has said. Drives
+   * the "Verify email" offer on the account strip; verifying is optional and never blocks paying. */
+  readonly emailVerified = signal<boolean | null>(null);
+  readonly verifyEmailOpen = signal(false);
+  /** Set for the moment right after a guest verifies their number here, to say what happened. */
+  readonly signedInNote = signal<'created' | 'returning' | null>(null);
 
   /** Applied by default; unticking saves the credit for a later order. */
   useWallet = signal(true);
@@ -206,6 +226,21 @@ export class Checkout implements OnInit {
       return;
     }
 
+    // A guest starts at step one - verifying their number - and has no account to load yet.
+    if (this.auth.isLoggedIn()) this.loadAccount();
+
+    // Redirect if nothing to checkout - once the selection is known; see the arrival check in
+    // the constructor.
+    this.arrivalCheckPending.set(true);
+  }
+
+  /**
+   * Everything checkout needs from the account: the wallet balance, the saved addresses and
+   * whether the email is confirmed. Run on arrival for a signed-in customer, and again the moment
+   * a guest verifies their number here - which may have opened an account that already has
+   * addresses and credit on it.
+   */
+  private loadAccount(): void {
     // Balance drives the payment summary below, so it's needed before they can pay.
     this.wallet.load().subscribe({ error: () => {} });
 
@@ -220,28 +255,55 @@ export class Checkout implements OnInit {
     // Load saved addresses, preferring whatever they were already shopping
     // against so the charge quoted on the product page is the one they pay.
     this.userService.getProfile().subscribe({
-      next: (profile) => {
-        this.savedAddresses.set(profile.savedAddresses ?? []);
-
-        const browsing = this.deliveryAddress.selected();
-        const match = browsing
-          ? (profile.savedAddresses?.find((a) => a.label === browsing.label) ?? browsing)
-          : profile.savedAddresses?.find((a) => a.isDefault);
-
-        if (match) {
-          this.selectedSavedAddress.set(match);
-          // Falls back to the account phone for addresses saved before this field
-          // existed, rather than leaving the field blank.
-          this.phone = match.phone || user?.phone || '';
-          this.updateDeliveryEstimate();
-        }
-      },
+      next: (profile) => this.applyProfile(profile),
       error: () => {},
     });
+  }
 
-    // Redirect if nothing to checkout - once the selection is known; see the arrival check in
-    // the constructor.
-    this.arrivalCheckPending.set(true);
+  private applyProfile(profile: UserProfileResponse): void {
+    const user = this.auth.user();
+    this.emailVerified.set(profile.isEmailVerified);
+    this.savedAddresses.set(profile.savedAddresses ?? []);
+
+    // Nothing saved yet - typically an account made a moment ago at step one. The address they
+    // are about to type is kept for next time unless they untick it, which is what "your details
+    // are saved" has to mean for an address.
+    if (!profile.savedAddresses?.length) {
+      this.saveNewAddress = true;
+      this.saveNewAddressLabel ||= 'Home';
+    }
+
+    const browsing = this.deliveryAddress.selected();
+    const match = browsing
+      ? (profile.savedAddresses?.find((a) => a.label === browsing.label) ?? browsing)
+      : profile.savedAddresses?.find((a) => a.isDefault);
+
+    if (match) {
+      this.selectedSavedAddress.set(match);
+      // Falls back to the account phone for addresses saved before this field
+      // existed, rather than leaving the field blank.
+      this.phone = match.phone || user?.phone || '';
+      this.updateDeliveryEstimate();
+    }
+  }
+
+  /** Step one done: the number is verified and the customer is signed in - into the account it
+   * already had, or one made just now from what they typed. Step two opens on the same page. */
+  onSignedIn(res: PhoneSignInResponse): void {
+    this.signedInNote.set(res.isNewAccount ? 'created' : 'returning');
+    this.emailVerified.set(res.emailVerified);
+    this.loadAccount();
+    // Step two replaces the form they were just looking at, so the page is taken to its top
+    // rather than left wherever step one's button happened to be.
+    setTimeout(() =>
+      document
+        .querySelector('.checkout-page .form-section')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  }
+
+  onEmailVerified(profile: UserProfileResponse): void {
+    this.emailVerified.set(profile.isEmailVerified);
   }
 
   get isAddressValid(): boolean {
@@ -367,7 +429,8 @@ export class Checkout implements OnInit {
             fullAddress: deliveryAddress,
             latitude,
             longitude,
-            isDefault: false,
+            // The first address an account saves is the one checkout offers next time.
+            isDefault: this.savedAddresses().length === 0,
           };
           this.userService.saveAddress(req).subscribe({ error: () => {} });
         }

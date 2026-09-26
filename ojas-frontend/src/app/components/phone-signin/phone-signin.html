@@ -1,0 +1,200 @@
+@if (step() === 'details') {
+  <form class="ps-form" (ngSubmit)="sendCode()" novalidate>
+    @if (needsDetails()) {
+      <div class="ps-field">
+        <label for="psName">Full name</label>
+        <input
+          id="psName"
+          name="fullName"
+          type="text"
+          autocomplete="name"
+          placeholder="Your full name"
+          [ngModel]="fullName()"
+          (ngModelChange)="fullName.set($event)"
+          (blur)="nameTouched.set(true)"
+          [attr.aria-invalid]="nameTouched() && !nameValid() ? 'true' : null"
+        />
+        @if (nameTouched() && !nameValid()) {
+          <p class="ps-field-error">Please enter your name.</p>
+        }
+      </div>
+    }
+
+    <div class="ps-field">
+      <label for="psPhone">Mobile number</label>
+      <div class="ps-phone">
+        <span class="ps-prefix" aria-hidden="true">+91</span>
+        <input
+          id="psPhone"
+          name="phone"
+          type="tel"
+          appDigitsOnly
+          inputmode="numeric"
+          autocomplete="tel-national"
+          maxlength="10"
+          placeholder="10-digit mobile number"
+          [ngModel]="phone()"
+          (ngModelChange)="onPhoneChange($event)"
+        />
+        @if (numberStatus() === 'checking') {
+          <mat-spinner class="ps-phone-status" diameter="16"></mat-spinner>
+        }
+      </div>
+      @if (numberStatus() === 'existing') {
+        <!-- The password is offered because it is free; every text code costs money. -->
+        <p class="ps-hint ps-hint--welcome" role="status">
+          <mat-icon inline="true">waving_hand</mat-icon>
+          <span>
+            Welcome back! This number has an Ojas account. Verify it with a code, or
+            <a routerLink="/login" [queryParams]="{ redirect: '/checkout' }">sign in with your password</a>.
+          </span>
+        </p>
+      }
+    </div>
+
+    @if (needsDetails()) {
+      <div class="ps-field">
+        <label for="psEmail">Email</label>
+        <input
+          id="psEmail"
+          name="email"
+          type="email"
+          autocomplete="email"
+          placeholder="you@example.com"
+          [ngModel]="email()"
+          (ngModelChange)="onEmailChange($event)"
+          (blur)="emailTouched.set(true); checkEmail()"
+          [attr.aria-invalid]="(emailTouched() && !emailValid()) || emailTaken() ? 'true' : null"
+        />
+        @if (emailTaken()) {
+          <p class="ps-field-error">
+            This email is already on another Ojas account. Use a different one, or
+            <a routerLink="/login" [queryParams]="{ redirect: '/checkout' }">sign in with it</a>.
+          </p>
+        } @else if (emailTouched() && !emailValid()) {
+          <p class="ps-field-error">Please enter a valid email address.</p>
+        } @else {
+          <p class="ps-hint">For your order receipts. You can verify it later.</p>
+        }
+      </div>
+
+      <div class="ps-field">
+        <label for="psPassword">Password</label>
+        <div class="ps-password">
+          <input
+            id="psPassword"
+            name="password"
+            autocomplete="new-password"
+            [type]="hidePassword() ? 'password' : 'text'"
+            [placeholder]="'Min ' + minPasswordLength + ' characters'"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            (blur)="passwordTouched.set(true)"
+            [attr.aria-invalid]="passwordTouched() && !passwordValid() ? 'true' : null"
+          />
+          <button
+            type="button"
+            class="ps-eye"
+            (click)="hidePassword.set(!hidePassword())"
+            [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
+          >
+            <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+        </div>
+        @if (passwordTouched() && !passwordValid()) {
+          <p class="ps-field-error">Password must be at least {{ minPasswordLength }} characters.</p>
+        } @else {
+          <p class="ps-hint">Sign in with your mobile number and this password next time.</p>
+        }
+      </div>
+    }
+
+    @if (widgetUnavailable()) {
+      <div class="ps-error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>Mobile verification isn't available right now. Please try again in a moment.</span>
+      </div>
+    }
+    @if (error()) {
+      <div class="ps-error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <button type="submit" class="ps-btn" [disabled]="!canSend()">
+      @if (busy()) {
+        <mat-spinner diameter="20"></mat-spinner>
+        Sending code…
+      } @else if (!widgetReady() && !widgetUnavailable()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        Setting up secure verification…
+      } @else {
+        <mat-icon>sms</mat-icon>
+        Send OTP
+      }
+    </button>
+  </form>
+} @else {
+  <form class="ps-form ps-reveal" (ngSubmit)="verifyCode()" novalidate>
+    <p class="ps-sent">
+      Enter the 4-digit code sent to <strong>+91 {{ phone() }}</strong>
+      <button type="button" class="ps-link" (click)="changeDetails()">Change</button>
+    </p>
+
+    @if (devCode) {
+      <p class="ps-dev" role="note">
+        <mat-icon inline="true">code</mat-icon>
+        Local testing — no SMS is sent. Use code <strong>{{ devCode }}</strong>.
+      </p>
+    }
+
+    <div class="ps-field">
+      <label for="psOtp" class="ps-sr">One-time code</label>
+      <input
+        id="psOtp"
+        name="otp"
+        class="ps-otp"
+        type="text"
+        appDigitsOnly
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        maxlength="4"
+        placeholder="• • • •"
+        [(ngModel)]="code"
+      />
+    </div>
+
+    @if (error()) {
+      <div class="ps-error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <button type="submit" class="ps-btn" [disabled]="busy() || code.trim().length !== 4">
+      @if (busy()) {
+        <mat-spinner diameter="20"></mat-spinner>
+        Verifying…
+      } @else {
+        <mat-icon>verified_user</mat-icon>
+        Verify &amp; continue
+      }
+    </button>
+
+    <p class="ps-resend">
+      Didn't get it?
+      @if (cooldown() > 0) {
+        <span>Resend in {{ cooldown() }}s</span>
+      } @else {
+        <button type="button" class="ps-link" (click)="resendCode()" [disabled]="busy()">
+          Resend code
+        </button>
+      }
+    </p>
+  </form>
+}
+
+<!-- MSG91 draws its captcha into this element by id, so it stays put across both steps - a resend
+     goes through it again. hCaptcha's passive check usually renders nothing here at all. -->
+<div [id]="captchaId" class="ps-captcha"></div>

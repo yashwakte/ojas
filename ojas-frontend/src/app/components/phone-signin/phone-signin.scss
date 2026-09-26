@@ -1,0 +1,306 @@
+// Shares the checkout form's field language - soft fill, 10px radius, orange-glass primary - so
+// on the checkout it reads as the first part of the same form rather than a login box dropped in.
+@use '../../styles/liquid-glass' as glass;
+
+:host {
+  display: block;
+}
+
+.ps-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ps-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ojas-text);
+  }
+
+  input {
+    width: 100%;
+    border: 1.5px solid #e8e4e0;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-family: 'Poppins', sans-serif;
+    // 16px stops iOS Safari zooming the page when the field takes focus.
+    font-size: 1rem;
+    color: var(--ojas-text);
+    background: #fafafa;
+    outline: none;
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease;
+
+    &:focus {
+      border-color: var(--ojas-ink-soft);
+      background: #fff;
+    }
+
+    &[aria-invalid='true'] {
+      border-color: #e57373;
+    }
+  }
+}
+
+.ps-phone {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  input {
+    padding-left: 52px;
+    letter-spacing: 0.04em;
+  }
+}
+
+.ps-password {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  input {
+    padding-right: 48px;
+  }
+}
+
+.ps-eye {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ojas-text-light);
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.ps-prefix {
+  position: absolute;
+  left: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ojas-text-light);
+  pointer-events: none;
+}
+
+.ps-phone-status {
+  position: absolute;
+  right: 14px;
+}
+
+.ps-hint {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--ojas-text-light);
+
+  &--welcome {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--ojas-ink-bg);
+    color: var(--ojas-text);
+    font-weight: 500;
+
+    mat-icon {
+      color: var(--ojas-ink);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+  }
+}
+
+.ps-hint--welcome a {
+  color: var(--ojas-ink);
+  font-weight: 700;
+}
+
+.ps-dev {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #fff8e1;
+  color: #7a5a00;
+  font-size: 0.8rem;
+}
+
+.ps-field-error {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #dc2626;
+
+  a {
+    color: inherit;
+    font-weight: 700;
+  }
+}
+
+.ps-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 14px;
+  background: #fff5f5;
+  border: 1px solid #ffc0c0;
+  border-radius: 10px;
+  color: #c62828;
+  font-size: 0.85rem;
+  line-height: 1.45;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+}
+
+.ps-captcha {
+  display: flex;
+  justify-content: center;
+}
+
+.ps-btn {
+  width: 100%;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 20px;
+  background: var(--ojas-orange-glass);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.98rem;
+  cursor: pointer;
+  box-shadow: var(--ojas-shadow-orange);
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.25s ease,
+    opacity 0.2s ease;
+  @include glass.button('light', 0.26);
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  mat-spinner {
+    --mdc-circular-progress-active-indicator-color: #fff;
+    --mat-progress-spinner-active-indicator-color: #fff;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--ojas-orange-glass-hover);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
+.ps-sent {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ojas-text-light);
+
+  strong {
+    color: var(--ojas-text);
+    white-space: nowrap;
+  }
+}
+
+.ps-otp {
+  text-align: center;
+  font-size: 1.5rem !important;
+  font-weight: 700;
+  letter-spacing: 0.6em;
+  // The letter-spacing adds trailing space after the last digit; this recentres the group.
+  padding-left: calc(14px + 0.6em) !important;
+}
+
+.ps-resend {
+  margin: 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ojas-text-light);
+}
+
+.ps-link {
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ojas-ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.ps-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// The code step settles in rather than snapping in.
+.ps-reveal {
+  animation: psRise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes psRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-reveal {
+    animation: none;
+  }
+}

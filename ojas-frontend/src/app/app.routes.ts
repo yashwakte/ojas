@@ -13,7 +13,7 @@ import type { RouteSeoKey } from './constants/seo';
 /**
  * `data.preload` marks the screens StorefrontPreloadStrategy fetches ahead of time, once the
  * browser is idle. It is the storefront a customer moves between — browse, product, cart,
- * checkout — plus login, which is the gate in front of checkout.
+ * checkout — plus login.
  *
  * Deliberately NOT marked: the admin console and the delivery screens, which are the two largest
  * chunks in the build and are reachable by a handful of people, and the legal pages, which are
@@ -71,10 +71,12 @@ export const routes: Routes = [
     canActivate: [storefrontGuard],
   },
   {
+    // Open to guests: verifying a mobile number is step one of checkout itself, and that is what
+    // signs them in or creates their account. Staff are still sent to their own home.
     path: 'checkout',
     loadComponent: () => import('./pages/checkout/checkout').then((m) => m.Checkout),
     data: { preload: true },
-    canActivate: [authGuard, customerGuard],
+    canActivate: [storefrontGuard],
   },
   {
     path: 'profile',

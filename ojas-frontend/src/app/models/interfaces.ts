@@ -273,6 +273,24 @@ export interface VerifyPhoneRegistrationRequest {
   widgetToken: string;
 }
 
+/** Signs in with a verified mobile number - step one of checkout for a signed-out customer. A
+ * number that already has an account opens it and the other fields are ignored; a new number
+ * creates the account from them, with the email stored unverified. */
+export interface PhoneSignInRequest {
+  phone: string;
+  widgetToken: string;
+  fullName?: string;
+  email?: string;
+  /** Required for a new number, as on the registration page; ignored otherwise. */
+  password?: string;
+}
+
+export interface PhoneSignInResponse {
+  session: AuthResponse;
+  isNewAccount: boolean;
+  emailVerified: boolean;
+}
+
 /** Registration requires both verify-email-otp and verify-phone-registration, completable in
  * either order - session is set only once both are done. email/phone are always the account's
  * real values regardless of which step this came from, so the frontend always knows what to

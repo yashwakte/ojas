@@ -18,7 +18,14 @@ const SESSION_IDENTITY_HEADER = 'X-Ojas-User';
 // Session-bootstrap endpoints must never trigger a refresh attempt off their own 401/403 -
 // login/register have no session to refresh yet, and refresh itself failing shouldn't try to
 // refresh again (AuthService.refreshOnce decides what a failed refresh means for the session).
-const NO_REFRESH_PATHS = ['/auth/login', '/auth/register', '/auth/verify-email-otp', '/auth/refresh', '/auth/logout'];
+const NO_REFRESH_PATHS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/verify-email-otp',
+  '/auth/phone-signin',
+  '/auth/refresh',
+  '/auth/logout',
+];
 
 function attachCredentials(req: HttpRequest<unknown>, csrfToken: string | null): HttpRequest<unknown> {
   const needsCsrf = MUTATING_METHODS.includes(req.method.toUpperCase());

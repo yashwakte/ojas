@@ -16,6 +16,8 @@ import {
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   LoginRequest,
+  PhoneSignInRequest,
+  PhoneSignInResponse,
   PreApprovedEnrollRequest,
   ResetPasswordRequest,
   RegisterPendingResponse,
@@ -383,6 +385,11 @@ export class AuthService {
 
   verifyPhoneRegistration(request: VerifyPhoneRegistrationRequest) {
     return this.http.post<RegistrationStepResponse>(`${this.apiUrl}/verify-phone-registration`, request);
+  }
+
+  /** Signs in - or signs up - with a mobile number the MSG91 widget has just verified. */
+  phoneSignIn(request: PhoneSignInRequest) {
+    return this.http.post<PhoneSignInResponse>(`${this.apiUrl}/phone-signin`, request);
   }
 
   resendEmailOtp(request: ResendEmailOtpRequest) {
