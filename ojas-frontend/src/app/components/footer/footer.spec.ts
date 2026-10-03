@@ -56,4 +56,15 @@ describe('Footer', () => {
     expect(link).toBeTruthy();
     expect(link?.getAttribute('rel')).toContain('noopener');
   });
+
+  it('credits Tulsi SoftTech with a link that opens in a new tab', () => {
+    const fixture = TestBed.createComponent(Footer);
+    fixture.detectChanges();
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a[href="https://tulsisofttech.com/"]',
+    );
+    expect(link?.textContent?.trim()).toBe('Tulsi SoftTech');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toContain('noopener');
+  });
 });
