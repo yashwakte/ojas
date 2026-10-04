@@ -379,7 +379,7 @@ public class OrdersController : ControllerBase
         if (fullyPaidByWallet)
         {
             await RetireReplacedOrderAsync(request.RetryOfOrderId, created.Id!, userId);
-            return Ok(created.ToResponse());
+            return Ok(created.ToPlacedResponse());
         }
 
         try
@@ -410,7 +410,7 @@ public class OrdersController : ControllerBase
         // it is still the only order they have.
         await RetireReplacedOrderAsync(request.RetryOfOrderId, created.Id!, userId);
 
-        return Ok(created.ToResponse());
+        return Ok(created.ToPlacedResponse());
     }
 
     /// <summary>Retires the failed attempt a retry was placed for. Silent when there was no
@@ -471,7 +471,7 @@ public class OrdersController : ControllerBase
             // id as "go to the payment page". Handing one back for a settled order would send a
             // customer who has already paid straight to Cashfree to pay again.
             order.PaymentSessionId = null;
-            return Ok(order.ToResponse());
+            return Ok(order.ToPlacedResponse());
         }
 
         // "We could not ask" has to be answered the same way as "the bank is still deciding".
@@ -502,7 +502,7 @@ public class OrdersController : ControllerBase
             DateTime.UtcNow - lastAttemptAt < CashfreeService.PaymentWindow - SessionMustHaveLeft)
         {
             order.PaymentSessionId = liveSession;
-            return Ok(order.ToResponse());
+            return Ok(order.ToPlacedResponse());
         }
 
         // Its own gateway order id: Cashfree refuses a reused one, and every later status check has
@@ -526,7 +526,7 @@ public class OrdersController : ControllerBase
 
         var refreshed = await _orderService.GetOrderByIdAsync(orderId) ?? order;
         refreshed.PaymentSessionId = session.PaymentSessionId;
-        return Ok(refreshed.ToResponse());
+        return Ok(refreshed.ToPlacedResponse());
     }
 
     [HttpGet("my")]
@@ -997,18 +997,18 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<List<OrderResponse>>> GetAllOrdersForAdmin()
     {
         var orders = await _orderService.GetAllOrdersAsync();
-        return Ok(orders.Select(OrderMapping.ToResponse).ToList());
+        return Ok(orders.Select(OrderMapping.ToAdminResponse).ToList());
     }
 
     [HttpGet("delivery/my")]
     [Authorize(Roles = UserRoles.Delivery)]
-    public async Task<ActionResult<List<OrderResponse>>> GetAssignedOrdersForDelivery()
+    public async Task<ActionResult<List<DeliveryOrderResponse>>> GetAssignedOrdersForDelivery()
     {
         var deliveryPartnerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (deliveryPartnerId == null) return Unauthorized();
 
         var orders = await _orderService.GetOrdersAssignedToDeliveryAsync(deliveryPartnerId);
-        return Ok(orders.Select(OrderMapping.ToResponse).ToList());
+        return Ok(orders.Select(OrderMapping.ToDeliveryResponse).ToList());
     }
 
     [HttpGet("admin/delivery-partners")]
@@ -1068,7 +1068,7 @@ public class OrdersController : ControllerBase
             }
 
             return Ok(new AdminStatusChangeResponse(
-                outcome.Order?.ToResponse(),
+                outcome.Order?.ToAdminResponse(),
                 outcome.WalletCredited,
                 outcome.RefundedToSource,
                 outcome.SourceRefundQueued,
@@ -1086,7 +1086,7 @@ public class OrdersController : ControllerBase
         if (refreshed != null)
             await _statusEmail.SendStatusUpdateAsync(refreshed, normalizedStatus);
 
-        return Ok(new AdminStatusChangeResponse(refreshed?.ToResponse(), 0m, 0m, 0m, null));
+        return Ok(new AdminStatusChangeResponse(refreshed?.ToAdminResponse(), 0m, 0m, 0m, null));
     }
 
     /// <summary>What a cancelling admin is about to hand back, worked out server-side so the
@@ -1145,7 +1145,7 @@ public class OrdersController : ControllerBase
             "Admin {AdminId} refunded {Amount} for order {OrderId}.",
             User.FindFirstValue(ClaimTypes.NameIdentifier), outcome.Refunded, orderId);
 
-        return Ok(new RefundOrderResponse(outcome.Refunded, outcome.Error, refreshed?.ToResponse()));
+        return Ok(new RefundOrderResponse(outcome.Refunded, outcome.Error, refreshed?.ToAdminResponse()));
     }
 
     [HttpPatch("admin/{orderId}/assign")]

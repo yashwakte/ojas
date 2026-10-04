@@ -130,9 +130,26 @@ public class OrderFlowTests : IDisposable
             PatchJson($"/api/orders/delivery/{placedOrder.Id}/delivered", new { }, deliveryCsrf));
         deliveredResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var assignedOrders = await deliveryClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/delivery/my");
+        var assignedOrders = await deliveryClient.GetFromJsonAsync<List<DeliveryOrderResponse>>("/api/orders/delivery/my");
         assignedOrders.ShouldNotBeNull();
         assignedOrders!.ShouldContain(o => o.Id == placedOrder.Id && o.Status == "Delivered");
+
+        // Each audience gets only what its screen uses. Read as raw JSON, because a typed read
+        // would quietly default a field that should not have been sent at all.
+        var deliveryJson = await deliveryClient.GetStringAsync("/api/orders/delivery/my");
+        foreach (var internalField in new[] { "paymentSessionId", "amountPaid", "walletAmountApplied", "amountRefunded", "couponCode", "paymentFailureReason", "pendingAmendment", "deliveryPartnerId" })
+            deliveryJson.ShouldNotContain($"\"{internalField}\"");
+
+        var myOrdersAfter = await _customerClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/my");
+        var customerView = myOrdersAfter!.Single(o => o.Id == placedOrder.Id);
+        customerView.PaymentSessionId.ShouldBeNull();
+        customerView.DeliveryPartnerId.ShouldBeNull();
+        customerView.DeliveryPartnerName.ShouldNotBeNullOrWhiteSpace();
+
+        var adminOrders = await adminClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/admin/all");
+        var adminView = adminOrders!.Single(o => o.Id == placedOrder.Id);
+        adminView.DeliveryPartnerId.ShouldBe(deliveryAuth.Id);
+        adminView.PaymentSessionId.ShouldBeNull();
     }
 
     /// <summary>Proves an explicitly-picked coupon and the cart-value free-delivery threshold
@@ -239,7 +256,7 @@ public class OrderFlowTests : IDisposable
             PatchJson($"/api/orders/delivery/{placedOrder.Id}/payment-collected", new { }, deliveryCsrf));
         collectedResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var assignedOrders = await deliveryClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/delivery/my");
+        var assignedOrders = await deliveryClient.GetFromJsonAsync<List<DeliveryOrderResponse>>("/api/orders/delivery/my");
         var afterCollection = assignedOrders!.Single(o => o.Id == placedOrder.Id);
         afterCollection.PaymentStatus.ShouldBe("Collected");
         afterCollection.Status.ShouldBe("Pending");
@@ -284,7 +301,7 @@ public class OrderFlowTests : IDisposable
 
         attempt.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
-        var assigned = await deliveryClient.GetFromJsonAsync<List<OrderResponse>>("/api/orders/delivery/my");
+        var assigned = await deliveryClient.GetFromJsonAsync<List<DeliveryOrderResponse>>("/api/orders/delivery/my");
         assigned!.Single(o => o.Id == placedOrder.Id).PaymentStatus.ShouldNotBe("Collected");
     }
 }

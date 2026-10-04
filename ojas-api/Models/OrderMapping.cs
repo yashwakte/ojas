@@ -7,10 +7,50 @@ namespace OjasApi.Models;
 /// (when a pending edit was paid for) its items and total all move at once. Returning the order
 /// itself is what saves the browser from patching a field or two and quietly keeping the rest of
 /// its stale copy.
+///
+/// Each caller gets only what its screen uses. The customer's view leaves out the internal id of
+/// the staff account delivering the order, and the gateway session id - which is handed over once,
+/// in the response to placing the order, and has no business sitting on every order in a list
+/// afterwards. A delivery partner gets <see cref="DeliveryOrderResponse"/>, which carries none of
+/// the money internals (sessions, refunds, wallet, coupons, failure reasons) of an order that is
+/// not theirs. Only an admin sees the whole order.
 /// </summary>
 public static class OrderMapping
 {
+    /// <summary>The customer's view of their own order.</summary>
     public static OrderResponse ToResponse(this Order order) =>
+        order.ToFullResponse() with { PaymentSessionId = null, DeliveryPartnerId = null };
+
+    /// <summary>The customer's view, plus the session id the browser needs to open the payment
+    /// page - only for the response to placing (or re-submitting) the order.</summary>
+    public static OrderResponse ToPlacedResponse(this Order order) =>
+        order.ToFullResponse() with { DeliveryPartnerId = null };
+
+    /// <summary>The admin dashboard's view. It needs the partner id to drive assignment; it never
+    /// opens a payment page, so it gets no session id either.</summary>
+    public static OrderResponse ToAdminResponse(this Order order) =>
+        order.ToFullResponse() with { PaymentSessionId = null };
+
+    /// <summary>What a delivery partner needs to find the customer and hand the order over.</summary>
+    public static DeliveryOrderResponse ToDeliveryResponse(this Order order) =>
+        new(
+            order.Id!,
+            order.FullName,
+            order.Phone,
+            order.Address,
+            order.Latitude,
+            order.Longitude,
+            order.AddressMapLink,
+            order.Notes,
+            order.Items.Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.Price, i.Weight, i.Quantity)).ToList(),
+            order.TotalAmount,
+            order.Status,
+            order.PaymentMethod,
+            order.PaymentStatus,
+            order.CreatedAt,
+            order.DeliveredAt);
+
+    private static OrderResponse ToFullResponse(this Order order) =>
         new(
             order.Id!,
             order.FullName,

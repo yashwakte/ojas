@@ -349,6 +349,25 @@ public record OrderResponse(
 /// <summary>An edit the customer priced but hasn't paid the difference for yet. The order's own
 /// fields above still describe what was actually bought and paid for — this is only a proposal,
 /// and it disappears if the top-up goes unpaid.</summary>
+/// <summary>A delivery partner's view of an order on their round - see OrderMapping for why it is
+/// not the full OrderResponse.</summary>
+public record DeliveryOrderResponse(
+	string Id,
+	string FullName,
+	string Phone,
+	string Address,
+	double Latitude,
+	double Longitude,
+	string? AddressMapLink,
+	string Notes,
+	List<OrderItemDto> Items,
+	decimal TotalAmount,
+	string Status,
+	string PaymentMethod,
+	string PaymentStatus,
+	DateTime CreatedAt,
+	DateTime? DeliveredAt);
+
 public record PendingAmendmentDto(
 	List<OrderItemDto> Items,
 	decimal Subtotal,

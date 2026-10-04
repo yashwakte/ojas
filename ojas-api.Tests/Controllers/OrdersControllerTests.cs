@@ -329,7 +329,7 @@ public class OrdersControllerTests
         var result = await _sut.GetAssignedOrdersForDelivery();
 
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
-        var orders = okResult.Value.ShouldBeOfType<List<OrderResponse>>();
+        var orders = okResult.Value.ShouldBeOfType<List<DeliveryOrderResponse>>();
         orders.Count.ShouldBe(1);
     }
 
