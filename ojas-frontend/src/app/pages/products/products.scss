@@ -920,9 +920,16 @@
   display: flex;
   gap: 6px;
 
-  > button {
+  > button,
+  > app-cart-stepper {
     flex: 1;
     min-width: 0;
+  }
+
+  // The Add button sits inside the stepper wrapper, and fills it.
+  app-cart-stepper .add-to-cart-btn {
+    width: 100%;
+    height: 100%;
   }
 }
 
@@ -1185,6 +1192,12 @@
   .buy-now-btn {
     min-height: 34px;
     border-radius: 10px;
+  }
+
+  app-cart-stepper {
+    --qty-height: 34px;
+    --qty-radius: 10px;
+    --qty-btn-width: 28px;
   }
 
   .product-actions > .buy-now-btn {

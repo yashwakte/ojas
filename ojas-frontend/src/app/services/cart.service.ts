@@ -26,6 +26,15 @@ export class CartService {
 
   readonly totalCount = computed(() => this.items().reduce((sum, i) => sum + i.quantity, 0));
 
+  private readonly quantities = computed(
+    () => new Map(this.items().map((i) => [i.product.id, i.quantity])),
+  );
+
+  /** Units of this product in the cart; 0 when it is not in it. */
+  quantityOf(productId: string): number {
+    return this.quantities().get(productId) ?? 0;
+  }
+
   /** Priced at what the customer will actually be charged, discount included. */
   readonly totalAmount = computed(() =>
     roundMoney(this.items().reduce((sum, i) => sum + effectivePrice(i.product) * i.quantity, 0)),

@@ -226,6 +226,21 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 5px;
+
+  // Matched to the Add button it replaces, which sits about 28px tall.
+  app-cart-stepper {
+    --qty-height: 28px;
+    --qty-radius: 9px;
+    --qty-btn-width: 24px;
+    --qty-font-size: 0.62rem;
+    --qty-icon-size: 14px;
+    --qty-bg: var(--ojas-orange-glass);
+  }
+
+  app-cart-stepper .home-add-cart-btn {
+    width: 100%;
+    height: 100%;
+  }
 }
 
 .home-add-cart-btn {

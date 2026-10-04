@@ -39,6 +39,7 @@ import { PRODUCT_NOT_FOUND_SEO, productPageSeo } from '../../constants/product-s
 import { SeoService } from '../../services/seo.service';
 import { ProductReviews } from '../../components/product-reviews/product-reviews';
 import { StarRating } from '../../components/star-rating/star-rating';
+import { CartStepper } from '../../components/cart-stepper/cart-stepper';
 import { ReviewSummary } from '../../models/interfaces';
 
 /** How many products the "You May Also Like" rail carries at most. Enough that the rail is worth
@@ -55,6 +56,7 @@ const SIMILAR_RAIL_SIZE = 12;
     ImageLightbox,
     ProductReviews,
     StarRating,
+    CartStepper,
   ],
   templateUrl: './product-detail.html',
   styleUrl: './product-detail.scss',
@@ -105,6 +107,14 @@ export class ProductDetail {
   readonly lowStock = computed(() => {
     const p = this.product();
     return !!p && isLowStock(p);
+  });
+
+  /** Units of this product already in the cart. Once there are some, the page's stepper is the
+   * cart's own, so the "how many to add" picker is put away. Always 0 while picking for an order
+   * edit, where adds go to the order's draft instead. */
+  readonly inCart = computed(() => {
+    const p = this.product();
+    return !p || this.picking() ? 0 : this.cartService.quantityOf(p.id);
   });
 
   /** Never let the quantity stepper exceed what's actually on the shelf. */
@@ -364,7 +374,8 @@ export class ProductDetail {
   buyNow(): void {
     const p = this.product();
     if (!p) return;
-    this.checkoutService.addItem(p, this.quantity());
+    // What the page shows: the cart's count once the product is in it, else the picker's.
+    this.checkoutService.addItem(p, this.inCart() || this.quantity());
     this.router.navigate(['/checkout']);
   }
 

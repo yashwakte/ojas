@@ -1,0 +1,108 @@
+// Sized by the page it sits in, through these custom properties, so it lines up with the Add
+// button it replaces:
+//   --qty-height, --qty-radius, --qty-btn-width, --qty-font-size, --qty-icon-size, --qty-bg
+:host {
+  display: block;
+  min-width: 0;
+  // Its own width decides whether "in cart" fits beside the count.
+  container: cart-stepper / inline-size;
+}
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  height: 100%;
+  min-height: var(--qty-height, 40px);
+  padding: 3px;
+  border-radius: var(--qty-radius, 12px);
+  background: var(--qty-bg, var(--ojas-orange));
+  color: #fff;
+  font: 600 var(--qty-font-size, 0.76rem) 'Poppins', sans-serif;
+  animation: qty-in 0.28s var(--ojas-ease) both;
+}
+
+.qty-btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--qty-btn-width, 34px);
+  align-self: stretch;
+  padding: 0;
+  border: none;
+  border-radius: calc(var(--qty-radius, 12px) - 3px);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    background 0.2s var(--ojas-ease),
+    transform 0.15s var(--ojas-ease);
+
+  mat-icon {
+    font-size: var(--qty-icon-size, 18px);
+    width: var(--qty-icon-size, 18px);
+    height: var(--qty-icon-size, 18px);
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.9);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: -2px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.qty-count {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.qty-num {
+  display: inline-block;
+  font-size: 1.25em;
+  font-variant-numeric: tabular-nums;
+  animation: qty-pop 0.25s var(--ojas-ease);
+}
+
+@container cart-stepper (max-width: 130px) {
+  .qty-unit {
+    display: none;
+  }
+}
+
+@keyframes qty-in {
+  from {
+    opacity: 0.4;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes qty-pop {
+  from {
+    transform: scale(1.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qty-stepper,
+  .qty-num {
+    animation: none;
+  }
+}

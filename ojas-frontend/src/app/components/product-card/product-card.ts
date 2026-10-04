@@ -4,10 +4,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe } from '@angular/common';
 import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../models/interfaces';
 import { thumbnailPackShot } from '../../constants/pack-shots';
+import { CartStepper } from '../cart-stepper/cart-stepper';
 
 @Component({
   selector: 'app-product-card',
-  imports: [RouterLink, MatIconModule, DecimalPipe],
+  imports: [RouterLink, MatIconModule, DecimalPipe, CartStepper],
   templateUrl: './product-card.html',
   styleUrl: './product-card.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,7 +23,6 @@ export class ProductCard {
 
   product = input.required<Product>();
   badge = input<string | null>(null);
-  justAdded = input(false);
 
   addToCart = output<Product>();
   buyNow = output<Product>();

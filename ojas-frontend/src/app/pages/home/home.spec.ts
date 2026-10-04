@@ -56,7 +56,8 @@ describe('Home', () => {
     });
     productServiceSpy.getBestsellers.and.returnValue(of([product]));
 
-    cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
+    cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart', 'quantityOf']);
+    cartServiceSpy.quantityOf.and.returnValue(0);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
     authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn', 'user', 'role']);
     authServiceSpy.isLoggedIn.and.returnValue(true);
@@ -168,11 +169,10 @@ describe('Home', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('addToCart adds the product and flags justAdded when logged in', () => {
+  it('addToCart adds the product to the cart', () => {
     const fixture = create();
     fixture.componentInstance.addToCart(product);
     expect(cartServiceSpy.addToCart).toHaveBeenCalledWith(product);
-    expect(fixture.componentInstance.justAdded()).toBe(product.id);
   });
 
   it('buyNow lets a logged-out guest through to /checkout, where the route guard takes over', () => {

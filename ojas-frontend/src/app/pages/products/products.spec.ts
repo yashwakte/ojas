@@ -99,7 +99,8 @@ describe('Products', () => {
       categoriesInUse,
       loadProducts: jasmine.createSpy('loadProducts'),
     };
-    cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
+    cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart', 'quantityOf']);
+    cartServiceSpy.quantityOf.and.returnValue(0);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
     const authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn']);
     authServiceSpy.isLoggedIn.and.returnValue(true);

@@ -43,15 +43,17 @@
 </a>
 <div class="pbody">
   <div class="pactions">
-    <button
-      class="home-add-cart-btn"
-      [class.added]="justAdded()"
-      [disabled]="!purchasable()"
-      (click)="addToCart.emit(product())"
-    >
-      <mat-icon>{{ justAdded() ? 'check' : 'add_shopping_cart' }}</mat-icon>
-      {{ justAdded() ? 'Added' : 'Add' }}
-    </button>
+    <app-cart-stepper [product]="product()">
+      <button
+        type="button"
+        class="home-add-cart-btn"
+        [disabled]="!purchasable()"
+        (click)="addToCart.emit(product())"
+      >
+        <mat-icon>add_shopping_cart</mat-icon>
+        Add
+      </button>
+    </app-cart-stepper>
     <button class="home-buy-now-btn" [disabled]="!purchasable()" (click)="buyNow.emit(product())">
       <mat-icon>bolt</mat-icon> Buy
     </button>

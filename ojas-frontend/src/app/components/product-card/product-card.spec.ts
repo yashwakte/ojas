@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ProductCard } from './product-card';
 import { Product } from '../../models/interfaces';
+import { CartService } from '../../services/cart.service';
 
 describe('ProductCard', () => {
   const product: Product = {
@@ -28,7 +29,10 @@ describe('ProductCard', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [ProductCard],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: { quantityOf: () => 0 } },
+      ],
     });
   });
 

@@ -1,0 +1,30 @@
+@if (quantity() > 0) {
+  <div class="qty-stepper" role="group" [attr.aria-label]="product().name + ' in cart'">
+    <button
+      type="button"
+      class="qty-btn"
+      [attr.aria-label]="quantity() === 1 ? 'Remove ' + product().name + ' from cart' : 'One less ' + product().name"
+      (click)="change(-1)"
+    >
+      <mat-icon>{{ quantity() === 1 ? 'delete_outline' : 'remove' }}</mat-icon>
+    </button>
+    <span class="qty-count" aria-live="polite">
+      <!-- Re-created on every change so the count pops each time it moves. -->
+      @for (n of [quantity()]; track n) {
+        <span class="qty-num">{{ n }}</span>
+      }
+      <span class="qty-unit">in cart</span>
+    </span>
+    <button
+      type="button"
+      class="qty-btn qty-plus"
+      [disabled]="!canAddMore()"
+      [attr.aria-label]="'One more ' + product().name"
+      (click)="change(1)"
+    >
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+} @else {
+  <ng-content />
+}

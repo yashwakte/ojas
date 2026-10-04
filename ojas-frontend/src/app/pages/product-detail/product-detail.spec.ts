@@ -66,7 +66,8 @@ describe('ProductDetail', () => {
       similarProduct,
     ]);
 
-    cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart']);
+    cartServiceSpy = jasmine.createSpyObj('CartService', ['addToCart', 'quantityOf']);
+    cartServiceSpy.quantityOf.and.returnValue(0);
     checkoutServiceSpy = jasmine.createSpyObj('CheckoutService', ['addItem']);
     authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedIn', 'user', 'role']);
     authServiceSpy.isLoggedIn.and.returnValue(true);
@@ -292,6 +293,26 @@ describe('ProductDetail', () => {
 
     expect(checkoutServiceSpy.addItem).toHaveBeenCalledWith(product, 2);
     expect(router.navigate).toHaveBeenCalledWith(['/checkout']);
+  });
+
+  it('once the product is in the cart, puts the quantity picker away and swaps Add for the count', () => {
+    cartServiceSpy.quantityOf.and.returnValue(3);
+    const fixture = create();
+    const el: HTMLElement = fixture.nativeElement;
+
+    expect(el.querySelector('.qty-controls')).toBeNull();
+    expect(el.querySelector('.detail-add-cart-btn')).toBeNull();
+    expect(el.querySelector('app-cart-stepper .qty-num')?.textContent?.trim()).toBe('3');
+  });
+
+  it('buyNow takes the in-cart count once the product is in the cart', () => {
+    cartServiceSpy.quantityOf.and.returnValue(3);
+    spyOn(router, 'navigate');
+    const fixture = create();
+
+    fixture.componentInstance.buyNow();
+
+    expect(checkoutServiceSpy.addItem).toHaveBeenCalledWith(product, 3);
   });
 
   // Delivery is priced from the delivery pincode, so the page must not promise a free distance

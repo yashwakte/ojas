@@ -207,24 +207,26 @@
                 </a>
                 <div class="product-info">
                   <div class="product-actions">
-                    <button
-                      type="button"
-                      class="add-to-cart-btn"
-                      [class.added]="justAdded() === product.id"
-                      [disabled]="!isPurchasable(product)"
-                      [attr.aria-label]="'Add ' + product.name + ' to cart'"
-                      (click)="addToCart(product)"
-                    >
-                      <mat-icon>{{
-                        justAdded() === product.id ? 'check' : 'add_shopping_cart'
-                      }}</mat-icon>
-                      <span class="btn-label btn-label--long">{{
-                        justAdded() === product.id ? 'Added!' : picking() ? 'Add' : 'Add to Cart'
-                      }}</span>
-                      <span class="btn-label btn-label--short">{{
-                        justAdded() === product.id ? 'Added' : 'Add'
-                      }}</span>
-                    </button>
+                    <app-cart-stepper [product]="product">
+                      <button
+                        type="button"
+                        class="add-to-cart-btn"
+                        [class.added]="justAdded() === product.id"
+                        [disabled]="!isPurchasable(product)"
+                        [attr.aria-label]="'Add ' + product.name + ' to cart'"
+                        (click)="addToCart(product)"
+                      >
+                        <mat-icon>{{
+                          justAdded() === product.id ? 'check' : 'add_shopping_cart'
+                        }}</mat-icon>
+                        <span class="btn-label btn-label--long">{{
+                          justAdded() === product.id ? 'Added!' : picking() ? 'Add' : 'Add to Cart'
+                        }}</span>
+                        <span class="btn-label btn-label--short">{{
+                          justAdded() === product.id ? 'Added' : 'Add'
+                        }}</span>
+                      </button>
+                    </app-cart-stepper>
                     @if (!picking()) {
                       <button
                         type="button"

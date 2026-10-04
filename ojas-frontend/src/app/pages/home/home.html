@@ -50,7 +50,6 @@
                 class="cf-item"
                 [product]="p"
                 badge="Featured"
-                [justAdded]="justAdded() === p.id"
                 (addToCart)="addToCart($event)"
                 (buyNow)="buyNow($event)"
               />
@@ -82,7 +81,6 @@
               class="cf-item"
               [product]="p"
               badge="Bestseller"
-              [justAdded]="justAdded() === p.id"
               (addToCart)="addToCart($event)"
               (buyNow)="buyNow($event)"
             />
@@ -119,7 +117,6 @@
               class="cf-item"
               [product]="p"
               badge="Sale"
-              [justAdded]="justAdded() === p.id"
               (addToCart)="addToCart($event)"
               (buyNow)="buyNow($event)"
             />
@@ -184,7 +181,6 @@
             <app-product-card
               class="cf-item"
               [product]="p"
-              [justAdded]="justAdded() === p.id"
               (addToCart)="addToCart($event)"
               (buyNow)="buyNow($event)"
             />

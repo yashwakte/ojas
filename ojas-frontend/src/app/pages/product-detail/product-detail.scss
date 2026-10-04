@@ -549,6 +549,12 @@
   align-items: center;
   gap: 16px;
   margin-bottom: 24px;
+
+  // Left with nothing in it once the product is in the cart (the picker gives way to the cart's
+  // own stepper) and stock is plentiful.
+  &:empty {
+    display: none;
+  }
 }
 
 .quantity-label {
@@ -756,6 +762,22 @@
   display: flex;
   gap: 12px;
   margin-bottom: 32px;
+
+  // Matched to the Add to Cart button it replaces once the product is in the cart.
+  app-cart-stepper {
+    flex: 1;
+    --qty-height: 50px;
+    --qty-radius: 14px;
+    --qty-btn-width: 46px;
+    --qty-font-size: 0.95rem;
+    --qty-icon-size: 22px;
+    --qty-bg: var(--ojas-orange-glass);
+  }
+
+  app-cart-stepper .detail-add-cart-btn {
+    width: 100%;
+    height: 100%;
+  }
 }
 
 .detail-add-cart-btn,

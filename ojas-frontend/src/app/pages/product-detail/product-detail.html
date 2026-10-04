@@ -263,26 +263,28 @@
 
           <!-- Quantity Selector -->
           <div class="quantity-section">
-            <span class="quantity-label">Quantity</span>
-            <div class="qty-controls">
-              <button
-                class="qty-btn"
-                (click)="decreaseQty()"
-                [disabled]="quantity() <= 1"
-                aria-label="Decrease quantity"
-              >
-                <mat-icon>remove</mat-icon>
-              </button>
-              <span class="qty-value">{{ quantity() }}</span>
-              <button
-                class="qty-btn"
-                (click)="increaseQty()"
-                [disabled]="quantity() >= maxQuantity()"
-                aria-label="Increase quantity"
-              >
-                <mat-icon>add</mat-icon>
-              </button>
-            </div>
+            @if (!inCart()) {
+              <span class="quantity-label">Quantity</span>
+              <div class="qty-controls">
+                <button
+                  class="qty-btn"
+                  (click)="decreaseQty()"
+                  [disabled]="quantity() <= 1"
+                  aria-label="Decrease quantity"
+                >
+                  <mat-icon>remove</mat-icon>
+                </button>
+                <span class="qty-value">{{ quantity() }}</span>
+                <button
+                  class="qty-btn"
+                  (click)="increaseQty()"
+                  [disabled]="quantity() >= maxQuantity()"
+                  aria-label="Increase quantity"
+                >
+                  <mat-icon>add</mat-icon>
+                </button>
+              </div>
+            }
             @if (outOfStock()) {
               <span class="stock-note out">Out of stock</span>
             } @else if (lowStock()) {
@@ -344,15 +346,17 @@
 
           <!-- Action Buttons -->
           <div class="action-buttons">
-            <button
-              class="detail-add-cart-btn"
-              [class.added]="justAdded() === p.id"
-              (click)="addToCart()"
-              [disabled]="!purchasable()"
-            >
-              <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
-              {{ addButtonLabel() }}
-            </button>
+            <app-cart-stepper [product]="p">
+              <button
+                class="detail-add-cart-btn"
+                [class.added]="justAdded() === p.id"
+                (click)="addToCart()"
+                [disabled]="!purchasable()"
+              >
+                <mat-icon>{{ justAdded() === p.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                {{ addButtonLabel() }}
+              </button>
+            </app-cart-stepper>
             @if (!picking()) {
               <button class="detail-buy-now-btn" (click)="buyNow()" [disabled]="!purchasable()">
                 <mat-icon>bolt</mat-icon>

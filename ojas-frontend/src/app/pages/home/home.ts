@@ -149,8 +149,6 @@ export class Home implements OnInit {
   private campaignBannerService = inject(CampaignBannerService);
   private reviewService = inject(ReviewService);
 
-  justAdded = signal<string | null>(null);
-
   // Every active campaign renders as its own banner + featured-products row,
   // stacked in the order they were created (oldest first).
   readonly activeCampaigns = computed(() =>
@@ -239,8 +237,6 @@ export class Home implements OnInit {
 
   addToCart(product: Product): void {
     this.cartService.addToCart(product);
-    this.justAdded.set(product.id);
-    setTimeout(() => this.justAdded.set(null), 2000);
   }
 
   // Guests are allowed through — /checkout's auth guard collects the login and

@@ -25,6 +25,7 @@ import { Product, effectivePrice, isOutOfStock, isPurchasable } from '../../mode
 import { isProductCategory, normalizeCategory } from '../../constants/product-categories';
 import { searchProducts } from '../../constants/product-search';
 import { OrderPickingBanner } from '../../components/order-picking-banner/order-picking-banner';
+import { CartStepper } from '../../components/cart-stepper/cart-stepper';
 import { thumbnailPackShot } from '../../constants/pack-shots';
 
 /** The last card that gets a stagger delay; everything after it arrives with this one. */
@@ -105,7 +106,14 @@ export interface FilterPill {
  */
 @Component({
   selector: 'app-products',
-  imports: [RouterLink, MatIconModule, DecimalPipe, NgTemplateOutlet, OrderPickingBanner],
+  imports: [
+    RouterLink,
+    MatIconModule,
+    DecimalPipe,
+    NgTemplateOutlet,
+    OrderPickingBanner,
+    CartStepper,
+  ],
   templateUrl: './products.html',
   styleUrl: './products.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
