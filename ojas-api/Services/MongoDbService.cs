@@ -32,6 +32,7 @@ public class MongoDbService : IMongoDbService
     public IMongoCollection<OtpCode> OtpCodes => _database.GetCollection<OtpCode>("otp_codes");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
     public IMongoCollection<UsedPhoneToken> UsedPhoneTokens => _database.GetCollection<UsedPhoneToken>("used_phone_tokens");
+    public IMongoCollection<PhoneSignupTicket> PhoneSignupTickets => _database.GetCollection<PhoneSignupTicket>("phone_signup_tickets");
     public IMongoCollection<StaffDevice> StaffDevices => _database.GetCollection<StaffDevice>("staff_devices");
     public IMongoCollection<StaffInvite> StaffInvites => _database.GetCollection<StaffInvite>("staff_invites");
     public IMongoCollection<WalletTransaction> WalletTransactions => _database.GetCollection<WalletTransaction>("wallet_transactions");
@@ -113,6 +114,10 @@ public class MongoDbService : IMongoDbService
                 new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "used_phone_token_ttl" }
             );
             UsedPhoneTokens.Indexes.CreateOne(usedPhoneTokenTtlIndex);
+
+            PhoneSignupTickets.Indexes.CreateOne(new CreateIndexModel<PhoneSignupTicket>(
+                Builders<PhoneSignupTicket>.IndexKeys.Ascending(t => t.ExpiresAt),
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "phone_signup_ticket_ttl" }));
 
             // Every wallet statement reads one customer's rows newest-first, so index the pair
             // rather than the user alone - this collection only ever grows.

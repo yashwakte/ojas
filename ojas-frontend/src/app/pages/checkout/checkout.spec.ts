@@ -143,8 +143,6 @@ describe('Checkout', () => {
     authServiceSpy = {
       user,
       isLoggedIn: computed(() => !!user()),
-      checkPhone: jasmine.createSpy('checkPhone').and.returnValue(of({ exists: false })),
-      checkEmail: jasmine.createSpy('checkEmail').and.returnValue(of({ exists: false })),
     };
     userServiceSpy = jasmine.createSpyObj('UserService', ['getProfile', 'saveAddress']);
     userServiceSpy.getProfile.and.returnValue(of(profile));

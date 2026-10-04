@@ -153,10 +153,11 @@ public record VerifyPhoneRegistrationRequest(
 /// signed in. A number that already has an account opens it, and the other fields are ignored. A
 /// new number creates the account from them, exactly as the registration page would, so all three
 /// are then required; the email is stored unverified, to be confirmed whenever the customer
-/// chooses.</summary>
+/// chooses. WidgetToken is left out on the follow-up that sends the details for a proved new number;
+/// the phone sign-up ticket cookie stands in for it (see AuthController.PhoneSignIn).</summary>
 public record PhoneSignInRequest(
 	[Required, RegularExpression(@"^[6-9]\d{9}$")] string Phone,
-	[Required] string WidgetToken,
+	string? WidgetToken,
 	[MaxLength(80)] string? FullName = null,
 	[MaxLength(120)] string? Email = null,
 	[MaxLength(128)] string? Password = null);

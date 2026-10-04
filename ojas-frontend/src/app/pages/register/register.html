@@ -240,11 +240,7 @@
             <mat-label>Email</mat-label>
             <input matInput formControlName="email" type="email" placeholder="Enter your email" />
             <mat-icon matPrefix>email</mat-icon>
-            @if (emailChecking) {
-              <mat-hint class="checking-hint">
-                <span class="checking-dot"></span> Checking availability...
-              </mat-hint>
-            } @else if (registerForm.get('email')?.hasError('required') && registerForm.get('email')?.touched) {
+            @if (registerForm.get('email')?.hasError('required') && registerForm.get('email')?.touched) {
               <mat-error>Email is required</mat-error>
             } @else if (registerForm.get('email')?.hasError('email')) {
               <mat-error>Please enter a valid email</mat-error>
@@ -257,11 +253,7 @@
             <mat-label>Phone Number</mat-label>
             <input matInput type="tel" appDigitsOnly formControlName="phone" placeholder="10-digit mobile number" autocomplete="tel-national" />
             <mat-icon matPrefix>phone</mat-icon>
-            @if (phoneChecking) {
-              <mat-hint class="checking-hint">
-                <span class="checking-dot"></span> Checking availability...
-              </mat-hint>
-            } @else if (registerForm.get('phone')?.hasError('required') && registerForm.get('phone')?.touched) {
+            @if (registerForm.get('phone')?.hasError('required') && registerForm.get('phone')?.touched) {
               <mat-error>Phone number is required</mat-error>
             } @else if (registerForm.get('phone')?.hasError('pattern')) {
               <mat-error>Enter a valid 10-digit Indian mobile number</mat-error>

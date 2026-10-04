@@ -16,6 +16,7 @@ public class AuthController : ControllerBase
     private const string CsrfCookieName = "ojas_csrf";
     private const string RefreshCookieName = "ojas_refresh";
     private const string DeviceCookieName = "ojas_device";
+    private const string PhoneTicketCookieName = "ojas_phone_ticket";
 
     // Deliberately long-lived: this cookie *is* the device binding, so it has to outlive
     // ordinary sessions - a staff member logging out at the end of a shift must not have to
@@ -109,6 +110,16 @@ public class AuthController : ControllerBase
     // HttpOnly is the whole point: script on the page can't read the device id, so an XSS bug
     // can't exfiltrate the thing that makes this device trusted. Scoped to /api/auth because
     // login, refresh and enrolment are the only endpoints that ever consult it.
+    // Only the phone sign-in endpoint ever reads it, and it is worthless after fifteen minutes.
+    private CookieOptions BuildPhoneTicketCookieOptions() => new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.None,
+        Path = "/api/auth/phone-signin",
+        Expires = DateTimeOffset.UtcNow.Add(PhoneSignupTicket.Lifetime)
+    };
+
     private CookieOptions BuildDeviceCookieOptions() => new()
     {
         HttpOnly = true,
@@ -203,22 +214,6 @@ public class AuthController : ControllerBase
             csrfToken ?? string.Empty));
     }
 
-    [HttpGet("check-email")]
-    [DisableRateLimiting]
-    public async Task<IActionResult> CheckEmail([FromQuery] string email)
-    {
-        var exists = await _authService.EmailExistsAsync(email);
-        return Ok(new { exists });
-    }
-
-    [HttpGet("check-phone")]
-    [DisableRateLimiting]
-    public async Task<IActionResult> CheckPhone([FromQuery] string phone)
-    {
-        var exists = await _authService.PhoneExistsAsync(phone);
-        return Ok(new { exists });
-    }
-
     // Creates the account but issues no session yet - VerifyEmailOtp is what actually logs
     // the user in, once they've proven the email address is real.
     [HttpPost("register")]
@@ -290,40 +285,71 @@ public class AuthController : ControllerBase
     /// Signs in with a verified mobile number - step one of checkout for a customer who is not
     /// signed in. Only checkout sends these codes, since each one costs money; the login page stays
     /// on passwords. A number with an account opens it; a new number creates one from the name,
-    /// email and password sent with it, as the registration page would. See
+    /// email and password, as the registration page would. See
     /// AuthService.SignInWithVerifiedPhoneAsync for who gets what.
     ///
-    /// Anything that can be refused without the code is refused first, so a typo in the email
-    /// never burns the customer's one-use token. The token is then checked with MSG91, bound to
-    /// this number, and claimed so it can never be presented a second time.
+    /// Nothing about whether a number (or an email) has an account is said until the number has
+    /// been proved: the widget token is checked with MSG91, bound to this number and claimed
+    /// first. Answering earlier let anyone test any number against the customer list.
+    ///
+    /// A proved number with no account, sent without usable details, gets a
+    /// <see cref="PhoneSignupTicket"/> in an HttpOnly cookie. The follow-up request carries the
+    /// details and no widget token, and the ticket stands in for the code - so fixing a typo in
+    /// the email never costs the customer a second text.
     /// </summary>
     [HttpPost("phone-signin")]
     public async Task<ActionResult<PhoneSignInResponse>> PhoneSignIn([FromBody] PhoneSignInRequest request)
     {
-        var refusal = await _authService.CheckPhoneSignInAsync(
-            request.Phone, request.FullName, request.Email, request.Password);
-        if (refusal != null)
-            return PhoneSignInRefusal(refusal);
-
-        var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
-        if (!verification.Success)
+        string? ticket = null;
+        if (string.IsNullOrWhiteSpace(request.WidgetToken))
         {
-            _logger.LogWarning(
-                "Phone sign-in rejected at the MSG91 verification step for {Phone}: {Error}",
-                request.Phone, verification.Error);
-            return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
+            // Every failure here reads the same, so the endpoint says nothing about why a ticket
+            // was refused - only that the number has to be verified again.
+            if (!Request.Cookies.TryGetValue(PhoneTicketCookieName, out ticket) ||
+                string.IsNullOrWhiteSpace(ticket) ||
+                !await _authService.UsePhoneSignupTicketAsync(ticket, request.Phone))
+            {
+                Response.Cookies.Delete(PhoneTicketCookieName, BuildPhoneTicketCookieOptions());
+                return BadRequest(new { message = "Please verify your mobile number again.", verifyAgain = true });
+            }
         }
-
-        if (!await _authService.ClaimPhoneTokenAsync(request.WidgetToken))
+        else
         {
-            _logger.LogWarning("A MSG91 token was presented a second time for {Phone}.", request.Phone);
-            return BadRequest(new { message = "That code has already been used. Please request a new one." });
+            var verification = await _phoneWidgetVerifier.VerifyAsync(request.WidgetToken, request.Phone);
+            if (!verification.Success)
+            {
+                _logger.LogWarning(
+                    "Phone sign-in rejected at the MSG91 verification step for {Phone}: {Error}",
+                    request.Phone, verification.Error);
+                return BadRequest(new { message = verification.Error ?? "That code is invalid or has expired." });
+            }
+
+            if (!await _authService.ClaimPhoneTokenAsync(request.WidgetToken))
+            {
+                _logger.LogWarning("A MSG91 token was presented a second time for {Phone}.", request.Phone);
+                return BadRequest(new { message = "That code has already been used. Please request a new one." });
+            }
         }
 
         var result = await _authService.SignInWithVerifiedPhoneAsync(
             request.Phone, request.FullName, request.Email, request.Password);
         if (result.Session == null)
+        {
+            // Proved, but new and missing usable details: hand over a ticket (once - a follow-up
+            // already holding one keeps it) so the details can be fixed without another code.
+            if (ticket == null && result.Outcome is PhoneSignInOutcome.DetailsRequired or PhoneSignInOutcome.EmailTaken)
+            {
+                var issued = await _authService.IssuePhoneSignupTicketAsync(request.Phone);
+                Response.Cookies.Append(PhoneTicketCookieName, issued, BuildPhoneTicketCookieOptions());
+            }
             return PhoneSignInRefusal(result);
+        }
+
+        if (ticket != null)
+        {
+            await _authService.DeletePhoneSignupTicketAsync(ticket);
+            Response.Cookies.Delete(PhoneTicketCookieName, BuildPhoneTicketCookieOptions());
+        }
 
         if (result.Outcome == PhoneSignInOutcome.Created)
             _logger.LogInformation("Account {UserId} created by phone sign-in.", result.Session.User.Id);

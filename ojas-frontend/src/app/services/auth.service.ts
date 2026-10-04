@@ -396,14 +396,6 @@ export class AuthService {
     return this.http.post<ResendEmailOtpResponse>(`${this.apiUrl}/resend-email-otp`, request);
   }
 
-  checkEmail(email: string) {
-    return this.http.get<{ exists: boolean }>(`${this.apiUrl}/check-email`, { params: { email } });
-  }
-
-  checkPhone(phone: string) {
-    return this.http.get<{ exists: boolean }>(`${this.apiUrl}/check-phone`, { params: { phone } });
-  }
-
   ping() {
     // Fire-and-forget to wake up Render free-tier server on app load
     this.http.get(`${this.apiUrl}/ping`, { responseType: 'text' }).subscribe({ error: () => {} });

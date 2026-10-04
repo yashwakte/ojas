@@ -115,37 +115,6 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task CheckEmail_ReturnsExistsTrue_WhenEmailIsRegistered()
-    {
-        _usersMock.SetupFind(new List<User> { MakeUser() });
-
-        var result = await _sut.CheckEmail("jane@example.com");
-
-        var okResult = result.ShouldBeOfType<OkObjectResult>();
-        okResult.Value.ShouldNotBeNull();
-    }
-
-    [Fact]
-    public async Task CheckEmail_ReturnsExistsFalse_WhenEmailIsUnregistered()
-    {
-        _usersMock.SetupFind(new List<User>());
-
-        var result = await _sut.CheckEmail("unknown@example.com");
-
-        result.ShouldBeOfType<OkObjectResult>();
-    }
-
-    [Fact]
-    public async Task CheckPhone_ReturnsOk()
-    {
-        _usersMock.SetupFind(new List<User>());
-
-        var result = await _sut.CheckPhone("9000000000");
-
-        result.ShouldBeOfType<OkObjectResult>();
-    }
-
-    [Fact]
     public async Task Register_Success_ReturnsPendingVerification_AndSetsNoCookiesYet()
     {
         _usersMock.SetupFind(new List<User>());

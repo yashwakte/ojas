@@ -187,9 +187,9 @@ public class AuthService
     /// a staff number, and - for a number with no account yet - a missing name, email or password,
     /// or an email that already belongs to someone else. Returns null when the sign-in may go ahead.
     ///
-    /// Run before the widget token is checked, so that a customer who mistyped their email is
-    /// told so and can fix it, rather than having their one-use token consumed by a request that
-    /// was always going to be refused.
+    /// Only ever consulted once the number has been proved - see AuthController.PhoneSignIn. Its
+    /// answers say whether the number and the email have accounts, which is nobody's business but
+    /// the number's owner.
     /// </summary>
     public async Task<PhoneSignInResult?> CheckPhoneSignInAsync(
         string phone, string? fullName, string? email, string? password)
@@ -225,6 +225,41 @@ public class AuthService
         }
 
         return null;
+    }
+
+    /// <summary>Issues a <see cref="PhoneSignupTicket"/> for a number this browser has just
+    /// proved, and returns the raw ticket for the controller to put in its cookie.</summary>
+    public async Task<string> IssuePhoneSignupTicketAsync(string phone)
+    {
+        var raw = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await _db.PhoneSignupTickets.InsertOneAsync(new PhoneSignupTicket
+        {
+            TicketHash = HashToken(raw),
+            Phone = phone,
+            ExpiresAt = DateTime.UtcNow.Add(PhoneSignupTicket.Lifetime),
+        });
+        return raw;
+    }
+
+    /// <summary>
+    /// Spends one use of a sign-up ticket. True only if it exists, was issued for this number, has
+    /// not expired and has uses left. The check and the count are one atomic update, so a burst of
+    /// parallel requests cannot all slip in under the limit on the same stale count.
+    /// </summary>
+    public async Task<bool> UsePhoneSignupTicketAsync(string rawTicket, string phone)
+    {
+        var hash = HashToken(rawTicket);
+        var now = DateTime.UtcNow;
+        var used = await _db.PhoneSignupTickets.FindOneAndUpdateAsync(
+            t => t.TicketHash == hash && t.Phone == phone && t.ExpiresAt > now && t.Uses < PhoneSignupTicket.MaxUses,
+            Builders<PhoneSignupTicket>.Update.Inc(t => t.Uses, 1));
+        return used != null;
+    }
+
+    public Task DeletePhoneSignupTicketAsync(string rawTicket)
+    {
+        var hash = HashToken(rawTicket);
+        return _db.PhoneSignupTickets.DeleteOneAsync(t => t.TicketHash == hash);
     }
 
     /// <summary>

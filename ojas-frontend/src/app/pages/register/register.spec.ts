@@ -44,11 +44,7 @@ describe('Register', () => {
       'resendEmailOtp',
       'verifyPhoneRegistration',
       'saveAuth',
-      'checkEmail',
-      'checkPhone',
     ]);
-    spy.checkEmail.and.returnValue(of({ exists: false }));
-    spy.checkPhone.and.returnValue(of({ exists: false }));
     spy.resendEmailOtp.and.returnValue(of({ message: 'ok', devCode: null }));
     spy.register.and.returnValue(of(pendingResponse));
     spy.verifyPhoneRegistration.and.returnValue(of(phoneVerifiedStep));
@@ -129,56 +125,6 @@ describe('Register', () => {
     const control = fixture.componentInstance.registerForm.get('phone')!;
     control.setValue('12345');
     expect(control.hasError('pattern')).toBeTrue();
-  });
-
-  it('emailChecking/phoneChecking report true while the async validators are pending', () => {
-    const { fixture } = create();
-    const form = fixture.componentInstance.registerForm;
-
-    jasmine.clock().install();
-    try {
-      form.get('email')?.setValue('jane@x.com');
-      form.get('phone')?.setValue('9876543210');
-
-      expect(fixture.componentInstance.emailChecking).toBeTrue();
-      expect(fixture.componentInstance.phoneChecking).toBeTrue();
-
-      jasmine.clock().tick(200);
-      expect(fixture.componentInstance.emailChecking).toBeFalse();
-      expect(fixture.componentInstance.phoneChecking).toBeFalse();
-    } finally {
-      jasmine.clock().uninstall();
-    }
-  });
-
-  it('flags the email control invalid when checkEmail reports it already exists', () => {
-    authServiceSpy.checkEmail.and.returnValue(of({ exists: true }));
-    const { fixture } = create();
-    const control = fixture.componentInstance.registerForm.get('email')!;
-
-    jasmine.clock().install();
-    try {
-      control.setValue('taken@x.com');
-      jasmine.clock().tick(200);
-      expect(control.hasError('serverError')).toBeTrue();
-    } finally {
-      jasmine.clock().uninstall();
-    }
-  });
-
-  it('flags the phone control invalid when checkPhone reports it already exists', () => {
-    authServiceSpy.checkPhone.and.returnValue(of({ exists: true }));
-    const { fixture } = create();
-    const control = fixture.componentInstance.registerForm.get('phone')!;
-
-    jasmine.clock().install();
-    try {
-      control.setValue('9876543210');
-      jasmine.clock().tick(200);
-      expect(control.hasError('serverError')).toBeTrue();
-    } finally {
-      jasmine.clock().uninstall();
-    }
   });
 
   it('onSubmit does nothing when the form is invalid', () => {

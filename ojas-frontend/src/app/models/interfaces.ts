@@ -278,7 +278,9 @@ export interface VerifyPhoneRegistrationRequest {
  * creates the account from them, with the email stored unverified. */
 export interface PhoneSignInRequest {
   phone: string;
-  widgetToken: string;
+  /** Left out on the follow-up that sends a new number's details: the HttpOnly sign-up ticket
+   * cookie the first, proved request set stands in for the code. */
+  widgetToken?: string;
   fullName?: string;
   email?: string;
   /** Required for a new number, as on the registration page; ignored otherwise. */

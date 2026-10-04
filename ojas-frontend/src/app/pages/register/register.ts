@@ -6,8 +6,6 @@ import {
   FormsModule,
   Validators,
   ReactiveFormsModule,
-  AbstractControl,
-  AsyncValidatorFn,
 } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -19,7 +17,7 @@ import { SlowHint } from '../../components/slow-hint/slow-hint';
 import { AuthService } from '../../services/auth.service';
 import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { AuthResponse } from '../../models/interfaces';
-import { timeout, of, switchMap, map, catchError, timer } from 'rxjs';
+import { timeout } from 'rxjs';
 import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
 
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -104,7 +102,6 @@ export class Register implements OnInit, OnDestroy {
         '',
         {
           validators: [Validators.required, Validators.email],
-          asyncValidators: [this.emailExistsValidator()],
           updateOn: 'blur',
         },
       ],
@@ -112,7 +109,6 @@ export class Register implements OnInit, OnDestroy {
         '',
         {
           validators: [Validators.required, Validators.pattern(/^[6-9]\d{9}$/)],
-          asyncValidators: [this.phoneExistsValidator()],
           updateOn: 'blur',
         },
       ],
@@ -142,40 +138,6 @@ export class Register implements OnInit, OnDestroy {
       // will route them onward if the phone is genuinely outstanding.
       this.router.navigate(['/login']);
     }
-  }
-
-  private emailExistsValidator(): AsyncValidatorFn {
-    return (control: AbstractControl) => {
-      if (!control.value || control.hasError('email') || control.hasError('required')) {
-        return of(null);
-      }
-      return timer(200).pipe(
-        switchMap(() => this.auth.checkEmail(control.value)),
-        map((res) => (res.exists ? { serverError: 'Email already registered' } : null)),
-        catchError(() => of(null)),
-      );
-    };
-  }
-
-  private phoneExistsValidator(): AsyncValidatorFn {
-    return (control: AbstractControl) => {
-      if (!control.value || control.hasError('pattern') || control.hasError('required')) {
-        return of(null);
-      }
-      return timer(200).pipe(
-        switchMap(() => this.auth.checkPhone(control.value)),
-        map((res) => (res.exists ? { serverError: 'Phone number already in use' } : null)),
-        catchError(() => of(null)),
-      );
-    };
-  }
-
-  get emailChecking() {
-    return this.registerForm.get('email')?.status === 'PENDING';
-  }
-
-  get phoneChecking() {
-    return this.registerForm.get('phone')?.status === 'PENDING';
   }
 
   onTurnstileVerified(token: string) {
@@ -219,7 +181,8 @@ export class Register implements OnInit, OnDestroy {
           // A Turnstile token is single-use - whatever happened, this one is spent.
           this.turnstileToken = null;
           this.turnstileWidget()?.reset();
-          // 409 is a safety net — async validators should have caught this already
+          // Whether an email or number is taken is only said here, behind Turnstile and the
+          // auth rate limit - never by a lookup anyone could call in a loop.
           if (err.status === 409) {
             const field = err.error?.field;
             if (field === 'email') {

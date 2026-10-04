@@ -102,38 +102,16 @@
   pointer-events: none;
 }
 
-.ps-phone-status {
-  position: absolute;
-  right: 14px;
-}
-
 .ps-hint {
   margin: 0;
   font-size: 0.76rem;
   line-height: 1.45;
   color: var(--ojas-text-light);
 
-  &--welcome {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 9px 12px;
-    border-radius: 10px;
-    background: var(--ojas-ink-bg);
-    color: var(--ojas-text);
-    font-weight: 500;
-
-    mat-icon {
-      color: var(--ojas-ink);
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
+  a {
+    color: var(--ojas-ink);
+    font-weight: 700;
   }
-}
-
-.ps-hint--welcome a {
-  color: var(--ojas-ink);
-  font-weight: 700;
 }
 
 .ps-dev {
@@ -241,6 +219,12 @@
 
 .ps-sent {
   margin: 0;
+
+  > mat-icon {
+    color: var(--ojas-ink);
+    vertical-align: -2px;
+  }
+
   font-size: 0.88rem;
   line-height: 1.5;
   color: var(--ojas-text-light);

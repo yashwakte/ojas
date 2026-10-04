@@ -167,35 +167,6 @@
   margin-bottom: 16px;
 }
 
-.checking-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ojas-text-light);
-  font-size: 0.78rem;
-}
-
-.checking-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ojas-ink-soft);
-  animation: pulse 1s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.7);
-  }
-}
-
 .error-banner {
   display: flex;
   align-items: center;

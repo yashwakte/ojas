@@ -131,25 +131,6 @@ describe('AuthService', () => {
     call.flush(res);
   });
 
-  it('checkEmail() gets /auth/check-email with query param', () => {
-    setup();
-    service.checkEmail('a@b.com').subscribe((res) => expect(res).toEqual({ exists: true }));
-    const call = httpMock.expectOne(
-      (r) => r.url === `${environment.apiUrl}/auth/check-email` && r.params.get('email') === 'a@b.com',
-    );
-    expect(call.request.method).toBe('GET');
-    call.flush({ exists: true });
-  });
-
-  it('checkPhone() gets /auth/check-phone with query param', () => {
-    setup();
-    service.checkPhone('9999999999').subscribe((res) => expect(res).toEqual({ exists: false }));
-    const call = httpMock.expectOne(
-      (r) => r.url === `${environment.apiUrl}/auth/check-phone` && r.params.get('phone') === '9999999999',
-    );
-    call.flush({ exists: false });
-  });
-
   it('login() posts to /auth/login', () => {
     setup();
     const req = { identifier: 'a@b.com', password: 'secret', turnstileToken: 'tok' };

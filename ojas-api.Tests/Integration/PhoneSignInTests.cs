@@ -37,7 +37,15 @@ public class PhoneSignInTests : IDisposable
             "/api/auth/phone-signin",
             new PhoneSignInRequest(phone, token ?? FakeMsg91WidgetHandler.TokenFor(phone), fullName, email, password));
 
-    private async Task<User> FindUserAsync(string phone)
+    /// <summary>The follow-up for a proved new number: the details, no widget token - the sign-up
+    /// ticket cookie the client is holding stands in for the code.</summary>
+    private static Task<HttpResponseMessage> CompleteAsync(
+        HttpClient client, string phone, string? fullName = "Sneha", string? email = null, string? password = CheckoutPassword) =>
+        client.PostAsJsonAsync(
+            "/api/auth/phone-signin",
+            new PhoneSignInRequest(phone, null, fullName, email ?? NewEmail(), password));
+
+        private async Task<User> FindUserAsync(string phone)
     {
         User? user = null;
         await _factory.SeedAsync(async db =>
@@ -81,18 +89,17 @@ public class PhoneSignInTests : IDisposable
     [Theory]
     [InlineData(null)]
     [InlineData("short")]
-    public async Task ANewNumber_WithoutAProperPassword_IsRefused_BeforeTheCodeIsSpent(string? password)
+    public async Task ANewNumber_WithoutAProperPassword_IsRefused_AndFixedWithoutASecondCode(string? password)
     {
         using var client = _factory.CreateClient();
         var phone = GeneratePhone();
-        var token = _factory.Msg91Widget.IssueToken(phone);
 
-        var refused = await SignInAsync(client, phone, token: token, fullName: "Sneha", email: NewEmail(), password: password);
+        var refused = await SignInAsync(client, phone, fullName: "Sneha", email: NewEmail(), password: password);
         refused.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await FindUserAsync(phone)).ShouldBeNull();
 
-        (await SignInAsync(client, phone, token: token, fullName: "Sneha", email: NewEmail()))
-            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await CompleteAsync(client, phone)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await FindUserAsync(phone)).ShouldNotBeNull();
     }
 
     [Fact]
@@ -114,19 +121,90 @@ public class PhoneSignInTests : IDisposable
         body.Session.Email.ShouldBe(existing.Email);
     }
 
+    /// <summary>The checkout flow as the page now runs it: the number alone, proved by its code;
+    /// then, because it is new, the details - with no second text code.</summary>
     [Fact]
-    public async Task ANewNumber_WithoutANameOrEmail_IsRefused_BeforeTheCodeIsSpent()
+    public async Task ANewNumber_ProvedAlone_IsAskedForDetails_ThenCreatedWithoutASecondCode()
     {
         using var client = _factory.CreateClient();
         var phone = GeneratePhone();
-        var token = _factory.Msg91Widget.IssueToken(phone);
 
-        var refused = await SignInAsync(client, phone, token: token, fullName: "Sneha", email: "not-an-email");
-        refused.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var asked = await SignInAsync(client, phone, password: null);
+        asked.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await asked.Content.ReadAsStringAsync()).ShouldContain("needsDetails");
 
-        // The same token still works once the details are fixed - it was never sent to MSG91.
-        var retried = await SignInAsync(client, phone, token: token, fullName: "Sneha", email: NewEmail());
-        retried.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var created = await CompleteAsync(client, phone, fullName: "Sneha Dhoran");
+        created.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await created.Content.ReadFromJsonAsync<PhoneSignInResponse>())!.IsNewAccount.ShouldBeTrue();
+
+        // The ticket is spent with the account it opened; it cannot open a second one.
+        var again = await CompleteAsync(client, phone);
+        again.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await again.Content.ReadAsStringAsync()).ShouldContain("verifyAgain");
+    }
+
+    /// <summary>The enumeration hole this flow closes: before the number is proved, a number with
+    /// an account, a staff number and a new number must all be answered identically.</summary>
+    [Fact]
+    public async Task BeforeTheNumberIsProved_NothingSaysWhetherItHasAnAccount()
+    {
+        using var registering = _factory.CreateClient();
+        var customerPhone = GeneratePhone();
+        await registering.RegisterAsync(phone: customerPhone);
+        var staffPhone = GeneratePhone("8");
+        await _factory.SeedAsync(db => db.Users.InsertOneAsync(new User
+        {
+            FullName = "Delivery Partner", Email = NewEmail(), Phone = staffPhone,
+            PasswordHash = "x", Role = UserRoles.Delivery, IsEmailVerified = true, IsPhoneVerified = true,
+        }));
+        var newPhone = GeneratePhone();
+
+        var bodies = new List<string>();
+        foreach (var phone in new[] { customerPhone, staffPhone, newPhone })
+        {
+            using var client = _factory.CreateClient();
+            var response = await SignInAsync(client, phone, token: "not-a-real-token", password: null);
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+            response.Headers.Contains("Set-Cookie").ShouldBeFalse();
+            bodies.Add(await response.Content.ReadAsStringAsync());
+
+            // And with no token at all, the same for every number too.
+            using var noToken = _factory.CreateClient();
+            (await CompleteAsync(noToken, phone)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+        bodies.Distinct().Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ASignUpTicket_IsBoundToTheNumberItWasIssuedFor()
+    {
+        using var client = _factory.CreateClient();
+        var proved = GeneratePhone();
+        (await SignInAsync(client, proved, password: null)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var someoneElse = GeneratePhone();
+        (await CompleteAsync(client, someoneElse)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await FindUserAsync(someoneElse)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ASignUpTicket_CannotBeUsedToTestEmailsForever()
+    {
+        using var registering = _factory.CreateClient();
+        var takenEmail = NewEmail();
+        await registering.RegisterAsync(email: takenEmail);
+
+        using var client = _factory.CreateClient();
+        var phone = GeneratePhone();
+        (await SignInAsync(client, phone, password: null)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        for (var i = 0; i < PhoneSignupTicket.MaxUses; i++)
+            (await CompleteAsync(client, phone, email: takenEmail)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
+
+        // Uses exhausted: even a perfectly good email now needs the number proved again.
+        var exhausted = await CompleteAsync(client, phone);
+        exhausted.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await exhausted.Content.ReadAsStringAsync()).ShouldContain("verifyAgain");
     }
 
     [Fact]

@@ -17,7 +17,7 @@ import { timeout } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { Msg91WidgetService } from '../../services/msg91-widget.service';
 import { DigitsOnlyDirective } from '../../directives/digits-only.directive';
-import { PhoneSignInResponse } from '../../models/interfaces';
+import { PhoneSignInRequest, PhoneSignInResponse } from '../../models/interfaces';
 
 const PHONE_PATTERN = /^[6-9]\d{9}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -27,16 +27,19 @@ const RESEND_COOLDOWN_SECONDS = 30;
 /** Generous for the same reason as login's: a cold API instance can take a while to answer. */
 const REQUEST_TIMEOUT_MS = 35_000;
 
-/** Whether the number typed already has an account - asked before a code is sent, because the
- * answer decides whether the account details are needed at all. */
-type NumberStatus = 'unknown' | 'checking' | 'existing' | 'new';
-
 /**
- * Step one of checkout for a customer who is not signed in: the registration page's fields - name,
- * mobile, email and password - and a text code to prove the mobile is theirs.
+ * Step one of checkout for a customer who is not signed in: the mobile number, a text code to
+ * prove it is theirs, and - only for a number with no Ojas account - the registration page's
+ * name, email and password.
  *
- * A number that already has an Ojas account opens it; a new number creates one from what is typed
- * here, with the email left unverified for the customer to confirm whenever they like. There is no separate "guest order" - verifying the number is what makes the
+ * Nothing says whether a number has an account until its code is verified. Asking first let
+ * anyone test any number (and any email) against the customer list, so the page now learns it
+ * from the verified sign-in itself: a known number is signed straight in, and a new one is asked
+ * for its details. The API hands the browser an HttpOnly ticket for that second request, so a
+ * mistyped email never costs a second text.
+ *
+ * A new number's account has its email left unverified for the customer to confirm whenever they
+ * like. There is no separate "guest order" - verifying the number is what makes the
  * customer somebody we can deliver to, show their orders to and refund.
  *
  * Only checkout sends these codes. Each one costs money, so signing in anywhere else stays on the
@@ -73,8 +76,7 @@ export class PhoneSignIn implements OnDestroy {
   protected readonly minPasswordLength = MIN_PASSWORD_LENGTH;
   protected code = '';
 
-  protected readonly step = signal<'details' | 'code'>('details');
-  protected readonly numberStatus = signal<NumberStatus>('unknown');
+  protected readonly step = signal<'phone' | 'code' | 'details'>('phone');
   protected readonly emailTaken = signal(false);
   protected readonly emailTouched = signal(false);
   protected readonly nameTouched = signal(false);
@@ -90,23 +92,13 @@ export class PhoneSignIn implements OnDestroy {
   protected readonly emailValid = computed(() => EMAIL_PATTERN.test(this.email().trim()));
   protected readonly passwordValid = computed(() => this.password().length >= MIN_PASSWORD_LENGTH);
 
-  /** Name, email and password - what the registration page asks for - are only asked of a
-   * number with no account. While the check is still out, or could not be made, they are asked
-   * for anyway: a returning customer who fills them in loses nothing, since the API ignores them
-   * for a number it already knows. */
-  protected readonly needsDetails = computed(() => this.numberStatus() !== 'existing');
+  protected readonly canSend = computed(() => !this.busy() && this.phoneValid() && this.widgetReady());
 
-  protected readonly canSend = computed(() => {
-    if (this.busy() || !this.phoneValid() || !this.widgetReady()) return false;
-    if (this.numberStatus() === 'checking') return false;
-    if (!this.needsDetails()) return true;
-    return this.nameValid() && this.emailValid() && !this.emailTaken() && this.passwordValid();
-  });
+  protected readonly canCreate = computed(
+    () => !this.busy() && this.nameValid() && this.emailValid() && !this.emailTaken() && this.passwordValid(),
+  );
 
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
-  /** The number the latest existence check was for, so a slower answer about a number the
-   * customer has since changed is ignored rather than applied to the new one. */
-  private checkingFor = '';
 
   constructor() {
     this.msg91.preload();
@@ -125,31 +117,8 @@ export class PhoneSignIn implements OnDestroy {
   }
 
   protected onPhoneChange(value: string): void {
-    const digits = value.replace(/\D/g, '').slice(-10);
-    this.phone.set(digits);
+    this.phone.set(value.replace(/\D/g, '').slice(-10));
     this.error.set('');
-
-    if (!PHONE_PATTERN.test(digits)) {
-      this.numberStatus.set('unknown');
-      this.checkingFor = '';
-      return;
-    }
-    if (digits === this.checkingFor) return;
-
-    this.checkingFor = digits;
-    this.numberStatus.set('checking');
-    this.auth.checkPhone(digits).subscribe({
-      next: (res) => {
-        if (this.checkingFor !== digits) return;
-        this.numberStatus.set(res.exists ? 'existing' : 'new');
-        if (!res.exists) this.checkEmail();
-      },
-      // Could not tell. Asking for the details anyway is the safe side: the API will say if
-      // anything was wrong, and a returning customer is merely asked for two fields it ignores.
-      error: () => {
-        if (this.checkingFor === digits) this.numberStatus.set('new');
-      },
-    });
   }
 
   protected onEmailChange(value: string): void {
@@ -157,24 +126,7 @@ export class PhoneSignIn implements OnDestroy {
     this.emailTaken.set(false);
   }
 
-  /** Runs on blur, and once the number is known to be new. An email on another account cannot
-   * be used to open a new one, and saying so before the text goes out saves the customer a code. */
-  protected checkEmail(): void {
-    const email = this.email().trim().toLowerCase();
-    if (!EMAIL_PATTERN.test(email) || this.numberStatus() === 'existing') return;
-
-    this.auth.checkEmail(email).subscribe({
-      next: (res) => {
-        if (this.email().trim().toLowerCase() === email) this.emailTaken.set(res.exists);
-      },
-      error: () => {},
-    });
-  }
-
   protected sendCode(): void {
-    this.emailTouched.set(true);
-    this.nameTouched.set(true);
-    this.passwordTouched.set(true);
     if (!this.canSend()) return;
 
     this.busy.set(true);
@@ -216,51 +168,81 @@ export class PhoneSignIn implements OnDestroy {
     this.error.set('');
 
     this.msg91.verifyOtp(code).then(
-      (widgetToken) =>
-        this.auth
-          .phoneSignIn({
-            phone: this.phone(),
-            widgetToken,
-            fullName: this.needsDetails() ? this.fullName().trim() : undefined,
-            email: this.needsDetails() ? this.email().trim().toLowerCase() : undefined,
-            password: this.needsDetails() ? this.password() : undefined,
-          })
-          .pipe(timeout(REQUEST_TIMEOUT_MS))
-          .subscribe({
-            next: (res) => {
-              this.busy.set(false);
-              this.clearCooldown();
-              this.auth.saveAuth(res.session);
-              this.signedIn.emit(res);
-            },
-            error: (err) => this.onSignInRefused(err),
-          }),
+      (widgetToken) => this.submit({ phone: this.phone(), widgetToken }),
       (e: Error) => this.fail(e.message || 'That code is invalid or has expired.'),
     );
   }
 
-  /** Back to the form, keeping what was typed - for a mistyped number, or a text that never came. */
-  protected changeDetails(): void {
+  /** A proved new number's details. No code goes with them - the ticket cookie the verified
+   * request set stands in for it. */
+  protected createAccount(): void {
+    this.nameTouched.set(true);
+    this.emailTouched.set(true);
+    this.passwordTouched.set(true);
+    if (!this.canCreate()) return;
+
+    this.busy.set(true);
+    this.error.set('');
+    this.submit({
+      phone: this.phone(),
+      fullName: this.fullName().trim(),
+      email: this.email().trim().toLowerCase(),
+      password: this.password(),
+    });
+  }
+
+  /** Back to the number, keeping what was typed - for a mistyped number, or a text that never came. */
+  protected changeNumber(): void {
     this.code = '';
     this.error.set('');
     this.clearCooldown();
-    this.step.set('details');
+    this.step.set('phone');
     this.focus('input[name="phone"]');
   }
 
-  private onSignInRefused(err: { status?: number; name?: string; error?: { message?: string; field?: string; needsDetails?: boolean } }): void {
+  private submit(request: PhoneSignInRequest): void {
+    this.auth
+      .phoneSignIn(request)
+      .pipe(timeout(REQUEST_TIMEOUT_MS))
+      .subscribe({
+        next: (res) => {
+          this.busy.set(false);
+          this.clearCooldown();
+          this.auth.saveAuth(res.session);
+          this.signedIn.emit(res);
+        },
+        error: (err) => this.onSignInRefused(err),
+      });
+  }
+
+  private onSignInRefused(err: {
+    status?: number;
+    name?: string;
+    error?: { message?: string; field?: string; needsDetails?: boolean; verifyAgain?: boolean };
+  }): void {
     const message = err.error?.message;
 
-    // Both of these are about what was typed, so they go back to the form with it intact.
-    if (err.status === 409 && err.error?.field === 'email') {
-      this.emailTaken.set(true);
-      this.changeDetails();
+    // The number is proved and new. Asking for the details is the expected next step, not an
+    // error - unless they were already being asked for, in which case the API says what is wrong.
+    if (err.status === 400 && err.error?.needsDetails) {
+      const firstAsk = this.step() !== 'details';
+      this.busy.set(false);
+      this.clearCooldown();
+      this.step.set('details');
+      if (firstAsk) this.focus('input[name="fullName"]');
+      else this.fail(message ?? 'Please check your details.');
       return;
     }
-    if (err.status === 400 && err.error?.needsDetails) {
-      this.numberStatus.set('new');
-      this.changeDetails();
-      this.fail(message ?? 'Please enter your name and a valid email address.');
+    if (err.status === 409 && err.error?.field === 'email') {
+      this.busy.set(false);
+      this.step.set('details');
+      this.emailTaken.set(true);
+      return;
+    }
+    // The ticket ran out (fifteen minutes, or too many tries): the number has to be proved again.
+    if (err.status === 400 && err.error?.verifyAgain) {
+      this.changeNumber();
+      this.fail(message ?? 'Please verify your mobile number again.');
       return;
     }
 

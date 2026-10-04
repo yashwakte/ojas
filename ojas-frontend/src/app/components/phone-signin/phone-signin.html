@@ -1,25 +1,5 @@
-@if (step() === 'details') {
+@if (step() === 'phone') {
   <form class="ps-form" (ngSubmit)="sendCode()" novalidate>
-    @if (needsDetails()) {
-      <div class="ps-field">
-        <label for="psName">Full name</label>
-        <input
-          id="psName"
-          name="fullName"
-          type="text"
-          autocomplete="name"
-          placeholder="Your full name"
-          [ngModel]="fullName()"
-          (ngModelChange)="fullName.set($event)"
-          (blur)="nameTouched.set(true)"
-          [attr.aria-invalid]="nameTouched() && !nameValid() ? 'true' : null"
-        />
-        @if (nameTouched() && !nameValid()) {
-          <p class="ps-field-error">Please enter your name.</p>
-        }
-      </div>
-    }
-
     <div class="ps-field">
       <label for="psPhone">Mobile number</label>
       <div class="ps-phone">
@@ -36,78 +16,16 @@
           [ngModel]="phone()"
           (ngModelChange)="onPhoneChange($event)"
         />
-        @if (numberStatus() === 'checking') {
-          <mat-spinner class="ps-phone-status" diameter="16"></mat-spinner>
-        }
       </div>
-      @if (numberStatus() === 'existing') {
-        <!-- The password is offered because it is free; every text code costs money. -->
-        <p class="ps-hint ps-hint--welcome" role="status">
-          <mat-icon inline="true">waving_hand</mat-icon>
-          <span>
-            Welcome back! This number has an Ojas account. Verify it with a code, or
-            <a routerLink="/login" [queryParams]="{ redirect: '/checkout' }">sign in with your password</a>.
-          </span>
-        </p>
-      }
+      <!-- Offered to everyone, never only to a number we recognise - saying "welcome back" before the
+           code is verified would tell anyone which numbers are customers. The password is free;
+           every text code costs money. -->
+      <p class="ps-hint">
+        Already have an Ojas password?
+        <a routerLink="/login" [queryParams]="{ redirect: '/checkout' }">Sign in with it</a>
+        - no code needed.
+      </p>
     </div>
-
-    @if (needsDetails()) {
-      <div class="ps-field">
-        <label for="psEmail">Email</label>
-        <input
-          id="psEmail"
-          name="email"
-          type="email"
-          autocomplete="email"
-          placeholder="you@example.com"
-          [ngModel]="email()"
-          (ngModelChange)="onEmailChange($event)"
-          (blur)="emailTouched.set(true); checkEmail()"
-          [attr.aria-invalid]="(emailTouched() && !emailValid()) || emailTaken() ? 'true' : null"
-        />
-        @if (emailTaken()) {
-          <p class="ps-field-error">
-            This email is already on another Ojas account. Use a different one, or
-            <a routerLink="/login" [queryParams]="{ redirect: '/checkout' }">sign in with it</a>.
-          </p>
-        } @else if (emailTouched() && !emailValid()) {
-          <p class="ps-field-error">Please enter a valid email address.</p>
-        } @else {
-          <p class="ps-hint">For your order receipts. You can verify it later.</p>
-        }
-      </div>
-
-      <div class="ps-field">
-        <label for="psPassword">Password</label>
-        <div class="ps-password">
-          <input
-            id="psPassword"
-            name="password"
-            autocomplete="new-password"
-            [type]="hidePassword() ? 'password' : 'text'"
-            [placeholder]="'Min ' + minPasswordLength + ' characters'"
-            [ngModel]="password()"
-            (ngModelChange)="password.set($event)"
-            (blur)="passwordTouched.set(true)"
-            [attr.aria-invalid]="passwordTouched() && !passwordValid() ? 'true' : null"
-          />
-          <button
-            type="button"
-            class="ps-eye"
-            (click)="hidePassword.set(!hidePassword())"
-            [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
-          >
-            <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-          </button>
-        </div>
-        @if (passwordTouched() && !passwordValid()) {
-          <p class="ps-field-error">Password must be at least {{ minPasswordLength }} characters.</p>
-        } @else {
-          <p class="ps-hint">Sign in with your mobile number and this password next time.</p>
-        }
-      </div>
-    }
 
     @if (widgetUnavailable()) {
       <div class="ps-error" role="alert">
@@ -135,11 +53,11 @@
       }
     </button>
   </form>
-} @else {
+} @else if (step() === 'code') {
   <form class="ps-form ps-reveal" (ngSubmit)="verifyCode()" novalidate>
     <p class="ps-sent">
       Enter the 4-digit code sent to <strong>+91 {{ phone() }}</strong>
-      <button type="button" class="ps-link" (click)="changeDetails()">Change</button>
+      <button type="button" class="ps-link" (click)="changeNumber()">Change</button>
     </p>
 
     @if (devCode) {
@@ -193,8 +111,106 @@
       }
     </p>
   </form>
+} @else {
+  <!-- Only a number that has just been proved, and has no account, ever reaches this step. -->
+  <form class="ps-form ps-reveal" (ngSubmit)="createAccount()" novalidate>
+    <p class="ps-sent">
+      <mat-icon inline="true">verified</mat-icon>
+      <span><strong>+91 {{ phone() }}</strong> is verified. Create your Ojas account to continue.</span>
+    </p>
+
+    <div class="ps-field">
+      <label for="psName">Full name</label>
+      <input
+        id="psName"
+        name="fullName"
+        type="text"
+        autocomplete="name"
+        placeholder="Your full name"
+        [ngModel]="fullName()"
+        (ngModelChange)="fullName.set($event)"
+        (blur)="nameTouched.set(true)"
+        [attr.aria-invalid]="nameTouched() && !nameValid() ? 'true' : null"
+      />
+      @if (nameTouched() && !nameValid()) {
+        <p class="ps-field-error">Please enter your name.</p>
+      }
+    </div>
+
+    <div class="ps-field">
+      <label for="psEmail">Email</label>
+      <input
+        id="psEmail"
+        name="email"
+        type="email"
+        autocomplete="email"
+        placeholder="you@example.com"
+        [ngModel]="email()"
+        (ngModelChange)="onEmailChange($event)"
+        (blur)="emailTouched.set(true)"
+        [attr.aria-invalid]="(emailTouched() && !emailValid()) || emailTaken() ? 'true' : null"
+      />
+      @if (emailTaken()) {
+        <p class="ps-field-error">
+          This email is already on another Ojas account. Use a different one, or
+          <a routerLink="/login" [queryParams]="{ redirect: '/checkout' }">sign in with it</a>.
+        </p>
+      } @else if (emailTouched() && !emailValid()) {
+        <p class="ps-field-error">Please enter a valid email address.</p>
+      } @else {
+        <p class="ps-hint">For your order receipts. You can verify it later.</p>
+      }
+    </div>
+
+    <div class="ps-field">
+      <label for="psPassword">Password</label>
+      <div class="ps-password">
+        <input
+          id="psPassword"
+          name="password"
+          autocomplete="new-password"
+          [type]="hidePassword() ? 'password' : 'text'"
+          [placeholder]="'Min ' + minPasswordLength + ' characters'"
+          [ngModel]="password()"
+          (ngModelChange)="password.set($event)"
+          (blur)="passwordTouched.set(true)"
+          [attr.aria-invalid]="passwordTouched() && !passwordValid() ? 'true' : null"
+        />
+        <button
+          type="button"
+          class="ps-eye"
+          (click)="hidePassword.set(!hidePassword())"
+          [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
+        >
+          <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+        </button>
+      </div>
+      @if (passwordTouched() && !passwordValid()) {
+        <p class="ps-field-error">Password must be at least {{ minPasswordLength }} characters.</p>
+      } @else {
+        <p class="ps-hint">Sign in with your mobile number and this password next time.</p>
+      }
+    </div>
+
+    @if (error()) {
+      <div class="ps-error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <button type="submit" class="ps-btn" [disabled]="!canCreate()">
+      @if (busy()) {
+        <mat-spinner diameter="20"></mat-spinner>
+        Creating your account…
+      } @else {
+        <mat-icon>person_add</mat-icon>
+        Create account &amp; continue
+      }
+    </button>
+  </form>
 }
 
-<!-- MSG91 draws its captcha into this element by id, so it stays put across both steps - a resend
+<!-- MSG91 draws its captcha into this element by id, so it stays put across every step - a resend
      goes through it again. hCaptcha's passive check usually renders nothing here at all. -->
 <div [id]="captchaId" class="ps-captcha"></div>
