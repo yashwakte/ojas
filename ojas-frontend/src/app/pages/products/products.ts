@@ -49,7 +49,11 @@ export const SORT_OPTIONS: readonly { key: SortKey; label: string; short: string
 ];
 
 /** Bands on the price a customer actually pays - the same figure the card shows. */
-export const PRICE_BANDS: readonly { id: PriceBand; label: string; holds: (price: number) => boolean }[] = [
+export const PRICE_BANDS: readonly {
+  id: PriceBand;
+  label: string;
+  holds: (price: number) => boolean;
+}[] = [
   { id: 'under-50', label: 'Under ₹50', holds: (p) => p < 50 },
   { id: '50-100', label: '₹50 – ₹100', holds: (p) => p >= 50 && p <= 100 },
   { id: 'over-100', label: 'Over ₹100', holds: (p) => p > 100 },
@@ -169,12 +173,10 @@ export class Products {
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       this.selectedCategories.set(
         new Set(
-          params
-            .getAll('category')
-            .flatMap((raw) => {
-              const category = normalizeCategory(raw);
-              return isProductCategory(category) ? [category] : [];
-            }),
+          params.getAll('category').flatMap((raw) => {
+            const category = normalizeCategory(raw);
+            return isProductCategory(category) ? [category] : [];
+          }),
         ),
       );
 
@@ -189,7 +191,12 @@ export class Products {
 
       const sort = params.get('sort') as SortKey | null;
       this.sort.set(sort && SORT_OPTIONS.some((o) => o.key === sort) ? sort : 'relevance');
-      this.priceBands.set(parseList(params.get('price'), PRICE_BANDS.map((b) => b.id)));
+      this.priceBands.set(
+        parseList(
+          params.get('price'),
+          PRICE_BANDS.map((b) => b.id),
+        ),
+      );
       this.sizes.set(parseList(params.get('size')));
       this.inStockOnly.set(params.get('stock') === '1');
       this.onOfferOnly.set(params.get('offer') === '1');
@@ -354,10 +361,16 @@ export class Products {
     const q = this.query();
     if (q) pills.push({ id: 'q', label: `“${q}”`, facet: 'q' });
     for (const category of this.selectedCategories()) {
-      pills.push({ id: `category-${category}`, label: category, facet: 'category', value: category });
+      pills.push({
+        id: `category-${category}`,
+        label: category,
+        facet: 'category',
+        value: category,
+      });
     }
     for (const b of PRICE_BANDS) {
-      if (this.priceBands().has(b.id)) pills.push({ id: `price-${b.id}`, label: b.label, facet: 'price', value: b.id });
+      if (this.priceBands().has(b.id))
+        pills.push({ id: `price-${b.id}`, label: b.label, facet: 'price', value: b.id });
     }
     for (const s of this.sizes()) {
       pills.push({ id: `size-${s}`, label: packLabel(s), facet: 'size', value: s });
@@ -367,7 +380,9 @@ export class Products {
     return pills;
   });
 
-  readonly sortLabel = computed(() => SORT_OPTIONS.find((o) => o.key === this.sort())?.short ?? 'Sort');
+  readonly sortLabel = computed(
+    () => SORT_OPTIONS.find((o) => o.key === this.sort())?.short ?? 'Sort',
+  );
 
   // ----- Page heading -----
 
@@ -422,7 +437,10 @@ export class Products {
     const sort = SORT_OPTIONS.some((o) => o.key === key) ? (key as SortKey) : 'relevance';
     this.sortSheetOpen.set(false);
     this.syncScrollLock();
-    this.patchQuery({ sort: sort === 'relevance' ? null : sort }, { replaceUrl: true, scroll: true });
+    this.patchQuery(
+      { sort: sort === 'relevance' ? null : sort },
+      { replaceUrl: true, scroll: true },
+    );
   }
 
   toggleBand(id: PriceBand): void {
@@ -527,7 +545,10 @@ export class Products {
     }
   }
 
-  private patchQuery(params: Params, options: { replaceUrl?: boolean; scroll?: boolean } = {}): void {
+  private patchQuery(
+    params: Params,
+    options: { replaceUrl?: boolean; scroll?: boolean } = {},
+  ): void {
     if (typeof window !== 'undefined') {
       this.keepScrollY = window.scrollY;
       this.scrollToResultsAfter = !!options.scroll;

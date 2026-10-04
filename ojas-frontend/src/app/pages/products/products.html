@@ -23,7 +23,9 @@
           (input)="onSearchInput($any($event.target).value)"
           (keydown.enter)="commitSearch()"
           [attr.placeholder]="
-            selectedCategory() === 'All' ? 'Search jowar, ragi, custard…' : 'Search in ' + selectedCategory() + '…'
+            selectedCategory() === 'All'
+              ? 'Search jowar, ragi, custard…'
+              : 'Search in ' + selectedCategory() + '…'
           "
           aria-label="Search products"
           autocomplete="off"
@@ -32,7 +34,12 @@
           enterkeyhint="search"
         />
         @if (searchDraft()) {
-          <button type="button" class="shop-search-clear" (click)="clearSearch()" aria-label="Clear search">
+          <button
+            type="button"
+            class="shop-search-clear"
+            (click)="clearSearch()"
+            aria-label="Clear search"
+          >
             <mat-icon>close</mat-icon>
           </button>
         }
@@ -40,7 +47,11 @@
       <div class="toolbar-actions">
         <label class="sort-select">
           <span>Sort by</span>
-          <select [value]="sort()" (change)="setSort($any($event.target).value)" aria-label="Sort products">
+          <select
+            [value]="sort()"
+            (change)="setSort($any($event.target).value)"
+            aria-label="Sort products"
+          >
             @for (o of sortOptions; track o.key) {
               <option [value]="o.key" [selected]="sort() === o.key">{{ o.label }}</option>
             }
@@ -48,7 +59,8 @@
           <mat-icon aria-hidden="true">expand_more</mat-icon>
         </label>
         <button type="button" class="tool-btn tool-btn--sort" (click)="openSortSheet()">
-          <mat-icon aria-hidden="true">swap_vert</mat-icon><span class="tool-label">{{ sortLabel() }}</span>
+          <mat-icon aria-hidden="true">swap_vert</mat-icon
+          ><span class="tool-label">{{ sortLabel() }}</span>
         </button>
         <button type="button" class="tool-btn tool-btn--filter" (click)="openFilterSheet()">
           <mat-icon aria-hidden="true">tune</mat-icon><span class="tool-label">Filter</span>
@@ -78,7 +90,11 @@
         @for (pill of activePills(); track pill.id) {
           <span class="pill">
             {{ pill.label }}
-            <button type="button" (click)="removePill(pill)" [attr.aria-label]="'Remove ' + pill.label">
+            <button
+              type="button"
+              (click)="removePill(pill)"
+              [attr.aria-label]="'Remove ' + pill.label"
+            >
               <mat-icon>close</mat-icon>
             </button>
           </span>
@@ -152,7 +168,13 @@
                     @if (product.ratingCount) {
                       <span
                         class="product-rating"
-                        [attr.aria-label]="'Rated ' + product.ratingAverage + ' out of 5 from ' + product.ratingCount + ' reviews'"
+                        [attr.aria-label]="
+                          'Rated ' +
+                          product.ratingAverage +
+                          ' out of 5 from ' +
+                          product.ratingCount +
+                          ' reviews'
+                        "
                       >
                         <mat-icon aria-hidden="true">star</mat-icon>
                         <b>{{ product.ratingAverage | number: '1.1-1' }}</b>
@@ -167,11 +189,15 @@
                     <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
                     <p class="product-desc">{{ product.description }}</p>
                     <div class="product-meta">
-                      <span class="product-weight"> <mat-icon>scale</mat-icon> {{ product.weight }} </span>
+                      <span class="product-weight">
+                        <mat-icon>scale</mat-icon> {{ product.weight }}
+                      </span>
                       <span class="product-price">
                         @if (product.discount && product.discount > 0) {
                           <span class="original-price">₹{{ product.price | number: '1.0-2' }}</span>
-                          <span class="sale-price">₹{{ effectivePrice(product) | number: '1.0-2' }}</span>
+                          <span class="sale-price"
+                            >₹{{ effectivePrice(product) | number: '1.0-2' }}</span
+                          >
                         } @else {
                           <span class="sale-price">₹{{ product.price | number: '1.0-2' }}</span>
                         }
@@ -189,11 +215,15 @@
                       [attr.aria-label]="'Add ' + product.name + ' to cart'"
                       (click)="addToCart(product)"
                     >
-                      <mat-icon>{{ justAdded() === product.id ? 'check' : 'add_shopping_cart' }}</mat-icon>
+                      <mat-icon>{{
+                        justAdded() === product.id ? 'check' : 'add_shopping_cart'
+                      }}</mat-icon>
                       <span class="btn-label btn-label--long">{{
                         justAdded() === product.id ? 'Added!' : picking() ? 'Add' : 'Add to Cart'
                       }}</span>
-                      <span class="btn-label btn-label--short">{{ justAdded() === product.id ? 'Added' : 'Add' }}</span>
+                      <span class="btn-label btn-label--short">{{
+                        justAdded() === product.id ? 'Added' : 'Add'
+                      }}</span>
                     </button>
                     @if (!picking()) {
                       <button
@@ -276,13 +306,29 @@
 
     <div class="fgroup">
       <h3 class="fgroup-title">Availability &amp; offers</h3>
-      <button type="button" class="ftoggle" role="switch" [attr.aria-checked]="inStockOnly()" (click)="toggleInStock()">
-        <span class="ftoggle-label">In stock only <small>{{ inStockCount() }}</small></span>
+      <button
+        type="button"
+        class="ftoggle"
+        role="switch"
+        [attr.aria-checked]="inStockOnly()"
+        (click)="toggleInStock()"
+      >
+        <span class="ftoggle-label"
+          >In stock only <small>{{ inStockCount() }}</small></span
+        >
         <span class="fswitch" aria-hidden="true"></span>
       </button>
       @if (onOfferCount() > 0 || onOfferOnly()) {
-        <button type="button" class="ftoggle" role="switch" [attr.aria-checked]="onOfferOnly()" (click)="toggleOnOffer()">
-          <span class="ftoggle-label">On offer <small>{{ onOfferCount() }}</small></span>
+        <button
+          type="button"
+          class="ftoggle"
+          role="switch"
+          [attr.aria-checked]="onOfferOnly()"
+          (click)="toggleOnOffer()"
+        >
+          <span class="ftoggle-label"
+            >On offer <small>{{ onOfferCount() }}</small></span
+          >
           <span class="fswitch" aria-hidden="true"></span>
         </button>
       }
@@ -295,7 +341,12 @@
       <div class="sheet-grip" aria-hidden="true"></div>
       <div class="sheet-head">
         <h2 id="filter-sheet-title">Filters</h2>
-        <button type="button" class="sheet-close" (click)="closeSheets()" aria-label="Close filters">
+        <button
+          type="button"
+          class="sheet-close"
+          (click)="closeSheets()"
+          aria-label="Close filters"
+        >
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -303,9 +354,12 @@
         <ng-container [ngTemplateOutlet]="filterPanel" />
       </div>
       <div class="sheet-foot">
-        <button type="button" class="sheet-btn sheet-btn--ghost" (click)="clearAll()">Clear all</button>
+        <button type="button" class="sheet-btn sheet-btn--ghost" (click)="clearAll()">
+          Clear all
+        </button>
         <button type="button" class="sheet-btn sheet-btn--primary" (click)="closeSheets()">
-          Show {{ filteredProducts().length }} {{ filteredProducts().length === 1 ? 'product' : 'products' }}
+          Show {{ filteredProducts().length }}
+          {{ filteredProducts().length === 1 ? 'product' : 'products' }}
         </button>
       </div>
     </div>
@@ -317,7 +371,12 @@
       <div class="sheet-grip" aria-hidden="true"></div>
       <div class="sheet-head">
         <h2 id="sort-sheet-title">Sort by</h2>
-        <button type="button" class="sheet-close" (click)="closeSheets()" aria-label="Close sorting">
+        <button
+          type="button"
+          class="sheet-close"
+          (click)="closeSheets()"
+          aria-label="Close sorting"
+        >
           <mat-icon>close</mat-icon>
         </button>
       </div>

@@ -81,7 +81,9 @@
   border: 1px solid var(--ojas-border);
   background: #fff;
   // 16px, or iOS zooms the page when the box is focused.
-  font: 500 1rem 'Poppins', sans-serif;
+  font:
+    500 1rem 'Poppins',
+    sans-serif;
   color: var(--ojas-text);
   box-shadow: var(--ojas-shadow-sm);
   outline: none;
@@ -152,7 +154,9 @@
   border-radius: 999px;
   border: 1px solid var(--ojas-border);
   background: #fff;
-  font: 600 0.82rem 'Poppins', sans-serif;
+  font:
+    600 0.82rem 'Poppins',
+    sans-serif;
   color: var(--ojas-text-light);
   cursor: pointer;
   transition: all 0.3s var(--ojas-ease);
@@ -234,7 +238,9 @@
   border-radius: 12px;
   border: 1px solid var(--ojas-border);
   background: #fff;
-  font: 600 0.8rem 'Poppins', sans-serif;
+  font:
+    600 0.8rem 'Poppins',
+    sans-serif;
   color: var(--ojas-text);
   cursor: pointer;
 
@@ -276,7 +282,9 @@
     border-radius: 12px;
     border: 1px solid var(--ojas-border);
     background: #fff;
-    font: 600 0.84rem 'Poppins', sans-serif;
+    font:
+      600 0.84rem 'Poppins',
+      sans-serif;
     color: var(--ojas-text);
     cursor: pointer;
 
@@ -311,7 +319,9 @@
   border-radius: 999px;
   border: 1px solid rgba(242, 90, 26, 0.3);
   background: var(--ojas-orange-bg);
-  font: 600 0.78rem 'Poppins', sans-serif;
+  font:
+    600 0.78rem 'Poppins',
+    sans-serif;
   color: var(--ojas-orange-dark);
   animation: rise 0.3s var(--ojas-ease) both;
 
@@ -390,7 +400,9 @@
   border: none;
   border-radius: 10px;
   background: transparent;
-  font: 500 0.86rem 'Poppins', sans-serif;
+  font:
+    500 0.86rem 'Poppins',
+    sans-serif;
   color: var(--ojas-text);
   text-align: left;
   cursor: pointer;
@@ -489,7 +501,9 @@
   border-radius: 999px;
   border: 1px solid var(--ojas-border);
   background: #fff;
-  font: 600 0.8rem 'Poppins', sans-serif;
+  font:
+    600 0.8rem 'Poppins',
+    sans-serif;
   color: var(--ojas-text);
   cursor: pointer;
   transition: all 0.25s var(--ojas-ease);
@@ -521,7 +535,9 @@
   border: none;
   border-radius: 10px;
   background: transparent;
-  font: 500 0.86rem 'Poppins', sans-serif;
+  font:
+    500 0.86rem 'Poppins',
+    sans-serif;
   color: var(--ojas-text);
   cursor: pointer;
 
@@ -609,7 +625,9 @@
 
   h2 {
     margin: 0;
-    font: 700 1.05rem 'Poppins', sans-serif;
+    font:
+      700 1.05rem 'Poppins',
+      sans-serif;
     color: var(--ojas-text);
   }
 }
@@ -649,7 +667,9 @@
   flex: 1;
   min-height: 48px;
   border-radius: 14px;
-  font: 600 0.9rem 'Poppins', sans-serif;
+  font:
+    600 0.9rem 'Poppins',
+    sans-serif;
   cursor: pointer;
 
   &--ghost {
@@ -918,7 +938,9 @@
   overflow: hidden;
   white-space: nowrap;
   border-radius: 12px;
-  font: 600 0.76rem 'Poppins', sans-serif;
+  font:
+    600 0.76rem 'Poppins',
+    sans-serif;
   cursor: pointer;
   transition: all 0.25s var(--ojas-ease);
 
@@ -1000,7 +1022,9 @@
 
   h3 {
     margin: 0 0 6px;
-    font: 600 1.05rem 'Poppins', sans-serif;
+    font:
+      600 1.05rem 'Poppins',
+      sans-serif;
     color: var(--ojas-text);
     word-break: break-word;
   }
@@ -1039,7 +1063,9 @@
   border-radius: 14px;
   background: var(--ojas-ink);
   color: #fff;
-  font: 600 0.88rem 'Poppins', sans-serif;
+  font:
+    600 0.88rem 'Poppins',
+    sans-serif;
   cursor: pointer;
 
   mat-icon {
@@ -1302,14 +1328,18 @@
 
     h2 {
       margin: 0;
-      font: 700 1rem 'Poppins', sans-serif;
+      font:
+        700 1rem 'Poppins',
+        sans-serif;
       color: var(--ojas-text);
     }
 
     button {
       border: none;
       background: none;
-      font: 600 0.76rem 'Poppins', sans-serif;
+      font:
+        600 0.76rem 'Poppins',
+        sans-serif;
       color: var(--ojas-orange-dark);
       cursor: pointer;
     }

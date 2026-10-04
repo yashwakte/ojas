@@ -32,11 +32,48 @@ describe('Products', () => {
     updatedAt: '2026-01-01',
   };
   const bajra = base;
-  const modak: Product = { ...base, id: 'p2', name: 'Modak Pith', price: 65, category: 'Traditional & Festive', createdAt: '2026-03-01' };
-  const custard: Product = { ...base, id: 'p3', name: 'Custard Powder - Mango Flavour', price: 40, discount: 10, category: 'Baking & Desserts', weight: '100g' };
-  const rajgira: Product = { ...base, id: 'p4', name: 'Rajgira (Amaranth) Flour', price: 65, category: 'Upwas', weight: '200g', stockQuantity: 0 };
-  const sattu: Product = { ...base, id: 'p5', name: 'Chana Sattu', price: 55, category: 'Health & Nutrition', weight: '200 g', createdAt: '2026-05-01' };
-  const anarasa: Product = { ...base, id: 'p6', name: 'Anarasa Flour', price: 115, category: 'Traditional & Festive' };
+  const modak: Product = {
+    ...base,
+    id: 'p2',
+    name: 'Modak Pith',
+    price: 65,
+    category: 'Traditional & Festive',
+    createdAt: '2026-03-01',
+  };
+  const custard: Product = {
+    ...base,
+    id: 'p3',
+    name: 'Custard Powder - Mango Flavour',
+    price: 40,
+    discount: 10,
+    category: 'Baking & Desserts',
+    weight: '100g',
+  };
+  const rajgira: Product = {
+    ...base,
+    id: 'p4',
+    name: 'Rajgira (Amaranth) Flour',
+    price: 65,
+    category: 'Upwas',
+    weight: '200g',
+    stockQuantity: 0,
+  };
+  const sattu: Product = {
+    ...base,
+    id: 'p5',
+    name: 'Chana Sattu',
+    price: 55,
+    category: 'Health & Nutrition',
+    weight: '200 g',
+    createdAt: '2026-05-01',
+  };
+  const anarasa: Product = {
+    ...base,
+    id: 'p6',
+    name: 'Anarasa Flour',
+    price: 115,
+    category: 'Traditional & Festive',
+  };
   const catalogue = [bajra, modak, custard, rajgira, sattu, anarasa];
 
   let params$: BehaviorSubject<Params>;
@@ -137,7 +174,11 @@ describe('Products', () => {
 
       expect(page.selectedCategory()).toBe('All');
       expect(page.title()).toBe('2 categories');
-      expect(names(page.filteredProducts()).sort()).toEqual(['Anarasa Flour', 'Bajra Flour', 'Modak Pith']);
+      expect(names(page.filteredProducts()).sort()).toEqual([
+        'Anarasa Flour',
+        'Bajra Flour',
+        'Modak Pith',
+      ]);
       expect(page.activeFilterCount()).toBe(2);
       expect(page.isCategoryOn('Upwas')).toBeFalse();
       expect(page.isCategoryOn('All')).toBeFalse();
@@ -169,7 +210,10 @@ describe('Products', () => {
       page.selectCategory('Upwas');
       expect(router.navigate).toHaveBeenCalledWith(
         [],
-        jasmine.objectContaining({ queryParams: { category: 'Upwas' }, queryParamsHandling: 'merge' }),
+        jasmine.objectContaining({
+          queryParams: { category: 'Upwas' },
+          queryParamsHandling: 'merge',
+        }),
       );
 
       page.selectCategory('All');
@@ -309,11 +353,11 @@ describe('Products', () => {
 
     it('lists pack sizes smallest first', () => {
       configure();
-      expect(create().componentInstance.sizeOptions().map((s) => s.label)).toEqual([
-        '100 g',
-        '200 g',
-        '500 g',
-      ]);
+      expect(
+        create()
+          .componentInstance.sizeOptions()
+          .map((s) => s.label),
+      ).toEqual(['100 g', '200 g', '500 g']);
     });
 
     it("counts each price band without applying the price filter's own choice", () => {
@@ -328,7 +372,12 @@ describe('Products', () => {
       const page = create().componentInstance;
 
       expect(page.activeFilterCount()).toBe(4);
-      expect(page.activePills().map((p) => p.label)).toEqual(['Upwas', '200 g', '500 g', 'In stock']);
+      expect(page.activePills().map((p) => p.label)).toEqual([
+        'Upwas',
+        '200 g',
+        '500 g',
+        'In stock',
+      ]);
 
       page.removePill(page.activePills()[1]);
       expect(router.navigate).toHaveBeenCalledWith(
@@ -347,7 +396,14 @@ describe('Products', () => {
       expect(router.navigate).toHaveBeenCalledWith(
         [],
         jasmine.objectContaining({
-          queryParams: { category: null, q: null, price: null, size: null, stock: null, offer: null },
+          queryParams: {
+            category: null,
+            q: null,
+            price: null,
+            size: null,
+            stock: null,
+            offer: null,
+          },
         }),
       );
       expect(page.searchDraft()).toBe('');
