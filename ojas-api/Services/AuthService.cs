@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using OjasApi.Models;
 
@@ -465,21 +466,22 @@ public class AuthService
         if (user.LoginBlockedUntil is { } blockedUntil && blockedUntil > DateTime.UtcNow)
             return null;
 
-        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-        {
-            await RecordFailedLoginAsync(user);
+        // Counted before the password is checked, atomically, with the cooldown written in the
+        // same update - see ReserveLoginAttemptAsync. Null means the account went into cooldown
+        // between the read above and now.
+        if (await ReserveLoginAttemptAsync(user.Id!) == null)
             return null;
-        }
 
-        // Only written when there is something to clear, so an ordinary sign-in stays one read.
-        if (user.FailedLoginCount > 0 || user.LoginBlockedUntil != null)
-        {
-            await _db.Users.UpdateOneAsync(
-                u => u.Id == user.Id,
-                Builders<User>.Update
-                    .Set(u => u.FailedLoginCount, 0)
-                    .Set(u => u.LoginBlockedUntil, (DateTime?)null));
-        }
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            return null;
+
+        // The right password: the attempt just counted, and any cooldown it pessimistically set,
+        // are both cleared.
+        await _db.Users.UpdateOneAsync(
+            u => u.Id == user.Id,
+            Builders<User>.Update
+                .Set(u => u.FailedLoginCount, 0)
+                .Set(u => u.LoginBlockedUntil, (DateTime?)null));
 
         return user;
     }
@@ -498,25 +500,60 @@ public class AuthService
     private static readonly TimeSpan FirstLoginCooldown = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan MaxLoginCooldown = TimeSpan.FromMinutes(15);
 
-    private async Task RecordFailedLoginAsync(User user)
+    /// <summary>
+    /// Counts a login attempt before its password is checked, and refuses it if the account is
+    /// cooling down. One atomic update: the filter refuses a blocked account, the count goes up,
+    /// and - once it reaches the threshold - the cooldown is written there and then, doubling
+    /// from <see cref="FirstLoginCooldown"/> to <see cref="MaxLoginCooldown"/>. A correct
+    /// password clears both afterwards.
+    ///
+    /// Reading the count, checking the password and writing count + 1 afterwards (as this used
+    /// to) let a parallel burst of wrong passwords all read the same count, so the account was
+    /// never seen to pass one failure and a burst of any size was checked in full. Now the
+    /// sixth request of a burst finds the cooldown already written and is refused unchecked.
+    /// </summary>
+    private Task<User?> ReserveLoginAttemptAsync(string userId)
     {
-        var attempts = user.FailedLoginCount + 1;
+        var now = DateTime.UtcNow;
+        var filter = Builders<User>.Filter.And(
+            Builders<User>.Filter.Eq(u => u.Id, userId),
+            Builders<User>.Filter.Or(
+                Builders<User>.Filter.Eq(u => u.LoginBlockedUntil, null),
+                Builders<User>.Filter.Lte(u => u.LoginBlockedUntil, now)));
 
-        DateTime? blockedUntil = null;
-        if (attempts >= FailedLoginsBeforeCooldown)
+        var count = new BsonDocument("$add", new BsonArray { new BsonDocument("$ifNull", new BsonArray { "$failedLoginCount", 0 }), 1 });
+        // min(first * 2^min(count - threshold, 8), max), in milliseconds.
+        var cooldownMs = new BsonDocument("$min", new BsonArray
         {
-            // Doubling from the first cooldown, capped - and the exponent is capped too, so the
-            // arithmetic cannot overflow however long an attacker keeps going.
-            var doublings = Math.Min(attempts - FailedLoginsBeforeCooldown, 8);
-            var ticks = Math.Min(FirstLoginCooldown.Ticks << doublings, MaxLoginCooldown.Ticks);
-            blockedUntil = DateTime.UtcNow.Add(TimeSpan.FromTicks(ticks));
-        }
+            new BsonDocument("$multiply", new BsonArray
+            {
+                FirstLoginCooldown.TotalMilliseconds,
+                new BsonDocument("$pow", new BsonArray
+                {
+                    2,
+                    new BsonDocument("$min", new BsonArray
+                    {
+                        new BsonDocument("$subtract", new BsonArray { "$failedLoginCount", FailedLoginsBeforeCooldown }),
+                        8,
+                    }),
+                }),
+            }),
+            MaxLoginCooldown.TotalMilliseconds,
+        });
 
-        await _db.Users.UpdateOneAsync(
-            u => u.Id == user.Id,
-            Builders<User>.Update
-                .Set(u => u.FailedLoginCount, attempts)
-                .Set(u => u.LoginBlockedUntil, blockedUntil));
+        var pipeline = PipelineDefinition<User, User>.Create(
+            new BsonDocument("$set", new BsonDocument("failedLoginCount", count)),
+            new BsonDocument("$set", new BsonDocument("loginBlockedUntil", new BsonDocument("$cond", new BsonArray
+            {
+                new BsonDocument("$gte", new BsonArray { "$failedLoginCount", FailedLoginsBeforeCooldown }),
+                new BsonDocument("$add", new BsonArray { now, cooldownMs }),
+                BsonNull.Value,
+            }))));
+
+        return _db.Users.FindOneAndUpdateAsync(
+            filter,
+            Builders<User>.Update.Pipeline(pipeline),
+            new FindOneAndUpdateOptions<User> { ReturnDocument = ReturnDocument.After });
     }
 
     /// <summary>Binds the calling device to a staff account and issues a session on it. Because

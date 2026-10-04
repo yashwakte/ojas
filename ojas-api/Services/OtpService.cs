@@ -137,21 +137,29 @@ public class OtpService
             .SortByDescending(o => o.CreatedAt)
             .FirstOrDefaultAsync();
 
-        if (record == null || record.ExpiresAt < DateTime.UtcNow || record.Attempts >= MaxAttempts)
+        if (record == null)
             return false;
 
-        var isMatch = BCrypt.Net.BCrypt.Verify(code, record.CodeHash);
-        if (!isMatch)
-        {
-            await _db.OtpCodes.UpdateOneAsync(
+        // The attempt is counted BEFORE the code is checked, in one atomic update that also
+        // refuses an expired or exhausted code. Checking first and counting afterwards let a
+        // parallel burst of guesses all read the same stale count and all be checked.
+        var now = DateTime.UtcNow;
+        var reserved = await _db.OtpCodes.FindOneAndUpdateAsync(
+            Builders<OtpCode>.Filter.And(
                 Builders<OtpCode>.Filter.Eq(o => o.Id, record.Id),
-                Builders<OtpCode>.Update.Inc(o => o.Attempts, 1));
+                Builders<OtpCode>.Filter.Gt(o => o.ExpiresAt, now),
+                Builders<OtpCode>.Filter.Lt(o => o.Attempts, MaxAttempts)),
+            Builders<OtpCode>.Update.Inc(o => o.Attempts, 1));
+        if (reserved == null)
             return false;
-        }
 
-        // Consumed - delete so it can't be replayed.
-        await _db.OtpCodes.DeleteOneAsync(Builders<OtpCode>.Filter.Eq(o => o.Id, record.Id));
-        return true;
+        if (!BCrypt.Net.BCrypt.Verify(code, record.CodeHash))
+            return false;
+
+        // Consumed - and only the request that actually deletes it wins, so two parallel
+        // redemptions of the right code cannot both succeed.
+        var consumed = await _db.OtpCodes.DeleteOneAsync(Builders<OtpCode>.Filter.Eq(o => o.Id, record.Id));
+        return consumed.DeletedCount == 1;
     }
 
     private async Task StoreCodeAsync(string target, string channel, string code)

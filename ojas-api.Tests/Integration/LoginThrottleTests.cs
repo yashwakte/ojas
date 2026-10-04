@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using OjasApi.Models;
 using OjasApi.Tests.TestHelpers;
@@ -86,6 +87,33 @@ public class LoginThrottleTests : IDisposable
         var user = await ReadUserAsync(email);
         user.LoginBlockedUntil.ShouldNotBeNull();
         user.LoginBlockedUntil!.Value.ShouldBeGreaterThan(DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// A burst of guesses sent all at once must hit the cooldown just as a slow series does.
+    /// Counting used to happen after the password check on a stale read, so every request in a
+    /// burst saw the same count: twenty parallel wrong passwords left the account at one failure,
+    /// unblocked, with all twenty checked. Called on the service directly so the IP rate limiter
+    /// in front of the endpoint cannot be what stops the burst.
+    /// </summary>
+    [Fact]
+    public async Task AParallelBurstOfWrongPasswords_IsCountedAndStoppedAtTheThreshold()
+    {
+        var email = await RegisterAndSignOutAsync();
+
+        using var scope = _factory.Services.CreateScope();
+        var auth = scope.ServiceProvider.GetRequiredService<OjasApi.Services.AuthService>();
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 20).Select(_ => Task.Run(() => auth.FindByCredentialsAsync(email, WrongPassword))));
+        results.ShouldAllBe(u => u == null);
+
+        // Exactly five were let through to be checked; the rest found the cooldown already written.
+        var user = await ReadUserAsync(email);
+        user.FailedLoginCount.ShouldBe(5);
+        user.LoginBlockedUntil.ShouldNotBeNull();
+        user.LoginBlockedUntil!.Value.ShouldBeGreaterThan(DateTime.UtcNow);
+
+        (await auth.FindByCredentialsAsync(email, RealPassword)).ShouldBeNull();
     }
 
     /// <summary>

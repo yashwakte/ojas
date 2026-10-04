@@ -40,6 +40,16 @@ public class AuthControllerTests
         _staffDevicesMock
             .Setup(c => c.InsertOneAsync(It.IsAny<StaffDevice>(), null, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        // Login counts each attempt atomically before checking the password, and treats "no
+        // document matched" as "this account is cooling down". These tests are not about the
+        // cooldown, so the counted attempt always lands.
+        _usersMock.SetupRotationClaim(MakeUser());
+        // Likewise an emailed code reserves its attempt before it is checked, and only the
+        // request that deletes it may redeem it.
+        _otpCodesMock.SetupRotationClaim(new OtpCode { Target = "t", Channel = "c", CodeHash = "h" });
+        _otpCodesMock
+            .Setup(c => c.DeleteOneAsync(It.IsAny<FilterDefinition<OtpCode>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeleteResult.Acknowledged(1));
         _usersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")

@@ -29,6 +29,10 @@ public class AuthServiceTests
         // Mimics the real MongoDB driver's server-assigned ObjectId behaviour on insert, since
         // AuthService reads user.Id right back off the object immediately after InsertOneAsync
         // (e.g. to embed it in the JWT claims) and a bare Moq stub would leave it null.
+        // Login counts each attempt atomically before checking the password, and treats "no
+        // document matched" as "this account is cooling down". These tests are not about the
+        // cooldown, so the counted attempt always lands.
+        _usersMock.SetupRotationClaim(MakeUser());
         _usersMock
             .Setup(c => c.InsertOneAsync(It.IsAny<User>(), null, It.IsAny<CancellationToken>()))
             .Callback<User, InsertOneOptions?, CancellationToken>((user, _, _) => user.Id ??= "507f1f77bcf86cd799439099")
