@@ -56,7 +56,7 @@ public class DeliveryChargesAndCampaignBannerTests : IDisposable
         fetched!.WarehouseAddress.ShouldBe("Integration Warehouse");
 
         // 1 degree latitude north of the warehouse => distance = 6371*(pi/180) ~= 111.1949km
-        var calcResponse = await publicClient.GetAsync("/api/delivery-charges/calculate?latitude=19.0&longitude=73.0");
+        var calcResponse = await publicClient.PostAsJsonAsync("/api/delivery-charges/calculate", new DeliveryQuoteRequest(19.0, 73.0));
         calcResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         var calc = await calcResponse.Content.ReadFromJsonAsync<DeliveryChargeCalculationResponse>();
         calc!.IsFree.ShouldBeFalse();

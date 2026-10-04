@@ -81,3 +81,11 @@ public class DeliveryCharges
     [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>Where the customer wants delivery, for a pre-order estimate. Sent in a POST body so the
+/// pin never appears in a URL - see DeliveryChargesController.Calculate.</summary>
+public record DeliveryQuoteRequest(
+    [System.ComponentModel.DataAnnotations.Range(-90, 90)] double Latitude,
+    [System.ComponentModel.DataAnnotations.Range(-180, 180)] double Longitude,
+    [System.ComponentModel.DataAnnotations.MaxLength(10)] string? Pincode = null);
+

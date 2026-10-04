@@ -70,16 +70,14 @@ describe('DeliveryChargesService', () => {
     expect(service.error()).toBeNull();
   });
 
-  it('previewCharge gets /delivery-charges/calculate with lat/lng params', () => {
+  it('previewCharge posts the location in the body, never in the URL', () => {
     flushInitialLoad();
     let result: any;
-    service.previewCharge(18.5, 73.8).subscribe((res) => (result = res));
-    const req = httpMock.expectOne(
-      (r) =>
-        r.url === environment.apiUrl + '/delivery-charges/calculate' &&
-        r.params.get('latitude') === '18.5' &&
-        r.params.get('longitude') === '73.8',
-    );
+    service.previewCharge(18.5, 73.8, '411014').subscribe((res) => (result = res));
+    const req = httpMock.expectOne(environment.apiUrl + '/delivery-charges/calculate');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.urlWithParams).not.toContain('18.5');
+    expect(req.request.body).toEqual({ latitude: 18.5, longitude: 73.8, pincode: '411014' });
     req.flush({ distanceKm: 3, charge: 0, isFree: true, isServiceable: true, maxRadiusKm: 25 });
     expect(result).toEqual({
       distanceKm: 3,

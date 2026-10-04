@@ -94,10 +94,13 @@ export class DeliveryChargesService {
     longitude: number,
     pincode?: string | null,
   ): Observable<DeliveryChargeCalculation> {
-    const params: Record<string, string | number> = { latitude, longitude };
-    if (pincode) params['pincode'] = pincode;
-
-    return this.http.get<DeliveryChargeCalculation>(`${this.apiUrl}/calculate`, { params });
+    // In the body, never the query string: a URL lands in every access log on the way to the API,
+    // and the customer's exact pin is effectively their home address.
+    return this.http.post<DeliveryChargeCalculation>(`${this.apiUrl}/calculate`, {
+      latitude,
+      longitude,
+      pincode: pincode || null,
+    });
   }
 
   /** The six-digit pincode stated in a free-text address; mirrors the server's own reading of it,

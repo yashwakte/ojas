@@ -50,12 +50,25 @@ public class DeliveryChargesController : ControllerBase
 
     /// <summary>The estimate shown before an order is placed. Takes the pincode as well as the
     /// pin so the preview matches what the order will actually be charged - the two are computed
-    /// by the same method, and once pincodes are configured only the pincode counts.</summary>
+    /// by the same method, and once pincodes are configured only the pincode counts.
+    ///
+    /// A POST with the location in the body, not a GET with it in the address: a URL is written
+    /// verbatim into every access log between the browser and here (Vercel's, Render's), and a
+    /// customer's exact pin is effectively their home address.</summary>
+    [HttpPost("calculate")]
+    public Task<ActionResult<DeliveryChargeCalculationResponse>> Calculate([FromBody] DeliveryQuoteRequest request) =>
+        QuoteAsync(request.Latitude, request.Longitude, request.Pincode);
+
+    /// <summary>The old shape, kept only so a browser still running the previous build keeps
+    /// working through a deploy. Nothing current calls it; remove it once that build is gone.</summary>
     [HttpGet("calculate")]
-    public async Task<ActionResult<DeliveryChargeCalculationResponse>> Calculate(
+    public Task<ActionResult<DeliveryChargeCalculationResponse>> CalculateFromQuery(
         [FromQuery] double latitude,
         [FromQuery] double longitude,
-        [FromQuery] string? pincode = null)
+        [FromQuery] string? pincode = null) =>
+        QuoteAsync(latitude, longitude, pincode);
+
+    private async Task<ActionResult<DeliveryChargeCalculationResponse>> QuoteAsync(double latitude, double longitude, string? pincode)
     {
         var quote = await _deliveryChargesService.CalculateDeliveryChargeAsync(latitude, longitude, pincode);
         return Ok(new DeliveryChargeCalculationResponse(

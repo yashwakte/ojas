@@ -71,7 +71,7 @@ public class DeliveryChargesControllerTests
     {
         _chargesMock.SetupFind(new List<DeliveryCharges> { MakeConfig() });
 
-        var result = await _sut.Calculate(19.0, 73.0);
+        var result = await _sut.Calculate(new DeliveryQuoteRequest(19.0, 73.0));
 
         var okResult = result.Result.ShouldBeOfType<OkObjectResult>();
         var response = okResult.Value.ShouldBeOfType<DeliveryChargeCalculationResponse>();
