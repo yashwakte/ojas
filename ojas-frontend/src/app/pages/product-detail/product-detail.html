@@ -438,6 +438,7 @@
           [imageUrl]="p.imageUrl || null"
           [returnUrl]="'/products/' + (p.slug || p.id)"
           (summaryChange)="reviewSummary.set($event)"
+          (topChange)="topReviews.set($event)"
         />
       }
 

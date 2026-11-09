@@ -1,12 +1,13 @@
 import {
   Product,
+  ProductReview,
   deliveryDaysLabel,
   effectivePrice,
   isPurchasable,
 } from '../models/interfaces';
 import { BRAND_NAME } from './business';
 import { ProductCategory, isProductCategory } from './product-categories';
-import { ORGANIZATION_ID, PageSeo, SITE_URL, absoluteUrl } from './seo';
+import { MERCHANT_RETURN_POLICY, ORGANIZATION_ID, PageSeo, SITE_URL, absoluteUrl } from './seo';
 
 /**
  * What a product or aisle page tells search engines.
@@ -85,6 +86,26 @@ export function categoryPath(category: string): string {
   return `/products?category=${encodeURIComponent(category)}`;
 }
 
+/** The most reviews a product's structured data names. Google reads a handful; the rest add bytes. */
+const MAX_JSON_LD_REVIEWS = 5;
+
+/** A published review as structured data. Only reviews shown on the page itself may be marked up. */
+function reviewJsonLd(review: ProductReview): Record<string, unknown> {
+  const comment = review.comment?.trim();
+  return {
+    '@type': 'Review',
+    author: { '@type': 'Person', name: review.authorName },
+    datePublished: review.createdAt.slice(0, 10),
+    ...(comment ? { reviewBody: comment } : {}),
+    reviewRating: {
+      '@type': 'Rating',
+      ratingValue: review.rating,
+      bestRating: 5,
+      worstRating: 1,
+    },
+  };
+}
+
 /**
  * The product and its breadcrumb, as Google's merchant listings read them.
  *
@@ -92,11 +113,15 @@ export function categoryPath(category: string): string {
  * result shows is what the checkout charges. Shipping is deliberately absent: delivery here is
  * priced by distance within 25 km of Sangvi, and Google can only describe an Indian delivery area
  * by country and state — it would tell a shopper in Mumbai we deliver to them. The return policy
- * is declared once for the whole shop, on the organisation block in index.html.
+ * rides on every offer as well as on the organisation block in index.html.
+ *
+ * `reviews` are the product's top reviews — the ones its page shows above the fold of the reviews
+ * block — never hidden ones.
  */
 export function productJsonLd(
   product: Product,
   rating?: { average: number; count: number } | null,
+  reviews: readonly ProductReview[] = [],
 ): Record<string, unknown>[] {
   const url = SITE_URL + productPath(product);
   const local = localNameFor(product.name);
@@ -104,6 +129,7 @@ export function productJsonLd(
   const images = [product.imageUrl, ...(product.galleryImageUrls ?? [])]
     .filter((src) => !!src && !src.startsWith('data:'))
     .map(absoluteUrl);
+  const published = reviews.filter((r) => !r.isHidden).slice(0, MAX_JSON_LD_REVIEWS);
 
   const productBlock: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -128,6 +154,7 @@ export function productJsonLd(
         : 'https://schema.org/OutOfStock',
       itemCondition: 'https://schema.org/NewCondition',
       seller: { '@id': ORGANIZATION_ID },
+      hasMerchantReturnPolicy: MERCHANT_RETURN_POLICY,
     },
     // Star ratings in search results. Only once a real review exists: the reviews are verified
     // purchases shown on this same page, which is what Google requires of a rating it displays.
@@ -142,6 +169,7 @@ export function productJsonLd(
           },
         }
       : {}),
+    ...(published.length ? { review: published.map(reviewJsonLd) } : {}),
   };
 
   // Mirrors the breadcrumb drawn at the top of the product page: Home › Products › aisle › product.
@@ -175,6 +203,7 @@ export const PRODUCT_NOT_FOUND_SEO: PageSeo = {
 export function productPageSeo(
   product: Product,
   rating?: { average: number; count: number } | null,
+  reviews: readonly ProductReview[] = [],
 ): PageSeo {
   const image = product.imageUrl && !product.imageUrl.startsWith('data:')
     ? absoluteUrl(product.imageUrl)
@@ -185,7 +214,7 @@ export function productPageSeo(
     canonicalPath: productPath(product),
     image,
     type: 'product',
-    jsonLd: productJsonLd(product, rating),
+    jsonLd: productJsonLd(product, rating, reviews),
   };
 }
 

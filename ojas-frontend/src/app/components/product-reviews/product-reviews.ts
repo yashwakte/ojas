@@ -49,6 +49,9 @@ export class ProductReviews {
 
   /** The summary, once loaded, so the page can show it beside the price. */
   readonly summaryChange = output<ReviewSummary>();
+  /** The top reviews this block shows, so the page can name them in its structured data — Google
+   * only accepts review markup for reviews that are visible on the page. */
+  readonly topChange = output<ProductReview[]>();
 
   protected readonly summary = signal<ReviewSummary | null>(null);
   /** The product's best reviews, always shown. */
@@ -116,6 +119,14 @@ export class ProductReviews {
     effect(() => {
       const id = this.productId();
       untracked(() => this.load(id));
+    });
+
+    // Every change to the top reviews — the first load, a new review joining them, an edit, a
+    // removal — reaches the page from this one place, so its structured data never names a
+    // review the block no longer shows.
+    effect(() => {
+      const top = this.top();
+      untracked(() => this.topChange.emit(top));
     });
 
     // The customer's own reviews decide whether "Write a review" or "Your review" is shown.

@@ -1,4 +1,4 @@
-import { Product } from '../models/interfaces';
+import { Product, ProductReview } from '../models/interfaces';
 import {
   formatWeight,
   productJsonLd,
@@ -136,6 +136,71 @@ describe('product SEO', () => {
 
     it('has no shipping claim — Google cannot describe a Pune-only delivery area', () => {
       expect(JSON.stringify(productBlock)).not.toContain('shippingDetails');
+    });
+
+    it('carries the returns policy on the offer: three days, unopened packs collected free', () => {
+      expect(productBlock['offers'].hasMerchantReturnPolicy).toEqual(
+        jasmine.objectContaining({
+          '@type': 'MerchantReturnPolicy',
+          applicableCountry: 'IN',
+          merchantReturnDays: 3,
+          returnFees: 'https://schema.org/FreeReturn',
+          merchantReturnLink: `${SITE_URL}/refunds`,
+        }),
+      );
+    });
+
+    describe('reviews', () => {
+      const review = (overrides: Partial<ProductReview> = {}): ProductReview => ({
+        id: 'r1',
+        productId: '69db536f167fde4aa39e8807',
+        productName: 'Modak Pith',
+        authorName: 'Priya S.',
+        rating: 5,
+        comment: 'Soft modak every time.',
+        createdAt: '2026-09-23T19:19:07.898Z',
+        updatedAt: null,
+        ...overrides,
+      });
+
+      it('names no review when the page shows none', () => {
+        expect(productBlock['review']).toBeUndefined();
+      });
+
+      it('marks up the reviews the page shows, each with its author, date, words and stars', () => {
+        const [block] = productJsonLd(product(), { average: 5, count: 1 }, [review()]) as Block[];
+
+        expect(block['review']).toEqual([
+          {
+            '@type': 'Review',
+            author: { '@type': 'Person', name: 'Priya S.' },
+            datePublished: '2026-09-23',
+            reviewBody: 'Soft modak every time.',
+            reviewRating: { '@type': 'Rating', ratingValue: 5, bestRating: 5, worstRating: 1 },
+          },
+        ]);
+      });
+
+      it('never marks up a hidden review, and leaves out an empty comment', () => {
+        const [block] = productJsonLd(product(), null, [
+          review({ id: 'hidden', isHidden: true }),
+          review({ id: 'stars-only', comment: '  ' }),
+        ]) as Block[];
+
+        expect(block['review'].length).toBe(1);
+        expect(block['review'][0].reviewBody).toBeUndefined();
+      });
+
+      it('names at most five', () => {
+        const many = Array.from({ length: 8 }, (_, i) => review({ id: `r${i}` }));
+        const [block] = productJsonLd(product(), null, many) as Block[];
+        expect(block['review'].length).toBe(5);
+      });
+
+      it('reaches the page SEO too', () => {
+        const seo = productPageSeo(product(), { average: 4, count: 1 }, [review({ rating: 4 })]);
+        expect((seo.jsonLd![0] as Block)['review'][0].reviewRating.ratingValue).toBe(4);
+      });
     });
   });
 

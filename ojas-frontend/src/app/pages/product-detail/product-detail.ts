@@ -40,7 +40,7 @@ import { SeoService } from '../../services/seo.service';
 import { ProductReviews } from '../../components/product-reviews/product-reviews';
 import { StarRating } from '../../components/star-rating/star-rating';
 import { CartStepper } from '../../components/cart-stepper/cart-stepper';
-import { ReviewSummary } from '../../models/interfaces';
+import { ProductReview, ReviewSummary } from '../../models/interfaces';
 
 /** How many products the "You May Also Like" rail carries at most. Enough that the rail is worth
  * scrolling on a wide screen and still a bounded number of images to fetch. */
@@ -125,6 +125,8 @@ export class ProductDetail {
   /** The reviews block's summary, reported up so the rating can sit under the product name and
    * go into the page's structured data. Null until the reviews have loaded. */
   readonly reviewSummary = signal<ReviewSummary | null>(null);
+  /** The reviews block's top reviews, for the page's structured data. Empty until loaded. */
+  readonly topReviews = signal<ProductReview[]>([]);
   private readonly shownProductId = computed(() => this.product()?.id ?? null);
 
   /** Jumps to the reviews block from the rating under the name. */
@@ -239,7 +241,10 @@ export class ProductDetail {
     // does not wipe a rating that will not be sent again.
     effect(() => {
       this.shownProductId();
-      untracked(() => this.reviewSummary.set(null));
+      untracked(() => {
+        this.reviewSummary.set(null);
+        this.topReviews.set([]);
+      });
     });
 
     // What search engines and link previews are told about this page — and, for a link that
@@ -254,7 +259,7 @@ export class ProductDetail {
           void this.router.navigate(['/products', p.slug], { replaceUrl: true });
           return;
         }
-        this.seo.apply(productPageSeo(p, this.reviewSummary()));
+        this.seo.apply(productPageSeo(p, this.reviewSummary(), this.topReviews()));
       } else if (!this.resolving()) {
         this.seo.apply(PRODUCT_NOT_FOUND_SEO);
       }

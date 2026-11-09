@@ -1,3 +1,4 @@
+import { RETURN_WINDOW_DAYS } from './business';
 import { COUPONS, FREE_DELIVERY_CART_THRESHOLD } from './pricing';
 
 /**
@@ -23,6 +24,22 @@ export const SHARE_IMAGE_HEIGHT = 640;
 
 /** Matches the @id of the OnlineStore block in index.html, so product markup can name its seller. */
 export const ORGANIZATION_ID = `${SITE_URL}/#organization`;
+
+/**
+ * The returns policy as Google's merchant listings read it: three days from delivery, unopened
+ * packs, collected free. The same block sits on the organisation in index.html; Search Console
+ * still reported "Missing field 'hasMerchantReturnPolicy' (in 'offers')" with only that one, so
+ * every product's offer carries it too. KEEP IN STEP WITH index.html and the Refunds page.
+ */
+export const MERCHANT_RETURN_POLICY: Readonly<Record<string, unknown>> = {
+  '@type': 'MerchantReturnPolicy',
+  applicableCountry: 'IN',
+  returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+  merchantReturnDays: RETURN_WINDOW_DAYS,
+  returnMethod: 'https://schema.org/ReturnByMail',
+  returnFees: 'https://schema.org/FreeReturn',
+  merchantReturnLink: `${SITE_URL}/refunds`,
+};
 
 export interface PageSeo {
   title: string;
