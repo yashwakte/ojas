@@ -5,7 +5,18 @@ on:
     branches: [main]
     paths:
       - "ojas-frontend/**"
+  # Once a day the site is rebuilt from the live catalogue, because the build writes each product's
+  # page as finished HTML for search engines (tools/prerender.mjs): a product listed, renamed or
+  # repriced in the admin console reaches those pages on the next build. Customers never wait on
+  # this - the app always shows the live catalogue. 00:30 UTC = 06:00 IST.
+  schedule:
+    - cron: "30 0 * * *"
   workflow_dispatch:
+
+# A scheduled rebuild and a push landing together must not race each other to production.
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
 
 jobs:
   test-and-deploy:
