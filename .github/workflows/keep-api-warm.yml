@@ -1,0 +1,46 @@
+name: Keep the API awake
+
+# The API runs on Render's free plan, which shuts an instance down after 15 idle minutes and takes
+# up to a minute to start it again on the next request. On a shop with a few visitors a day that
+# means most visitors arrive to a sleeping API: the products, the cart and checkout all wait on
+# that cold start, and many people leave before it ends. Measured 2026-11-06: 24.7 seconds for the
+# first /api/products after an idle spell, under half a second once awake.
+#
+# A request every five minutes keeps the instance up during the hours customers shop. Overnight
+# it is allowed to sleep, deliberately: Render's free plan gives a workspace 750 instance-hours a
+# month across ALL its free services, and an instance kept up around the clock uses ~744 of them
+# on its own - one more free service in the workspace and every one of them would be suspended
+# until the month ends. 06:30-23:40 IST is ~17 hours a day, ~530 a month.
+#
+# This is a stopgap. The real fix is a paid, always-on instance (Render Starter, or the Azure plan
+# proposed in September 2026), after which this workflow should be deleted. GitHub may delay
+# scheduled runs when it is busy, so an occasional cold start can still slip through.
+#
+# Free for this repository: Actions minutes are not billed on public repositories.
+
+on:
+  schedule:
+    # Every 5 minutes, 01:00-17:55 UTC = 06:30-23:25 IST (the last ping keeps it up until ~23:40).
+    - cron: "*/5 1-17 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keep-api-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      # /health checks the database too, so a run that fails here is a real outage worth seeing
+      # in the Actions tab. A cold start answers within the 120 s allowed.
+      - name: Ping the API health check
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 https://ojas-api-kl2q.onrender.com/health) || code=000
+            echo "attempt $attempt: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          exit 1
