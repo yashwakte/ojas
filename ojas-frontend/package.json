@@ -5,6 +5,8 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:prod": "ng build --configuration production && node tools/prerender.mjs",
+    "prerender": "node tools/prerender.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "images:optimize": "node tools/optimize-images.mjs",

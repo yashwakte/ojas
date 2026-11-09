@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build -- --configuration production",
+  "buildCommand": "npm run build:prod",
   "outputDirectory": "dist/ojas-frontend/browser",
   "framework": null,
   "headers": [
@@ -28,6 +28,13 @@
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "https://ojas-api-kl2q.onrender.com/api/seo/sitemap.xml" },
     { "source": "/api/(.*)", "destination": "https://ojas-api-kl2q.onrender.com/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/products", "has": [{ "type": "query", "key": "category", "value": "^Everyday(?: |\\+|%20)Flours$" }], "destination": "/_pages/category-everyday-flours.html" },
+    { "source": "/products", "has": [{ "type": "query", "key": "category", "value": "^Traditional(?: |\\+|%20)(?:&|%26)(?: |\\+|%20)Festive$" }], "destination": "/_pages/category-traditional-and-festive.html" },
+    { "source": "/products", "has": [{ "type": "query", "key": "category", "value": "^Upwas$" }], "destination": "/_pages/category-upwas.html" },
+    { "source": "/products", "has": [{ "type": "query", "key": "category", "value": "^Health(?: |\\+|%20)(?:&|%26)(?: |\\+|%20)Nutrition$" }], "destination": "/_pages/category-health-and-nutrition.html" },
+    { "source": "/products", "has": [{ "type": "query", "key": "category", "value": "^Baking(?: |\\+|%20)(?:&|%26)(?: |\\+|%20)Desserts$" }], "destination": "/_pages/category-baking-and-desserts.html" },
+    { "source": "/products", "has": [{ "type": "query", "key": "category", "value": "^Spices(?: |\\+|%20)(?:&|%26)(?: |\\+|%20)Essentials$" }], "destination": "/_pages/category-spices-and-essentials.html" },
+    { "source": "/products", "destination": "/_pages/products.html" },
+    { "source": "/(.*)", "destination": "/app-shell.html" }
   ]
 }

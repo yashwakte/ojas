@@ -5,8 +5,10 @@
     <!-- The home page's title and description, and what every page carries until the app has
          started. KEEP IN STEP WITH HOME_SEO in src/app/constants/seo.ts, which SeoService applies
          once it runs. A link previewer (WhatsApp, Instagram) never runs it, so for a shared link
-         these lines ARE the preview. There is deliberately no canonical tag here: this file is
-         served for every address, and SeoService sets the right one per page. -->
+         these lines ARE the preview. There is deliberately no canonical tag here: as built, this
+         file is the fallback served for every address (app-shell.html). tools/prerender.mjs
+         writes a copy per public page with that page's own title, description, canonical and
+         structured data, and SeoService keeps them right as the customer navigates. -->
     <title>Ojas Aata – Stone-Ground Atta, Modak Peeth &amp; Upwas Flours in Pune</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -155,11 +157,41 @@
         font-weight: 700;
         margin-bottom: 8px;
       }
-      .boot-shell h1 {
+      /* A paragraph styled as a heading, not an h1: every prerendered page carries its own h1 in
+         app-root, and a second one in this fallback would give each page two main headings. */
+      .boot-shell .boot-heading {
         font-size: 1.4rem;
+        font-weight: 700;
       }
       .boot-shell a {
         color: #b3541e;
+      }
+      /* The page as tools/prerender.mjs writes it into app-root, for crawlers. A customer never
+         sees it: the arrival screen covers the window until the app has drawn the page, and
+         Angular empties app-root as it starts. These rules are for a reader with JavaScript off. */
+      .prerendered {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+        font-family: 'Poppins', 'Roboto', system-ui, sans-serif;
+        color: #3a2f28;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+      }
+      .prerendered nav ul,
+      .prerendered nav ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        padding: 0;
+        list-style: none;
+      }
+      .prerendered a {
+        color: #b3541e;
+      }
+      .prerendered footer {
+        margin-top: 40px;
+        font-size: 0.9rem;
       }
       /* THE ARRIVAL - the one screen a visitor sees before the shop, in the manner of
          zerotoone.ai (the owner's pick, September 2026): a dark ground, the Ojas mark, and a single
@@ -280,9 +312,12 @@
       <span class="arrival-line"></span>
     </div>
 
-    <!-- No text inside app-root. An earlier version put the business description here, where it
-         rendered as a wall of unstyled text for the moments before Angular booted - a poor first
-         impression on every single visit.
+    <!-- No text inside app-root in this file. An earlier version put the business description
+         here, where it rendered as a wall of unstyled text for the moments before Angular booted -
+         a poor first impression on every single visit. (That was before the arrival screen above
+         existed. tools/prerender.mjs now writes each public page's content in here at build time;
+         the arrival screen covers it until the app has drawn the page, so a customer never sees
+         it, and this file as built stays empty because it is the fallback for every address.)
 
          The noscript block below carries that text without that cost. Its content is present in
          the HTML as served, so anything that does not execute JavaScript still reads it -
@@ -296,7 +331,7 @@
     <noscript>
       <div class="boot-shell">
         <span class="boot-logo">ओजस्</span>
-        <h1>Ojas — pure flours and traditional food products</h1>
+        <p class="boot-heading">Ojas — pure flours and traditional food products</p>
         <p>
           Ojas is an online shop selling stone-ground atta, millet flours, besan, daliya and
           custard powders, milled and packed in Pune. Ojas is a brand owned and operated by Asha
