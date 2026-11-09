@@ -11,6 +11,15 @@ import {
   SUPPORT_PHONE,
   SUPPORT_PHONE_HREF,
 } from '../../constants/business';
+import {
+  ABOUT_COMPANY_INTRO,
+  ABOUT_MILESTONES,
+  ABOUT_STATS,
+  ABOUT_STORY,
+  ABOUT_STORY_HEADING,
+  ABOUT_TAGLINE,
+  ABOUT_VALUES,
+} from './about-content';
 
 @Component({
   selector: 'app-about',
@@ -27,56 +36,11 @@ export class About {
   readonly instagramHandle = INSTAGRAM_HANDLE;
   readonly instagramUrl = INSTAGRAM_URL;
 
-  readonly values = [
-    {
-      icon: 'agriculture',
-      title: 'Farmers at the Root',
-      desc: 'We come from a farming family, so we buy grain the way a farmer would — by looking at it, not at a spec sheet.',
-    },
-    {
-      icon: 'eco',
-      title: 'Traditional Process',
-      desc: 'Every grain is stone-ground on a chakki, the way our grandmothers did it, to protect flavour and nutrition.',
-    },
-    {
-      icon: 'storefront',
-      title: 'Trusted on the Shelf',
-      desc: 'Over 1,200 retail outlets stock Ojas. Shopkeepers reorder what their customers come back for, and they have kept coming back.',
-    },
-    {
-      icon: 'verified',
-      title: 'Purity First',
-      desc: 'No additives, no preservatives, no shortcuts — just grains the way nature made them.',
-    },
-  ];
-
-  readonly milestones = [
-    {
-      year: 'Roots',
-      title: 'A Farming Family',
-      desc: 'Ojas begins where the grain does. Our family farmed it long before we ever packed it, and that is still how we judge what goes into a pack.',
-    },
-    {
-      year: 'Day 1',
-      title: 'One Small Outlet',
-      desc: 'We opened a single small outlet in Pune, grinding fresh flour on a stone chakki for the families in the lane.',
-    },
-    {
-      year: '1,200+',
-      title: 'Across the Shelves',
-      desc: 'A decade on, Ojas is stocked in more than 1,200 retail outlets, with a range that has grown past 50 products.',
-    },
-    {
-      year: 'Next',
-      title: 'Ojas Everywhere',
-      desc: 'Growing fast in Pune, and building towards a simple vision — Ojas on kitchen shelves all over the world.',
-    },
-  ];
-
-  readonly stats = [
-    { value: '10+', label: 'Years of Trust' },
-    { value: '50+', label: 'Pure Products' },
-    { value: '1,200+', label: 'Retail Outlets' },
-    { value: '100%', label: 'Natural Ingredients' },
-  ];
+  readonly tagline = ABOUT_TAGLINE;
+  readonly storyHeading = ABOUT_STORY_HEADING;
+  readonly story = ABOUT_STORY;
+  readonly companyIntro = ABOUT_COMPANY_INTRO;
+  readonly values = ABOUT_VALUES;
+  readonly milestones = ABOUT_MILESTONES;
+  readonly stats = ABOUT_STATS;
 }
